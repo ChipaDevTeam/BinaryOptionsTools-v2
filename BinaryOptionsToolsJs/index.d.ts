@@ -274,7 +274,7 @@ export declare class PocketOption {
    *
    * # Examples
    * ```javascript
-   * const candles = await client.getCandles("EUR/USD", 60, 0);
+   * const candles = await client.getCandles("EUR/USD", 60, 6000);
    * const data = JSON.parse(candles);
    * console.log(`Retrieved ${data.length} candles`);
    * ```
