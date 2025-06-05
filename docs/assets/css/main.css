@@ -2248,7 +2248,7 @@ body {
 }
 
 .tab-content {
-  display: none;
+  display: block; /* Show by default for examples page */
 }
 
 .tab-content.active {
@@ -2259,6 +2259,7 @@ body {
 .code-block {
   position: relative;
   margin: 0;
+  display: block; /* Ensure code blocks are always visible */
 }
 
 .code-header {
@@ -2305,11 +2306,13 @@ body {
   font-family: 'Fira Code', monospace;
   font-size: 0.9rem;
   line-height: 1.6;
+  display: block; /* Ensure pre elements are visible */
 }
 
 .code-block code {
   color: var(--text-primary);
   background: none;
+  display: block; /* Ensure code elements are visible */
 }
 
 /* SSID Tutorial Styles */

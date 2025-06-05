@@ -274,18 +274,20 @@ style.textContent = `
             transform: translateY(0);
         }
     }
-    
-    .copy-btn.copied {
+      .copy-btn.copied {
         background: var(--accent-color) !important;
         color: white !important;
     }
-    
-    .tab-content {
-        display: none;
-    }
-    
-    .tab-content.active {
-        display: block;
-    }
 `;
 document.head.appendChild(style);
+
+    // Initialize first tab content as visible in each example block
+    const exampleBlocks = document.querySelectorAll('.example-block');
+    exampleBlocks.forEach(block => {
+        const firstTabContent = block.querySelector('.tab-content');
+        if (firstTabContent && !firstTabContent.classList.contains('active')) {
+            firstTabContent.classList.add('active');
+        }
+    });
+
+});
