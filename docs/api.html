@@ -27,11 +27,10 @@
 <body>
     <!-- Navigation -->
     <nav class="navbar">
-        <div class="nav-container">
-            <div class="nav-brand">
-                <a href="index.html" class="logo">
-                    <i class="fas fa-chart-line"></i>
-                    BinaryOptionsToolsV2
+        <div class="nav-container">            <div class="nav-brand">
+                <a href="index.html" class="nav-brand">
+                    <img src="assets/images/logo.svg" alt="BinaryOptionsTools V2" class="logo">
+                    <span class="brand-text">BinaryOptionsToolsV2</span>
                 </a>
             </div>
             
@@ -110,9 +109,7 @@
                 </div>
             </div>
         </div>
-    </header>
-
-    <!-- Main Content -->
+    </header>    <!-- Main Content -->
     <main class="api-content">
         <div class="container">
             <div class="api-layout">
@@ -126,790 +123,712 @@
                         
                         <nav class="api-nav">
                             <div class="nav-section">
-                                <h3>Core API</h3>
+                                <h3><i class="fas fa-plug"></i> Authentication</h3>
                                 <ul>
-                                    <li><a href="#connection">Connection & Auth</a></li>
-                                    <li><a href="#trading">Trading Methods</a></li>
-                                    <li><a href="#account">Account Management</a></li>
-                                    <li><a href="#market-data">Market Data</a></li>
+                                    <li><a href="#auth-connect" class="api-method post">POST Connect</a></li>
+                                    <li><a href="#auth-disconnect" class="api-method delete">DELETE Disconnect</a></li>
+                                    <li><a href="#auth-status" class="api-method get">GET Auth Status</a></li>
                                 </ul>
                             </div>
                             
                             <div class="nav-section">
-                                <h3>Analysis Tools</h3>
+                                <h3><i class="fas fa-chart-line"></i> Trading</h3>
                                 <ul>
-                                    <li><a href="#indicators">Technical Indicators</a></li>
-                                    <li><a href="#signals">Signal Generation</a></li>
-                                    <li><a href="#backtesting">Backtesting</a></li>
+                                    <li><a href="#trade-place" class="api-method post">POST Place Trade</a></li>
+                                    <li><a href="#trade-close" class="api-method put">PUT Close Trade</a></li>
+                                    <li><a href="#trade-result" class="api-method get">GET Trade Result</a></li>
+                                    <li><a href="#trade-history" class="api-method get">GET Trade History</a></li>
                                 </ul>
                             </div>
                             
                             <div class="nav-section">
-                                <h3>Utilities</h3>
+                                <h3><i class="fas fa-user-circle"></i> Account</h3>
                                 <ul>
-                                    <li><a href="#helpers">Helper Functions</a></li>
-                                    <li><a href="#events">Event System</a></li>
-                                    <li><a href="#logging">Logging & Debug</a></li>
+                                    <li><a href="#account-balance" class="api-method get">GET Balance</a></li>
+                                    <li><a href="#account-profile" class="api-method get">GET Profile</a></li>
+                                    <li><a href="#account-settings" class="api-method put">PUT Settings</a></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="nav-section">
+                                <h3><i class="fas fa-chart-bar"></i> Market Data</h3>
+                                <ul>
+                                    <li><a href="#market-candles" class="api-method get">GET Candles</a></li>
+                                    <li><a href="#market-price" class="api-method get">GET Current Price</a></li>
+                                    <li><a href="#market-assets" class="api-method get">GET Assets</a></li>
+                                    <li><a href="#market-stream" class="api-method websocket">WS Price Stream</a></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="nav-section">
+                                <h3><i class="fas fa-chart-area"></i> Indicators</h3>
+                                <ul>
+                                    <li><a href="#indicator-sma" class="api-method get">GET SMA</a></li>
+                                    <li><a href="#indicator-rsi" class="api-method get">GET RSI</a></li>
+                                    <li><a href="#indicator-macd" class="api-method get">GET MACD</a></li>
+                                    <li><a href="#indicator-bollinger" class="api-method get">GET Bollinger Bands</a></li>
                                 </ul>
                             </div>
                         </nav>
                     </div>
-                </aside>
-
-                <!-- API Documentation -->
+                </aside>                <!-- API Documentation -->
                 <div class="api-main">
-                    <!-- Python API -->
+                    <!-- Authentication Endpoints -->
                     <div class="api-section" data-tab-content="python">
-                        <!-- Connection & Authentication -->
-                        <section id="connection" class="method-group fade-in-up">
-                            <h2><i class="fas fa-plug"></i> Connection & Authentication</h2>
-                            
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>connect()</h3>
-                                    <span class="method-type">async</span>
+                        <!-- Connect Endpoint -->
+                        <div id="auth-connect" class="endpoint-card fade-in-up">
+                            <div class="endpoint-header">
+                                <div class="endpoint-title">
+                                    <span class="method-badge post">POST</span>
+                                    <h3>Connect to Broker</h3>
                                 </div>
-                                <p class="method-description">
-                                    Establishes connection to the binary options broker.
+                                <p class="endpoint-description">
+                                    Establishes a secure connection to the binary options broker platform.
                                 </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-python">async def connect(
-    username: str,
-    password: str,
-    demo: bool = True,
-    timeout: int = 30
-) -> bool:
-    """
-    Connect to the binary options platform.
-    
-    Args:
-        username (str): Account username
-        password (str): Account password  
-        demo (bool): Use demo account (default: True)
-        timeout (int): Connection timeout in seconds
-        
-    Returns:
-        bool: True if connection successful
-        
-    Raises:
-        ConnectionError: If connection fails
-        AuthenticationError: If credentials invalid
-    """</code></pre>
+                            </div>
+                            
+                            <div class="endpoint-details">
+                                <div class="detail-tabs">
+                                    <button class="detail-tab active" data-detail="params">Parameters</button>
+                                    <button class="detail-tab" data-detail="response">Response</button>
+                                    <button class="detail-tab" data-detail="example">Example</button>
                                 </div>
                                 
-                                <div class="method-example">
-                                    <h4>Example:</h4>
-                                    <pre><code class="language-python">from binary_options_tools import BinaryOptionsAPI
+                                <div class="detail-content">
+                                    <div class="detail-pane active" data-detail="params">
+                                        <h4>Request Parameters</h4>
+                                        <div class="param-table">
+                                            <div class="param-row header">
+                                                <span>Parameter</span>
+                                                <span>Type</span>
+                                                <span>Required</span>
+                                                <span>Description</span>
+                                            </div>
+                                            <div class="param-row">
+                                                <span class="param-name">username</span>
+                                                <span class="param-type">string</span>
+                                                <span class="param-required">✓</span>
+                                                <span class="param-desc">Account username or email</span>
+                                            </div>
+                                            <div class="param-row">
+                                                <span class="param-name">password</span>
+                                                <span class="param-type">string</span>
+                                                <span class="param-required">✓</span>
+                                                <span class="param-desc">Account password</span>
+                                            </div>
+                                            <div class="param-row">
+                                                <span class="param-name">demo</span>
+                                                <span class="param-type">boolean</span>
+                                                <span class="param-required">-</span>
+                                                <span class="param-desc">Use demo account (default: true)</span>
+                                            </div>
+                                            <div class="param-row">
+                                                <span class="param-name">timeout</span>
+                                                <span class="param-type">integer</span>
+                                                <span class="param-required">-</span>
+                                                <span class="param-desc">Connection timeout in seconds (default: 30)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-pane" data-detail="response">
+                                        <h4>Response Schema</h4>
+                                        <div class="response-schema">
+                                            <pre class="json-schema"><code>{
+  "success": true,
+  "message": "Connection established successfully",
+  "data": {
+    "session_id": "abc123def456",
+    "account_type": "demo",
+    "server_time": "2025-06-05T10:30:00Z",
+    "connection_id": "conn_789xyz"
+  },
+  "timestamp": "2025-06-05T10:30:00Z"
+}</code></pre>
+                                        </div>
+                                        
+                                        <h4>Status Codes</h4>
+                                        <div class="status-codes">
+                                            <div class="status-code success">
+                                                <span class="code">200</span>
+                                                <span class="desc">Connection successful</span>
+                                            </div>
+                                            <div class="status-code error">
+                                                <span class="code">401</span>
+                                                <span class="desc">Invalid credentials</span>
+                                            </div>
+                                            <div class="status-code error">
+                                                <span class="code">408</span>
+                                                <span class="desc">Connection timeout</span>
+                                            </div>
+                                            <div class="status-code error">
+                                                <span class="code">503</span>
+                                                <span class="desc">Service unavailable</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-pane" data-detail="example">
+                                        <div class="code-tabs">
+                                            <button class="code-tab active" data-lang="python">Python</button>
+                                            <button class="code-tab" data-lang="javascript">JavaScript</button>
+                                            <button class="code-tab" data-lang="rust">Rust</button>
+                                        </div>
+                                        
+                                        <div class="code-examples">
+                                            <div class="code-example active" data-lang="python">
+                                                <pre><code class="language-python"># Python Example
+from binary_options_tools import BinaryOptionsAPI
 
 api = BinaryOptionsAPI()
-success = await api.connect("username", "password", demo=True)
-if success:
-    print("Connected successfully!")
-else:
-    print("Connection failed")</code></pre>
-                                </div>
-                            </div>
 
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>disconnect()</h3>
-                                    <span class="method-type">async</span>
-                                </div>
-                                <p class="method-description">
-                                    Safely disconnects from the broker and cleans up resources.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-python">async def disconnect() -> None:
-    """
-    Disconnect from the platform and cleanup resources.
+# Connect to demo account
+try:
+    result = await api.connect(
+        username="your_username",
+        password="your_password",
+        demo=True,
+        timeout=30
+    )
     
-    This method should always be called when done trading
-    to ensure proper cleanup of connections and resources.
-    """</code></pre>
-                                </div>
-                            </div>
-                        </section>
-
-                        <!-- Trading Methods -->
-                        <section id="trading" class="method-group fade-in-up">
-                            <h2><i class="fas fa-chart-line"></i> Trading Methods</h2>
-                            
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>place_trade()</h3>
-                                    <span class="method-type">async</span>
-                                </div>
-                                <p class="method-description">
-                                    Places a binary options trade with specified parameters.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-python">async def place_trade(
-    asset: str,
-    amount: float,
-    direction: str,
-    expiry_time: int,
-    trade_type: str = "binary"
-) -> Dict[str, Any]:
-    """
-    Place a binary options trade.
-    
-    Args:
-        asset (str): Trading asset (e.g., "EURUSD", "BTCUSD")
-        amount (float): Trade amount in account currency
-        direction (str): "call" or "put"
-        expiry_time (int): Expiry time in seconds
-        trade_type (str): Type of trade ("binary", "turbo")
+    if result.success:
+        print(f"Connected! Session ID: {result.data.session_id}")
+        print(f"Account type: {result.data.account_type}")
+    else:
+        print(f"Connection failed: {result.message}")
         
-    Returns:
-        Dict[str, Any]: Trade result with ID, status, and details
-        
-    Raises:
-        InsufficientFundsError: If account balance too low
-        InvalidAssetError: If asset not available
-        TradingClosedError: If market closed
-    """</code></pre>
-                                </div>
-                                
-                                <div class="method-example">
-                                    <h4>Example:</h4>
-                                    <pre><code class="language-python"># Place a $10 CALL trade on EUR/USD for 1 minute
-result = await api.place_trade(
-    asset="EURUSD",
-    amount=10.0,
-    direction="call",
-    expiry_time=60
-)
-
-print(f"Trade ID: {result['trade_id']}")
-print(f"Status: {result['status']}")
-print(f"Expected payout: ${result['payout']}")</code></pre>
-                                </div>
-                            </div>
-
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>get_trade_result()</h3>
-                                    <span class="method-type">async</span>
-                                </div>
-                                <p class="method-description">
-                                    Retrieves the result of a completed trade.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-python">async def get_trade_result(trade_id: str) -> Dict[str, Any]:
-    """
-    Get the result of a specific trade.
-    
-    Args:
-        trade_id (str): Unique trade identifier
-        
-    Returns:
-        Dict[str, Any]: Trade result details
-    """</code></pre>
-                                </div>
-                            </div>
-
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>close_trade()</h3>
-                                    <span class="method-type">async</span>
-                                </div>
-                                <p class="method-description">
-                                    Closes an open trade before expiry (if supported by broker).
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-python">async def close_trade(trade_id: str) -> Dict[str, Any]:
-    """
-    Close an open trade before expiry.
-    
-    Args:
-        trade_id (str): Trade ID to close
-        
-    Returns:
-        Dict[str, Any]: Close operation result
-    """</code></pre>
-                                </div>
-                            </div>
-                        </section>
-
-                        <!-- Account Management -->
-                        <section id="account" class="method-group fade-in-up">
-                            <h2><i class="fas fa-user-circle"></i> Account Management</h2>
-                            
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>get_balance()</h3>
-                                    <span class="method-type">async</span>
-                                </div>
-                                <p class="method-description">
-                                    Retrieves current account balance information.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-python">async def get_balance() -> Dict[str, float]:
-    """
-    Get current account balance.
-    
-    Returns:
-        Dict[str, float]: Balance information
-            - real: Real money balance
-            - demo: Demo account balance  
-            - currency: Account currency
-    """</code></pre>
-                                </div>
-                                
-                                <div class="method-example">
-                                    <h4>Example:</h4>
-                                    <pre><code class="language-python">balance = await api.get_balance()
-print(f"Real balance: {balance['real']} {balance['currency']}")
-print(f"Demo balance: {balance['demo']} {balance['currency']}")</code></pre>
-                                </div>
-                            </div>
-
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>get_trade_history()</h3>
-                                    <span class="method-type">async</span>
-                                </div>
-                                <p class="method-description">
-                                    Retrieves historical trade data for the account.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-python">async def get_trade_history(
-    limit: int = 100,
-    start_date: datetime = None,
-    end_date: datetime = None
-) -> List[Dict[str, Any]]:
-    """
-    Get trade history.
-    
-    Args:
-        limit (int): Maximum number of trades to return
-        start_date (datetime): Start date filter
-        end_date (datetime): End date filter
-        
-    Returns:
-        List[Dict[str, Any]]: List of historical trades
-    """</code></pre>
-                                </div>
-                            </div>
-                        </section>
-
-                        <!-- Market Data -->
-                        <section id="market-data" class="method-group fade-in-up">
-                            <h2><i class="fas fa-chart-bar"></i> Market Data</h2>
-                            
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>get_candles()</h3>
-                                    <span class="method-type">async</span>
-                                </div>
-                                <p class="method-description">
-                                    Retrieves historical price data (candlesticks) for an asset.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-python">async def get_candles(
-    asset: str,
-    timeframe: str,
-    count: int = 100,
-    end_time: datetime = None
-) -> List[Dict[str, Any]]:
-    """
-    Get historical candlestick data.
-    
-    Args:
-        asset (str): Asset symbol (e.g., "EURUSD")
-        timeframe (str): Timeframe ("1m", "5m", "15m", "1h", "4h", "1d")
-        count (int): Number of candles to retrieve
-        end_time (datetime): End time for data retrieval
-        
-    Returns:
-        List[Dict[str, Any]]: List of OHLCV candles
-    """</code></pre>
-                                </div>
-                                
-                                <div class="method-example">
-                                    <h4>Example:</h4>
-                                    <pre><code class="language-python"># Get last 50 5-minute candles for EUR/USD
-candles = await api.get_candles("EURUSD", "5m", count=50)
-
-for candle in candles[-5:]:  # Show last 5 candles
-    print(f"Time: {candle['time']}")
-    print(f"OHLC: {candle['open']}, {candle['high']}, {candle['low']}, {candle['close']}")
-    print(f"Volume: {candle['volume']}")
-    print("---")</code></pre>
-                                </div>
-                            </div>
-
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>get_current_price()</h3>
-                                    <span class="method-type">async</span>
-                                </div>
-                                <p class="method-description">
-                                    Gets the current price for a specific asset.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-python">async def get_current_price(asset: str) -> Dict[str, float]:
-    """
-    Get current price for an asset.
-    
-    Args:
-        asset (str): Asset symbol
-        
-    Returns:
-        Dict[str, float]: Current price data
-            - bid: Current bid price
-            - ask: Current ask price
-            - timestamp: Price timestamp
-    """</code></pre>
-                                </div>
-                            </div>
-                        </section>
-
-                        <!-- Technical Indicators -->
-                        <section id="indicators" class="method-group fade-in-up">
-                            <h2><i class="fas fa-chart-area"></i> Technical Indicators</h2>
-                            
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>calculate_sma()</h3>
-                                    <span class="method-type">function</span>
-                                </div>
-                                <p class="method-description">
-                                    Calculates Simple Moving Average for price data.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-python">def calculate_sma(
-    prices: List[float],
-    period: int
-) -> List[float]:
-    """
-    Calculate Simple Moving Average.
-    
-    Args:
-        prices (List[float]): List of prices
-        period (int): SMA period
-        
-    Returns:
-        List[float]: SMA values
-    """</code></pre>
-                                </div>
-                            </div>
-
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>calculate_rsi()</h3>
-                                    <span class="method-type">function</span>
-                                </div>
-                                <p class="method-description">
-                                    Calculates Relative Strength Index (RSI) indicator.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-python">def calculate_rsi(
-    prices: List[float],
-    period: int = 14
-) -> List[float]:
-    """
-    Calculate RSI indicator.
-    
-    Args:
-        prices (List[float]): List of closing prices
-        period (int): RSI period (default: 14)
-        
-    Returns:
-        List[float]: RSI values (0-100)
-    """</code></pre>
-                                </div>
-                            </div>
-
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>calculate_macd()</h3>
-                                    <span class="method-type">function</span>
-                                </div>
-                                <p class="method-description">
-                                    Calculates MACD (Moving Average Convergence Divergence) indicator.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-python">def calculate_macd(
-    prices: List[float],
-    fast_period: int = 12,
-    slow_period: int = 26,
-    signal_period: int = 9
-) -> Dict[str, List[float]]:
-    """
-    Calculate MACD indicator.
-    
-    Args:
-        prices (List[float]): List of closing prices
-        fast_period (int): Fast EMA period
-        slow_period (int): Slow EMA period  
-        signal_period (int): Signal line period
-        
-    Returns:
-        Dict[str, List[float]]: MACD values
-            - macd: MACD line
-            - signal: Signal line
-            - histogram: MACD histogram
-    """</code></pre>
-                                </div>
-                            </div>
-                        </section>
-                    </div>
-
-                    <!-- JavaScript API -->
-                    <div class="api-section" data-tab-content="javascript" style="display: none;">
-                        <!-- Connection & Authentication -->
-                        <section class="method-group fade-in-up">
-                            <h2><i class="fas fa-plug"></i> Connection & Authentication</h2>
-                            
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>connect()</h3>
-                                    <span class="method-type">async</span>
-                                </div>
-                                <p class="method-description">
-                                    Establishes connection to the binary options broker.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-javascript">async connect(options) {
-    /**
-     * Connect to the binary options platform.
-     * 
-     * @param {Object} options - Connection options
-     * @param {string} options.username - Account username
-     * @param {string} options.password - Account password
-     * @param {boolean} [options.demo=true] - Use demo account
-     * @param {number} [options.timeout=30000] - Connection timeout in ms
-     * 
-     * @returns {Promise&lt;boolean&gt;} True if connection successful
-     * 
-     * @throws {ConnectionError} If connection fails
-     * @throws {AuthenticationError} If credentials invalid
-     */
-}</code></pre>
-                                </div>
-                                
-                                <div class="method-example">
-                                    <h4>Example:</h4>
-                                    <pre><code class="language-javascript">const BinaryOptionsAPI = require('binary-options-tools');
+except Exception as e:
+    print(f"Error: {e}")</code></pre>
+                                            </div>
+                                            
+                                            <div class="code-example" data-lang="javascript">
+                                                <pre><code class="language-javascript">// JavaScript Example
+const { BinaryOptionsAPI } = require('binary-options-tools');
 
 const api = new BinaryOptionsAPI();
 
+// Connect to demo account
 try {
-    const success = await api.connect({
+    const result = await api.connect({
         username: 'your_username',
         password: 'your_password',
-        demo: true
+        demo: true,
+        timeout: 30000
     });
     
-    if (success) {
-        console.log('Connected successfully!');
+    if (result.success) {
+        console.log(`Connected! Session ID: ${result.data.sessionId}`);
+        console.log(`Account type: ${result.data.accountType}`);
+    } else {
+        console.log(`Connection failed: ${result.message}`);
     }
 } catch (error) {
-    console.error('Connection failed:', error.message);
+    console.error(`Error: ${error.message}`);
 }</code></pre>
-                                </div>
-                            </div>
-                        </section>
-
-                        <!-- Trading Methods -->
-                        <section class="method-group fade-in-up">
-                            <h2><i class="fas fa-chart-line"></i> Trading Methods</h2>
-                            
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>placeTrade()</h3>
-                                    <span class="method-type">async</span>
-                                </div>
-                                <p class="method-description">
-                                    Places a binary options trade with specified parameters.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-javascript">async placeTrade(tradeOptions) {
-    /**
-     * Place a binary options trade.
-     * 
-     * @param {Object} tradeOptions - Trade parameters
-     * @param {string} tradeOptions.asset - Trading asset (e.g., "EURUSD")
-     * @param {number} tradeOptions.amount - Trade amount
-     * @param {string} tradeOptions.direction - "call" or "put"
-     * @param {number} tradeOptions.expiryTime - Expiry time in seconds
-     * @param {string} [tradeOptions.tradeType="binary"] - Trade type
-     * 
-     * @returns {Promise&lt;Object&gt;} Trade result object
-     * 
-     * @throws {InsufficientFundsError} If account balance too low
-     * @throws {InvalidAssetError} If asset not available
-     */
-}</code></pre>
-                                </div>
-                                
-                                <div class="method-example">
-                                    <h4>Example:</h4>
-                                    <pre><code class="language-javascript">// Place a $10 CALL trade on EUR/USD for 1 minute
-const result = await api.placeTrade({
-    asset: 'EURUSD',
-    amount: 10,
-    direction: 'call',
-    expiryTime: 60
-});
-
-console.log(`Trade ID: ${result.tradeId}`);
-console.log(`Status: ${result.status}`);
-console.log(`Expected payout: $${result.payout}`);</code></pre>
-                                </div>
-                            </div>
-                        </section>
-
-                        <!-- Event System -->
-                        <section class="method-group fade-in-up">
-                            <h2><i class="fas fa-bolt"></i> Event System</h2>
-                            
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>on()</h3>
-                                    <span class="method-type">method</span>
-                                </div>
-                                <p class="method-description">
-                                    Registers an event listener for specific events.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-javascript">on(eventName, callback) {
-    /**
-     * Register an event listener.
-     * 
-     * @param {string} eventName - Name of the event
-     * @param {Function} callback - Event handler function
-     * 
-     * Available events:
-     * - 'connected': When connection is established
-     * - 'disconnected': When connection is lost
-     * - 'trade_placed': When a trade is placed
-     * - 'trade_result': When trade result is received
-     * - 'price_update': When price data is updated
-     * - 'balance_update': When balance changes
-     */
-}</code></pre>
-                                </div>
-                                
-                                <div class="method-example">
-                                    <h4>Example:</h4>
-                                    <pre><code class="language-javascript">// Listen for trade results
-api.on('trade_result', (result) => {
-    console.log(`Trade ${result.tradeId}: ${result.outcome}`);
-    console.log(`Profit/Loss: $${result.profit}`);
-});
-
-// Listen for price updates
-api.on('price_update', (data) => {
-    console.log(`${data.asset}: ${data.price}`);
-});
-
-// Listen for connection events
-api.on('connected', () => {
-    console.log('Successfully connected to broker');
-});
-
-api.on('disconnected', () => {
-    console.log('Connection lost');
-});</code></pre>
-                                </div>
-                            </div>
-                        </section>
-                    </div>
-
-                    <!-- Rust API -->
-                    <div class="api-section" data-tab-content="rust" style="display: none;">
-                        <!-- Connection & Authentication -->
-                        <section class="method-group fade-in-up">
-                            <h2><i class="fas fa-plug"></i> Connection & Authentication</h2>
-                            
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>connect()</h3>
-                                    <span class="method-type">async</span>
-                                </div>
-                                <p class="method-description">
-                                    Establishes connection to the binary options broker.
-                                </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-rust">pub async fn connect(
-    &mut self,
-    username: &str,
-    password: &str,
-    demo: bool,
-    timeout: Duration
-) -> Result&lt;bool, BinaryOptionsError&gt; {
-    //! Connect to the binary options platform.
-    //!
-    //! # Arguments
-    //! * `username` - Account username
-    //! * `password` - Account password
-    //! * `demo` - Use demo account
-    //! * `timeout` - Connection timeout
-    //!
-    //! # Returns
-    //! * `Result&lt;bool, BinaryOptionsError&gt;` - Connection result
-    //!
-    //! # Errors
-    //! * `BinaryOptionsError::Connection` - If connection fails
-    //! * `BinaryOptionsError::Authentication` - If credentials invalid
-}</code></pre>
-                                </div>
-                                
-                                <div class="method-example">
-                                    <h4>Example:</h4>
-                                    <pre><code class="language-rust">use binary_options_tools::BinaryOptionsAPI;
-use std::time::Duration;
+                                            </div>
+                                            
+                                            <div class="code-example" data-lang="rust">
+                                                <pre><code class="language-rust">// Rust Example
+use binary_options_tools::{BinaryOptionsAPI, ConnectionConfig};
 
 #[tokio::main]
-async fn main() -> Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
-    let mut api = BinaryOptionsAPI::new();
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api = BinaryOptionsAPI::new();
     
-    let success = api.connect(
-        "username",
-        "password",
-        true, // demo account
-        Duration::from_secs(30)
-    ).await?;
+    // Connect to demo account
+    let config = ConnectionConfig {
+        username: "your_username".to_string(),
+        password: "your_password".to_string(),
+        demo: true,
+        timeout: 30,
+    };
     
-    if success {
-        println!("Connected successfully!");
+    match api.connect(config).await {
+        Ok(result) => {
+            if result.success {
+                println!("Connected! Session ID: {}", result.data.session_id);
+                println!("Account type: {}", result.data.account_type);
+            } else {
+                println!("Connection failed: {}", result.message);
+            }
+        }
+        Err(e) => println!("Error: {}", e),
     }
     
     Ok(())
 }</code></pre>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </section>
+                        </div>
 
-                        <!-- Trading Methods -->
-                        <section class="method-group fade-in-up">
-                            <h2><i class="fas fa-chart-line"></i> Trading Methods</h2>
-                            
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>place_trade()</h3>
-                                    <span class="method-type">async</span>
+                        <!-- Place Trade Endpoint -->
+                        <div id="trade-place" class="endpoint-card fade-in-up">
+                            <div class="endpoint-header">
+                                <div class="endpoint-title">
+                                    <span class="method-badge post">POST</span>
+                                    <h3>Place Trade</h3>
                                 </div>
-                                <p class="method-description">
-                                    Places a binary options trade with zero-cost abstractions.
+                                <p class="endpoint-description">
+                                    Places a new binary options trade with specified parameters.
                                 </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-rust">pub async fn place_trade(
-    &self,
-    asset: &str,
-    amount: f64,
-    direction: TradeDirection,
-    expiry_time: u64
-) -> Result&lt;TradeResult, BinaryOptionsError&gt; {
-    //! Place a binary options trade.
-    //!
-    //! # Arguments
-    //! * `asset` - Trading asset symbol
-    //! * `amount` - Trade amount in account currency
-    //! * `direction` - Trade direction (Call or Put)
-    //! * `expiry_time` - Expiry time in seconds
-    //!
-    //! # Returns
-    //! * `Result&lt;TradeResult, BinaryOptionsError&gt;` - Trade result
-    //!
-    //! # Safety
-    //! This function is memory-safe and uses zero-cost abstractions
-    //! for optimal performance in high-frequency trading scenarios.
-}</code></pre>
+                            </div>
+                            
+                            <div class="endpoint-details">
+                                <div class="detail-tabs">
+                                    <button class="detail-tab active" data-detail="params">Parameters</button>
+                                    <button class="detail-tab" data-detail="response">Response</button>
+                                    <button class="detail-tab" data-detail="example">Example</button>
                                 </div>
                                 
-                                <div class="method-example">
-                                    <h4>Example:</h4>
-                                    <pre><code class="language-rust">use binary_options_tools::{BinaryOptionsAPI, TradeDirection};
+                                <div class="detail-content">
+                                    <div class="detail-pane active" data-detail="params">
+                                        <h4>Request Parameters</h4>
+                                        <div class="param-table">
+                                            <div class="param-row header">
+                                                <span>Parameter</span>
+                                                <span>Type</span>
+                                                <span>Required</span>
+                                                <span>Description</span>
+                                            </div>
+                                            <div class="param-row">
+                                                <span class="param-name">asset</span>
+                                                <span class="param-type">string</span>
+                                                <span class="param-required">✓</span>
+                                                <span class="param-desc">Trading asset symbol (e.g., "EURUSD", "BTCUSD")</span>
+                                            </div>
+                                            <div class="param-row">
+                                                <span class="param-name">amount</span>
+                                                <span class="param-type">number</span>
+                                                <span class="param-required">✓</span>
+                                                <span class="param-desc">Trade amount in account currency</span>
+                                            </div>
+                                            <div class="param-row">
+                                                <span class="param-name">direction</span>
+                                                <span class="param-type">string</span>
+                                                <span class="param-required">✓</span>
+                                                <span class="param-desc">Trade direction: "call" or "put"</span>
+                                            </div>
+                                            <div class="param-row">
+                                                <span class="param-name">expiry_time</span>
+                                                <span class="param-type">integer</span>
+                                                <span class="param-required">✓</span>
+                                                <span class="param-desc">Expiry time in seconds (60, 120, 300, etc.)</span>
+                                            </div>
+                                            <div class="param-row">
+                                                <span class="param-name">trade_type</span>
+                                                <span class="param-type">string</span>
+                                                <span class="param-required">-</span>
+                                                <span class="param-desc">Trade type: "binary" or "turbo" (default: "binary")</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-pane" data-detail="response">
+                                        <h4>Response Schema</h4>
+                                        <div class="response-schema">
+                                            <pre class="json-schema"><code>{
+  "success": true,
+  "message": "Trade placed successfully",
+  "data": {
+    "trade_id": "trade_123456789",
+    "asset": "EURUSD",
+    "amount": 10.00,
+    "direction": "call",
+    "entry_price": 1.0850,
+    "expiry_time": 60,
+    "expected_payout": 18.50,
+    "payout_percentage": 85,
+    "status": "active",
+    "created_at": "2025-06-05T10:30:00Z"
+  },
+  "timestamp": "2025-06-05T10:30:00Z"
+}</code></pre>
+                                        </div>
+                                        
+                                        <h4>Status Codes</h4>
+                                        <div class="status-codes">
+                                            <div class="status-code success">
+                                                <span class="code">201</span>
+                                                <span class="desc">Trade created successfully</span>
+                                            </div>
+                                            <div class="status-code error">
+                                                <span class="code">400</span>
+                                                <span class="desc">Invalid parameters</span>
+                                            </div>
+                                            <div class="status-code error">
+                                                <span class="code">402</span>
+                                                <span class="desc">Insufficient funds</span>
+                                            </div>
+                                            <div class="status-code error">
+                                                <span class="code">403</span>
+                                                <span class="desc">Market closed</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-pane" data-detail="example">
+                                        <div class="code-tabs">
+                                            <button class="code-tab active" data-lang="python">Python</button>
+                                            <button class="code-tab" data-lang="javascript">JavaScript</button>
+                                            <button class="code-tab" data-lang="rust">Rust</button>
+                                        </div>
+                                        
+                                        <div class="code-examples">
+                                            <div class="code-example active" data-lang="python">
+                                                <pre><code class="language-python"># Python Example
+# Place a $10 CALL trade on EUR/USD for 1 minute
+try:
+    result = await api.place_trade(
+        asset="EURUSD",
+        amount=10.0,
+        direction="call",
+        expiry_time=60,
+        trade_type="binary"
+    )
+    
+    if result.success:
+        trade = result.data
+        print(f"Trade placed successfully!")
+        print(f"Trade ID: {trade.trade_id}")
+        print(f"Entry price: {trade.entry_price}")
+        print(f"Expected payout: ${trade.expected_payout}")
+        print(f"Payout percentage: {trade.payout_percentage}%")
+    else:
+        print(f"Trade failed: {result.message}")
+        
+except Exception as e:
+    print(f"Error placing trade: {e}")</code></pre>
+                                            </div>
+                                            
+                                            <div class="code-example" data-lang="javascript">
+                                                <pre><code class="language-javascript">// JavaScript Example
+// Place a $10 CALL trade on EUR/USD for 1 minute
+try {
+    const result = await api.placeTrade({
+        asset: 'EURUSD',
+        amount: 10.0,
+        direction: 'call',
+        expiryTime: 60,
+        tradeType: 'binary'
+    });
+    
+    if (result.success) {
+        const trade = result.data;
+        console.log('Trade placed successfully!');
+        console.log(`Trade ID: ${trade.tradeId}`);
+        console.log(`Entry price: ${trade.entryPrice}`);
+        console.log(`Expected payout: $${trade.expectedPayout}`);
+        console.log(`Payout percentage: ${trade.payoutPercentage}%`);
+    } else {
+        console.log(`Trade failed: ${result.message}`);
+    }
+} catch (error) {
+    console.error(`Error placing trade: ${error.message}`);
+}</code></pre>
+                                            </div>
+                                            
+                                            <div class="code-example" data-lang="rust">
+                                                <pre><code class="language-rust">// Rust Example
+use binary_options_tools::TradeRequest;
 
 // Place a $10 CALL trade on EUR/USD for 1 minute
-let result = api.place_trade(
-    "EURUSD",
-    10.0,
-    TradeDirection::Call,
-    60
-).await?;
+let trade_request = TradeRequest {
+    asset: "EURUSD".to_string(),
+    amount: 10.0,
+    direction: "call".to_string(),
+    expiry_time: 60,
+    trade_type: Some("binary".to_string()),
+};
 
-println!("Trade ID: {}", result.trade_id);
-println!("Status: {:?}", result.status);
-println!("Expected payout: ${:.2}", result.payout);</code></pre>
+match api.place_trade(trade_request).await {
+    Ok(result) => {
+        if result.success {
+            let trade = result.data;
+            println!("Trade placed successfully!");
+            println!("Trade ID: {}", trade.trade_id);
+            println!("Entry price: {}", trade.entry_price);
+            println!("Expected payout: ${:.2}", trade.expected_payout);
+            println!("Payout percentage: {}%", trade.payout_percentage);
+        } else {
+            println!("Trade failed: {}", result.message);
+        }
+    }
+    Err(e) => println!("Error placing trade: {}", e),
+}</code></pre>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </section>
+                        </div>
 
-                        <!-- Stream Processing -->
-                        <section class="method-group fade-in-up">
-                            <h2><i class="fas fa-stream"></i> Stream Processing</h2>
-                            
-                            <div class="method-card">
-                                <div class="method-header">
-                                    <h3>price_stream()</h3>
-                                    <span class="method-type">async stream</span>
+                        <!-- Get Balance Endpoint -->
+                        <div id="account-balance" class="endpoint-card fade-in-up">
+                            <div class="endpoint-header">
+                                <div class="endpoint-title">
+                                    <span class="method-badge get">GET</span>
+                                    <h3>Get Account Balance</h3>
                                 </div>
-                                <p class="method-description">
-                                    Creates a high-performance async stream of real-time price data.
+                                <p class="endpoint-description">
+                                    Retrieves current account balance and currency information.
                                 </p>
-                                
-                                <div class="code-block">
-                                    <pre><code class="language-rust">pub fn price_stream(
-    &self,
-    assets: &[&str]
-) -> impl Stream&lt;Item = Result&lt;PriceUpdate, BinaryOptionsError&gt;&gt; + '_ {
-    //! Create a real-time price data stream.
-    //!
-    //! # Arguments
-    //! * `assets` - List of asset symbols to stream
-    //!
-    //! # Returns
-    //! * `Stream&lt;PriceUpdate&gt;` - Async stream of price updates
-    //!
-    //! # Performance
-    //! Uses zero-allocation streaming for maximum throughput
-    //! in high-frequency trading environments.
-}</code></pre>
+                            </div>
+                            
+                            <div class="endpoint-details">
+                                <div class="detail-tabs">
+                                    <button class="detail-tab active" data-detail="response">Response</button>
+                                    <button class="detail-tab" data-detail="example">Example</button>
                                 </div>
                                 
-                                <div class="method-example">
-                                    <h4>Example:</h4>
-                                    <pre><code class="language-rust">use futures::StreamExt;
-
-// Stream prices for multiple assets
-let mut price_stream = api.price_stream(&["EURUSD", "GBPUSD", "BTCUSD"]);
-
-while let Some(price_update) = price_stream.next().await {
-    match price_update {
-        Ok(update) => {
-            println!("{}: {} ({})", 
-                update.asset, 
-                update.price, 
-                update.timestamp
-            );
+                                <div class="detail-content">
+                                    <div class="detail-pane active" data-detail="response">
+                                        <h4>Response Schema</h4>
+                                        <div class="response-schema">
+                                            <pre class="json-schema"><code>{
+  "success": true,
+  "message": "Balance retrieved successfully",
+  "data": {
+    "real_balance": 1250.75,
+    "demo_balance": 10000.00,
+    "currency": "USD",
+    "account_type": "demo",
+    "last_updated": "2025-06-05T10:30:00Z"
+  },
+  "timestamp": "2025-06-05T10:30:00Z"
+}</code></pre>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-pane" data-detail="example">
+                                        <div class="code-tabs">
+                                            <button class="code-tab active" data-lang="python">Python</button>
+                                            <button class="code-tab" data-lang="javascript">JavaScript</button>
+                                            <button class="code-tab" data-lang="rust">Rust</button>
+                                        </div>
+                                        
+                                        <div class="code-examples">
+                                            <div class="code-example active" data-lang="python">
+                                                <pre><code class="language-python"># Python Example
+try:
+    result = await api.get_balance()
+    
+    if result.success:
+        balance = result.data
+        print(f"Real balance: {balance.real_balance} {balance.currency}")
+        print(f"Demo balance: {balance.demo_balance} {balance.currency}")
+        print(f"Account type: {balance.account_type}")
+    else:
+        print(f"Failed to get balance: {result.message}")
+        
+except Exception as e:
+    print(f"Error: {e}")</code></pre>
+                                            </div>
+                                            
+                                            <div class="code-example" data-lang="javascript">
+                                                <pre><code class="language-javascript">// JavaScript Example
+try {
+    const result = await api.getBalance();
+    
+    if (result.success) {
+        const balance = result.data;
+        console.log(`Real balance: ${balance.realBalance} ${balance.currency}`);
+        console.log(`Demo balance: ${balance.demoBalance} ${balance.currency}`);
+        console.log(`Account type: ${balance.accountType}`);
+    } else {
+        console.log(`Failed to get balance: ${result.message}`);
+    }
+} catch (error) {
+    console.error(`Error: ${error.message}`);
+}</code></pre>
+                                            </div>
+                                            
+                                            <div class="code-example" data-lang="rust">
+                                                <pre><code class="language-rust">// Rust Example
+match api.get_balance().await {
+    Ok(result) => {
+        if result.success {
+            let balance = result.data;
+            println!("Real balance: {:.2} {}", balance.real_balance, balance.currency);
+            println!("Demo balance: {:.2} {}", balance.demo_balance, balance.currency);
+            println!("Account type: {}", balance.account_type);
+        } else {
+            println!("Failed to get balance: {}", result.message);
         }
-        Err(e) => eprintln!("Stream error: {}", e),
+    }
+    Err(e) => println!("Error: {}", e),
+}</code></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- WebSocket Stream Endpoint -->
+                        <div id="market-stream" class="endpoint-card fade-in-up">
+                            <div class="endpoint-header">
+                                <div class="endpoint-title">
+                                    <span class="method-badge websocket">WS</span>
+                                    <h3>Real-time Price Stream</h3>
+                                </div>
+                                <p class="endpoint-description">
+                                    WebSocket connection for real-time price updates and market data.
+                                </p>
+                            </div>
+                            
+                            <div class="endpoint-details">
+                                <div class="detail-tabs">
+                                    <button class="detail-tab active" data-detail="params">Parameters</button>
+                                    <button class="detail-tab" data-detail="events">Events</button>
+                                    <button class="detail-tab" data-detail="example">Example</button>
+                                </div>
+                                
+                                <div class="detail-content">
+                                    <div class="detail-pane active" data-detail="params">
+                                        <h4>Connection Parameters</h4>
+                                        <div class="param-table">
+                                            <div class="param-row header">
+                                                <span>Parameter</span>
+                                                <span>Type</span>
+                                                <span>Required</span>
+                                                <span>Description</span>
+                                            </div>
+                                            <div class="param-row">
+                                                <span class="param-name">assets</span>
+                                                <span class="param-type">array</span>
+                                                <span class="param-required">✓</span>
+                                                <span class="param-desc">List of asset symbols to stream</span>
+                                            </div>
+                                            <div class="param-row">
+                                                <span class="param-name">update_frequency</span>
+                                                <span class="param-type">integer</span>
+                                                <span class="param-required">-</span>
+                                                <span class="param-desc">Update frequency in milliseconds (default: 1000)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-pane" data-detail="events">
+                                        <h4>WebSocket Events</h4>
+                                        <div class="event-list">
+                                            <div class="event-item">
+                                                <h5>price_update</h5>
+                                                <pre class="event-payload"><code>{
+  "event": "price_update",
+  "data": {
+    "asset": "EURUSD",
+    "bid": 1.0850,
+    "ask": 1.0852,
+    "timestamp": "2025-06-05T10:30:00.123Z"
+  }
+}</code></pre>
+                                            </div>
+                                            
+                                            <div class="event-item">
+                                                <h5>candle_update</h5>
+                                                <pre class="event-payload"><code>{
+  "event": "candle_update",
+  "data": {
+    "asset": "EURUSD",
+    "timeframe": "1m",
+    "open": 1.0845,
+    "high": 1.0860,
+    "low": 1.0840,
+    "close": 1.0850,
+    "volume": 1234,
+    "timestamp": "2025-06-05T10:30:00Z"
+  }
+}</code></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="detail-pane" data-detail="example">
+                                        <div class="code-tabs">
+                                            <button class="code-tab active" data-lang="python">Python</button>
+                                            <button class="code-tab" data-lang="javascript">JavaScript</button>
+                                            <button class="code-tab" data-lang="rust">Rust</button>
+                                        </div>
+                                        
+                                        <div class="code-examples">
+                                            <div class="code-example active" data-lang="python">
+                                                <pre><code class="language-python"># Python WebSocket Example
+import asyncio
+
+async def price_handler(data):
+    print(f"{data['asset']}: {data['bid']} / {data['ask']}")
+
+async def main():
+    # Start price stream
+    stream = api.start_price_stream(
+        assets=["EURUSD", "GBPUSD", "BTCUSD"],
+        update_frequency=1000
+    )
+    
+    # Listen for price updates
+    async for price_update in stream:
+        await price_handler(price_update)
+
+asyncio.run(main())</code></pre>
+                                            </div>
+                                            
+                                            <div class="code-example" data-lang="javascript">
+                                                <pre><code class="language-javascript">// JavaScript WebSocket Example
+// Start price stream
+const stream = api.startPriceStream({
+    assets: ['EURUSD', 'GBPUSD', 'BTCUSD'],
+    updateFrequency: 1000
+});
+
+// Listen for price updates
+stream.on('price_update', (data) => {
+    console.log(`${data.asset}: ${data.bid} / ${data.ask}`);
+});
+
+stream.on('candle_update', (data) => {
+    console.log(`${data.asset} candle: O:${data.open} H:${data.high} L:${data.low} C:${data.close}`);
+});
+
+stream.on('error', (error) => {
+    console.error('Stream error:', error);
+});
+
+// Start streaming
+await stream.connect();</code></pre>
+                                            </div>
+                                            
+                                            <div class="code-example" data-lang="rust">
+                                                <pre><code class="language-rust">// Rust WebSocket Example
+use futures::StreamExt;
+
+// Start price stream
+let mut stream = api.start_price_stream(vec![
+    "EURUSD".to_string(),
+    "GBPUSD".to_string(),
+    "BTCUSD".to_string()
+], 1000).await?;
+
+// Listen for price updates
+while let Some(price_update) = stream.next().await {
+    match price_update {
+        Ok(data) => {
+            println!("{}: {} / {}", data.asset, data.bid, data.ask);
+        }
+        Err(e) => {
+            eprintln!("Stream error: {}", e);
+            break;
+        }
     }
 }</code></pre>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </section>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -984,11 +903,10 @@ while let Some(price_update) = price_stream.next().await {
                 <p>&copy; 2024 BinaryOptionsToolsV2. MIT License. Built for traders, by traders.</p>
             </div>
         </div>
-    </footer>
-
-    <!-- Scripts -->
+    </footer>    <!-- Scripts -->
     <script src="assets/js/main.js"></script>
     <script src="assets/js/animations.js"></script>
     <script src="assets/js/code-highlight.js"></script>
+    <script src="assets/js/api.js"></script>
 </body>
 </html>

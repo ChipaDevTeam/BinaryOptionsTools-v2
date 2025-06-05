@@ -1,0 +1,69 @@
+# GitHub Pages Configuration for BinaryOptionsToolsV2 Documentation
+title: "BinaryOptionsToolsV2 Documentation"
+description: "High-performance binary options trading tools with multi-language support (Python, JavaScript, Rust)"
+url: "https://yourusername.github.io"
+baseurl: "/BinaryOptionsTools-v2-1"
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+plugins:
+  - jekyll-sitemap
+  - jekyll-feed
+  - jekyll-seo-tag
+
+# Site settings
+lang: en
+author: "BinaryOptionsToolsV2 Team"
+twitter:
+  username: yourusername
+social:
+  name: BinaryOptionsToolsV2
+  links:
+    - https://github.com/yourusername/BinaryOptionsTools-v2-1
+
+# SEO settings
+google_site_verification: "your-google-site-verification-code"
+bing_site_verification: "your-bing-site-verification-code"
+
+# Exclude from processing
+exclude:
+  - README.md
+  - .gitignore
+  - .github/
+  - node_modules/
+  - vendor/
+
+# Include files
+include:
+  - _pages
+  - assets
+  - sitemap.xml
+  - favicon.svg
+
+# Collections
+collections:
+  docs:
+    output: true
+    permalink: /:collection/:name/
+
+# Default layouts
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"
+  - scope:
+      path: "_docs"
+      type: "docs"
+    values:
+      layout: "doc"
+
+# Theme
+theme: minima
+
+# Custom variables
+brand_color: "#8B5CF6"
+secondary_color: "#A855F7"
+accent_color: "#C084FC"
