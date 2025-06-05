@@ -4,60 +4,521 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Examples - BinaryOptionsToolsV2</title>
-    <meta name="description" content="Comprehensive examples for BinaryOptionsToolsV2 in Python, JavaScript, and Rust">
+    <meta name="description" content="Comprehensive examples and tutorials for BinaryOptionsToolsV2 - Learn binary options trading with Python async examples">
+    <meta name="keywords" content="binary options, examples, Python, async, trading, tutorials, PocketOption">
+    
+    <!-- Open Graph tags -->
+    <meta property="og:title" content="Examples - BinaryOptionsToolsV2">
+    <meta property="og:description" content="Comprehensive examples and tutorials for binary options trading">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://your-username.github.io/BinaryOptionsTools-v2-1/examples.html">
+    
+    <!-- Stylesheets -->
     <link rel="stylesheet" href="assets/css/main.css">
-    <link rel="stylesheet" href="assets/css/animations.css">    <link rel="stylesheet" href="assets/css/code-highlight.css">
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="assets/css/animations.css">
+    <link rel="stylesheet" href="assets/css/code-highlight.css">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@300;400;500&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Prism.js for Code Highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
 </head>
 <body>
+    <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-brand">
-                <h2>BinaryOptionsToolsV2</h2>
+                <a href="index.html" class="logo-link">
+                    <img src="assets/images/logo.svg" alt="BinaryOptionsToolsV2 Logo" class="logo">
+                    <span class="brand-text">BinaryOptionsToolsV2</span>
+                </a>
             </div>
-            <div class="nav-toggle" id="mobile-menu">
-                <span class="bar"></span>
-                <span class="bar"></span>
-                <span class="bar"></span>
+            
+            <div class="nav-menu">
+                <div class="dropdown">
+                    <a href="#" class="nav-link dropdown-toggle">
+                        Documentation <i class="fas fa-chevron-down"></i>
+                    </a>
+                    <div class="dropdown-menu">
+                        <a href="python.html" class="dropdown-link">
+                            <i class="fab fa-python"></i> Python
+                        </a>
+                        <a href="javascript.html" class="dropdown-link">
+                            <i class="fab fa-js"></i> JavaScript
+                        </a>
+                        <a href="rust.html" class="dropdown-link">
+                            <i class="fas fa-cog"></i> Rust
+                        </a>
+                    </div>
+                </div>
+                <a href="examples.html" class="nav-link active">Examples</a>
+                <a href="api.html" class="nav-link">API Reference</a>
+                <a href="https://chipa.tech" target="_blank" class="nav-link nav-cta">
+                    <i class="fas fa-robot"></i> Bot Services
+                </a>
             </div>
-            <ul class="nav-menu">
-                <li class="nav-item">
-                    <a href="index.html" class="nav-link">Home</a>
-                </li>
-                <li class="nav-item dropdown">
-                    <a href="#" class="nav-link dropdown-toggle">Languages</a>
-                    <ul class="dropdown-menu">
-                        <li><a href="python.html">Python</a></li>
-                        <li><a href="javascript.html">JavaScript</a></li>
-                        <li><a href="rust.html">Rust</a></li>
-                    </ul>
-                </li>
-                <li class="nav-item">
-                    <a href="examples.html" class="nav-link active">Examples</a>
-                </li>
-                <li class="nav-item">
-                    <a href="api.html" class="nav-link">API Reference</a>
-                </li>
-                <li class="nav-item">
-                    <a href="https://chipa.tech" class="nav-link btn-outline" target="_blank">Bot Services</a>
-                </li>
-            </ul>
+
+            <button class="mobile-menu-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
         </div>
     </nav>
 
-    <main>
-        <section class="hero-section examples-hero">
-            <div class="container">
-                <div class="hero-content fade-in-up">
-                    <h1>Examples & Tutorials</h1>
-                    <p class="hero-subtitle">Comprehensive examples for all programming languages</p>
-                    <div class="hero-badges">
-                        <span class="badge">Python</span>
-                        <span class="badge">JavaScript</span>
-                        <span class="badge">Rust</span>
-                        <span class="badge">Real Examples</span>
+    <!-- Mobile Menu -->
+    <div class="mobile-menu">
+        <div class="mobile-menu-content">
+            <a href="index.html" class="mobile-nav-link">Home</a>
+            <a href="python.html" class="mobile-nav-link">Python Docs</a>
+            <a href="javascript.html" class="mobile-nav-link">JavaScript Docs</a>
+            <a href="rust.html" class="mobile-nav-link">Rust Docs</a>
+            <a href="examples.html" class="mobile-nav-link active">Examples</a>
+            <a href="api.html" class="mobile-nav-link">API Reference</a>
+            <a href="https://chipa.tech" target="_blank" class="mobile-nav-link">Bot Services</a>
+        </div>
+    </div>
+    <div class="mobile-overlay"></div>
+
+    <!-- Header -->
+    <header class="page-header">
+        <div class="container">
+            <div class="header-content fade-in-up">
+                <h1 class="header-title">
+                    <i class="fas fa-code"></i>
+                    Comprehensive Examples
+                </h1>
+                <p class="header-subtitle">
+                    Learn BinaryOptionsToolsV2 with practical, real-world examples across all features
+                </p>
+                
+                <!-- Category Filter -->
+                <div class="example-filters">
+                    <button class="filter-btn active" data-category="all">
+                        <i class="fas fa-th"></i> All Examples
+                    </button>
+                    <button class="filter-btn" data-category="trading">
+                        <i class="fas fa-chart-line"></i> Trading
+                    </button>
+                    <button class="filter-btn" data-category="data">
+                        <i class="fas fa-database"></i> Market Data
+                    </button>
+                    <button class="filter-btn" data-category="streaming">
+                        <i class="fas fa-stream"></i> Live Streaming
+                    </button>
+                    <button class="filter-btn" data-category="tools">
+                        <i class="fas fa-tools"></i> Utilities
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="examples-content">
+        <div class="container">
+            <!-- Quick Start Guide -->
+            <section class="quick-start-section fade-in-up">
+                <div class="section-header">
+                    <h2><i class="fas fa-rocket"></i> Quick Start</h2>
+                    <p>Get up and running with BinaryOptionsToolsV2 in minutes</p>
+                </div>
+                
+                <div class="quick-start-grid">
+                    <div class="quick-start-card">
+                        <div class="step-number">1</div>
+                        <h3>Install the Package</h3>
+                        <div class="code-block">
+                            <pre><code class="language-bash">pip install BinaryOptionsToolsV2</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="quick-start-card">
+                        <div class="step-number">2</div>
+                        <h3>Get Your SSID</h3>
+                        <p>Follow our <a href="#ssid-guide" class="inline-link">SSID tutorial</a> to extract your session ID from PocketOption</p>
+                    </div>
+                    
+                    <div class="quick-start-card">
+                        <div class="step-number">3</div>
+                        <h3>Start Trading</h3>
+                        <div class="code-block">
+                            <pre><code class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main():
+    api = PocketOptionAsync(your_ssid)
+    balance = await api.balance()
+    print(f"Balance: {balance}")
+
+asyncio.run(main())</code></pre>
+                        </div>
                     </div>
                 </div>
+            </section>            <!-- Examples Grid -->
+            <section class="examples-grid-section">
+                <div class="examples-sidebar">
+                    <div class="sidebar-sticky">
+                        <h3><i class="fas fa-list"></i> Examples Index</h3>
+                        <nav class="examples-nav">
+                            <div class="nav-section">
+                                <h4><i class="fas fa-chart-line"></i> Trading Operations</h4>
+                                <ul>
+                                    <li><a href="#basic-trading" class="nav-link">Basic Buy/Sell</a></li>
+                                    <li><a href="#check-win" class="nav-link">Check Trade Results</a></li>
+                                    <li><a href="#trade-history" class="nav-link">Trade History</a></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="nav-section">
+                                <h4><i class="fas fa-database"></i> Market Data</h4>
+                                <ul>
+                                    <li><a href="#get-balance" class="nav-link">Account Balance</a></li>
+                                    <li><a href="#get-candles" class="nav-link">Historical Candles</a></li>
+                                    <li><a href="#payout-rates" class="nav-link">Payout Rates</a></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="nav-section">
+                                <h4><i class="fas fa-stream"></i> Live Streaming</h4>
+                                <ul>
+                                    <li><a href="#subscribe-symbol" class="nav-link">Symbol Subscription</a></li>
+                                    <li><a href="#chunked-streaming" class="nav-link">Chunked Streaming</a></li>
+                                    <li><a href="#timed-streaming" class="nav-link">Timed Streaming</a></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="nav-section">
+                                <h4><i class="fas fa-cogs"></i> Advanced Features</h4>
+                                <ul>
+                                    <li><a href="#raw-messages" class="nav-link">Raw WebSocket</a></li>
+                                    <li><a href="#raw-iterators" class="nav-link">Raw Iterators</a></li>
+                                    <li><a href="#raw-orders" class="nav-link">Raw Orders</a></li>
+                                    <li><a href="#logging-system" class="nav-link">Logging System</a></li>
+                                    <li><a href="#validators" class="nav-link">Validators</a></li>
+                                    <li><a href="#validators" class="nav-link">Data Validators</a></li>
+                                </ul>
+                            </div>
+                        </nav>
+                    </div>
+                </div>                <div class="examples-main-content">
+                    <!-- Trading Operations Section -->
+                    <section id="trading-operations" class="examples-category fade-in-up">
+                        <div class="category-header">
+                            <h2><i class="fas fa-chart-line"></i> Trading Operations</h2>
+                            <p>Essential trading functions - buy, sell, and manage your trades</p>
+                        </div>
+
+                        <!-- Basic Trading Example -->
+                        <div id="basic-trading" class="example-block">
+                            <div class="example-header">
+                                <h3>Basic Trading - Buy & Sell</h3>
+                                <span class="difficulty-badge beginner">Beginner</span>
+                            </div>
+                            <p>Learn how to place basic buy and sell orders with BinaryOptionsToolsV2</p>
+                            
+                            <div class="code-tabs">
+                                <button class="tab-button active" data-tab="basic-python">Python</button>
+                            </div>
+                            
+                            <div class="tab-content active" id="basic-python">
+                                <div class="code-block">
+                                    <div class="code-header">
+                                        <span class="filename">basic_trading.py</span>
+                                        <button class="copy-btn" onclick="copyCode('basic-trading-code')">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <pre><code id="basic-trading-code" class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main(ssid: str):
+    # The API automatically detects if the 'ssid' is for real or demo account
+    api = PocketOptionAsync(ssid)
+    
+    # Place a BUY order
+    (buy_id, buy_data) = await api.buy(
+        asset="EURUSD_otc", 
+        amount=1.0, 
+        time=60, 
+        check_win=False
+    )
+    print(f"Buy trade id: {buy_id}")
+    print(f"Buy trade data: {buy_data}")
+    
+    # Place a SELL order  
+    (sell_id, sell_data) = await api.sell(
+        asset="EURUSD_otc", 
+        amount=1.0, 
+        time=60, 
+        check_win=False
+    )
+    print(f"Sell trade id: {sell_id}")
+    print(f"Sell trade data: {sell_data}")
+
+if __name__ == '__main__':
+    ssid = input('Please enter your ssid: ')
+    asyncio.run(main(ssid))</code></pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Check Win Example -->
+                        <div id="check-win" class="example-block">
+                            <div class="example-header">
+                                <h3>Check Trade Results</h3>
+                                <span class="difficulty-badge beginner">Beginner</span>
+                            </div>
+                            <p>Monitor your trades and check win/loss results</p>
+                            
+                            <div class="code-tabs">
+                                <button class="tab-button active" data-tab="checkwin-python">Python</button>
+                            </div>
+                            
+                            <div class="tab-content active" id="checkwin-python">
+                                <div class="code-block">
+                                    <div class="code-header">
+                                        <span class="filename">check_win.py</span>
+                                        <button class="copy-btn" onclick="copyCode('check-win-code')">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <pre><code id="check-win-code" class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main(ssid: str):
+    # Initialize API
+    api = PocketOptionAsync(ssid)
+    
+    # Place trades without automatic win checking
+    (buy_id, _) = await api.buy(
+        asset="EURUSD_otc", 
+        amount=1.0, 
+        time=15, 
+        check_win=False
+    )
+    (sell_id, _) = await api.sell(
+        asset="EURUSD_otc", 
+        amount=1.0, 
+        time=300, 
+        check_win=False
+    )
+    print(f"Trade IDs: Buy={buy_id}, Sell={sell_id}")
+    
+    # Manually check trade results
+    buy_data = await api.check_win(buy_id)
+    print(f"Buy trade result: {buy_data['result']}")
+    print(f"Buy trade data: {buy_data}")
+    
+    sell_data = await api.check_win(sell_id)
+    print(f"Sell trade result: {sell_data['result']}")
+    print(f"Sell trade data: {sell_data}")
+
+if __name__ == '__main__':
+    ssid = input('Please enter your ssid: ')
+    asyncio.run(main(ssid))</code></pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Trade History Example -->
+                        <div id="trade-history" class="example-block">
+                            <div class="example-header">
+                                <h3>Trade History & Open Positions</h3>
+                                <span class="difficulty-badge intermediate">Intermediate</span>
+                            </div>
+                            <p>Retrieve and monitor your open and closed trades</p>
+                            
+                            <div class="code-tabs">
+                                <button class="tab-button active" data-tab="history-python">Python</button>
+                            </div>
+                            
+                            <div class="tab-content active" id="history-python">
+                                <div class="code-block">
+                                    <div class="code-header">
+                                        <span class="filename">trade_history.py</span>
+                                        <button class="copy-btn" onclick="copyCode('trade-history-code')">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <pre><code id="trade-history-code" class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main(ssid: str):
+    api = PocketOptionAsync(ssid)
+    
+    # Place some test trades
+    _ = await api.buy(asset="EURUSD_otc", amount=1.0, time=60, check_win=False)
+    _ = await api.sell(asset="EURUSD_otc", amount=1.0, time=60, check_win=False)
+    
+    # Get currently opened deals
+    opened_deals = await api.opened_deals()
+    print(f"Opened deals: {opened_deals}")
+    print(f"Number of opened deals: {len(opened_deals)} (should be at least 2)")
+    
+    # Wait for trades to complete
+    await asyncio.sleep(62)
+    
+    # Get closed deals history
+    closed_deals = await api.closed_deals()
+    print(f"Closed deals: {closed_deals}")
+    print(f"Number of closed deals: {len(closed_deals)} (should be at least 2)")
+
+if __name__ == '__main__':
+    ssid = input('Please enter your ssid: ')
+    asyncio.run(main(ssid))</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Market Data Section -->
+                    <section id="market-data" class="examples-category fade-in-up">
+                        <div class="category-header">
+                            <h2><i class="fas fa-database"></i> Market Data</h2>
+                            <p>Access real-time and historical market data</p>
+                        </div>
+
+                        <!-- Get Balance Example -->
+                        <div id="get-balance" class="example-block">
+                            <div class="example-header">
+                                <h3>Account Balance</h3>
+                                <span class="difficulty-badge beginner">Beginner</span>
+                            </div>
+                            <p>Retrieve your current account balance</p>
+                            
+                            <div class="code-tabs">
+                                <button class="tab-button active" data-tab="balance-python">Python</button>
+                            </div>
+                            
+                            <div class="tab-content active" id="balance-python">
+                                <div class="code-block">
+                                    <div class="code-header">
+                                        <span class="filename">get_balance.py</span>
+                                        <button class="copy-btn" onclick="copyCode('balance-code')">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <pre><code id="balance-code" class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main(ssid: str):
+    # The API automatically detects if the 'ssid' is for real or demo account
+    api = PocketOptionAsync(ssid)
+    await asyncio.sleep(5)  # Wait for connection
+    
+    balance = await api.balance()
+    print(f"Current Balance: ${balance}")
+
+if __name__ == '__main__':
+    ssid = input('Please enter your ssid: ')
+    asyncio.run(main(ssid))</code></pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Get Candles Example -->
+                        <div id="get-candles" class="example-block">
+                            <div class="example-header">
+                                <h3>Historical Candles</h3>
+                                <span class="difficulty-badge intermediate">Intermediate</span>
+                            </div>
+                            <p>Fetch historical candlestick data for technical analysis</p>
+                            
+                            <div class="code-tabs">
+                                <button class="tab-button active" data-tab="candles-python">Python</button>
+                            </div>
+                            
+                            <div class="tab-content active" id="candles-python">
+                                <div class="code-block">
+                                    <div class="code-header">
+                                        <span class="filename">get_candles.py</span>
+                                        <button class="copy-btn" onclick="copyCode('candles-code')">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <pre><code id="candles-code" class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import pandas as pd
+import asyncio
+
+async def main(ssid: str):
+    api = PocketOptionAsync(ssid)    
+    await asyncio.sleep(5)  # Wait for connection
+    
+    # Test different time frames and periods
+    times = [3600 * i for i in range(1, 11)]  # 1-10 hours back
+    time_frames = [1, 5, 15, 30, 60, 300]  # Different timeframes in seconds
+    
+    for time in times:
+        for frame in time_frames:
+            # Get candles data
+            candles = await api.get_candles("EURUSD_otc", frame, time)
+            
+            # Convert to pandas DataFrame for analysis
+            candles_df = pd.DataFrame.from_dict(candles)
+            print(f"Timeframe: {frame}s, Period: {time}s")
+            print(f"Candles DataFrame: {candles_df.head()}")
+            print(f"Number of candles: {len(candles_df)}")
+            print("-" * 50)
+
+if __name__ == '__main__':
+    ssid = input('Please enter your ssid: ')
+    asyncio.run(main(ssid))</code></pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payout Rates Example -->
+                        <div id="payout-rates" class="example-block">
+                            <div class="example-header">
+                                <h3>Payout Rates</h3>
+                                <span class="difficulty-badge beginner">Beginner</span>
+                            </div>
+                            <p>Get current payout rates for different assets</p>
+                            
+                            <div class="code-tabs">
+                                <button class="tab-button active" data-tab="payout-python">Python</button>
+                            </div>
+                            
+                            <div class="tab-content active" id="payout-python">
+                                <div class="code-block">
+                                    <div class="code-header">
+                                        <span class="filename">payout_rates.py</span>
+                                        <button class="copy-btn" onclick="copyCode('payout-code')">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <pre><code id="payout-code" class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main(ssid: str):
+    api = PocketOptionAsync(ssid)    
+    await asyncio.sleep(5)  # Wait for connection
+    
+    # Get all available payouts
+    full_payout = await api.payout()
+    print(f"All Payouts: {full_payout}")
+    
+    # Get payouts for specific assets
+    assets = ["EURUSD_otc", "EURUSD", "AEX25"]
+    partial_payout = await api.payout(assets)
+    print(f"Specific Assets Payout: {partial_payout}")
+    
+    # Get payout for single asset
+    single_payout = await api.payout("EURUSD_otc")
+    print(f"EURUSD_otc Payout: {single_payout}%")
+
+if __name__ == '__main__':
+    ssid = input('Please enter your ssid: ')
+    asyncio.run(main(ssid))</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
             </div>
         </section>
 
@@ -1191,10 +1652,6 @@ impl HighPerformanceTrader {
         }
     }
 
-    fn calculate_moving_average(data: &[MarketData]) -> f64 {
-        data.iter().map(|d| d.price).sum::<f64>() / data.len() as f64
-    }
-
     async fn setup_signal_processor(&self) -> mpsc::UnboundedReceiver<TradingSignal> {
         let (sender, receiver) = mpsc::unbounded_channel();
         self.signal_sender.clone(); // Store sender for later use
@@ -1357,8 +1814,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         </div>
     </footer>
 
+    <!-- JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
     <script src="assets/js/main.js"></script>
-    <script src="assets/js/animations.js"></script>
-    <script src="assets/js/code-highlight.js"></script>
+    <script src="assets/js/examples.js"></script>
 </body>
 </html>
