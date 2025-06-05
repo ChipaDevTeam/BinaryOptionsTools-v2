@@ -4,10 +4,9 @@ class DocumentationApp {
         this.currentLanguage = 'python';
         this.isScrolling = false;
         this.init();
-    }
-
-    init() {
+    }    init() {
         this.setupLanguageTabs();
+        this.setupInstallationTabs();
         this.setupScrollAnimations();
         this.setupNavigation();
         this.setupCopyButtons();
@@ -15,6 +14,8 @@ class DocumentationApp {
         this.setupTypewriter();
         this.setupParallaxEffects();
         this.setupThemeToggle();
+        this.setupSmoothScrolling();
+        this.trackPerformance();
     }
 
     // Language Tab Functionality
@@ -71,6 +72,8 @@ class DocumentationApp {
 
     // Scroll Animations
     setupScrollAnimations() {
+        const animatedElements = document.querySelectorAll('.animate-on-scroll, .feature-card, .api-feature');
+        
         const observerOptions = {
             threshold: 0.1,
             rootMargin: '0px 0px -50px 0px'
@@ -79,22 +82,14 @@ class DocumentationApp {
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    entry.target.classList.add('animate-in');
-                    
-                    // Stagger animations for children
-                    const children = entry.target.querySelectorAll('.stagger-child');
-                    children.forEach((child, index) => {
-                        setTimeout(() => {
-                            child.classList.add('animate-in');
-                        }, index * 100);
-                    });
+                    const animation = entry.target.dataset.animation || 'fade-in-up';
+                    entry.target.classList.add('animate', animation);
                 }
             });
         }, observerOptions);
 
-        // Observe all animatable elements
-        document.querySelectorAll('.fade-in-up, .fade-in-left, .fade-in-right, .scale-in').forEach(el => {
-            observer.observe(el);
+        animatedElements.forEach(element => {
+            observer.observe(element);
         });
     }
 
@@ -145,52 +140,85 @@ class DocumentationApp {
         });
     }
 
-    // Copy to Clipboard Functionality
+    // Enhanced Copy Button Functionality
     setupCopyButtons() {
-        const codeBlocks = document.querySelectorAll('pre[class*="language-"]');
+        const copyButtons = document.querySelectorAll('.copy-btn');
         
-        codeBlocks.forEach(block => {
-            const button = document.createElement('button');
-            button.className = 'copy-btn';
-            button.innerHTML = `
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-                Copy
-            `;
-            
-            block.style.position = 'relative';
-            block.appendChild(button);
-
-            button.addEventListener('click', async () => {
-                const code = block.querySelector('code').textContent;
-                try {
-                    await navigator.clipboard.writeText(code);
-                    button.innerHTML = `
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M20 6L9 17l-5-5"></path>
-                        </svg>
-                        Copied!
-                    `;
-                    button.classList.add('copied');
-                    
-                    setTimeout(() => {
-                        button.innerHTML = `
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                            </svg>
-                            Copy
-                        `;
-                        button.classList.remove('copied');
-                    }, 2000);
-                } catch (err) {
-                    console.error('Failed to copy:', err);
-                    button.textContent = 'Failed to copy';
+        copyButtons.forEach(button => {
+            button.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const textToCopy = button.dataset.copy || button.parentElement.querySelector('code')?.textContent;
+                
+                if (textToCopy) {
+                    try {
+                        await navigator.clipboard.writeText(textToCopy);
+                        
+                        // Visual feedback
+                        const originalIcon = button.innerHTML;
+                        button.innerHTML = '<i class="fas fa-check"></i>';
+                        button.classList.add('copied');
+                        
+                        setTimeout(() => {
+                            button.innerHTML = originalIcon;
+                            button.classList.remove('copied');
+                        }, 2000);
+                        
+                        // Show toast notification
+                        this.showToast('Code copied to clipboard!', 'success');
+                    } catch (err) {
+                        console.error('Failed to copy text: ', err);
+                        this.showToast('Failed to copy code', 'error');
+                    }
                 }
             });
         });
+    }
+
+    // Installation Tab Functionality
+    setupInstallationTabs() {
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabPanes = document.querySelectorAll('.tab-pane');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetTab = button.dataset.tab;
+                
+                // Remove active class from all buttons and panes
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabPanes.forEach(pane => pane.classList.remove('active'));
+                
+                // Add active class to selected button and pane
+                button.classList.add('active');
+                const targetPane = document.querySelector(`.tab-pane[data-tab="${targetTab}"]`);
+                if (targetPane) {
+                    targetPane.classList.add('active');
+                }
+            });
+        });
+    }
+
+    // Toast Notification System
+    showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+            <div class="toast-content">
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                <span>${message}</span>
+            </div>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Trigger animation
+        setTimeout(() => toast.classList.add('show'), 100);
+        
+        // Auto remove
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => document.body.removeChild(toast), 300);
+        }, 3000);
     }
 
     // Mobile Menu
@@ -305,6 +333,22 @@ class DocumentationApp {
                 document.body.classList.add('dark-theme');
             }
         }
+    }
+
+    // Performance Monitoring
+    trackPerformance() {
+        // Track page load time
+        window.addEventListener('load', () => {
+            const loadTime = performance.now();
+            console.log(`Documentation loaded in ${loadTime.toFixed(2)}ms`);
+        });
+
+        // Track user interactions
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('.btn, .nav-link, .feature-card')) {
+                console.log(`User clicked: ${e.target.textContent?.trim() || e.target.className}`);
+            }
+        });
     }
 
     // Utility Methods
