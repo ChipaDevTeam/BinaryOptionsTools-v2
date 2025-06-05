@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JavaScript Documentation - BinaryOptionsToolsV2</title>
+    <meta name="description" content="Complete JavaScript documentation for BinaryOptionsToolsV2 - Binary options trading tools with Node.js and browser support">
+    <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="stylesheet" href="assets/css/animations.css">    <link rel="stylesheet" href="assets/css/code-highlight.css">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h2>BinaryOptionsToolsV2</h2>
+            </div>
+            <div class="nav-toggle" id="mobile-menu">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="index.html" class="nav-link">Home</a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-link dropdown-toggle">Languages</a>
+                    <ul class="dropdown-menu">
+                        <li><a href="python.html">Python</a></li>
+                        <li><a href="javascript.html" class="active">JavaScript</a></li>
+                        <li><a href="rust.html">Rust</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item">
+                    <a href="examples.html" class="nav-link">Examples</a>
+                </li>
+                <li class="nav-item">
+                    <a href="api.html" class="nav-link">API Reference</a>
+                </li>
+                <li class="nav-item">
+                    <a href="https://chipa.tech" class="nav-link btn-outline" target="_blank">Bot Services</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero-section javascript-hero">
+            <div class="container">
+                <div class="hero-content fade-in-up">
+                    <h1>JavaScript Documentation</h1>
+                    <p class="hero-subtitle">Complete JavaScript integration guide for BinaryOptionsToolsV2</p>
+                    <div class="hero-badges">
+                        <span class="badge">Node.js</span>
+                        <span class="badge">Browser</span>
+                        <span class="badge">Promise-based</span>
+                        <span class="badge">TypeScript Ready</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Installation</h2>
+                    <p>Get started with BinaryOptionsToolsV2 in JavaScript</p>
+                </div>
+
+                <div class="tabs-container fade-in-up stagger-1">
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="npm">npm</button>
+                        <button class="tab-btn" data-tab="yarn">yarn</button>
+                        <button class="tab-btn" data-tab="cdn">CDN</button>
+                    </div>
+
+                    <div class="tab-content active" id="npm">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">bash</span>
+                                <button class="copy-btn" data-clipboard-target="#npm-code">Copy</button>
+                            </div>
+                            <pre><code id="npm-code">npm install binaryoptionstools-v2</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="yarn">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">bash</span>
+                                <button class="copy-btn" data-clipboard-target="#yarn-code">Copy</button>
+                            </div>
+                            <pre><code id="yarn-code">yarn add binaryoptionstools-v2</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="cdn">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">html</span>
+                                <button class="copy-btn" data-clipboard-target="#cdn-code">Copy</button>
+                            </div>
+                            <pre><code id="cdn-code">&lt;script src="https://cdn.jsdelivr.net/npm/binaryoptionstools-v2@latest/dist/index.min.js"&gt;&lt;/script&gt;</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Quick Start</h2>
+                    <p>Basic usage examples for JavaScript environments</p>
+                </div>
+
+                <div class="tabs-container fade-in-up stagger-2">
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="nodejs">Node.js</button>
+                        <button class="tab-btn" data-tab="browser">Browser</button>
+                        <button class="tab-btn" data-tab="typescript">TypeScript</button>
+                    </div>
+
+                    <div class="tab-content active" id="nodejs">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">javascript</span>
+                                <button class="copy-btn" data-clipboard-target="#nodejs-code">Copy</button>
+                            </div>
+                            <pre><code id="nodejs-code">const { PocketOption } = require('binaryoptionstools-v2');
+
+async function main() {
+    // Initialize the client
+    const client = new PocketOption({
+        ssid: 'your_ssid_here'
+    });
+
+    try {
+        // Get account balance
+        const balance = await client.getBalance();
+        console.log(`Balance: $${balance}`);
+
+        // Get candles data
+        const candles = await client.getCandles('EURUSD_otc', 60, 100);
+        candles.forEach(candle => {
+            console.log(`Open: ${candle.open}, Close: ${candle.close}`);
+        });
+
+        // Create a raw order
+        const orderResult = await client.createRawOrder({
+            asset: 'EURUSD_otc',
+            amount: 10.0,
+            action: 'call',
+            expiration: 60
+        });
+        console.log(`Order ID: ${orderResult.orderId}`);
+
+        // Check win status
+        const winStatus = await client.checkWin(orderResult.orderId);
+        console.log(`Win status: ${winStatus}`);
+
+    } catch (error) {
+        console.error('Error:', error.message);
+    }
+}
+
+main();</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="browser">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">html</span>
+                                <button class="copy-btn" data-clipboard-target="#browser-code">Copy</button>
+                            </div>
+                            <pre><code id="browser-code">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;Binary Options Trading&lt;/title&gt;
+    &lt;script src="https://cdn.jsdelivr.net/npm/binaryoptionstools-v2@latest/dist/index.min.js"&gt;&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;script&gt;
+        async function initTrading() {
+            const client = new BinaryOptionsToolsV2.PocketOption({
+                ssid: 'your_ssid_here'
+            });
+
+            // Get balance and display
+            const balance = await client.getBalance();
+            document.getElementById('balance').textContent = `$${balance}`;
+
+            // Stream live candles
+            const stream = client.streamCandles('EURUSD_otc', 60);
+            stream.on('candle', (candle) => {
+                console.log('New candle:', candle);
+                updateChart(candle);
+            });
+        }
+
+        function updateChart(candle) {
+            // Update your chart visualization here
+            console.log(`Price: ${candle.close}`);
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', initTrading);
+    &lt;/script&gt;
+    
+    &lt;div id="balance"&gt;Loading...&lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="typescript">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">typescript</span>
+                                <button class="copy-btn" data-clipboard-target="#typescript-code">Copy</button>
+                            </div>
+                            <pre><code id="typescript-code">import { PocketOption, OrderResult, CandleData } from 'binaryoptionstools-v2';
+
+interface TradingConfig {
+    ssid: string;
+    defaultAsset: string;
+    defaultAmount: number;
+}
+
+class TradingBot {
+    private client: PocketOption;
+    private config: TradingConfig;
+
+    constructor(config: TradingConfig) {
+        this.config = config;
+        this.client = new PocketOption({
+            ssid: config.ssid
+        });
+    }
+
+    async getAccountInfo(): Promise<{ balance: number; history: any[] }> {
+        const [balance, history] = await Promise.all([
+            this.client.getBalance(),
+            this.client.getHistory(50)
+        ]);
+
+        return { balance, history };
+    }
+
+    async placeOrder(
+        asset: string = this.config.defaultAsset,
+        amount: number = this.config.defaultAmount,
+        action: 'call' | 'put' = 'call',
+        expiration: number = 60
+    ): Promise<OrderResult> {
+        return await this.client.createRawOrder({
+            asset,
+            amount,
+            action,
+            expiration
+        });
+    }
+
+    async monitorCandles(asset: string, timeframe: number): Promise<void> {
+        const stream = this.client.streamCandles(asset, timeframe);
+        
+        stream.on('candle', (candle: CandleData) => {
+            this.analyzeCandle(candle);
+        });
+
+        stream.on('error', (error: Error) => {
+            console.error('Stream error:', error);
+        });
+    }
+
+    private analyzeCandle(candle: CandleData): void {
+        // Implement your trading logic here
+        console.log(`Analyzing candle: ${candle.close}`);
+    }
+}
+
+// Usage
+const config: TradingConfig = {
+    ssid: 'your_ssid_here',
+    defaultAsset: 'EURUSD_otc',
+    defaultAmount: 10.0
+};
+
+const bot = new TradingBot(config);
+bot.monitorCandles('EURUSD_otc', 60);</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Core Classes & Methods</h2>
+                    <p>JavaScript API reference</p>
+                </div>
+
+                <div class="api-grid fade-in-up stagger-3">
+                    <div class="api-card">
+                        <h3>PocketOption</h3>
+                        <p>Main client class for PocketOption trading operations</p>
+                        <div class="method-list">
+                            <div class="method">
+                                <code>getBalance()</code>
+                                <span>Returns Promise&lt;number&gt;</span>
+                            </div>
+                            <div class="method">
+                                <code>getCandles(asset, timeframe, count)</code>
+                                <span>Returns Promise&lt;CandleData[]&gt;</span>
+                            </div>
+                            <div class="method">
+                                <code>createRawOrder(options)</code>
+                                <span>Returns Promise&lt;OrderResult&gt;</span>
+                            </div>
+                            <div class="method">
+                                <code>checkWin(orderId)</code>
+                                <span>Returns Promise&lt;WinStatus&gt;</span>
+                            </div>
+                            <div class="method">
+                                <code>streamCandles(asset, timeframe)</code>
+                                <span>Returns EventEmitter</span>
+                            </div>
+                            <div class="method">
+                                <code>getHistory(limit)</code>
+                                <span>Returns Promise&lt;HistoryItem[]&gt;</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="api-card">
+                        <h3>Types & Interfaces</h3>
+                        <p>TypeScript interfaces and type definitions</p>
+                        <div class="method-list">
+                            <div class="method">
+                                <code>CandleData</code>
+                                <span>{ open, high, low, close, volume, timestamp }</span>
+                            </div>
+                            <div class="method">
+                                <code>OrderResult</code>
+                                <span>{ orderId, success, message }</span>
+                            </div>
+                            <div class="method">
+                                <code>OrderOptions</code>
+                                <span>{ asset, amount, action, expiration }</span>
+                            </div>
+                            <div class="method">
+                                <code>WinStatus</code>
+                                <span>'win' | 'lose' | 'pending'</span>
+                            </div>
+                            <div class="method">
+                                <code>HistoryItem</code>
+                                <span>Trading history entry</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Advanced Features</h2>
+                    <p>Professional features for JavaScript developers</p>
+                </div>
+
+                <div class="features-grid fade-in-up stagger-4">
+                    <div class="feature-card">
+                        <div class="feature-icon">🌊</div>
+                        <h3>Real-time Streaming</h3>
+                        <p>EventEmitter-based streaming for live data</p>
+                        <div class="code-block small">
+                            <pre><code>const stream = client.streamCandles('EURUSD_otc', 60);
+stream.on('candle', (candle) => {
+    console.log('New candle:', candle.close);
+});</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🔧</div>
+                        <h3>Event-Driven Architecture</h3>
+                        <p>Reactive programming with event emitters</p>
+                        <div class="code-block small">
+                            <pre><code>client.on('order_complete', (result) => {
+    console.log('Order completed:', result);
+});
+
+client.on('error', (error) => {
+    console.error('Client error:', error);
+});</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3>Promise-based API</h3>
+                        <p>Modern async/await support throughout</p>
+                        <div class="code-block small">
+                            <pre><code>try {
+    const [balance, candles] = await Promise.all([
+        client.getBalance(),
+        client.getCandles('EURUSD_otc', 60, 100)
+    ]);
+} catch (error) {
+    console.error(error);
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h3>TypeScript Support</h3>
+                        <p>Full type definitions included</p>
+                        <div class="code-block small">
+                            <pre><code>import { PocketOption, OrderOptions } from 'binaryoptionstools-v2';
+
+const options: OrderOptions = {
+    asset: 'EURUSD_otc',
+    amount: 10,
+    action: 'call',
+    expiration: 60
+};</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🔌</div>
+                        <h3>WebSocket Integration</h3>
+                        <p>Real-time data via WebSocket connections</p>
+                        <div class="code-block small">
+                            <pre><code>client.enableWebSocket({
+    reconnect: true,
+    timeout: 30000
+});
+
+client.subscribeToAsset('EURUSD_otc');</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">📱</div>
+                        <h3>Cross-Platform</h3>
+                        <p>Works in Node.js, browsers, and mobile apps</p>
+                        <div class="code-block small">
+                            <pre><code>// Node.js
+const { PocketOption } = require('binaryoptionstools-v2');
+
+// Browser
+import { PocketOption } from 'binaryoptionstools-v2';
+
+// React Native
+import { PocketOption } from 'binaryoptionstools-v2/native';</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Error Handling</h2>
+                    <p>Robust error handling patterns</p>
+                </div>
+
+                <div class="code-block fade-in-up stagger-5">
+                    <div class="code-header">
+                        <span class="code-lang">javascript</span>
+                        <button class="copy-btn" data-clipboard-target="#error-code">Copy</button>
+                    </div>
+                    <pre><code id="error-code">const { PocketOption, BinaryOptionsError } = require('binaryoptionstools-v2');
+
+async function safeTrading() {
+    const client = new PocketOption({ ssid: 'your_ssid' });
+
+    try {
+        // Set up error handlers
+        client.on('error', (error) => {
+            if (error instanceof BinaryOptionsError) {
+                console.error('Trading error:', error.code, error.message);
+            } else {
+                console.error('Unexpected error:', error);
+            }
+        });
+
+        // Connection error handling
+        client.on('disconnect', () => {
+            console.log('Connection lost, attempting to reconnect...');
+        });
+
+        client.on('reconnect', () => {
+            console.log('Reconnected successfully');
+        });
+
+        // Graceful order placement with retry
+        const maxRetries = 3;
+        let attempt = 0;
+
+        while (attempt < maxRetries) {
+            try {
+                const order = await client.createRawOrder({
+                    asset: 'EURUSD_otc',
+                    amount: 10,
+                    action: 'call',
+                    expiration: 60
+                });
+
+                console.log('Order placed successfully:', order.orderId);
+                break;
+
+            } catch (error) {
+                attempt++;
+                console.warn(`Order attempt ${attempt} failed:`, error.message);
+                
+                if (attempt >= maxRetries) {
+                    throw new Error('Max retries exceeded');
+                }
+                
+                // Wait before retry
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            }
+        }
+
+    } catch (error) {
+        console.error('Fatal error:', error.message);
+        process.exit(1);
+    }
+}
+
+safeTrading();</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section class="cta-section">
+            <div class="container">
+                <div class="cta-content fade-in-up">
+                    <h2>Need Professional Bot Development?</h2>
+                    <p>Get custom JavaScript trading bots built by experts at chipa.tech</p>
+                    <div class="cta-buttons">
+                        <a href="https://chipa.tech" class="btn btn-primary" target="_blank">
+                            Explore Bot Services
+                        </a>
+                        <a href="examples.html#javascript" class="btn btn-outline">
+                            View JavaScript Examples
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>BinaryOptionsToolsV2</h3>
+                    <p>Professional trading tools for binary options</p>
+                    <div class="social-links">
+                        <a href="#" aria-label="GitHub">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4>Documentation</h4>
+                    <ul>
+                        <li><a href="python.html">Python</a></li>
+                        <li><a href="javascript.html">JavaScript</a></li>
+                        <li><a href="rust.html">Rust</a></li>
+                        <li><a href="api.html">API Reference</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Examples</h4>
+                    <ul>
+                        <li><a href="examples.html">All Examples</a></li>
+                        <li><a href="examples.html#javascript">JavaScript Examples</a></li>
+                        <li><a href="examples.html#nodejs">Node.js Examples</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Services</h4>
+                    <ul>
+                        <li><a href="https://chipa.tech" target="_blank">Bot Development</a></li>
+                        <li><a href="https://chipa.tech" target="_blank">Custom Solutions</a></li>
+                        <li><a href="https://chipa.tech" target="_blank">Consulting</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 BinaryOptionsToolsV2. All rights reserved.</p>
+                <p>Professional bot services by <a href="https://chipa.tech" target="_blank">chipa.tech</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/animations.js"></script>
+    <script src="assets/js/code-highlight.js"></script>
+</body>
+</html>

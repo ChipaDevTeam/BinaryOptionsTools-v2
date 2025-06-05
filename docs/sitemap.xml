@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+
+    <!-- Homepage -->
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>1.0</priority>
+    </url>
+
+    <!-- Main Documentation Pages -->
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/python.html</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/javascript.html</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/rust.html</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+
+    <!-- API Reference -->
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+
+    <!-- Examples -->
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/examples.html</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.7</priority>
+    </url>
+
+    <!-- Language-specific API sections -->
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html#python</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.6</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html#javascript</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.6</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html#rust</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.6</priority>
+    </url>
+
+    <!-- API Method Categories -->
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html#connection</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html#trading</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html#account</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html#market-data</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html#indicators</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html#signals</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html#backtesting</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html#helpers</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html#events</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/api.html#logging</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+
+    <!-- Documentation sections -->
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/python.html#installation</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/python.html#quickstart</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/python.html#examples</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/javascript.html#installation</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/javascript.html#quickstart</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/javascript.html#examples</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/rust.html#installation</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/rust.html#quickstart</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/rust.html#examples</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+
+    <!-- Examples sections -->
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/examples.html#beginner</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.3</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/examples.html#intermediate</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.3</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/examples.html#advanced</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.3</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/examples.html#trading-bots</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.3</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/examples.html#web-apps</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.3</priority>
+    </url>
+
+    <url>
+        <loc>https://your-username.github.io/BinaryOptionsTools-v2-1/examples.html#high-performance</loc>
+        <lastmod>2024-12-19</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.3</priority>
+    </url>
+
+</urlset>

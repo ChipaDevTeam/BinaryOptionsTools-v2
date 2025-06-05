@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BinaryOptionsTools V2 - Advanced Binary Options Trading Library</title>
+    <meta name="description" content="Professional binary options trading tools for Python, JavaScript, and Rust. Real-time data streaming, automated trading, and comprehensive API documentation.">
+    <meta name="keywords" content="binary options, trading, API, Python, JavaScript, Rust, PocketOption, automated trading">
+      <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="stylesheet" href="assets/css/animations.css">
+    <link rel="stylesheet" href="assets/css/code-highlight.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <img src="assets/images/logo.svg" alt="BinaryOptionsTools V2" class="logo">
+                <span class="brand-text">BinaryOptionsTools V2</span>
+            </div>
+            
+            <ul class="nav-menu" id="nav-menu">
+                <li class="nav-item">
+                    <a href="#home" class="nav-link active">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#features" class="nav-link">Features</a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-link dropdown-toggle">Documentation <i class="fas fa-chevron-down"></i></a>
+                    <ul class="dropdown-menu">
+                        <li><a href="python.html" class="dropdown-link">Python API</a></li>
+                        <li><a href="javascript.html" class="dropdown-link">JavaScript API</a></li>
+                        <li><a href="rust.html" class="dropdown-link">Rust API</a></li>
+                        <li><a href="examples.html" class="dropdown-link">Examples</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item">
+                    <a href="#installation" class="nav-link">Installation</a>
+                </li>
+                <li class="nav-item">
+                    <a href="https://chipa.tech/shop/" class="nav-link" target="_blank">Bot Services</a>
+                </li>
+            </ul>
+            
+            <div class="nav-toggle" id="nav-toggle">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-background">
+            <div class="floating-particles"></div>
+        </div>
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="hero-title animate-fade-in">
+                    <span class="gradient-text">BinaryOptionsTools V2</span>
+                </h1>
+                <p class="hero-subtitle animate-fade-in-delay">
+                    The most advanced binary options trading library for Python, JavaScript, and Rust.
+                    Build sophisticated trading bots with real-time data streaming and automated execution.
+                </p>
+                
+                <div class="hero-cta animate-fade-in-delay-2">
+                    <a href="#installation" class="btn btn-primary btn-large">
+                        <i class="fas fa-download"></i>
+                        Get Started
+                    </a>
+                    <a href="#features" class="btn btn-secondary btn-large">
+                        <i class="fas fa-play"></i>
+                        View Demo
+                    </a>
+                </div>
+                
+                <div class="hero-stats animate-fade-in-delay-3">
+                    <div class="stat">
+                        <span class="stat-number">3</span>
+                        <span class="stat-label">Languages</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">50+</span>
+                        <span class="stat-label">Functions</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">24/7</span>
+                        <span class="stat-label">Real-time Data</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="hero-code-demo animate-slide-up">
+                <div class="code-tabs">
+                    <button class="code-tab active" data-lang="python">Python</button>
+                    <button class="code-tab" data-lang="javascript">JavaScript</button>
+                    <button class="code-tab" data-lang="rust">Rust</button>
+                </div>
+                
+                <div class="code-content">
+                    <div class="code-block active" data-lang="python">
+                        <pre><code class="language-python"># Quick Start - Python
+from BinaryOptionsToolsV2.pocketoption import PocketOption
+import time
+
+# Initialize the API
+api = PocketOption(ssid="your-session-id")
+time.sleep(5)
+
+# Get account balance
+balance = api.balance()
+print(f"Balance: ${balance}")
+
+# Place a trade
+trade_id, trade_data = api.buy(
+    asset="EURUSD_otc", 
+    amount=1.0, 
+    time=60
+)
+print(f"Trade placed: {trade_id}")</code></pre>
+                    </div>
+                    
+                    <div class="code-block" data-lang="javascript">
+                        <pre><code class="language-javascript">// Quick Start - JavaScript
+const { PocketOption } = require('@rick-29/binary-options-tools');
+
+async function main() {
+    // Initialize the API
+    const api = new PocketOption('your-session-id');
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    // Get account balance
+    const balance = await api.balance();
+    console.log(`Balance: $${balance}`);
+    
+    // Place a trade
+    const tradeData = await api.buy({
+        asset: "EURUSD_otc",
+        amount: 1.0,
+        time: 60
+    });
+    console.log('Trade placed:', tradeData);
+}
+
+main().catch(console.error);</code></pre>
+                    </div>
+                    
+                    <div class="code-block" data-lang="rust">
+                        <pre><code class="language-rust">// Quick Start - Rust
+use binary_options_tools::PocketOption;
+use tokio;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize the API
+    let api = PocketOption::new("your-session-id").await?;
+    
+    // Get account balance
+    let balance = api.balance().await?;
+    println!("Balance: ${}", balance);
+    
+    // Place a trade
+    let trade_data = api.buy("EURUSD_otc", 1.0, 60).await?;
+    println!("Trade placed: {:?}", trade_data);
+    
+    Ok(())
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Powerful Features</h2>
+                <p class="section-subtitle">Everything you need to build professional trading applications</p>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card animate-on-scroll" data-animation="fade-in-left">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3 class="feature-title">Real-time Data Streaming</h3>
+                    <p class="feature-description">
+                        Stream live market data with WebSocket connections. Get instant price updates, 
+                        candlestick data, and market changes as they happen.
+                    </p>
+                </div>
+                
+                <div class="feature-card animate-on-scroll" data-animation="fade-in-up">
+                    <div class="feature-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h3 class="feature-title">Automated Trading</h3>
+                    <p class="feature-description">
+                        Execute trades programmatically with high precision. Support for both buy/sell 
+                        operations with customizable parameters and risk management.
+                    </p>
+                </div>
+                
+                <div class="feature-card animate-on-scroll" data-animation="fade-in-right">
+                    <div class="feature-icon">
+                        <i class="fas fa-code"></i>
+                    </div>
+                    <h3 class="feature-title">Multi-language Support</h3>
+                    <p class="feature-description">
+                        Native support for Python, JavaScript, and Rust. Choose your preferred 
+                        language while maintaining the same powerful functionality.
+                    </p>
+                </div>
+                
+                <div class="feature-card animate-on-scroll" data-animation="fade-in-left">
+                    <div class="feature-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3 class="feature-title">Secure & Reliable</h3>
+                    <p class="feature-description">
+                        Built with security in mind. Encrypted connections, secure authentication, 
+                        and robust error handling for production environments.
+                    </p>
+                </div>
+                
+                <div class="feature-card animate-on-scroll" data-animation="fade-in-up">
+                    <div class="feature-icon">
+                        <i class="fas fa-tachometer-alt"></i>
+                    </div>
+                    <h3 class="feature-title">High Performance</h3>
+                    <p class="feature-description">
+                        Optimized for speed with Rust core. Handle thousands of operations per second 
+                        with minimal latency and maximum throughput.
+                    </p>
+                </div>
+                
+                <div class="feature-card animate-on-scroll" data-animation="fade-in-right">
+                    <div class="feature-icon">
+                        <i class="fas fa-cogs"></i>
+                    </div>
+                    <h3 class="feature-title">Easy Integration</h3>
+                    <p class="feature-description">
+                        Simple APIs with comprehensive documentation. Get started in minutes with 
+                        our extensive examples and detailed guides.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation Section -->
+    <section id="installation" class="installation">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Quick Installation</h2>
+                <p class="section-subtitle">Get up and running in under 5 minutes</p>
+            </div>
+            
+            <div class="installation-tabs">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-tab="python">
+                        <i class="fab fa-python"></i>
+                        Python
+                    </button>
+                    <button class="tab-btn" data-tab="javascript">
+                        <i class="fab fa-js-square"></i>
+                        JavaScript
+                    </button>
+                    <button class="tab-btn" data-tab="rust">
+                        <i class="fab fa-rust"></i>
+                        Rust
+                    </button>
+                </div>
+                
+                <div class="tab-content">
+                    <div class="tab-pane active" data-tab="python">
+                        <div class="install-step">
+                            <h4>1. Install via pip</h4>
+                            <div class="code-snippet">
+                                <pre><code>pip install binaryoptionstoolsv2==0.1.6a3</code></pre>
+                                <button class="copy-btn" data-copy="pip install binaryoptionstoolsv2==0.1.6a3">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <h4>2. Import and initialize</h4>
+                            <div class="code-snippet">
+                                <pre><code>from BinaryOptionsToolsV2.pocketoption import PocketOption
+api = PocketOption(ssid="your-session-id")</code></pre>
+                                <button class="copy-btn" data-copy="from BinaryOptionsToolsV2.pocketoption import PocketOption&#10;api = PocketOption(ssid=&quot;your-session-id&quot;)">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="requirements">
+                            <h4>Requirements</h4>
+                            <ul>
+                                <li>Python 3.9 - 3.12</li>
+                                <li>Windows OS (Linux/Mac support coming soon)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-pane" data-tab="javascript">
+                        <div class="install-step">
+                            <h4>1. Install via npm</h4>
+                            <div class="code-snippet">
+                                <pre><code>npm install @rick-29/binary-options-tools</code></pre>
+                                <button class="copy-btn" data-copy="npm install @rick-29/binary-options-tools">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <h4>2. Import and initialize</h4>
+                            <div class="code-snippet">
+                                <pre><code>const { PocketOption } = require('@rick-29/binary-options-tools');
+const api = new PocketOption('your-session-id');</code></pre>
+                                <button class="copy-btn" data-copy="const { PocketOption } = require('@rick-29/binary-options-tools');&#10;const api = new PocketOption('your-session-id');">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="requirements">
+                            <h4>Requirements</h4>
+                            <ul>
+                                <li>Node.js >= 10</li>
+                                <li>Support for multiple platforms</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-pane" data-tab="rust">
+                        <div class="install-step">
+                            <h4>1. Add to Cargo.toml</h4>
+                            <div class="code-snippet">
+                                <pre><code>[dependencies]
+binary-options-tools = "0.1.0"
+tokio = { version = "1.0", features = ["full"] }</code></pre>
+                                <button class="copy-btn" data-copy="[dependencies]&#10;binary-options-tools = &quot;0.1.0&quot;&#10;tokio = { version = &quot;1.0&quot;, features = [&quot;full&quot;] }">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <h4>2. Import and initialize</h4>
+                            <div class="code-snippet">
+                                <pre><code>use binary_options_tools::PocketOption;
+let api = PocketOption::new("your-session-id").await?;</code></pre>
+                                <button class="copy-btn" data-copy="use binary_options_tools::PocketOption;&#10;let api = PocketOption::new(&quot;your-session-id&quot;).await?;">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="requirements">
+                            <h4>Requirements</h4>
+                            <ul>
+                                <li>Rust 1.70+</li>
+                                <li>Tokio runtime for async operations</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Bot Services CTA -->
+    <section class="bot-services">
+        <div class="container">
+            <div class="services-content">
+                <div class="services-text">
+                    <h2>Need a Custom Trading Bot?</h2>
+                    <p>
+                        Let our expert team create a fully customized trading bot tailored to your specific needs. 
+                        We offer professional bot development services with advanced strategies, risk management, 
+                        and 24/7 monitoring.
+                    </p>
+                    <div class="services-features">
+                        <div class="service-feature">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Custom Strategy Development</span>
+                        </div>
+                        <div class="service-feature">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Advanced Risk Management</span>
+                        </div>
+                        <div class="service-feature">
+                            <i class="fas fa-check-circle"></i>
+                            <span>24/7 Technical Support</span>
+                        </div>
+                        <div class="service-feature">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Performance Monitoring</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="services-cta">
+                    <a href="https://chipa.tech/product/create-your-bot/" class="btn btn-primary btn-large" target="_blank">
+                        <i class="fas fa-robot"></i>
+                        Create Your Bot
+                    </a>
+                    <a href="https://chipa.tech/shop/" class="btn btn-secondary btn-large" target="_blank">
+                        <i class="fas fa-store"></i>
+                        Browse Services
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>BinaryOptionsTools V2</h3>
+                    <p>The ultimate binary options trading library for developers.</p>
+                    <div class="social-links">
+                        <a href="https://discord.gg/T3FGXcmd" target="_blank" aria-label="Discord">
+                            <i class="fab fa-discord"></i>
+                        </a>
+                        <a href="https://github.com/ChipaDevTeam" target="_blank" aria-label="GitHub">
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Documentation</h4>
+                    <ul>
+                        <li><a href="python.html">Python API</a></li>
+                        <li><a href="javascript.html">JavaScript API</a></li>
+                        <li><a href="rust.html">Rust API</a></li>
+                        <li><a href="examples.html">Examples</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Services</h4>
+                    <ul>
+                        <li><a href="https://chipa.tech/shop/" target="_blank">Bot Development</a></li>
+                        <li><a href="https://chipa.tech/product/create-your-bot/" target="_blank">Custom Solutions</a></li>
+                        <li><a href="https://chipa.tech/" target="_blank">Chipa.tech</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Support</h4>
+                    <ul>
+                        <li><a href="https://discord.gg/T3FGXcmd" target="_blank">Discord Community</a></li>
+                        <li><a href="mailto:support@chipa.tech">Contact Support</a></li>
+                        <li><a href="https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues" target="_blank">Report Issues</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2025 ChipaDev Team. All rights reserved.</p>
+                <p>Build professional trading applications with confidence.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/animations.js"></script>
+    <script src="assets/js/code-highlight.js"></script>
+</body>
+</html>
+    <script src="assets/js/main.js"></script>
+</body>
+</html>
