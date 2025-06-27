@@ -1,4 +1,5 @@
 use core::fmt;
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -23,6 +24,11 @@ pub struct Demo {
     is_demo: u32,
     uid: u32,
     platform: u32,
+    is_fast_history: Option<bool>,
+    is_optimized: Option<bool>,
+    #[serde(flatten)]
+    extra: HashMap<String, Value>
+
 }
 
 #[derive(Debug, Serialize, Clone)]
