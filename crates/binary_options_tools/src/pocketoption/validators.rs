@@ -45,7 +45,7 @@ pub fn history_validator(
     period: i64,
 ) -> impl Fn(&WebSocketMessage) -> bool + Send + Sync {
     move |message| {
-        if let WebSocketMessage::UpdateHistoryNew(history) = message {
+        if let WebSocketMessage::UpdateHistoryNewFast(history) = message {
             if history.asset == asset && history.period == period {
                 return true;
             }

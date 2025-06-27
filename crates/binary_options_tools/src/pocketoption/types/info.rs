@@ -9,7 +9,7 @@ use super::base::RawWebsocketMessage;
 pub enum MessageInfo {
     OpenOrder,
     UpdateStream,
-    UpdateHistoryNew,
+    UpdateHistoryNewFast,
     UpdateAssets,
     UpdateBalance,
     SuccesscloseOrder,

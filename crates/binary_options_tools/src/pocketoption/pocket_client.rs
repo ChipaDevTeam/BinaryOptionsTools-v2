@@ -1,5 +1,7 @@
 use std::{
-    collections::{HashMap, HashSet}, ops::Deref, time::{Duration, Instant}
+    collections::{HashMap, HashSet},
+    ops::Deref,
+    time::{Duration, Instant},
 };
 
 use chrono::{DateTime, Utc};
@@ -18,7 +20,7 @@ use binary_options_tools_core::{
     error::BinaryOptionsToolsError,
     general::{
         client::WebSocketClient,
-        config::{Config, _Config},
+        config::{_Config, Config},
         stream::FilteredRecieverStream,
         traits::{MessageTransfer, ValidatorTrait},
         types::{Callback, Data},
@@ -97,14 +99,7 @@ use super::{
 /// It can be safely cloned and shared between multiple tasks.
 #[derive(Clone)]
 pub struct PocketOption {
-    client: WebSocketClient<
-        WebSocketMessage,
-        Handler,
-        PocketConnect,
-        Ssid,
-        PocketData,
-        (),
-        >,
+    client: WebSocketClient<WebSocketMessage, Handler, PocketConnect, Ssid, PocketData, ()>,
 }
 
 impl Deref for PocketOption {
@@ -189,7 +184,7 @@ impl PocketOption {
         Ok(Self { client })
     }
 
-        /// Creates a new PocketOption client with a provided configuration.
+    /// Creates a new PocketOption client with a provided configuration.
     ///
     /// # Arguments
     /// * `ssid` - Session ID for authentication
@@ -214,7 +209,7 @@ impl PocketOption {
         let data = Data::new(PocketData::default());
         let handler = Handler::new(ssid.clone());
         let callback = PocketCallback;
-        
+
         let client = WebSocketClient::init(
             ssid,
             PocketConnect {},
@@ -224,7 +219,7 @@ impl PocketOption {
             config,
         )
         .await?;
-        
+
         Ok(Self { client })
     }
 
@@ -443,7 +438,13 @@ impl PocketOption {
         Err(BinaryOptionsToolsError::Unallowed("Couldn't check result for a deal that is not in the list of opened trades nor closed trades.".into()).into())
     }
 
-    pub async fn get_candles_advanced(&self, asset: impl ToString, time: i64, period: i64, offset: i64) -> PocketResult<Vec<DataCandle>> {
+    pub async fn get_candles_advanced(
+        &self,
+        asset: impl ToString,
+        time: i64,
+        period: i64,
+        offset: i64,
+    ) -> PocketResult<Vec<DataCandle>> {
         info!(target: "GetCandlesAdvanced", "Retrieving candles for asset '{}' with period of '{}' and offset of '{}'", asset.to_string(), period, offset);
         if time == 0 {
             return Err(PocketOptionError::GeneralParsingError(
@@ -530,11 +531,11 @@ impl PocketOption {
                 self.get_timeout()?,
                 "History",
                 WebSocketMessage::ChangeSymbol(request),
-                MessageInfo::UpdateHistoryNew,
+                MessageInfo::UpdateHistoryNewFast,
                 &history_validator(asset.to_string(), period),
             )
             .await?;
-        if let WebSocketMessage::UpdateHistoryNew(history) = res {
+        if let WebSocketMessage::UpdateHistoryNewFast(history) = res {
             return Ok(history.candle_data());
         }
         Err(PocketOptionError::UnexpectedIncorrectWebSocketMessage(
@@ -589,7 +590,10 @@ impl PocketOption {
     /// ```
     pub async fn subscribe_symbol(&self, asset: impl ToString) -> PocketResult<StreamAsset> {
         info!(target: "SubscribeSymbol", "Subscribing to asset '{}'", asset.to_string());
-        let _ = self.history(asset.to_string(), 1).await?;
+        // Send 3 messages, 1 changesymbol, 2 unsubfor, 3 subfor 
+        self.client.send(WebSocketMessage::ChangeSymbol(ChangeSymbol::new(asset.to_string(), 1))).await?;
+        self.client.send(WebSocketMessage::Unsubfor(asset.to_string())).await?;
+        self.client.send(WebSocketMessage::Subfor(asset.to_string())).await?;
         debug!("Created StreamAsset instance.");
         Ok(self.client.data.add_stream(asset.to_string()).await)
     }
@@ -614,7 +618,10 @@ impl PocketOption {
         chunck_size: impl Into<usize>,
     ) -> PocketResult<StreamAsset> {
         info!(target: "SubscribeSymbolChuncked", "Subscribing to asset '{}'", asset.to_string());
-        let _ = self.history(asset.to_string(), 1).await?;
+        // Send 3 messages, 1 changesymbol, 2 unsubfor, 3 subfor 
+        self.client.send(WebSocketMessage::ChangeSymbol(ChangeSymbol::new(asset.to_string(), 1))).await?;
+        self.client.send(WebSocketMessage::Unsubfor(asset.to_string())).await?;
+        self.client.send(WebSocketMessage::Subfor(asset.to_string())).await?;
         debug!("Created StreamAsset instance.");
         Ok(self
             .client
@@ -644,7 +651,10 @@ impl PocketOption {
         time: impl Into<Duration>,
     ) -> PocketResult<StreamAsset> {
         info!(target: "SubscribeSymbolTimed", "Subscribing to asset '{}'", asset.to_string());
-        let _ = self.history(asset.to_string(), 1).await?;
+        // Send 3 messages, 1 changesymbol, 2 unsubfor, 3 subfor 
+        self.client.send(WebSocketMessage::ChangeSymbol(ChangeSymbol::new(asset.to_string(), 1))).await?;
+        self.client.send(WebSocketMessage::Unsubfor(asset.to_string())).await?;
+        self.client.send(WebSocketMessage::Subfor(asset.to_string())).await?;
         debug!("Created StreamAsset instance.");
         Ok(self
             .client

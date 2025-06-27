@@ -22,7 +22,7 @@ use crate::pocketoption::{
         },
         success::SuccessAuth,
         update::{
-            LoadHistoryPeriodResult, UpdateAssets, UpdateBalance, UpdateHistoryNew, UpdateStream,
+            LoadHistoryPeriodResult, UpdateAssets, UpdateBalance, UpdateHistoryNewFast, UpdateStream,
         },
     },
     ws::ssid::Ssid,
@@ -35,12 +35,14 @@ use super::basic::LoadHistoryPeriod;
 pub enum WebSocketMessage {
     OpenOrder(OpenOrder),
     ChangeSymbol(ChangeSymbol),
+    Subfor(String),
+    Unsubfor(String),
     Auth(Ssid),
     GetCandles(LoadHistoryPeriod),
 
     LoadHistoryPeriod(LoadHistoryPeriodResult),
     UpdateStream(UpdateStream),
-    UpdateHistoryNew(UpdateHistoryNew),
+    UpdateHistoryNewFast(UpdateHistoryNewFast),
     SubscribeSymbol(SubscribeSymbol),
     UpdateAssets(UpdateAssets),
     UpdateBalance(UpdateBalance),
@@ -70,8 +72,8 @@ impl WebSocketMessage {
                 if let Ok(assets) = from_str::<UpdateAssets>(&data) {
                     return Ok(Self::UpdateAssets(assets));
                 }
-                if let Ok(history) = from_str::<UpdateHistoryNew>(&data) {
-                    return Ok(Self::UpdateHistoryNew(history));
+                if let Ok(history) = from_str::<UpdateHistoryNewFast>(&data) {
+                    return Ok(Self::UpdateHistoryNewFast(history));
                 }
                 if let Ok(stream) = from_str::<UpdateStream>(&data) {
                     return Ok(Self::UpdateStream(stream));
@@ -97,9 +99,9 @@ impl WebSocketMessage {
                     return Self::UpdateStream(stream);
                 }
             }
-            MessageInfo::UpdateHistoryNew => {
-                if let Ok(history) = from_str::<UpdateHistoryNew>(&data) {
-                    return Self::UpdateHistoryNew(history);
+            MessageInfo::UpdateHistoryNewFast => {
+                if let Ok(history) = from_str::<UpdateHistoryNewFast>(&data) {
+                    return Self::UpdateHistoryNewFast(history);
                 }
             }
             MessageInfo::UpdateAssets => {
@@ -215,7 +217,7 @@ impl WebSocketMessage {
     pub fn information(&self) -> MessageInfo {
         match self {
             Self::UpdateStream(_) => MessageInfo::UpdateStream,
-            Self::UpdateHistoryNew(_) => MessageInfo::UpdateHistoryNew,
+            Self::UpdateHistoryNewFast(_) => MessageInfo::UpdateHistoryNewFast,
             Self::UpdateAssets(_) => MessageInfo::UpdateAssets,
             Self::UpdateBalance(_) => MessageInfo::UpdateBalance,
             Self::OpenOrder(_) => MessageInfo::OpenOrder,
@@ -236,6 +238,8 @@ impl WebSocketMessage {
             Self::SuccessOpenPendingOrder(_) => MessageInfo::SuccessopenPendingOrder,
             Self::OpenPendingOrder(_) => MessageInfo::OpenPendingOrder,
             Self::Raw(_) => MessageInfo::None,
+            Self::Subfor(_) => MessageInfo::None,
+            Self::Unsubfor(_) => MessageInfo::None,
             Self::None => MessageInfo::None,
         }
     }
@@ -284,7 +288,7 @@ impl fmt::Display for WebSocketMessage {
             WebSocketMessage::Raw(text) => text.fmt(f),
 
             WebSocketMessage::UpdateStream(update_stream) => write!(f, "{:?}", update_stream),
-            WebSocketMessage::UpdateHistoryNew(update_history_new) => {
+            WebSocketMessage::UpdateHistoryNewFast(update_history_new) => {
                 write!(f, "{:?}", update_history_new)
             }
             WebSocketMessage::UpdateAssets(update_assets) => write!(f, "{:?}", update_assets),
@@ -322,6 +326,8 @@ impl fmt::Display for WebSocketMessage {
             }
             WebSocketMessage::FailOpenOrder(order) => order.fmt(f),
             WebSocketMessage::SuccessupdatePending(pending) => pending.fmt(f),
+            WebSocketMessage::Subfor(sub) => write!(f, "42[\"subfor\",{}]", sub),
+            WebSocketMessage::Unsubfor(unsub) => write!(f, "42[\"unsubfor\",{}]", unsub),
         }
     }
 }

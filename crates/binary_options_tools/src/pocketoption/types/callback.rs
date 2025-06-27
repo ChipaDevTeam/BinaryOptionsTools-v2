@@ -34,11 +34,11 @@ impl PocketCallback {
                     "SubscribeSymbolCallback",
                     data,
                     WebSocketMessage::ChangeSymbol(history),
-                    MessageInfo::UpdateHistoryNew,
+                    MessageInfo::UpdateHistoryNewFast,
                     &history_validator(asset.to_string(), 3600),
                 )
                 .await?;
-            if let WebSocketMessage::UpdateHistoryNew(_) = res {
+            if let WebSocketMessage::UpdateHistoryNewFast(_) = res {
                 debug!("Sent 'ChangeSymbol' for asset: {asset}");
             } else {
                 return Err(PocketOptionError::UnexpectedIncorrectWebSocketMessage(

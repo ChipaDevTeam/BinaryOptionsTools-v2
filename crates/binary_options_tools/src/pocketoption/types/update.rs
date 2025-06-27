@@ -17,7 +17,7 @@ pub struct UpdateStreamItem {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct UpdateHistoryNew {
+pub struct UpdateHistoryNewFast {
     pub asset: String,
     pub period: i64,
     pub history: Vec<Candle>,
@@ -183,7 +183,7 @@ impl LoadHistoryPeriodResult {
     }
 }
 
-impl UpdateHistoryNew {
+impl UpdateHistoryNewFast {
     pub fn candle_data(&self) -> Vec<DataCandle> {
         self.history.iter().map(DataCandle::from).collect()
     }
@@ -351,7 +351,7 @@ mod tests {
     fn test_deserialize_update_history() -> Result<(), Box<dyn Error>> {
         let history_raw = File::open("tests/update_history_new.txt")?;
         let bufreader = BufReader::new(history_raw);
-        let history_new: UpdateHistoryNew = serde_json::from_reader(bufreader)?;
+        let history_new: UpdateHistoryNewFast = serde_json::from_reader(bufreader)?;
         dbg!(history_new);
 
         Ok(())
