@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://yourusername.github.io/BinaryOptionsTools-v2-1/sitemap.xml
+
+# Allow indexing of all documentation pages
+Allow: /index.html
+Allow: /python.html
+Allow: /javascript.html
+Allow: /rust.html
+Allow: /api.html
+Allow: /examples.html
+
+# Allow assets
+Allow: /assets/
+
+# Disallow any temporary or development files
+Disallow: /README.md
+Disallow: /DEPLOYMENT.md
+Disallow: /_config.yml
+Disallow: /.nojekyll

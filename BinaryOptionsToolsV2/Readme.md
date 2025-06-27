@@ -4,7 +4,7 @@
 ## How to install
 Install it with PyPi using the following command:
 ```bash
-pip install binaryoptionstoolsv2==0.1.6a4
+pip install binaryoptionstoolsv2==0.1.6a3
 ```
 
 ## Supported OS

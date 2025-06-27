@@ -8,7 +8,7 @@ async def main(ssid: str):
     api = PocketOptionAsync(ssid)    
     await asyncio.sleep(5)
     
-    # Candñes are returned in the format of a list of dictionaries
+    # Candles are returned in the format of a list of dictionaries
     times = [ 3600 * i for i in range(1, 11)]
     time_frames = [ 1, 5, 15, 30, 60, 300]
     for time in times:

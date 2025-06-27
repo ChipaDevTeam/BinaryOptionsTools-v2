@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Documentation - BinaryOptionsToolsV2</title>
+    <meta name="description" content="Complete Python documentation for BinaryOptionsToolsV2 - Binary options trading tools with async and sync support">
+    <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="stylesheet" href="assets/css/animations.css">    <link rel="stylesheet" href="assets/css/code-highlight.css">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h2>BinaryOptionsToolsV2</h2>
+            </div>
+            <div class="nav-toggle" id="mobile-menu">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="index.html" class="nav-link">Home</a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-link dropdown-toggle">Languages</a>
+                    <ul class="dropdown-menu">
+                        <li><a href="python.html" class="active">Python</a></li>
+                        <li><a href="javascript.html">JavaScript</a></li>
+                        <li><a href="rust.html">Rust</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item">
+                    <a href="examples.html" class="nav-link">Examples</a>
+                </li>
+                <li class="nav-item">
+                    <a href="api.html" class="nav-link">API Reference</a>
+                </li>
+                <li class="nav-item">
+                    <a href="https://chipa.tech" class="nav-link btn-outline" target="_blank">Bot Services</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero-section python-hero">
+            <div class="container">
+                <div class="hero-content fade-in-up">
+                    <h1>Python Documentation</h1>
+                    <p class="hero-subtitle">Complete Python integration guide for BinaryOptionsToolsV2</p>
+                    <div class="hero-badges">
+                        <span class="badge">Async Support</span>
+                        <span class="badge">Sync Support</span>
+                        <span class="badge">Type Hints</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Installation</h2>
+                    <p>Get started with BinaryOptionsToolsV2 in Python</p>
+                </div>
+
+                <div class="code-block fade-in-up stagger-1">
+                    <div class="code-header">
+                        <span class="code-lang">bash</span>
+                        <button class="copy-btn" data-clipboard-target="#install-code">Copy</button>
+                    </div>
+                    <pre><code id="install-code">pip install BinaryOptionsToolsV2</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Quick Start</h2>
+                    <p>Basic usage examples for both sync and async operations</p>
+                </div>
+
+                <div class="tabs-container fade-in-up stagger-2">
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="sync">Synchronous</button>
+                        <button class="tab-btn" data-tab="async">Asynchronous</button>
+                    </div>
+
+                    <div class="tab-content active" id="sync">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">python</span>
+                                <button class="copy-btn" data-clipboard-target="#sync-code">Copy</button>
+                            </div>
+                            <pre><code id="sync-code">from BinaryOptionsToolsV2 import PocketOption
+
+# Initialize the client
+client = PocketOption(ssid="your_ssid_here")
+
+# Get account balance
+balance = client.get_balance()
+print(f"Balance: ${balance}")
+
+# Get candles data
+candles = client.get_candles("EURUSD_otc", 60, 100)
+for candle in candles:
+    print(f"Open: {candle.open}, Close: {candle.close}")
+
+# Create a raw order
+order_result = client.create_raw_order(
+    asset="EURUSD_otc",
+    amount=10.0,
+    action="call",
+    expiration=60
+)
+print(f"Order ID: {order_result.order_id}")
+
+# Check win status
+win_status = client.check_win(order_result.order_id)
+print(f"Win status: {win_status}")</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="async">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">python</span>
+                                <button class="copy-btn" data-clipboard-target="#async-code">Copy</button>
+                            </div>
+                            <pre><code id="async-code">import asyncio
+from BinaryOptionsToolsV2 import AsyncPocketOption
+
+async def main():
+    # Initialize the async client
+    client = AsyncPocketOption(ssid="your_ssid_here")
+    
+    # Get account balance
+    balance = await client.get_balance()
+    print(f"Balance: ${balance}")
+    
+    # Get candles data
+    candles = await client.get_candles("EURUSD_otc", 60, 100)
+    for candle in candles:
+        print(f"Open: {candle.open}, Close: {candle.close}")
+    
+    # Create multiple orders concurrently
+    orders = await asyncio.gather(
+        client.create_raw_order("EURUSD_otc", 10.0, "call", 60),
+        client.create_raw_order("GBPUSD_otc", 15.0, "put", 60),
+        client.create_raw_order("USDJPY_otc", 20.0, "call", 120)
+    )
+    
+    # Check all orders
+    for order in orders:
+        print(f"Order ID: {order.order_id}")
+
+# Run the async function
+asyncio.run(main())</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Core Classes</h2>
+                    <p>Main classes and their methods</p>
+                </div>
+
+                <div class="api-grid fade-in-up stagger-3">
+                    <div class="api-card">
+                        <h3>PocketOption (Sync)</h3>
+                        <p>Synchronous client for PocketOption trading operations</p>
+                        <div class="method-list">
+                            <div class="method">
+                                <code>get_balance()</code>
+                                <span>Get account balance</span>
+                            </div>
+                            <div class="method">
+                                <code>get_candles(asset, timeframe, count)</code>
+                                <span>Retrieve candlestick data</span>
+                            </div>
+                            <div class="method">
+                                <code>create_raw_order(asset, amount, action, expiration)</code>
+                                <span>Place binary options order</span>
+                            </div>
+                            <div class="method">
+                                <code>check_win(order_id)</code>
+                                <span>Check order win status</span>
+                            </div>
+                            <div class="method">
+                                <code>get_history(limit)</code>
+                                <span>Get trading history</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="api-card">
+                        <h3>AsyncPocketOption</h3>
+                        <p>Asynchronous client with coroutine support</p>
+                        <div class="method-list">
+                            <div class="method">
+                                <code>await get_balance()</code>
+                                <span>Get account balance asynchronously</span>
+                            </div>
+                            <div class="method">
+                                <code>await get_candles(asset, timeframe, count)</code>
+                                <span>Retrieve candlestick data</span>
+                            </div>
+                            <div class="method">
+                                <code>await create_raw_order(...)</code>
+                                <span>Place order asynchronously</span>
+                            </div>
+                            <div class="method">
+                                <code>await stream_candles(asset, timeframe)</code>
+                                <span>Stream real-time candle data</span>
+                            </div>
+                            <div class="method">
+                                <code>await stream_chunked(asset)</code>
+                                <span>Stream chunked market data</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Advanced Features</h2>
+                    <p>Powerful features for professional trading</p>
+                </div>
+
+                <div class="features-grid fade-in-up stagger-4">
+                    <div class="feature-card">
+                        <div class="feature-icon">🔄</div>
+                        <h3>Real-time Streaming</h3>
+                        <p>Stream live market data with async generators</p>
+                        <div class="code-block small">
+                            <pre><code>async for candle in client.stream_candles("EURUSD_otc", 60):
+    print(f"New candle: {candle.close}")</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h3>Data Validation</h3>
+                        <p>Built-in validation for assets and parameters</p>
+                        <div class="code-block small">
+                            <pre><code>from BinaryOptionsToolsV2 import validate_asset
+
+is_valid = validate_asset("EURUSD_otc")
+print(f"Asset valid: {is_valid}")</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🔍</div>
+                        <h3>Comprehensive Logging</h3>
+                        <p>Detailed logging for debugging and monitoring</p>
+                        <div class="code-block small">
+                            <pre><code>import logging
+from BinaryOptionsToolsV2 import enable_logging
+
+enable_logging(level=logging.DEBUG)</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3>High Performance</h3>
+                        <p>Rust-powered backend for maximum speed</p>
+                        <div class="code-block small">
+                            <pre><code># Concurrent operations
+results = await asyncio.gather(
+    client.get_balance(),
+    client.get_candles("EURUSD_otc", 60, 100)
+)</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="cta-section">
+            <div class="container">
+                <div class="cta-content fade-in-up">
+                    <h2>Need Professional Bot Development?</h2>
+                    <p>Get custom trading bots built by experts at chipa.tech</p>
+                    <div class="cta-buttons">
+                        <a href="https://chipa.tech" class="btn btn-primary" target="_blank">
+                            Explore Bot Services
+                        </a>
+                        <a href="examples.html" class="btn btn-outline">
+                            View Examples
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>BinaryOptionsToolsV2</h3>
+                    <p>Professional trading tools for binary options</p>
+                    <div class="social-links">
+                        <a href="#" aria-label="GitHub">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4>Documentation</h4>
+                    <ul>
+                        <li><a href="python.html">Python</a></li>
+                        <li><a href="javascript.html">JavaScript</a></li>
+                        <li><a href="rust.html">Rust</a></li>
+                        <li><a href="api.html">API Reference</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Examples</h4>
+                    <ul>
+                        <li><a href="examples.html">All Examples</a></li>
+                        <li><a href="examples.html#python">Python Examples</a></li>
+                        <li><a href="examples.html#javascript">JavaScript Examples</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Services</h4>
+                    <ul>
+                        <li><a href="https://chipa.tech" target="_blank">Bot Development</a></li>
+                        <li><a href="https://chipa.tech" target="_blank">Custom Solutions</a></li>
+                        <li><a href="https://chipa.tech" target="_blank">Consulting</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 BinaryOptionsToolsV2. All rights reserved.</p>
+                <p>Professional bot services by <a href="https://chipa.tech" target="_blank">chipa.tech</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/animations.js"></script>
+    <script src="assets/js/code-highlight.js"></script>
+</body>
+</html>

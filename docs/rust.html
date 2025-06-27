@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rust Documentation - BinaryOptionsToolsV2</title>
+    <meta name="description" content="Complete Rust documentation for BinaryOptionsToolsV2 - High-performance binary options trading tools">
+    <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="stylesheet" href="assets/css/animations.css">    <link rel="stylesheet" href="assets/css/code-highlight.css">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h2>BinaryOptionsToolsV2</h2>
+            </div>
+            <div class="nav-toggle" id="mobile-menu">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="index.html" class="nav-link">Home</a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-link dropdown-toggle">Languages</a>
+                    <ul class="dropdown-menu">
+                        <li><a href="python.html">Python</a></li>
+                        <li><a href="javascript.html">JavaScript</a></li>
+                        <li><a href="rust.html" class="active">Rust</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item">
+                    <a href="examples.html" class="nav-link">Examples</a>
+                </li>
+                <li class="nav-item">
+                    <a href="api.html" class="nav-link">API Reference</a>
+                </li>
+                <li class="nav-item">
+                    <a href="https://chipa.tech" class="nav-link btn-outline" target="_blank">Bot Services</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero-section rust-hero">
+            <div class="container">
+                <div class="hero-content fade-in-up">
+                    <h1>Rust Documentation</h1>
+                    <p class="hero-subtitle">High-performance Rust bindings for BinaryOptionsToolsV2</p>
+                    <div class="hero-badges">
+                        <span class="badge">Zero-Cost Abstractions</span>
+                        <span class="badge">Memory Safe</span>
+                        <span class="badge">Ultra Fast</span>
+                        <span class="badge">Async/Await</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Installation</h2>
+                    <p>Add BinaryOptionsToolsV2 to your Rust project</p>
+                </div>
+
+                <div class="code-block fade-in-up stagger-1">
+                    <div class="code-header">
+                        <span class="code-lang">toml</span>
+                        <button class="copy-btn" data-clipboard-target="#cargo-code">Copy</button>
+                    </div>
+                    <pre><code id="cargo-code"># Add to your Cargo.toml
+[dependencies]
+binary-options-tools-v2 = "2.0"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }</code></pre>
+                </div>
+
+                <div class="code-block fade-in-up stagger-2">
+                    <div class="code-header">
+                        <span class="code-lang">bash</span>
+                        <button class="copy-btn" data-clipboard-target="#install-code">Copy</button>
+                    </div>
+                    <pre><code id="install-code">cargo add binary-options-tools-v2 tokio serde</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Quick Start</h2>
+                    <p>Basic usage examples for Rust applications</p>
+                </div>
+
+                <div class="tabs-container fade-in-up stagger-3">
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="basic">Basic Usage</button>
+                        <button class="tab-btn" data-tab="async">Async/Await</button>
+                        <button class="tab-btn" data-tab="advanced">Advanced</button>
+                    </div>
+
+                    <div class="tab-content active" id="basic">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">rust</span>
+                                <button class="copy-btn" data-clipboard-target="#basic-code">Copy</button>
+                            </div>
+                            <pre><code id="basic-code">use binary_options_tools_v2::{PocketOption, OrderOptions, Result};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Initialize the client
+    let client = PocketOption::new("your_ssid_here").await?;
+
+    // Get account balance
+    let balance = client.get_balance().await?;
+    println!("Balance: ${}", balance);
+
+    // Get candles data
+    let candles = client.get_candles("EURUSD_otc", 60, 100).await?;
+    for candle in candles {
+        println!("Open: {}, Close: {}", candle.open, candle.close);
+    }
+
+    // Create a raw order
+    let order_options = OrderOptions {
+        asset: "EURUSD_otc".to_string(),
+        amount: 10.0,
+        action: "call".to_string(),
+        expiration: 60,
+    };
+
+    let order_result = client.create_raw_order(order_options).await?;
+    println!("Order ID: {}", order_result.order_id);
+
+    // Check win status
+    let win_status = client.check_win(&order_result.order_id).await?;
+    println!("Win status: {:?}", win_status);
+
+    Ok(())
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="async">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">rust</span>
+                                <button class="copy-btn" data-clipboard-target="#async-code">Copy</button>
+                            </div>
+                            <pre><code id="async-code">use binary_options_tools_v2::{PocketOption, StreamEvent};
+use tokio::time::{Duration, timeout};
+use futures::StreamExt;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = PocketOption::new("your_ssid_here").await?;
+
+    // Concurrent operations
+    let (balance, candles, history) = tokio::try_join!(
+        client.get_balance(),
+        client.get_candles("EURUSD_otc", 60, 100),
+        client.get_history(50)
+    )?;
+
+    println!("Balance: ${}", balance);
+    println!("Candles count: {}", candles.len());
+    println!("History count: {}", history.len());
+
+    // Stream real-time candles with timeout
+    let mut stream = client.stream_candles("EURUSD_otc", 60).await?;
+    
+    while let Ok(Some(event)) = timeout(Duration::from_secs(30), stream.next()).await {
+        match event? {
+            StreamEvent::Candle(candle) => {
+                println!("New candle: {} -> {}", candle.open, candle.close);
+                
+                // Implement your trading logic here
+                if should_place_order(&candle) {
+                    let order = client.create_raw_order(OrderOptions {
+                        asset: "EURUSD_otc".to_string(),
+                        amount: 10.0,
+                        action: determine_action(&candle),
+                        expiration: 60,
+                    }).await?;
+                    
+                    println!("Placed order: {}", order.order_id);
+                }
+            }
+            StreamEvent::Error(e) => {
+                eprintln!("Stream error: {}", e);
+                break;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn should_place_order(candle: &CandleData) -> bool {
+    // Your trading logic here
+    candle.close > candle.open
+}
+
+fn determine_action(candle: &CandleData) -> String {
+    if candle.close > candle.open {
+        "call".to_string()
+    } else {
+        "put".to_string()
+    }
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="advanced">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">rust</span>
+                                <button class="copy-btn" data-clipboard-target="#advanced-code">Copy</button>
+                            </div>
+                            <pre><code id="advanced-code">use binary_options_tools_v2::{PocketOption, TradingBot, Strategy};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TradingConfig {
+    ssid: String,
+    assets: Vec<String>,
+    max_concurrent_orders: usize,
+    risk_percentage: f64,
+}
+
+struct AdvancedTradingBot {
+    client: PocketOption,
+    config: TradingConfig,
+    active_orders: HashMap<String, OrderInfo>,
+}
+
+impl AdvancedTradingBot {
+    async fn new(config: TradingConfig) -> Result<Self, Box<dyn std::error::Error>> {
+        let client = PocketOption::new(&config.ssid).await?;
+        
+        Ok(Self {
+            client,
+            config,
+            active_orders: HashMap::new(),
+        })
+    }
+
+    async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // Initialize multiple asset streams
+        let mut streams = Vec::new();
+        
+        for asset in &self.config.assets {
+            let stream = self.client.stream_candles(asset, 60).await?;
+            streams.push(stream);
+        }
+
+        // Process streams concurrently
+        let mut combined_stream = futures::stream::select_all(streams);
+
+        while let Some(event) = combined_stream.next().await {
+            match event? {
+                StreamEvent::Candle(candle) => {
+                    self.process_candle(candle).await?;
+                }
+                StreamEvent::OrderUpdate(update) => {
+                    self.handle_order_update(update).await?;
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn process_candle(&mut self, candle: CandleData) -> Result<(), Box<dyn std::error::Error>> {
+        // Check if we can place more orders
+        if self.active_orders.len() >= self.config.max_concurrent_orders {
+            return Ok(());
+        }
+
+        // Analyze candle with multiple strategies
+        let strategies = vec![
+            MACDStrategy::new(),
+            RSIStrategy::new(),
+            BollingerBandsStrategy::new(),
+        ];
+
+        let mut signals = Vec::new();
+        for strategy in strategies {
+            if let Some(signal) = strategy.analyze(&candle) {
+                signals.push(signal);
+            }
+        }
+
+        // Consensus-based trading
+        if signals.len() >= 2 {
+            let action = determine_consensus_action(&signals);
+            let amount = self.calculate_position_size().await?;
+            
+            let order = self.client.create_raw_order(OrderOptions {
+                asset: candle.asset.clone(),
+                amount,
+                action,
+                expiration: 60,
+            }).await?;
+
+            self.active_orders.insert(order.order_id.clone(), OrderInfo {
+                id: order.order_id,
+                asset: candle.asset,
+                amount,
+                timestamp: std::time::SystemTime::now(),
+            });
+        }
+
+        Ok(())
+    }
+
+    async fn calculate_position_size(&self) -> Result<f64, Box<dyn std::error::Error>> {
+        let balance = self.client.get_balance().await?;
+        let risk_amount = balance * self.config.risk_percentage / 100.0;
+        Ok(risk_amount.min(100.0).max(1.0)) // Min $1, Max $100
+    }
+
+    async fn handle_order_update(&mut self, update: OrderUpdate) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(order_info) = self.active_orders.remove(&update.order_id) {
+            match update.status {
+                OrderStatus::Win => {
+                    println!("✅ Order {} won! Profit: ${}", order_info.id, update.profit);
+                }
+                OrderStatus::Lose => {
+                    println!("❌ Order {} lost. Loss: ${}", order_info.id, order_info.amount);
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = TradingConfig {
+        ssid: "your_ssid_here".to_string(),
+        assets: vec![
+            "EURUSD_otc".to_string(),
+            "GBPUSD_otc".to_string(),
+            "USDJPY_otc".to_string(),
+        ],
+        max_concurrent_orders: 3,
+        risk_percentage: 2.0,
+    };
+
+    let mut bot = AdvancedTradingBot::new(config).await?;
+    bot.run().await?;
+
+    Ok(())
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Core Structs & Traits</h2>
+                    <p>Rust API reference with type safety</p>
+                </div>
+
+                <div class="api-grid fade-in-up stagger-4">
+                    <div class="api-card">
+                        <h3>PocketOption</h3>
+                        <p>Main client struct for trading operations</p>
+                        <div class="method-list">
+                            <div class="method">
+                                <code>async fn get_balance(&self) -> Result&lt;f64&gt;</code>
+                                <span>Get account balance</span>
+                            </div>
+                            <div class="method">
+                                <code>async fn get_candles(&self, asset: &str, timeframe: u32, count: u32) -> Result&lt;Vec&lt;CandleData&gt;&gt;</code>
+                                <span>Retrieve candlestick data</span>
+                            </div>
+                            <div class="method">
+                                <code>async fn create_raw_order(&self, options: OrderOptions) -> Result&lt;OrderResult&gt;</code>
+                                <span>Place binary options order</span>
+                            </div>
+                            <div class="method">
+                                <code>async fn stream_candles(&self, asset: &str, timeframe: u32) -> Result&lt;impl Stream&lt;Item = StreamEvent&gt;&gt;</code>
+                                <span>Stream real-time candles</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="api-card">
+                        <h3>Data Structures</h3>
+                        <p>Core data types with serde support</p>
+                        <div class="method-list">
+                            <div class="method">
+                                <code>struct CandleData</code>
+                                <span>{ open: f64, high: f64, low: f64, close: f64, volume: f64, timestamp: i64 }</span>
+                            </div>
+                            <div class="method">
+                                <code>struct OrderOptions</code>
+                                <span>{ asset: String, amount: f64, action: String, expiration: u32 }</span>
+                            </div>
+                            <div class="method">
+                                <code>struct OrderResult</code>
+                                <span>{ order_id: String, success: bool, message: String }</span>
+                            </div>
+                            <div class="method">
+                                <code>enum WinStatus</code>
+                                <span>Win | Lose | Pending</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Performance Features</h2>
+                    <p>Rust-powered performance optimizations</p>
+                </div>
+
+                <div class="features-grid fade-in-up stagger-5">
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3>Zero-Cost Abstractions</h3>
+                        <p>High-level APIs with no runtime overhead</p>
+                        <div class="code-block small">
+                            <pre><code>// Compiled to optimal machine code
+let candles: Vec&lt;CandleData&gt; = client
+    .get_candles("EURUSD_otc", 60, 1000)
+    .await?
+    .into_iter()
+    .filter(|c| c.volume > 1000.0)
+    .collect();</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🔒</div>
+                        <h3>Memory Safety</h3>
+                        <p>No null pointer dereferences or buffer overflows</p>
+                        <div class="code-block small">
+                            <pre><code>// Compile-time guarantees
+async fn safe_trading(client: &PocketOption) -> Result&lt;f64, Error&gt; {
+    let balance = client.get_balance().await?;
+    Ok(balance * 0.02) // 2% risk
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🔄</div>
+                        <h3>Async Streams</h3>
+                        <p>Efficient async/await with Stream trait</p>
+                        <div class="code-block small">
+                            <pre><code>use futures::StreamExt;
+
+let mut stream = client.stream_candles("EURUSD_otc", 60).await?;
+while let Some(candle) = stream.next().await {
+    process_candle(candle?).await?;
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h3>Type Safety</h3>
+                        <p>Compile-time error detection</p>
+                        <div class="code-block small">
+                            <pre><code>// Compiler prevents runtime errors
+let order = OrderOptions {
+    asset: "EURUSD_otc".to_string(),
+    amount: 10.0,
+    action: OrderAction::Call, // Enum prevents typos
+    expiration: Duration::from_secs(60),
+};</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">📦</div>
+                        <h3>Minimal Dependencies</h3>
+                        <p>Small binary size with selective features</p>
+                        <div class="code-block small">
+                            <pre><code># Only include what you need
+[dependencies.binary-options-tools-v2]
+version = "2.0"
+default-features = false
+features = ["tokio-runtime", "serde"]</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🔧</div>
+                        <h3>Cross Compilation</h3>
+                        <p>Target multiple platforms from single codebase</p>
+                        <div class="code-block small">
+                            <pre><code># Build for different targets
+cargo build --target x86_64-pc-windows-gnu
+cargo build --target x86_64-unknown-linux-gnu
+cargo build --target aarch64-apple-darwin</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Error Handling</h2>
+                    <p>Robust error handling with Result type</p>
+                </div>
+
+                <div class="code-block fade-in-up stagger-6">
+                    <div class="code-header">
+                        <span class="code-lang">rust</span>
+                        <button class="copy-btn" data-clipboard-target="#error-code">Copy</button>
+                    </div>
+                    <pre><code id="error-code">use binary_options_tools_v2::{PocketOption, Error, ErrorKind};
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+enum TradingError {
+    #[error("Insufficient balance: required {required}, available {available}")]
+    InsufficientBalance { required: f64, available: f64 },
+    
+    #[error("Invalid asset: {asset}")]
+    InvalidAsset { asset: String },
+    
+    #[error("API error: {0}")]
+    ApiError(#[from] Error),
+}
+
+async fn safe_order_placement(
+    client: &PocketOption,
+    asset: &str,
+    amount: f64,
+) -> Result<String, TradingError> {
+    // Check balance first
+    let balance = client.get_balance().await?;
+    if balance < amount {
+        return Err(TradingError::InsufficientBalance {
+            required: amount,
+            available: balance,
+        });
+    }
+
+    // Validate asset
+    if !is_valid_asset(asset) {
+        return Err(TradingError::InvalidAsset {
+            asset: asset.to_string(),
+        });
+    }
+
+    // Place order with comprehensive error handling
+    match client.create_raw_order(OrderOptions {
+        asset: asset.to_string(),
+        amount,
+        action: "call".to_string(),
+        expiration: 60,
+    }).await {
+        Ok(result) => {
+            if result.success {
+                Ok(result.order_id)
+            } else {
+                Err(TradingError::ApiError(Error::new(
+                    ErrorKind::OrderFailed,
+                    result.message,
+                )))
+            }
+        }
+        Err(e) => match e.kind() {
+            ErrorKind::NetworkError => {
+                // Retry logic for network errors
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                safe_order_placement(client, asset, amount).await
+            }
+            ErrorKind::AuthenticationError => {
+                // Handle auth errors
+                Err(TradingError::ApiError(e))
+            }
+            _ => Err(TradingError::ApiError(e)),
+        }
+    }
+}
+
+fn is_valid_asset(asset: &str) -> bool {
+    const VALID_ASSETS: &[&str] = &[
+        "EURUSD_otc", "GBPUSD_otc", "USDJPY_otc", "AUDUSD_otc"
+    ];
+    VALID_ASSETS.contains(&asset)
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = PocketOption::new("your_ssid").await?;
+
+    match safe_order_placement(&client, "EURUSD_otc", 10.0).await {
+        Ok(order_id) => println!("Order placed successfully: {}", order_id),
+        Err(TradingError::InsufficientBalance { required, available }) => {
+            eprintln!("Cannot place order: need ${}, have ${}", required, available);
+        }
+        Err(TradingError::InvalidAsset { asset }) => {
+            eprintln!("Invalid asset: {}", asset);
+        }
+        Err(TradingError::ApiError(e)) => {
+            eprintln!("API error: {}", e);
+        }
+    }
+
+    Ok(())
+}</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section class="cta-section">
+            <div class="container">
+                <div class="cta-content fade-in-up">
+                    <h2>Need High-Performance Trading Solutions?</h2>
+                    <p>Get custom Rust trading applications built by experts at chipa.tech</p>
+                    <div class="cta-buttons">
+                        <a href="https://chipa.tech" class="btn btn-primary" target="_blank">
+                            Explore Bot Services
+                        </a>
+                        <a href="examples.html#rust" class="btn btn-outline">
+                            View Rust Examples
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>BinaryOptionsToolsV2</h3>
+                    <p>Professional trading tools for binary options</p>
+                    <div class="social-links">
+                        <a href="#" aria-label="GitHub">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4>Documentation</h4>
+                    <ul>
+                        <li><a href="python.html">Python</a></li>
+                        <li><a href="javascript.html">JavaScript</a></li>
+                        <li><a href="rust.html">Rust</a></li>
+                        <li><a href="api.html">API Reference</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Examples</h4>
+                    <ul>
+                        <li><a href="examples.html">All Examples</a></li>
+                        <li><a href="examples.html#rust">Rust Examples</a></li>
+                        <li><a href="examples.html#performance">Performance Examples</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Services</h4>
+                    <ul>
+                        <li><a href="https://chipa.tech" target="_blank">Bot Development</a></li>
+                        <li><a href="https://chipa.tech" target="_blank">Custom Solutions</a></li>
+                        <li><a href="https://chipa.tech" target="_blank">Consulting</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 BinaryOptionsToolsV2. All rights reserved.</p>
+                <p>Professional bot services by <a href="https://chipa.tech" target="_blank">chipa.tech</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/animations.js"></script>
+    <script src="assets/js/code-highlight.js"></script>
+</body>
+</html>

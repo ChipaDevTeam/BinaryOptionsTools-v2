@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examples - BinaryOptionsToolsV2</title>
+    <meta name="description" content="Comprehensive examples and tutorials for BinaryOptionsToolsV2 - Learn binary options trading with Python async examples">
+    <meta name="keywords" content="binary options, examples, Python, async, trading, tutorials, PocketOption">
+    
+    <!-- Open Graph tags -->
+    <meta property="og:title" content="Examples - BinaryOptionsToolsV2">
+    <meta property="og:description" content="Comprehensive examples and tutorials for binary options trading">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://your-username.github.io/BinaryOptionsTools-v2-1/examples.html">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="stylesheet" href="assets/css/animations.css">
+    <link rel="stylesheet" href="assets/css/code-highlight.css">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@300;400;500&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Prism.js for Code Highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <a href="index.html" class="logo-link">
+                    <img src="assets/images/logo.svg" alt="BinaryOptionsToolsV2 Logo" class="logo">
+                    <span class="brand-text">BinaryOptionsToolsV2</span>
+                </a>
+            </div>
+            
+            <div class="nav-menu">
+                <div class="dropdown">
+                    <a href="#" class="nav-link dropdown-toggle">
+                        Documentation <i class="fas fa-chevron-down"></i>
+                    </a>
+                    <div class="dropdown-menu">
+                        <a href="python.html" class="dropdown-link">
+                            <i class="fab fa-python"></i> Python
+                        </a>
+                        <a href="javascript.html" class="dropdown-link">
+                            <i class="fab fa-js"></i> JavaScript
+                        </a>
+                        <a href="rust.html" class="dropdown-link">
+                            <i class="fas fa-cog"></i> Rust
+                        </a>
+                    </div>
+                </div>
+                <a href="examples.html" class="nav-link active">Examples</a>
+                <a href="api.html" class="nav-link">API Reference</a>
+                <a href="https://chipa.tech" target="_blank" class="nav-link nav-cta">
+                    <i class="fas fa-robot"></i> Bot Services
+                </a>
+            </div>
+
+            <button class="mobile-menu-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu">
+        <div class="mobile-menu-content">
+            <a href="index.html" class="mobile-nav-link">Home</a>
+            <a href="python.html" class="mobile-nav-link">Python Docs</a>
+            <a href="javascript.html" class="mobile-nav-link">JavaScript Docs</a>
+            <a href="rust.html" class="mobile-nav-link">Rust Docs</a>
+            <a href="examples.html" class="mobile-nav-link active">Examples</a>
+            <a href="api.html" class="mobile-nav-link">API Reference</a>
+            <a href="https://chipa.tech" target="_blank" class="mobile-nav-link">Bot Services</a>
+        </div>
+    </div>
+    <div class="mobile-overlay"></div>
+
+    <!-- Header -->
+    <header class="page-header">
+        <div class="container">
+            <div class="header-content fade-in-up">
+                <h1 class="header-title">
+                    <i class="fas fa-code"></i>
+                    Comprehensive Examples
+                </h1>
+                <p class="header-subtitle">
+                    Learn BinaryOptionsToolsV2 with practical, real-world examples across all features
+                </p>
+                
+                <!-- Category Filter -->
+                <div class="example-filters">
+                    <button class="filter-btn active" data-category="all">
+                        <i class="fas fa-th"></i> All Examples
+                    </button>
+                    <button class="filter-btn" data-category="trading">
+                        <i class="fas fa-chart-line"></i> Trading
+                    </button>
+                    <button class="filter-btn" data-category="data">
+                        <i class="fas fa-database"></i> Market Data
+                    </button>
+                    <button class="filter-btn" data-category="streaming">
+                        <i class="fas fa-stream"></i> Live Streaming
+                    </button>
+                    <button class="filter-btn" data-category="tools">
+                        <i class="fas fa-tools"></i> Utilities
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="examples-content">
+        <div class="container">
+            <!-- Quick Start Guide -->
+            <section class="quick-start-section fade-in-up">
+                <div class="section-header">
+                    <h2><i class="fas fa-rocket"></i> Quick Start</h2>
+                    <p>Get up and running with BinaryOptionsToolsV2 in minutes</p>
+                </div>
+                
+                <div class="quick-start-grid">
+                    <div class="quick-start-card">
+                        <div class="step-number">1</div>
+                        <h3>Install the Package</h3>
+                        <div class="code-block">
+                            <pre><code class="language-bash">pip install BinaryOptionsToolsV2</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="quick-start-card">
+                        <div class="step-number">2</div>
+                        <h3>Get Your SSID</h3>
+                        <p>Follow our <a href="#ssid-guide" class="inline-link">SSID tutorial</a> to extract your session ID from PocketOption</p>
+                    </div>
+                    
+                    <div class="quick-start-card">
+                        <div class="step-number">3</div>
+                        <h3>Start Trading</h3>
+                        <div class="code-block">
+                            <pre><code class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main():
+    api = PocketOptionAsync(your_ssid)
+    balance = await api.balance()
+    print(f"Balance: {balance}")
+
+asyncio.run(main())</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>            <!-- Examples Grid -->
+            <section class="examples-grid-section">
+                <div class="examples-sidebar">
+                    <div class="sidebar-sticky">
+                        <h3><i class="fas fa-list"></i> Examples Index</h3>
+                        <nav class="examples-nav">
+                            <div class="nav-section">
+                                <h4><i class="fas fa-chart-line"></i> Trading Operations</h4>
+                                <ul>
+                                    <li><a href="#basic-trading" class="nav-link">Basic Buy/Sell</a></li>
+                                    <li><a href="#check-win" class="nav-link">Check Trade Results</a></li>
+                                    <li><a href="#trade-history" class="nav-link">Trade History</a></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="nav-section">
+                                <h4><i class="fas fa-database"></i> Market Data</h4>
+                                <ul>
+                                    <li><a href="#get-balance" class="nav-link">Account Balance</a></li>
+                                    <li><a href="#get-candles" class="nav-link">Historical Candles</a></li>
+                                    <li><a href="#payout-rates" class="nav-link">Payout Rates</a></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="nav-section">
+                                <h4><i class="fas fa-stream"></i> Live Streaming</h4>
+                                <ul>
+                                    <li><a href="#subscribe-symbol" class="nav-link">Symbol Subscription</a></li>
+                                    <li><a href="#chunked-streaming" class="nav-link">Chunked Streaming</a></li>
+                                    <li><a href="#timed-streaming" class="nav-link">Timed Streaming</a></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="nav-section">
+                                <h4><i class="fas fa-cogs"></i> Advanced Features</h4>
+                                <ul>
+                                    <li><a href="#raw-messages" class="nav-link">Raw WebSocket</a></li>
+                                    <li><a href="#raw-iterators" class="nav-link">Raw Iterators</a></li>
+                                    <li><a href="#raw-orders" class="nav-link">Raw Orders</a></li>
+                                    <li><a href="#logging-system" class="nav-link">Logging System</a></li>
+                                    <li><a href="#validators" class="nav-link">Validators</a></li>
+                                    <li><a href="#validators" class="nav-link">Data Validators</a></li>
+                                </ul>
+                            </div>
+                        </nav>
+                    </div>
+                </div>                <div class="examples-main-content">
+                    <!-- Trading Operations Section -->
+                    <section id="trading-operations" class="examples-category fade-in-up">
+                        <div class="category-header">
+                            <h2><i class="fas fa-chart-line"></i> Trading Operations</h2>
+                            <p>Essential trading functions - buy, sell, and manage your trades</p>
+                        </div>
+
+                        <!-- Basic Trading Example -->
+                        <div id="basic-trading" class="example-block">
+                            <div class="example-header">
+                                <h3>Basic Trading - Buy & Sell</h3>
+                                <span class="difficulty-badge beginner">Beginner</span>
+                            </div>
+                            <p>Learn how to place basic buy and sell orders with BinaryOptionsToolsV2</p>
+                            
+                            <div class="code-tabs">
+                                <button class="tab-button active" data-tab="basic-python">Python</button>
+                            </div>
+                            
+                            <div class="tab-content active" id="basic-python">
+                                <div class="code-block">
+                                    <div class="code-header">
+                                        <span class="filename">basic_trading.py</span>
+                                        <button class="copy-btn" onclick="copyCode('basic-trading-code')">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <pre><code id="basic-trading-code" class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main(ssid: str):
+    # The API automatically detects if the 'ssid' is for real or demo account
+    api = PocketOptionAsync(ssid)
+    
+    # Place a BUY order
+    (buy_id, buy_data) = await api.buy(
+        asset="EURUSD_otc", 
+        amount=1.0, 
+        time=60, 
+        check_win=False
+    )
+    print(f"Buy trade id: {buy_id}")
+    print(f"Buy trade data: {buy_data}")
+    
+    # Place a SELL order  
+    (sell_id, sell_data) = await api.sell(
+        asset="EURUSD_otc", 
+        amount=1.0, 
+        time=60, 
+        check_win=False
+    )
+    print(f"Sell trade id: {sell_id}")
+    print(f"Sell trade data: {sell_data}")
+
+if __name__ == '__main__':
+    ssid = input('Please enter your ssid: ')
+    asyncio.run(main(ssid))</code></pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Check Win Example -->
+                        <div id="check-win" class="example-block">
+                            <div class="example-header">
+                                <h3>Check Trade Results</h3>
+                                <span class="difficulty-badge beginner">Beginner</span>
+                            </div>
+                            <p>Monitor your trades and check win/loss results</p>
+                            
+                            <div class="code-tabs">
+                                <button class="tab-button active" data-tab="checkwin-python">Python</button>
+                            </div>
+                            
+                            <div class="tab-content active" id="checkwin-python">
+                                <div class="code-block">
+                                    <div class="code-header">
+                                        <span class="filename">check_win.py</span>
+                                        <button class="copy-btn" onclick="copyCode('check-win-code')">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <pre><code id="check-win-code" class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main(ssid: str):
+    # Initialize API
+    api = PocketOptionAsync(ssid)
+    
+    # Place trades without automatic win checking
+    (buy_id, _) = await api.buy(
+        asset="EURUSD_otc", 
+        amount=1.0, 
+        time=15, 
+        check_win=False
+    )
+    (sell_id, _) = await api.sell(
+        asset="EURUSD_otc", 
+        amount=1.0, 
+        time=300, 
+        check_win=False
+    )
+    print(f"Trade IDs: Buy={buy_id}, Sell={sell_id}")
+    
+    # Manually check trade results
+    buy_data = await api.check_win(buy_id)
+    print(f"Buy trade result: {buy_data['result']}")
+    print(f"Buy trade data: {buy_data}")
+    
+    sell_data = await api.check_win(sell_id)
+    print(f"Sell trade result: {sell_data['result']}")
+    print(f"Sell trade data: {sell_data}")
+
+if __name__ == '__main__':
+    ssid = input('Please enter your ssid: ')
+    asyncio.run(main(ssid))</code></pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Trade History Example -->
+                        <div id="trade-history" class="example-block">
+                            <div class="example-header">
+                                <h3>Trade History & Open Positions</h3>
+                                <span class="difficulty-badge intermediate">Intermediate</span>
+                            </div>
+                            <p>Retrieve and monitor your open and closed trades</p>
+                            
+                            <div class="code-tabs">
+                                <button class="tab-button active" data-tab="history-python">Python</button>
+                            </div>
+                            
+                            <div class="tab-content active" id="history-python">
+                                <div class="code-block">
+                                    <div class="code-header">
+                                        <span class="filename">trade_history.py</span>
+                                        <button class="copy-btn" onclick="copyCode('trade-history-code')">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <pre><code id="trade-history-code" class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main(ssid: str):
+    api = PocketOptionAsync(ssid)
+    
+    # Place some test trades
+    _ = await api.buy(asset="EURUSD_otc", amount=1.0, time=60, check_win=False)
+    _ = await api.sell(asset="EURUSD_otc", amount=1.0, time=60, check_win=False)
+    
+    # Get currently opened deals
+    opened_deals = await api.opened_deals()
+    print(f"Opened deals: {opened_deals}")
+    print(f"Number of opened deals: {len(opened_deals)} (should be at least 2)")
+    
+    # Wait for trades to complete
+    await asyncio.sleep(62)
+    
+    # Get closed deals history
+    closed_deals = await api.closed_deals()
+    print(f"Closed deals: {closed_deals}")
+    print(f"Number of closed deals: {len(closed_deals)} (should be at least 2)")
+
+if __name__ == '__main__':
+    ssid = input('Please enter your ssid: ')
+    asyncio.run(main(ssid))</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Market Data Section -->
+                    <section id="market-data" class="examples-category fade-in-up">
+                        <div class="category-header">
+                            <h2><i class="fas fa-database"></i> Market Data</h2>
+                            <p>Access real-time and historical market data</p>
+                        </div>
+
+                        <!-- Get Balance Example -->
+                        <div id="get-balance" class="example-block">
+                            <div class="example-header">
+                                <h3>Account Balance</h3>
+                                <span class="difficulty-badge beginner">Beginner</span>
+                            </div>
+                            <p>Retrieve your current account balance</p>
+                            
+                            <div class="code-tabs">
+                                <button class="tab-button active" data-tab="balance-python">Python</button>
+                            </div>
+                            
+                            <div class="tab-content active" id="balance-python">
+                                <div class="code-block">
+                                    <div class="code-header">
+                                        <span class="filename">get_balance.py</span>
+                                        <button class="copy-btn" onclick="copyCode('balance-code')">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <pre><code id="balance-code" class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main(ssid: str):
+    # The API automatically detects if the 'ssid' is for real or demo account
+    api = PocketOptionAsync(ssid)
+    await asyncio.sleep(5)  # Wait for connection
+    
+    balance = await api.balance()
+    print(f"Current Balance: ${balance}")
+
+if __name__ == '__main__':
+    ssid = input('Please enter your ssid: ')
+    asyncio.run(main(ssid))</code></pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Get Candles Example -->
+                        <div id="get-candles" class="example-block">
+                            <div class="example-header">
+                                <h3>Historical Candles</h3>
+                                <span class="difficulty-badge intermediate">Intermediate</span>
+                            </div>
+                            <p>Fetch historical candlestick data for technical analysis</p>
+                            
+                            <div class="code-tabs">
+                                <button class="tab-button active" data-tab="candles-python">Python</button>
+                            </div>
+                            
+                            <div class="tab-content active" id="candles-python">
+                                <div class="code-block">
+                                    <div class="code-header">
+                                        <span class="filename">get_candles.py</span>
+                                        <button class="copy-btn" onclick="copyCode('candles-code')">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <pre><code id="candles-code" class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import pandas as pd
+import asyncio
+
+async def main(ssid: str):
+    api = PocketOptionAsync(ssid)    
+    await asyncio.sleep(5)  # Wait for connection
+    
+    # Test different time frames and periods
+    times = [3600 * i for i in range(1, 11)]  # 1-10 hours back
+    time_frames = [1, 5, 15, 30, 60, 300]  # Different timeframes in seconds
+    
+    for time in times:
+        for frame in time_frames:
+            # Get candles data
+            candles = await api.get_candles("EURUSD_otc", frame, time)
+            
+            # Convert to pandas DataFrame for analysis
+            candles_df = pd.DataFrame.from_dict(candles)
+            print(f"Timeframe: {frame}s, Period: {time}s")
+            print(f"Candles DataFrame: {candles_df.head()}")
+            print(f"Number of candles: {len(candles_df)}")
+            print("-" * 50)
+
+if __name__ == '__main__':
+    ssid = input('Please enter your ssid: ')
+    asyncio.run(main(ssid))</code></pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payout Rates Example -->
+                        <div id="payout-rates" class="example-block">
+                            <div class="example-header">
+                                <h3>Payout Rates</h3>
+                                <span class="difficulty-badge beginner">Beginner</span>
+                            </div>
+                            <p>Get current payout rates for different assets</p>
+                            
+                            <div class="code-tabs">
+                                <button class="tab-button active" data-tab="payout-python">Python</button>
+                            </div>
+                            
+                            <div class="tab-content active" id="payout-python">
+                                <div class="code-block">
+                                    <div class="code-header">
+                                        <span class="filename">payout_rates.py</span>
+                                        <button class="copy-btn" onclick="copyCode('payout-code')">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <pre><code id="payout-code" class="language-python">from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main(ssid: str):
+    api = PocketOptionAsync(ssid)    
+    await asyncio.sleep(5)  # Wait for connection
+    
+    # Get all available payouts
+    full_payout = await api.payout()
+    print(f"All Payouts: {full_payout}")
+    
+    # Get payouts for specific assets
+    assets = ["EURUSD_otc", "EURUSD", "AEX25"]
+    partial_payout = await api.payout(assets)
+    print(f"Specific Assets Payout: {partial_payout}")
+    
+    # Get payout for single asset
+    single_payout = await api.payout("EURUSD_otc")
+    print(f"EURUSD_otc Payout: {single_payout}%")
+
+if __name__ == '__main__':
+    ssid = input('Please enter your ssid: ')
+    asyncio.run(main(ssid))</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+            </div>
+        </section>
+
+        <!-- Language Selection -->
+        <section class="language-selector">
+            <div class="container">
+                <div class="language-tabs fade-in-up">
+                    <button class="lang-tab active" data-lang="python">
+                        <div class="lang-icon">🐍</div>
+                        <span>Python</span>
+                    </button>
+                    <button class="lang-tab" data-lang="javascript">
+                        <div class="lang-icon">📜</div>
+                        <span>JavaScript</span>
+                    </button>
+                    <button class="lang-tab" data-lang="rust">
+                        <div class="lang-icon">🦀</div>
+                        <span>Rust</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Python Examples -->
+        <section id="python" class="lang-content active">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Python Examples</h2>
+                    <p>Practical Python examples for binary options trading</p>
+                </div>
+
+                <div class="examples-grid">
+                    <!-- Basic Operations -->
+                    <div class="example-card fade-in-up stagger-1">
+                        <div class="example-header">
+                            <h3>Basic Operations</h3>
+                            <span class="example-type">Beginner</span>
+                        </div>
+                        <p>Get balance, place orders, and check results</p>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">python</span>
+                                <button class="copy-btn" data-clipboard-target="#python-basic">Copy</button>
+                            </div>
+                            <pre><code id="python-basic">from BinaryOptionsToolsV2 import PocketOption
+
+# Initialize client
+client = PocketOption(ssid="your_ssid_here")
+
+# Get account balance
+balance = client.get_balance()
+print(f"Current balance: ${balance:.2f}")
+
+# Get candles for analysis
+candles = client.get_candles("EURUSD_otc", 60, 50)
+print(f"Retrieved {len(candles)} candles")
+
+# Place a simple order
+order = client.create_raw_order(
+    asset="EURUSD_otc",
+    amount=10.0,
+    action="call",
+    expiration=60
+)
+
+if order.success:
+    print(f"Order placed! ID: {order.order_id}")
+    
+    # Wait for order to complete
+    import time
+    time.sleep(65)
+    
+    # Check result
+    result = client.check_win(order.order_id)
+    print(f"Order result: {result}")
+else:
+    print(f"Order failed: {order.message}")</code></pre>
+                        </div>
+                    </div>
+
+                    <!-- Async Streaming -->
+                    <div class="example-card fade-in-up stagger-2">
+                        <div class="example-header">
+                            <h3>Async Streaming</h3>
+                            <span class="example-type">Intermediate</span>
+                        </div>
+                        <p>Real-time data streaming with async/await</p>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">python</span>
+                                <button class="copy-btn" data-clipboard-target="#python-async">Copy</button>
+                            </div>
+                            <pre><code id="python-async">import asyncio
+from BinaryOptionsToolsV2 import AsyncPocketOption
+
+async def stream_candles():
+    client = AsyncPocketOption(ssid="your_ssid_here")
+    
+    print("Starting candle stream...")
+    
+    # Stream candles for multiple assets
+    assets = ["EURUSD_otc", "GBPUSD_otc", "USDJPY_otc"]
+    
+    async def handle_asset(asset):
+        async for candle in client.stream_candles(asset, 60):
+            print(f"{asset}: {candle.close} (Volume: {candle.volume})")
+            
+            # Simple trading logic
+            if candle.volume > 1000:
+                await place_order_if_signal(client, asset, candle)
+    
+    # Stream multiple assets concurrently
+    tasks = [handle_asset(asset) for asset in assets]
+    await asyncio.gather(*tasks)
+
+async def place_order_if_signal(client, asset, candle):
+    """Place order based on simple signal"""
+    # Example: Buy if closing higher than opening
+    if candle.close > candle.open:
+        try:
+            order = await client.create_raw_order(
+                asset=asset,
+                amount=5.0,
+                action="call",
+                expiration=60
+            )
+            print(f"📈 Placed CALL order for {asset}: {order.order_id}")
+        except Exception as e:
+            print(f"❌ Order failed: {e}")
+
+# Run the async function
+asyncio.run(stream_candles())</code></pre>
+                        </div>
+                    </div>
+
+                    <!-- Trading Bot -->
+                    <div class="example-card fade-in-up stagger-3">
+                        <div class="example-header">
+                            <h3>Trading Bot</h3>
+                            <span class="example-type">Advanced</span>
+                        </div>
+                        <p>Complete trading bot with risk management</p>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">python</span>
+                                <button class="copy-btn" data-clipboard-target="#python-bot">Copy</button>
+                            </div>
+                            <pre><code id="python-bot">import asyncio
+import logging
+from datetime import datetime, timedelta
+from dataclasses import dataclass
+from typing import Dict, List
+from BinaryOptionsToolsV2 import AsyncPocketOption
+
+@dataclass
+class TradingConfig:
+    max_concurrent_orders: int = 3
+    risk_per_trade: float = 2.0  # Percentage of balance
+    min_volume_threshold: float = 1000.0
+    assets: List[str] = None
+
+    def __post_init__(self):
+        if self.assets is None:
+            self.assets = ["EURUSD_otc", "GBPUSD_otc", "USDJPY_otc"]
+
+class TradingBot:
+    def __init__(self, ssid: str, config: TradingConfig):
+        self.client = AsyncPocketOption(ssid)
+        self.config = config
+        self.active_orders: Dict[str, dict] = {}
+        self.balance = 0.0
+        
+        # Setup logging
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
+
+    async def start(self):
+        """Start the trading bot"""
+        self.logger.info("🚀 Trading bot starting...")
+        
+        # Get initial balance
+        self.balance = await self.client.get_balance()
+        self.logger.info(f"💰 Initial balance: ${self.balance:.2f}")
+        
+        # Start monitoring orders and streaming data
+        await asyncio.gather(
+            self.monitor_orders(),
+            self.stream_market_data()
+        )
+
+    async def stream_market_data(self):
+        """Stream market data for all configured assets"""
+        async def handle_asset_stream(asset):
+            try:
+                async for candle in self.client.stream_candles(asset, 60):
+                    await self.analyze_candle(asset, candle)
+            except Exception as e:
+                self.logger.error(f"Stream error for {asset}: {e}")
+
+        # Start streaming for all assets
+        tasks = [handle_asset_stream(asset) for asset in self.config.assets]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def analyze_candle(self, asset: str, candle):
+        """Analyze candle and decide whether to trade"""
+        # Check if we can place more orders
+        if len(self.active_orders) >= self.config.max_concurrent_orders:
+            return
+
+        # Simple strategy: high volume + price movement
+        price_change = abs(candle.close - candle.open) / candle.open * 100
+        
+        if (candle.volume > self.config.min_volume_threshold and 
+            price_change > 0.1):
+            
+            # Determine direction
+            action = "call" if candle.close > candle.open else "put"
+            
+            # Calculate position size
+            amount = self.calculate_position_size()
+            
+            await self.place_order(asset, amount, action)
+
+    def calculate_position_size(self) -> float:
+        """Calculate position size based on risk management"""
+        risk_amount = self.balance * (self.config.risk_per_trade / 100)
+        return max(1.0, min(risk_amount, 50.0))  # Min $1, Max $50
+
+    async def place_order(self, asset: str, amount: float, action: str):
+        """Place a trading order"""
+        try:
+            order = await self.client.create_raw_order(
+                asset=asset,
+                amount=amount,
+                action=action,
+                expiration=60
+            )
+            
+            if order.success:
+                self.active_orders[order.order_id] = {
+                    'asset': asset,
+                    'amount': amount,
+                    'action': action,
+                    'timestamp': datetime.now()
+                }
+                
+                self.logger.info(
+                    f"📊 Order placed: {asset} {action.upper()} "
+                    f"${amount:.2f} (ID: {order.order_id})"
+                )
+            else:
+                self.logger.error(f"❌ Order failed: {order.message}")
+                
+        except Exception as e:
+            self.logger.error(f"Order placement error: {e}")
+
+    async def monitor_orders(self):
+        """Monitor active orders and update results"""
+        while True:
+            if not self.active_orders:
+                await asyncio.sleep(5)
+                continue
+                
+            completed_orders = []
+            
+            for order_id, order_info in self.active_orders.items():
+                # Check if order should be completed (after 60+ seconds)
+                if datetime.now() - order_info['timestamp'] > timedelta(seconds=65):
+                    try:
+                        result = await self.client.check_win(order_id)
+                        
+                        if result != "pending":
+                            completed_orders.append(order_id)
+                            await self.handle_order_result(order_id, order_info, result)
+                            
+                    except Exception as e:
+                        self.logger.error(f"Error checking order {order_id}: {e}")
+            
+            # Remove completed orders
+            for order_id in completed_orders:
+                del self.active_orders[order_id]
+            
+            # Update balance periodically
+            try:
+                self.balance = await self.client.get_balance()
+            except Exception as e:
+                self.logger.error(f"Error updating balance: {e}")
+            
+            await asyncio.sleep(10)
+
+    async def handle_order_result(self, order_id: str, order_info: dict, result: str):
+        """Handle completed order result"""
+        asset = order_info['asset']
+        amount = order_info['amount']
+        action = order_info['action']
+        
+        if result == "win":
+            profit = amount * 0.8  # Assuming 80% payout
+            self.logger.info(
+                f"✅ WIN: {asset} {action.upper()} +${profit:.2f} "
+                f"(Balance: ${self.balance:.2f})"
+            )
+        else:
+            self.logger.info(
+                f"❌ LOSS: {asset} {action.upper()} -${amount:.2f} "
+                f"(Balance: ${self.balance:.2f})"
+            )
+
+# Usage example
+async def main():
+    config = TradingConfig(
+        max_concurrent_orders=2,
+        risk_per_trade=1.5,
+        assets=["EURUSD_otc", "GBPUSD_otc"]
+    )
+    
+    bot = TradingBot(ssid="your_ssid_here", config=config)
+    await bot.start()
+
+if __name__ == "__main__":
+    asyncio.run(main())</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- JavaScript Examples -->
+        <section id="javascript" class="lang-content">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>JavaScript Examples</h2>
+                    <p>Practical JavaScript examples for Node.js and browser environments</p>
+                </div>
+
+                <div class="examples-grid">
+                    <!-- Basic Node.js -->
+                    <div class="example-card fade-in-up stagger-1">
+                        <div class="example-header">
+                            <h3>Basic Node.js Usage</h3>
+                            <span class="example-type">Beginner</span>
+                        </div>
+                        <p>Simple trading operations in Node.js</p>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">javascript</span>
+                                <button class="copy-btn" data-clipboard-target="#js-basic">Copy</button>
+                            </div>
+                            <pre><code id="js-basic">const { PocketOption } = require('binaryoptionstools-v2');
+
+async function main() {
+    // Initialize the API client
+    const api = new PocketOption('your_ssid_here');
+    
+    // Wait for connection to establish
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    try {
+        // Get account balance
+        const balance = await api.getBalance();
+        console.log(`💰 Balance: $${balance.toFixed(2)}`);
+        
+        // Get recent candles for analysis
+        const candles = await api.getCandles('EURUSD_otc', 60, 20);
+        console.log(`📊 Retrieved ${candles.length} candles`);
+        
+        // Analyze last candle
+        const lastCandle = candles[candles.length - 1];
+        console.log(`📈 Last candle: Open=${lastCandle.open}, Close=${lastCandle.close}`);
+        
+        // Place order based on simple logic
+        const action = lastCandle.close > lastCandle.open ? 'call' : 'put';
+        const orderResult = await api.createRawOrder({
+            asset: 'EURUSD_otc',
+            amount: 10.0,
+            action: action,
+            expiration: 60
+        });
+        
+        if (orderResult.success) {
+            console.log(`✅ Order placed: ${action.toUpperCase()} (ID: ${orderResult.orderId})`);
+            
+            // Wait for order completion
+            setTimeout(async () => {
+                try {
+                    const result = await api.checkWin(orderResult.orderId);
+                    console.log(`🎯 Order result: ${result}`);
+                } catch (error) {
+                    console.error('Error checking result:', error.message);
+                }
+            }, 65000);
+            
+        } else {
+            console.error(`❌ Order failed: ${orderResult.message}`);
+        }
+        
+    } catch (error) {
+        console.error('Error:', error.message);
+    }
+}
+
+main().catch(console.error);</code></pre>
+                        </div>
+                    </div>
+
+                    <!-- Real-time Stream -->
+                    <div class="example-card fade-in-up stagger-2">
+                        <div class="example-header">
+                            <h3>Real-time Data Stream</h3>
+                            <span class="example-type">Intermediate</span>
+                        </div>
+                        <p>Stream live market data with event handling</p>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">javascript</span>
+                                <button class="copy-btn" data-clipboard-target="#js-stream">Copy</button>
+                            </div>
+                            <pre><code id="js-stream">const { PocketOption } = require('binaryoptionstools-v2');
+const EventEmitter = require('events');
+
+class MarketDataStreamer extends EventEmitter {
+    constructor(ssid) {
+        super();
+        this.api = new PocketOption(ssid);
+        this.activeStreams = new Map();
+        this.candleBuffer = new Map();
+    }
+
+    async initialize() {
+        // Wait for connection
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        console.log('🔗 Connected to PocketOption');
+    }
+
+    async subscribeToAsset(asset, timeframe = 60) {
+        try {
+            console.log(`📊 Subscribing to ${asset} (${timeframe}s)`);
+            
+            // Subscribe to symbol stream
+            const stream = await this.api.subscribeSymbol(asset);
+            this.activeStreams.set(asset, stream);
+            
+            // Process stream data
+            this.processStream(asset, stream);
+            
+        } catch (error) {
+            console.error(`Error subscribing to ${asset}:`, error.message);
+            this.emit('error', { asset, error });
+        }
+    }
+
+    async processStream(asset, stream) {
+        try {
+            for await (const data of stream) {
+                // Emit raw data
+                this.emit('tick', { asset, data });
+                
+                // Buffer candle data
+                this.bufferCandleData(asset, data);
+                
+                // Check for trading signals
+                this.analyzeData(asset, data);
+            }
+        } catch (error) {
+            console.error(`Stream error for ${asset}:`, error);
+            this.emit('streamError', { asset, error });
+            
+            // Attempt to reconnect after delay
+            setTimeout(() => {
+                console.log(`🔄 Reconnecting to ${asset}...`);
+                this.subscribeToAsset(asset);
+            }, 5000);
+        }
+    }
+
+    bufferCandleData(asset, data) {
+        if (!this.candleBuffer.has(asset)) {
+            this.candleBuffer.set(asset, []);
+        }
+        
+        const buffer = this.candleBuffer.get(asset);
+        buffer.push({
+            timestamp: Date.now(),
+            price: data.price || data.close,
+            volume: data.volume || 0,
+            ...data
+        });
+        
+        // Keep only last 50 data points
+        if (buffer.length > 50) {
+            buffer.shift();
+        }
+    }
+
+    analyzeData(asset, data) {
+        const buffer = this.candleBuffer.get(asset) || [];
+        if (buffer.length < 10) return; // Need minimum data
+        
+        const recentPrices = buffer.slice(-10).map(d => d.price);
+        const currentPrice = data.price || data.close;
+        const avgPrice = recentPrices.reduce((a, b) => a + b) / recentPrices.length;
+        
+        // Simple momentum strategy
+        const momentum = (currentPrice - avgPrice) / avgPrice * 100;
+        
+        if (Math.abs(momentum) > 0.1) { // 0.1% threshold
+            this.emit('signal', {
+                asset,
+                action: momentum > 0 ? 'call' : 'put',
+                strength: Math.abs(momentum),
+                price: currentPrice,
+                timestamp: Date.now()
+            });
+        }
+    }
+
+    async unsubscribe(asset) {
+        const stream = this.activeStreams.get(asset);
+        if (stream && stream.return) {
+            await stream.return();
+        }
+        this.activeStreams.delete(asset);
+        this.candleBuffer.delete(asset);
+        console.log(`❌ Unsubscribed from ${asset}`);
+    }
+
+    async cleanup() {
+        console.log('🧹 Cleaning up streams...');
+        for (const [asset] of this.activeStreams) {
+            await this.unsubscribe(asset);
+        }
+    }
+}
+
+// Usage example
+async function main() {
+    const streamer = new MarketDataStreamer('your_ssid_here');
+    
+    // Event listeners
+    streamer.on('tick', ({ asset, data }) => {
+        console.log(`📈 ${asset}: ${data.price || data.close}`);
+    });
+    
+    streamer.on('signal', async ({ asset, action, strength, price }) => {
+        console.log(`🚨 Signal: ${asset} ${action.toUpperCase()} (${strength.toFixed(3)}% @ ${price})`);
+        
+        // Optional: Place order on signal
+        // await placeOrder(asset, action, 5.0);
+    });
+    
+    streamer.on('error', ({ asset, error }) => {
+        console.error(`❌ ${asset} error:`, error.message);
+    });
+    
+    // Initialize and subscribe
+    await streamer.initialize();
+    await streamer.subscribeToAsset('EURUSD_otc');
+    await streamer.subscribeToAsset('GBPUSD_otc');
+    
+    // Run for 5 minutes then cleanup
+    setTimeout(async () => {
+        await streamer.cleanup();
+        console.log('✅ Demo completed');
+        process.exit(0);
+    }, 300000); // 5 minutes
+}
+
+main().catch(console.error);</code></pre>
+                        </div>
+                    </div>
+
+                    <!-- Browser Trading App -->
+                    <div class="example-card fade-in-up stagger-3">
+                        <div class="example-header">
+                            <h3>Browser Trading App</h3>
+                            <span class="example-type">Advanced</span>
+                        </div>
+                        <p>Complete trading interface for web browsers</p>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">html</span>
+                                <button class="copy-btn" data-clipboard-target="#js-browser">Copy</button>
+                            </div>
+                            <pre><code id="js-browser">&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+    &lt;title&gt;Binary Options Trader&lt;/title&gt;
+    &lt;script src="https://cdn.jsdelivr.net/npm/chart.js"&gt;&lt;/script&gt;
+    &lt;script src="https://cdn.jsdelivr.net/npm/binaryoptionstools-v2@latest/dist/index.min.js"&gt;&lt;/script&gt;
+    &lt;style&gt;
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a2e; color: white; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { display: flex; justify-content: between; align-items: center; margin-bottom: 20px; }
+        .balance { font-size: 24px; font-weight: bold; color: #4CAF50; }
+        .trading-panel { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        .chart-container { background: #16213e; padding: 20px; border-radius: 10px; }
+        .controls { background: #16213e; padding: 20px; border-radius: 10px; }
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: block; margin-bottom: 5px; }
+        .control-group input, .control-group select { 
+            width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #333; 
+            background: #0f172a; color: white; 
+        }
+        .btn { 
+            padding: 10px 20px; border: none; border-radius: 5px; 
+            cursor: pointer; font-size: 16px; margin: 5px; 
+        }
+        .btn-call { background: #4CAF50; color: white; }
+        .btn-put { background: #f44336; color: white; }
+        .btn:hover { opacity: 0.8; }
+        .orders { margin-top: 20px; }
+        .order { 
+            background: #16213e; padding: 10px; margin: 5px 0; 
+            border-radius: 5px; border-left: 4px solid #2196F3; 
+        }
+        .status { margin-top: 20px; padding: 10px; border-radius: 5px; }
+        .status.connected { background: #4CAF50; }
+        .status.error { background: #f44336; }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div class="container"&gt;
+        &lt;div class="header"&gt;
+            &lt;h1&gt;Binary Options Trader&lt;/h1&gt;
+            &lt;div class="balance" id="balance"&gt;Balance: $0.00&lt;/div&gt;
+        &lt;/div&gt;
+        
+        &lt;div class="status" id="status"&gt;Connecting...&lt;/div&gt;
+        
+        &lt;div class="trading-panel"&gt;
+            &lt;div class="chart-container"&gt;
+                &lt;canvas id="priceChart" width="800" height="400"&gt;&lt;/canvas&gt;
+            &lt;/div&gt;
+            
+            &lt;div class="controls"&gt;
+                &lt;div class="control-group"&gt;
+                    &lt;label&gt;Asset:&lt;/label&gt;
+                    &lt;select id="assetSelect"&gt;
+                        &lt;option value="EURUSD_otc"&gt;EUR/USD OTC&lt;/option&gt;
+                        &lt;option value="GBPUSD_otc"&gt;GBP/USD OTC&lt;/option&gt;
+                        &lt;option value="USDJPY_otc"&gt;USD/JPY OTC&lt;/option&gt;
+                    &lt;/select&gt;
+                &lt;/div&gt;
+                
+                &lt;div class="control-group"&gt;
+                    &lt;label&gt;Amount ($):&lt;/label&gt;
+                    &lt;input type="number" id="amountInput" value="10" step="1" min="1"&gt;
+                &lt;/div&gt;
+                
+                &lt;div class="control-group"&gt;
+                    &lt;label&gt;Expiration (seconds):&lt;/label&gt;
+                    &lt;select id="expirationSelect"&gt;
+                        &lt;option value="60"&gt;1 minute&lt;/option&gt;
+                        &lt;option value="120"&gt;2 minutes&lt;/option&gt;
+                        &lt;option value="300"&gt;5 minutes&lt;/option&gt;
+                    &lt;/select&gt;
+                &lt;/div&gt;
+                
+                &lt;div style="text-align: center;"&gt;
+                    &lt;button class="btn btn-call" id="callBtn"&gt;📈 CALL&lt;/button&gt;
+                    &lt;button class="btn btn-put" id="putBtn"&gt;📉 PUT&lt;/button&gt;
+                &lt;/div&gt;
+                
+                &lt;div class="control-group"&gt;
+                    &lt;label&gt;Current Price: &lt;span id="currentPrice"&gt;-.----&lt;/span&gt;&lt;/label&gt;
+                    &lt;label&gt;Trend: &lt;span id="trend"&gt;-&lt;/span&gt;&lt;/label&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+        
+        &lt;div class="orders"&gt;
+            &lt;h3&gt;Active Orders&lt;/h3&gt;
+            &lt;div id="ordersList"&gt;&lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;script&gt;
+        class TradingApp {
+            constructor() {
+                this.client = null;
+                this.chart = null;
+                this.priceData = [];
+                this.activeOrders = new Map();
+                this.currentAsset = 'EURUSD_otc';
+                
+                this.initializeChart();
+                this.bindEvents();
+                this.initialize();
+            }
+
+            async initialize() {
+                try {
+                    // Initialize client
+                    this.client = new BinaryOptionsToolsV2.PocketOption({
+                        ssid: prompt('Enter your SSID:') || 'demo_ssid'
+                    });
+                    
+                    await this.connect();
+                    this.updateStatus('Connected', 'connected');
+                    
+                    // Start data stream
+                    this.startDataStream();
+                    
+                    // Update balance
+                    await this.updateBalance();
+                    
+                } catch (error) {
+                    this.updateStatus(`Error: ${error.message}`, 'error');
+                }
+            }
+
+            async connect() {
+                // Wait for connection
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+
+            updateStatus(message, type = '') {
+                const statusEl = document.getElementById('status');
+                statusEl.textContent = message;
+                statusEl.className = `status ${type}`;
+            }
+
+            async updateBalance() {
+                try {
+                    const balance = await this.client.getBalance();
+                    document.getElementById('balance').textContent = `Balance: $${balance.toFixed(2)}`;
+                } catch (error) {
+                    console.error('Balance update error:', error);
+                }
+            }
+
+            initializeChart() {
+                const ctx = document.getElementById('priceChart').getContext('2d');
+                this.chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Price',
+                            data: [],
+                            borderColor: '#2196F3',
+                            backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { labels: { color: 'white' } }
+                        },
+                        scales: {
+                            x: { ticks: { color: 'white' }, grid: { color: '#333' } },
+                            y: { ticks: { color: 'white' }, grid: { color: '#333' } }
+                        }
+                    }
+                });
+            }
+
+            async startDataStream() {
+                try {
+                    const stream = await this.client.subscribeSymbol(this.currentAsset);
+                    
+                    for await (const data of stream) {
+                        this.updatePriceData(data);
+                    }
+                } catch (error) {
+                    console.error('Stream error:', error);
+                    setTimeout(() => this.startDataStream(), 5000);
+                }
+            }
+
+            updatePriceData(data) {
+                const price = data.price || data.close || Math.random() * 1.2 + 1.1;
+                const time = new Date().toLocaleTimeString();
+                
+                this.priceData.push({ time, price });
+                if (this.priceData.length > 50) {
+                    this.priceData.shift();
+                }
+                
+                // Update chart
+                this.chart.data.labels = this.priceData.map(d => d.time);
+                this.chart.data.datasets[0].data = this.priceData.map(d => d.price);
+                this.chart.update('none');
+                
+                // Update current price
+                document.getElementById('currentPrice').textContent = price.toFixed(5);
+                
+                // Update trend
+                if (this.priceData.length > 1) {
+                    const prev = this.priceData[this.priceData.length - 2].price;
+                    const trend = price > prev ? '📈 UP' : price < prev ? '📉 DOWN' : '➡️ FLAT';
+                    document.getElementById('trend').textContent = trend;
+                }
+            }
+
+            bindEvents() {
+                document.getElementById('callBtn').addEventListener('click', () => this.placeOrder('call'));
+                document.getElementById('putBtn').addEventListener('click', () => this.placeOrder('put'));
+                
+                document.getElementById('assetSelect').addEventListener('change', (e) => {
+                    this.currentAsset = e.target.value;
+                    this.startDataStream();
+                });
+            }
+
+            async placeOrder(action) {
+                const amount = parseFloat(document.getElementById('amountInput').value);
+                const expiration = parseInt(document.getElementById('expirationSelect').value);
+                
+                if (!amount || amount < 1) {
+                    alert('Please enter a valid amount');
+                    return;
+                }
+                
+                try {
+                    const order = await this.client.createRawOrder({
+                        asset: this.currentAsset,
+                        amount: amount,
+                        action: action,
+                        expiration: expiration
+                    });
+                    
+                    if (order.success) {
+                        this.addOrder(order.orderId, {
+                            asset: this.currentAsset,
+                            amount: amount,
+                            action: action,
+                            expiration: expiration,
+                            timestamp: Date.now()
+                        });
+                        
+                        await this.updateBalance();
+                    } else {
+                        alert(`Order failed: ${order.message}`);
+                    }
+                } catch (error) {
+                    alert(`Error placing order: ${error.message}`);
+                }
+            }
+
+            addOrder(orderId, orderInfo) {
+                this.activeOrders.set(orderId, orderInfo);
+                
+                const orderDiv = document.createElement('div');
+                orderDiv.className = 'order';
+                orderDiv.id = `order-${orderId}`;
+                orderDiv.innerHTML = `
+                    &lt;strong&gt;${orderInfo.asset}&lt;/strong&gt; 
+                    ${orderInfo.action.toUpperCase()} 
+                    $${orderInfo.amount} 
+                    (${orderInfo.expiration}s)
+                    &lt;span style="float: right;"&gt;⏳ Pending&lt;/span&gt;
+                `;
+                
+                document.getElementById('ordersList').appendChild(orderDiv);
+                
+                // Check result after expiration
+                setTimeout(async () => {
+                    await this.checkOrderResult(orderId);
+                }, (orderInfo.expiration + 5) * 1000);
+            }
+
+            async checkOrderResult(orderId) {
+                try {
+                    const result = await this.client.checkWin(orderId);
+                    const orderDiv = document.getElementById(`order-${orderId}`);
+                    
+                    if (orderDiv) {
+                        const status = result === 'win' ? '✅ WIN' : result === 'lose' ? '❌ LOSS' : '⏳ Pending';
+                        const color = result === 'win' ? '#4CAF50' : result === 'lose' ? '#f44336' : '#2196F3';
+                        
+                        orderDiv.style.borderLeftColor = color;
+                        orderDiv.querySelector('span').textContent = status;
+                        
+                        if (result !== 'pending') {
+                            this.activeOrders.delete(orderId);
+                            await this.updateBalance();
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error checking order ${orderId}:`, error);
+                }
+            }
+        }
+
+        // Initialize the trading app
+        window.addEventListener('load', () => {
+            new TradingApp();
+        });
+    &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Rust Examples -->
+        <section id="rust" class="lang-content">
+            <div class="container">
+                <div class="section-header fade-in-up">
+                    <h2>Rust Examples</h2>
+                    <p>High-performance Rust examples for professional trading</p>
+                </div>
+
+                <div class="examples-grid">
+                    <!-- Basic Rust -->
+                    <div class="example-card fade-in-up stagger-1">
+                        <div class="example-header">
+                            <h3>Basic Trading</h3>
+                            <span class="example-type">Beginner</span>
+                        </div>
+                        <p>Basic trading operations with error handling</p>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">rust</span>
+                                <button class="copy-btn" data-clipboard-target="#rust-basic">Copy</button>
+                            </div>
+                            <pre><code id="rust-basic">use binary_options_tools_v2::{
+    PocketOption, OrderOptions, Result, Error, ErrorKind
+};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Initialize client with error handling
+    let client = match PocketOption::new("your_ssid_here").await {
+        Ok(client) => {
+            println!("✅ Connected to PocketOption");
+            client
+        }
+        Err(e) => {
+            eprintln!("❌ Connection failed: {}", e);
+            return Err(e);
+        }
+    };
+
+    // Get account balance
+    match client.get_balance().await {
+        Ok(balance) => println!("💰 Balance: ${:.2}", balance),
+        Err(e) => eprintln!("Error getting balance: {}", e),
+    }
+
+    // Get candles for analysis
+    let candles = client.get_candles("EURUSD_otc", 60, 20).await?;
+    println!("📊 Retrieved {} candles", candles.len());
+
+    // Analyze trend
+    if let (Some(first), Some(last)) = (candles.first(), candles.last()) {
+        let trend = if last.close > first.close { "📈 Uptrend" } else { "📉 Downtrend" };
+        println!("Trend analysis: {}", trend);
+
+        // Place order based on trend
+        let action = if last.close > first.close { "call" } else { "put" };
+        
+        let order_options = OrderOptions {
+            asset: "EURUSD_otc".to_string(),
+            amount: 10.0,
+            action: action.to_string(),
+            expiration: 60,
+        };
+
+        match client.create_raw_order(order_options).await {
+            Ok(order_result) => {
+                if order_result.success {
+                    println!("✅ Order placed: {} (ID: {})", action.to_uppercase(), order_result.order_id);
+                    
+                    // Wait for order completion
+                    tokio::time::sleep(tokio::time::Duration::from_secs(65)).await;
+                    
+                    // Check result
+                    match client.check_win(&order_result.order_id).await {
+                        Ok(result) => println!("🎯 Order result: {:?}", result),
+                        Err(e) => eprintln!("Error checking result: {}", e),
+                    }
+                } else {
+                    eprintln!("❌ Order failed: {}", order_result.message);
+                }
+            }
+            Err(e) => eprintln!("Error placing order: {}", e),
+        }
+    }
+
+    Ok(())
+}</code></pre>
+                        </div>
+                    </div>
+
+                    <!-- High-Performance Stream -->
+                    <div class="example-card fade-in-up stagger-2">
+                        <div class="example-header">
+                            <h3>High-Performance Streaming</h3>
+                            <span class="example-type">Intermediate</span>
+                        </div>
+                        <p>Concurrent streams with advanced processing</p>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-lang">rust</span>
+                                <button class="copy-btn" data-clipboard-target="#rust-stream">Copy</button>
+                            </div>
+                            <pre><code id="rust-stream">use binary_options_tools_v2::{PocketOption, StreamEvent, OrderOptions};
+use futures::{StreamExt, stream::SelectAll};
+use tokio::sync::mpsc;
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
+
+#[derive(Debug, Clone)]
+struct MarketData {
+    asset: String,
+    price: f64,
+    timestamp: Instant,
+    volume: f64,
+}
+
+#[derive(Debug)]
+struct TradingSignal {
+    asset: String,
+    action: String,
+    strength: f64,
+    price: f64,
+}
+
+struct HighPerformanceTrader {
+    client: PocketOption,
+    price_buffer: HashMap<String, Vec<MarketData>>,
+    signal_sender: mpsc::UnboundedSender<TradingSignal>,
+}
+
+impl HighPerformanceTrader {
+    async fn new(ssid: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let client = PocketOption::new(ssid).await?;
+        let (signal_sender, _) = mpsc::unbounded_channel();
+        
+        Ok(Self {
+            client,
+            price_buffer: HashMap::new(),
+            signal_sender,
+        })
+    }
+
+    async fn start_multi_asset_streaming(&mut self, assets: Vec<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        // Create streams for all assets
+        let mut streams = SelectAll::new();
+        
+        for asset in assets {
+            match self.client.stream_candles(asset, 60).await {
+                Ok(stream) => {
+                    let asset_stream = stream.map(move |event| (asset.to_string(), event));
+                    streams.push(asset_stream);
+                    println!("📊 Started stream for {}", asset);
+                }
+                Err(e) => eprintln!("Failed to start stream for {}: {}", asset, e),
+            }
+        }
+
+        // Set up signal processing
+        let mut signal_receiver = self.setup_signal_processor().await;
+
+        // Process streams concurrently
+        tokio::select! {
+            _ = self.process_market_streams(streams) => {},
+            _ = self.process_trading_signals(&mut signal_receiver) => {},
+        }
+
+        Ok(())
+    }
+
+    async fn process_market_streams(&mut self, mut streams: SelectAll<impl futures::Stream<Item = (String, Result<StreamEvent, binary_options_tools_v2::Error>)> + Unpin>) {
+        while let Some((asset, event_result)) = streams.next().await {
+            match event_result {
+                Ok(StreamEvent::Candle(candle)) => {
+                    let market_data = MarketData {
+                        asset: asset.clone(),
+                        price: candle.close,
+                        timestamp: Instant::now(),
+                        volume: candle.volume,
+                    };
+
+                    // Buffer the data
+                    self.buffer_market_data(market_data.clone());
+
+                    // Analyze for signals
+                    if let Some(signal) = self.analyze_market_data(&asset, &market_data) {
+                        let _ = self.signal_sender.send(signal);
+                    }
+                }
+                Ok(StreamEvent::Error(e)) => {
+                    eprintln!("Stream error for {}: {}", asset, e);
+                }
+                Err(e) => {
+                    eprintln!("Failed to receive event for {}: {}", asset, e);
+                }
+            }
+        }
+    }
+
+    fn buffer_market_data(&mut self, data: MarketData) {
+        let buffer = self.price_buffer.entry(data.asset.clone()).or_insert_with(Vec::new);
+        buffer.push(data);
+
+        // Keep only last 100 data points for performance
+        if buffer.len() > 100 {
+            buffer.drain(0..50); // Remove first 50 elements
+        }
+    }
+
+    fn analyze_market_data(&self, asset: &str, current_data: &MarketData) -> Option<TradingSignal> {
+        let buffer = self.price_buffer.get(asset)?;
+        if buffer.len() < 20 { return None; } // Need minimum data
+
+        // Calculate moving averages
+        let short_ma = Self::calculate_moving_average(&buffer[buffer.len()-10..]);
+        let long_ma = Self::calculate_moving_average(&buffer[buffer.len()-20..]);
+
+        // Calculate momentum
+        let momentum = (short_ma - long_ma) / long_ma * 100.0;
+
+        // Generate signal if momentum is strong enough
+        if momentum.abs() > 0.05 { // 0.05% threshold
+            Some(TradingSignal {
+                asset: asset.to_string(),
+                action: if momentum > 0.0 { "call".to_string() } else { "put".to_string() },
+                strength: momentum.abs(),
+                price: current_data.price,
+            })
+        } else {
+            None
+        }
+    }
+
+    async fn setup_signal_processor(&self) -> mpsc::UnboundedReceiver<TradingSignal> {
+        let (sender, receiver) = mpsc::unbounded_channel();
+        self.signal_sender.clone(); // Store sender for later use
+        receiver
+    }
+
+    async fn process_trading_signals(&self, receiver: &mut mpsc::UnboundedReceiver<TradingSignal>) {
+        let mut active_orders = HashMap::new();
+        let mut last_order_time = HashMap::new();
+
+        while let Some(signal) = receiver.recv().await {
+            // Rate limiting: only one order per asset every 2 minutes
+            let now = Instant::now();
+            if let Some(&last_time) = last_order_time.get(&signal.asset) {
+                if now.duration_since(last_time) < Duration::from_secs(120) {
+                    continue;
+                }
+            }
+
+            // Check if we already have an active order for this asset
+            if active_orders.contains_key(&signal.asset) {
+                continue;
+            }
+
+            println!("🚨 Signal: {} {} (strength: {:.3}%)", 
+                signal.asset, signal.action.to_uppercase(), signal.strength);
+
+            // Place order
+            match self.place_order_from_signal(&signal).await {
+                Ok(order_id) => {
+                    active_orders.insert(signal.asset.clone(), order_id);
+                    last_order_time.insert(signal.asset.clone(), now);
+                }
+                Err(e) => eprintln!("Failed to place order: {}", e),
+            }
+        }
+    }
+
+    async fn place_order_from_signal(&self, signal: &TradingSignal) -> Result<String, Box<dyn std::error::Error>> {
+        let order_options = OrderOptions {
+            asset: signal.asset.clone(),
+            amount: 10.0, // Fixed amount for this example
+            action: signal.action.clone(),
+            expiration: 60,
+        };
+
+        let order_result = self.client.create_raw_order(order_options).await?;
+        
+        if order_result.success {
+            println!("✅ Order placed: {} {} $10 (ID: {})", 
+                signal.asset, signal.action.to_uppercase(), order_result.order_id);
+            
+            // Schedule result check
+            let client = self.client.clone();
+            let order_id = order_result.order_id.clone();
+            let asset = signal.asset.clone();
+            
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_secs(65)).await;
+                match client.check_win(&order_id).await {
+                    Ok(result) => {
+                        let emoji = match result.as_str() {
+                            "win" => "✅",
+                            "lose" => "❌", 
+                            _ => "⏳"
+                        };
+                        println!("{} {} order result: {}", emoji, asset, result);
+                    }
+                    Err(e) => eprintln!("Error checking order {}: {}", order_id, e),
+                }
+            });
+            
+            Ok(order_result.order_id)
+        } else {
+            Err(format!("Order failed: {}", order_result.message).into())
+        }
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🚀 Starting high-performance trading system...");
+
+    let mut trader = HighPerformanceTrader::new("your_ssid_here").await?;
+    
+    let assets = vec!["EURUSD_otc", "GBPUSD_otc", "USDJPY_otc", "AUDUSD_otc"];
+    
+    trader.start_multi_asset_streaming(assets).await?;
+
+    Ok(())
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="cta-section">
+            <div class="container">
+                <div class="cta-content fade-in-up">
+                    <h2>Ready to Build Your Trading Bot?</h2>
+                    <p>Professional bot development services available at chipa.tech</p>
+                    <div class="cta-buttons">
+                        <a href="https://chipa.tech" class="btn btn-primary" target="_blank">
+                            Get Custom Bot
+                        </a>
+                        <a href="api.html" class="btn btn-outline">
+                            API Reference
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>BinaryOptionsToolsV2</h3>
+                    <p>Professional trading tools for binary options</p>
+                    <div class="social-links">
+                        <a href="#" aria-label="GitHub">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4>Documentation</h4>
+                    <ul>
+                        <li><a href="python.html">Python</a></li>
+                        <li><a href="javascript.html">JavaScript</a></li>
+                        <li><a href="rust.html">Rust</a></li>
+                        <li><a href="api.html">API Reference</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Examples</h4>
+                    <ul>
+                        <li><a href="#python">Python Examples</a></li>
+                        <li><a href="#javascript">JavaScript Examples</a></li>
+                        <li><a href="#rust">Rust Examples</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Services</h4>
+                    <ul>
+                        <li><a href="https://chipa.tech" target="_blank">Bot Development</a></li>
+                        <li><a href="https://chipa.tech" target="_blank">Custom Solutions</a></li>
+                        <li><a href="https://chipa.tech" target="_blank">Consulting</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 BinaryOptionsToolsV2. All rights reserved.</p>
+                <p>Professional bot services by <a href="https://chipa.tech" target="_blank">chipa.tech</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/examples.js"></script>
+</body>
+</html>
