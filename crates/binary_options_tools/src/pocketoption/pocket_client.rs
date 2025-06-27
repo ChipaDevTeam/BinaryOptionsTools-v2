@@ -265,7 +265,7 @@ impl PocketOption {
                 "Trade",
                 WebSocketMessage::OpenOrder(order),
                 MessageInfo::SuccessopenOrder,
-                Box::new(order_validator(request_id)),
+                &order_validator(request_id),
             )
             .await?;
         if let WebSocketMessage::SuccessopenOrder(order) = res {
@@ -402,7 +402,7 @@ impl PocketOption {
                     "CheckResult",
                     WebSocketMessage::None,
                     MessageInfo::SuccesscloseOrder,
-                    Box::new(order_result_validator(trade_id)),
+                    &order_result_validator(trade_id),
                 )
                 .await
             {
@@ -464,7 +464,7 @@ impl PocketOption {
                 "GetCandles",
                 WebSocketMessage::GetCandles(request),
                 MessageInfo::LoadHistoryPeriod,
-                Box::new(candle_validator(index)),
+                &candle_validator(index),
             )
             .await?;
         if let WebSocketMessage::LoadHistoryPeriod(history) = res {
@@ -531,7 +531,7 @@ impl PocketOption {
                 "History",
                 WebSocketMessage::ChangeSymbol(request),
                 MessageInfo::UpdateHistoryNew,
-                Box::new(history_validator(asset.to_string(), period)),
+                &history_validator(asset.to_string(), period),
             )
             .await?;
         if let WebSocketMessage::UpdateHistoryNew(history) = res {
@@ -1207,7 +1207,7 @@ mod tests {
         let ssid = r#"42["auth",{"session":"mj194bjgehatidr1ml82453ajg","isDemo":1,"uid":87888871,"platform":2}]	"#;
         let client = PocketOption::new(ssid).await?;
         sleep(Duration::from_secs(5)).await;
-        fn my_validator(msg: &RawWebsocketMessage) -> bool {
+        fn _my_validator(msg: &RawWebsocketMessage) -> bool {
             msg.to_string().contains("success")
         }
         let res = client

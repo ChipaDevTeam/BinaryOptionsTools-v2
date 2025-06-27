@@ -3,7 +3,7 @@ use crate::error::{BinaryOptionsResult, BinaryOptionsToolsError};
 use super::traits::{MessageTransfer, ValidatorTrait};
 
 pub fn validate<Transfer>(
-    validator: &Box<dyn ValidatorTrait<Transfer> + Send + Sync>,
+    validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
     message: Transfer,
 ) -> BinaryOptionsResult<Option<Transfer>>
 where

@@ -2,3 +2,4 @@
 /rust/target    
 /examples/*.log
 .qodo
+/target

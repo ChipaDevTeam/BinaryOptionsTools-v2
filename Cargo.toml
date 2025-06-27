@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "crates/binary_options_tools",
+    "crates/core",
+    "crates/macros",
+]
+

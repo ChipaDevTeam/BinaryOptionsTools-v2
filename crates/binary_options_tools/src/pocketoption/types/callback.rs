@@ -35,7 +35,7 @@ impl PocketCallback {
                     data,
                     WebSocketMessage::ChangeSymbol(history),
                     MessageInfo::UpdateHistoryNew,
-                    Box::new(history_validator(asset.to_string(), 3600)),
+                    &history_validator(asset.to_string(), 3600),
                 )
                 .await?;
             if let WebSocketMessage::UpdateHistoryNew(_) = res {
@@ -83,7 +83,7 @@ impl WCallback for PocketCallback {
         config: &Config<Self::T, Self::Transfer, Self::U>,
     ) -> BinaryOptionsResult<()> {
         // let sender = sender.clone();
-        let update_assets_future = Self::update_assets(&data, sender, &config);
+        let update_assets_future = Self::update_assets(&data, sender, config);
         let update_check_results_future = Self::update_check_results(&data);
         try_join(update_assets_future, update_check_results_future).await?;
         Ok(())

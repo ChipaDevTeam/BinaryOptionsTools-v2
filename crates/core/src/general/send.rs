@@ -94,13 +94,13 @@ impl SenderMessage {
         data: &Data<T, Transfer>,
         msg: Transfer,
         response_type: Transfer::Info,
-        validator: Box<dyn ValidatorTrait<Transfer> + Send + Sync>,
+        validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
     ) -> BinaryOptionsResult<Transfer> {
         let reciever = self.reciever(data, msg, response_type).await?;
 
         while let Ok(msg) = reciever.recv().await {
             if let Some(msg) =
-                validate(&validator, msg).inspect_err(|e| warn!("Failed to place trade {e}"))?
+                validate(validator, msg).inspect_err(|e| warn!("Failed to place trade {e}"))?
             {
                 return Ok(msg);
             }
@@ -141,7 +141,7 @@ impl SenderMessage {
         data: &Data<T, Transfer>,
         msg: Transfer,
         response_type: Transfer::Info,
-        validator: Box<dyn ValidatorTrait<Transfer> + Send + Sync>,
+        validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
     ) -> BinaryOptionsResult<Transfer> {
         let reciever = self.reciever(data, msg, response_type).await?;
 
@@ -149,7 +149,7 @@ impl SenderMessage {
             time,
             async {
                 while let Ok(msg) = reciever.recv().await {
-                    if let Some(msg) = validate(&validator, msg)
+                    if let Some(msg) = validate(validator, msg)
                         .inspect_err(|e| warn!("Failed to place trade {e}"))?
                     {
                         return Ok(msg);
@@ -203,7 +203,7 @@ impl SenderMessage {
         data: &Data<T, Transfer>,
         msg: Transfer,
         response_type: Transfer::Info,
-        validator: Box<dyn ValidatorTrait<Transfer> + Send + Sync>,
+        validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
     ) -> BinaryOptionsResult<Transfer> {
         let reciever = self
             .reciever(data, msg.clone(), response_type.clone())
@@ -213,7 +213,7 @@ impl SenderMessage {
             time,
             async {
                 while let Ok(msg) = reciever.recv().await {
-                    if let Some(msg) = validate(&validator, msg)
+                    if let Some(msg) = validate(validator, msg)
                         .inspect_err(|e| warn!("Failed to place trade {e}"))?
                     {
                         return Ok(msg);
@@ -235,7 +235,7 @@ impl SenderMessage {
                     time,
                     async {
                         while let Ok(msg) = reciever.recv().await {
-                            if let Some(msg) = validate(&validator, msg)
+                            if let Some(msg) = validate(validator, msg)
                                 .inspect_err(|e| warn!("Failed to place trade {e}"))?
                             {
                                 return Ok(msg);

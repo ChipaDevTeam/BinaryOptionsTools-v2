@@ -31,12 +31,44 @@ struct Region {
 
 impl RegionImpl {
     fn regions(&self) -> anyhow::Result<Regions> {
-        let mut file = File::open(
-            self.path
-                .as_ref()
-                .explicit()
-                .ok_or(anyhow::anyhow!("Error"))?,
-        )?;
+        let base_path = self
+            .path
+            .as_ref()
+            .explicit()
+            .ok_or(anyhow::anyhow!("No path specified"))?;
+
+        // Try multiple possible locations for the file
+        let possible_paths = [
+            // Direct path
+            base_path.clone(),
+            // Relative to current manifest dir
+            std::env::var("CARGO_MANIFEST_DIR")
+                .map(|dir| PathBuf::from(dir).join(base_path))
+                .unwrap_or_else(|_| base_path.clone()),
+            // Relative to workspace root (go up from crate to workspace)
+            std::env::var("CARGO_MANIFEST_DIR")
+                .map(|dir| {
+                    PathBuf::from(dir)
+                        .parent()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .join(base_path)
+                })
+                .unwrap_or_else(|_| base_path.clone()),
+        ];
+
+        let file_path = possible_paths
+            .iter()
+            .find(|path| path.exists())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Could not find file at any of these locations: {:?}",
+                    possible_paths
+                )
+            })?;
+
+        let mut file = File::open(file_path)?;
         let mut buff = String::new();
         file.read_to_string(&mut buff)?;
 

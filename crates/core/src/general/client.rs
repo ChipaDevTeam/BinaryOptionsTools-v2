@@ -430,7 +430,7 @@ where
         &self,
         msg: Transfer,
         response_type: Transfer::Info,
-        validator: Box<dyn ValidatorTrait<Transfer> + Send + Sync>,
+        validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
     ) -> BinaryOptionsResult<Transfer> {
         self.sender
             .send_message(&self.data, msg, response_type, validator)
@@ -457,7 +457,7 @@ where
         task: impl ToString,
         msg: Transfer,
         response_type: Transfer::Info,
-        validator: Box<dyn ValidatorTrait<Transfer> + Send + Sync>,
+        validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
     ) -> BinaryOptionsResult<Transfer> {
         self.sender
             .send_message_with_timout(timeout, task, &self.data, msg, response_type, validator)
@@ -482,7 +482,7 @@ where
         task: impl ToString,
         msg: Transfer,
         response_type: Transfer::Info,
-        validator: Box<dyn ValidatorTrait<Transfer> + Send + Sync>,
+        validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
     ) -> BinaryOptionsResult<Transfer> {
         self.sender
             .send_message_with_timeout_and_retry(

@@ -26,6 +26,9 @@ where
     Raw(Transfer::Raw),
 }
 
+// Type alias to reduce type complexity for pending_requests
+type PendingRequests<Transfer> = Arc<Mutex<HashMap<<Transfer as MessageTransfer>::Info, (Sender<Transfer>, Receiver<Transfer>)>>>;
+
 #[derive(Clone)]
 pub struct Data<T, Transfer>
 where
@@ -33,9 +36,7 @@ where
     T: DataHandler,
 {
     inner: Arc<T>,
-    // #[allow(clippy::type_complexity)]
-    pub pending_requests:
-        Arc<Mutex<HashMap<Transfer::Info, (Sender<Transfer>, Receiver<Transfer>)>>>,
+    pub pending_requests: PendingRequests<Transfer>,
     pub raw_requests: (Sender<Transfer::Raw>, Receiver<Transfer::Raw>),
 }
 
