@@ -618,7 +618,7 @@ impl PocketOption {
         chunck_size: impl Into<usize>,
     ) -> PocketResult<StreamAsset> {
         info!(target: "SubscribeSymbolChuncked", "Subscribing to asset '{}'", asset.to_string());
-        // Send 3 messages, 1 changesymbol, 2 unsubfor, 3 subfor 
+        // Send 3 messages, 1 changesymbol, 2 unsubfor, 3 subfor, honestly no clue why pocket option does that
         self.client.send(WebSocketMessage::ChangeSymbol(ChangeSymbol::new(asset.to_string(), 1))).await?;
         self.client.send(WebSocketMessage::Unsubfor(asset.to_string())).await?;
         self.client.send(WebSocketMessage::Subfor(asset.to_string())).await?;

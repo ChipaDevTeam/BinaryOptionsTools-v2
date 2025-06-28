@@ -426,6 +426,15 @@ where
         })
         .await?)
     }
+
+    pub async fn send(&self, msg: Transfer) -> BinaryOptionsResult<()> {
+        self.sender.send::<Transfer>(msg).await
+    }
+
+    pub async fn raw_send(&self, msg: Transfer::Raw) -> BinaryOptionsResult<()> {
+        self.sender.raw_send::<Transfer>(msg).await
+    }
+
     pub async fn send_message(
         &self,
         msg: Transfer,
@@ -435,10 +444,6 @@ where
         self.sender
             .send_message(&self.data, msg, response_type, validator)
             .await
-    }
-
-    pub async fn raw_send(&self, msg: Transfer::Raw) -> BinaryOptionsResult<()> {
-        self.sender.raw_send::<Transfer>(msg).await
     }
 
     pub async fn send_raw_message(

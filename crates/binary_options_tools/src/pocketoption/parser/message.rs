@@ -42,6 +42,8 @@ pub enum WebSocketMessage {
 
     LoadHistoryPeriod(LoadHistoryPeriodResult),
     UpdateStream(UpdateStream),
+    UpdateHistoryNew(UpdateHistoryNewFast),
+
     UpdateHistoryNewFast(UpdateHistoryNewFast),
     SubscribeSymbol(SubscribeSymbol),
     UpdateAssets(UpdateAssets),
@@ -97,6 +99,11 @@ impl WebSocketMessage {
             MessageInfo::UpdateStream => {
                 if let Ok(stream) = from_str::<UpdateStream>(&data) {
                     return Self::UpdateStream(stream);
+                }
+            }
+            MessageInfo::UpdateHistoryNew => {
+                if let Ok(history) = from_str::<UpdateHistoryNewFast>(&data) {
+                    return Self::UpdateHistoryNew(history);
                 }
             }
             MessageInfo::UpdateHistoryNewFast => {
@@ -217,6 +224,7 @@ impl WebSocketMessage {
     pub fn information(&self) -> MessageInfo {
         match self {
             Self::UpdateStream(_) => MessageInfo::UpdateStream,
+            Self::UpdateHistoryNew(_) => MessageInfo::UpdateHistoryNew,
             Self::UpdateHistoryNewFast(_) => MessageInfo::UpdateHistoryNewFast,
             Self::UpdateAssets(_) => MessageInfo::UpdateAssets,
             Self::UpdateBalance(_) => MessageInfo::UpdateBalance,
@@ -288,7 +296,7 @@ impl fmt::Display for WebSocketMessage {
             WebSocketMessage::Raw(text) => text.fmt(f),
 
             WebSocketMessage::UpdateStream(update_stream) => write!(f, "{:?}", update_stream),
-            WebSocketMessage::UpdateHistoryNewFast(update_history_new) => {
+            WebSocketMessage::UpdateHistoryNewFast(update_history_new) | WebSocketMessage::UpdateHistoryNew(update_history_new)=> {
                 write!(f, "{:?}", update_history_new)
             }
             WebSocketMessage::UpdateAssets(update_assets) => write!(f, "{:?}", update_assets),
