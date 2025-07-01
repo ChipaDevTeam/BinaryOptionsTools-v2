@@ -57,10 +57,12 @@
     "@rick-29/binary-options-tools-linux-arm64-gnu": "0.1.0",
     "@rick-29/binary-options-tools-linux-arm64-musl": "0.1.0",
     "@rick-29/binary-options-tools-linux-riscv64-gnu": "0.1.0",
-    "@rick-29/binary-options-tools-linux-x64-gnu": "file:npm/linux-x64-gnu",
     "@rick-29/binary-options-tools-linux-x64-musl": "0.1.0",
     "@rick-29/binary-options-tools-win32-arm64-msvc": "0.1.0",
     "@rick-29/binary-options-tools-win32-ia32-msvc": "0.1.0",
     "@rick-29/binary-options-tools-win32-x64-msvc": "0.1.0"
+  },
+  "dependencies": {
+    "@rick-29/binary-options-tools-linux-x64-gnu": "file:npm/linux-x64-gnu"
   }
 }
