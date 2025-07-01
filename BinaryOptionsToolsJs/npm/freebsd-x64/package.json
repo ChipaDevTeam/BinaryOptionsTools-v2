@@ -1,15 +1,15 @@
 {
   "name": "@rick-29/binary-options-tools-freebsd-x64",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "os": [
     "freebsd"
   ],
   "cpu": [
     "x64"
   ],
-  "main": "@rick-29/binary-options-tools.freebsd-x64.node",
+  "main": "binary-options-tools.freebsd-x64.node",
   "files": [
-    "@rick-29/binary-options-tools.freebsd-x64.node"
+    "binary-options-tools.freebsd-x64.node"
   ],
   "license": "MIT",
   "engines": {

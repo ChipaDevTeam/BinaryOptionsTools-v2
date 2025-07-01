@@ -183,6 +183,30 @@ Planned support:
 - Supported platforms: Windows, macOS, Linux
 - Both x64 and ARM architectures supported
 
+## Troubleshooting
+
+### "Cannot find module '@rick-29/binary-options-tools-[platform]'" Error
+
+If you encounter an error like `Cannot find module '@rick-29/binary-options-tools-win32-x64-msvc'`, this means the native binary for your platform is not available. Here's how to resolve it:
+
+**For Users:**
+1. Make sure you have the latest version: `npm update @rick-29/binary-options-tools`
+2. Clear npm cache: `npm cache clean --force`
+3. Reinstall the package: `npm uninstall @rick-29/binary-options-tools && npm install @rick-29/binary-options-tools`
+4. If the issue persists, check if your platform is supported in the [System Requirements](#system-requirements) section
+
+**For Developers:**
+1. Build the native binaries: `npm run build`
+2. Set up development environment: `npm run setup-dev`
+3. Check that your platform is configured in the `napi.triples` section of `package.json`
+
+**Supported Platforms:**
+- Windows: x64, ia32, arm64 (MSVC)
+- macOS: x64, arm64, universal
+- Linux: x64, arm64, arm (GNU/musl)
+- FreeBSD: x64
+- Android: arm64, arm
+
 ## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.

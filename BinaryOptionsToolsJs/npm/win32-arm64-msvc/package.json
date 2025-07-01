@@ -1,15 +1,15 @@
 {
   "name": "@rick-29/binary-options-tools-win32-arm64-msvc",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "os": [
     "win32"
   ],
   "cpu": [
     "arm64"
   ],
-  "main": "@rick-29/binary-options-tools.win32-arm64-msvc.node",
+  "main": "binary-options-tools.win32-arm64-msvc.node",
   "files": [
-    "@rick-29/binary-options-tools.win32-arm64-msvc.node"
+    "binary-options-tools.win32-arm64-msvc.node"
   ],
   "license": "MIT",
   "engines": {

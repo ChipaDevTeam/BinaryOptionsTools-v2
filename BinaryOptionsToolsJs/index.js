@@ -305,9 +305,36 @@ switch (platform) {
 
 if (!nativeBinding) {
   if (loadError) {
-    throw loadError
+    // Enhanced error message for better debugging
+    const platformId = `${platform}-${arch}`
+    const expectedPackage = `@rick-29/binary-options-tools-${platformId === 'win32-x64' ? 'win32-x64-msvc' : 
+                                                               platformId === 'win32-ia32' ? 'win32-ia32-msvc' :
+                                                               platformId === 'win32-arm64' ? 'win32-arm64-msvc' :
+                                                               platformId === 'darwin-x64' ? 'darwin-x64' :
+                                                               platformId === 'darwin-arm64' ? 'darwin-arm64' :
+                                                               platformId === 'linux-x64' ? 'linux-x64-gnu' :
+                                                               platformId === 'linux-arm64' ? 'linux-arm64-gnu' :
+                                                               platformId}`
+    
+    const helpfulError = new Error(
+      `Failed to load native binary for ${platform}-${arch}.\n\n` +
+      `This package requires native binaries to be built for your platform.\n` +
+      `The following was attempted:\n` +
+      `1. Local binary file (not found)\n` +
+      `2. Platform package: ${expectedPackage} (failed)\n\n` +
+      `To fix this issue:\n` +
+      `1. Make sure you have the latest version of this package\n` +
+      `2. Try rebuilding: npm run build\n` +
+      `3. Check if your platform is supported\n\n` +
+      `Original error: ${loadError.message}`
+    )
+    helpfulError.code = loadError.code
+    helpfulError.platform = platform
+    helpfulError.arch = arch
+    helpfulError.originalError = loadError
+    throw helpfulError
   }
-  throw new Error(`Failed to load native binding`)
+  throw new Error(`Failed to load native binding for ${platform}-${arch}`)
 }
 
 const { StreamIterator, RawStreamIterator, PocketOption, Validator, startTracing, StreamLogsLayer, StreamLogsIterator, LogBuilder, Logger } = nativeBinding

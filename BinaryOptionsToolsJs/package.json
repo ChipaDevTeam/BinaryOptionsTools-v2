@@ -41,7 +41,26 @@
     "prepublishOnly": "napi prepublish -t npm",
     "test": "ava",
     "universal": "napi universal",
-    "version": "napi version"
+    "version": "napi version",
+    "setup-dev": "./setup-dev.sh"
   },
-  "packageManager": "yarn@4.7.0"
+  "packageManager": "yarn@4.7.0",
+  "optionalDependencies": {
+    "@rick-29/binary-options-tools-android-arm-eabi": "0.1.0",
+    "@rick-29/binary-options-tools-android-arm64": "0.1.0",
+    "@rick-29/binary-options-tools-darwin-arm64": "0.1.0",
+    "@rick-29/binary-options-tools-darwin-universal": "0.1.0",
+    "@rick-29/binary-options-tools-darwin-x64": "0.1.0",
+    "@rick-29/binary-options-tools-freebsd-x64": "0.1.0",
+    "@rick-29/binary-options-tools-linux-arm-gnueabihf": "0.1.0",
+    "@rick-29/binary-options-tools-linux-arm-musleabihf": "0.1.0",
+    "@rick-29/binary-options-tools-linux-arm64-gnu": "0.1.0",
+    "@rick-29/binary-options-tools-linux-arm64-musl": "0.1.0",
+    "@rick-29/binary-options-tools-linux-riscv64-gnu": "0.1.0",
+    "@rick-29/binary-options-tools-linux-x64-gnu": "file:npm/linux-x64-gnu",
+    "@rick-29/binary-options-tools-linux-x64-musl": "0.1.0",
+    "@rick-29/binary-options-tools-win32-arm64-msvc": "0.1.0",
+    "@rick-29/binary-options-tools-win32-ia32-msvc": "0.1.0",
+    "@rick-29/binary-options-tools-win32-x64-msvc": "0.1.0"
+  }
 }

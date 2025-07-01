@@ -49,6 +49,10 @@
 "@pkgjs/parseargs@^0.11.0":
   version "0.11.0"
 
+"@rick-29/binary-options-tools-linux-x64-gnu@file:npm/linux-x64-gnu":
+  version "0.1.0"
+  resolved "file:npm/linux-x64-gnu"
+
 "@rollup/pluginutils@^5.1.3":
   version "5.1.4"
   dependencies:

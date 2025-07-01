@@ -1,12 +1,12 @@
 {
   "name": "@rick-29/binary-options-tools-darwin-universal",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "os": [
     "darwin"
   ],
-  "main": "@rick-29/binary-options-tools.darwin-universal.node",
+  "main": "binary-options-tools.darwin-universal.node",
   "files": [
-    "@rick-29/binary-options-tools.darwin-universal.node"
+    "binary-options-tools.darwin-universal.node"
   ],
   "license": "MIT",
   "engines": {
