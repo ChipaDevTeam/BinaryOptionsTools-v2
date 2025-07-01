@@ -558,6 +558,8 @@ export declare class PocketOption {
    * ```
    */
   createRawIterator(message: string, validator: Validator, timeout?: number | undefined | null): Promise<RawStreamIterator>
+  /** Returns the current server time as a UNIX timestamp */
+  getServerTime(): Promise<number>
 }
 /**
  * A validator for WebSocket messages that provides various matching strategies.

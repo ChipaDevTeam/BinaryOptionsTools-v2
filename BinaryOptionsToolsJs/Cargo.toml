@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "binary-options-tools"
+name = "binary-options-tools-js"
 version = "0.1.1"
 
 [lib]
