@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
-use async_channel::{Receiver, RecvError};
+use async_channel::{Receiver, RecvError, Sender, bounded};
 use futures_util::future::try_join3;
 use futures_util::stream::{SplitSink, SplitStream, select_all};
 use futures_util::{SinkExt, StreamExt};
@@ -55,6 +55,7 @@ where
     pub sender: SenderMessage,
     pub reconnect_callback: Option<Callback<T, Transfer, U>>,
     pub config: Config<T, Transfer, U>,
+    shutdown_sender: Sender<()>,
     _event_loop: JoinHandle<BinaryOptionsResult<()>>,
 }
 
@@ -127,6 +128,7 @@ where
         config: Config<T, Transfer, U>,
     ) -> BinaryOptionsResult<Self> {
         let _connection = connector.connect(credentials.clone(), &config).await?; // Check if it's possible to connect before building the struct
+        let (shutdown_sender, shutdown_receiver) = bounded(1);
         let (_event_loop, sender) = Self::start_loops(
             handler.clone(),
             credentials.clone(),
@@ -134,6 +136,7 @@ where
             connector.clone(),
             reconnect_callback.clone(),
             config.clone(),
+            shutdown_receiver,
         )
         .await?;
         info!("Started WebSocketClient");
@@ -146,6 +149,7 @@ where
             sender,
             reconnect_callback,
             config,
+            shutdown_sender,
             _event_loop,
         })
     }
@@ -157,6 +161,7 @@ where
         connector: Connector,
         reconnect_callback: Option<Callback<T, Transfer, U>>,
         config: Config<T, Transfer, U>,
+        shutdown_receiver: Receiver<()>,
     ) -> BinaryOptionsResult<(JoinHandle<BinaryOptionsResult<()>>, SenderMessage)> {
         let (mut write, mut read) = connector
             .connect(credentials.clone(), &config)
@@ -169,6 +174,13 @@ where
             let loops = 0;
             let mut reconnected = false;
             loop {
+                // Check for shutdown signal
+                if shutdown_receiver.try_recv().is_ok() {
+                    info!("Shutdown signal received, closing WebSocket connection");
+                    let _ = write.send(Message::Close(None)).await;
+                    break;
+                }
+                
                 match WebSocketInnerClient::<Transfer, Handler, Connector, Creds, T, U>::step(
                     &previous,
                     &data,
@@ -199,6 +211,7 @@ where
                     }
                 }
             }
+            Ok(())
         });
         Ok((task, sender))
     }
@@ -522,6 +535,24 @@ where
         self.sender
             .send_raw_message_iterator(timeout, &self.data, msg, validator)
             .await
+    }
+
+    /// Gracefully closes the WebSocket connection.
+    /// 
+    /// This method sends a close frame to the remote peer and signals the event loop to terminate.
+    /// The connection will be closed asynchronously.
+    /// 
+    /// # Examples
+    /// ```rust
+    /// client.close().await?;
+    /// ```
+    pub async fn close(&self) -> BinaryOptionsResult<()> {
+        info!("Closing WebSocket connection");
+        self.shutdown_sender
+            .send(())
+            .await
+            .map_err(|e| BinaryOptionsToolsError::ChannelRequestSendingError(e.to_string()))?;
+        Ok(())
     }
 }
 

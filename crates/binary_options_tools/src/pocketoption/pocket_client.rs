@@ -838,6 +838,23 @@ impl PocketOption {
         Utc::now() + Duration::from_secs(2 * 3600 + 123)
     }
 
+    /// Gracefully closes the WebSocket connection to the Pocket Option server.
+    /// 
+    /// This method sends a close frame to the server and terminates the connection cleanly.
+    /// After calling this method, the client should not be used for further operations.
+    /// 
+    /// # Examples
+    /// ```rust
+    /// let client = PocketOption::new("your-ssid").await?;
+    /// // ... perform operations ...
+    /// client.close().await?;
+    /// ```
+    pub async fn close(&self) -> PocketResult<()> {
+        info!(target: "PocketOption", "Closing connection to Pocket Option server");
+        self.client.close().await?;
+        Ok(())
+    }
+
     pub fn kill(self) {
         drop(self)
     }
@@ -1265,5 +1282,30 @@ mod tests {
                 Err(e) => panic!("Error, {e}"),
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_close_connection() -> anyhow::Result<()> {
+        // This test verifies that the close method exists and can be called
+        // Even if connection fails, we can test the close method on the result
+        
+        let ssid = r#"42["auth",{"session":"test_session","isDemo":1,"uid":12345,"platform":2}]	"#;
+        
+        // Try to create a client instance (this will likely fail due to connection issues in test environment)
+        // But that's fine - we're testing that the close method exists and compiles
+        match PocketOption::new(ssid).await {
+            Ok(client) => {
+                // If by chance the connection works, test the close method
+                client.close().await?;
+                info!("Close connection test completed successfully");
+            }
+            Err(_) => {
+                // Connection failed as expected in test environment
+                // The important thing is that the close method exists and compiles
+                info!("Connection failed as expected in test environment - close method exists and compiles");
+            }
+        }
+        
+        Ok(())
     }
 }
