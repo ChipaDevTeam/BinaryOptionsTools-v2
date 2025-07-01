@@ -469,7 +469,7 @@ impl PocketOption {
             )
             .await?;
         if let WebSocketMessage::LoadHistoryPeriod(history) = res {
-            return Ok(history.candle_data());
+            return Ok(history.candle_data_with_period(period));
         }
         Err(PocketOptionError::UnexpectedIncorrectWebSocketMessage(
             res.info(),

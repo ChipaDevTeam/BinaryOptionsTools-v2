@@ -181,12 +181,92 @@ impl LoadHistoryPeriodResult {
     pub fn candle_data(&self) -> Vec<DataCandle> {
         self.data.iter().map(DataCandle::from).collect()
     }
+    
+    /// Returns candle data, aggregating raw ticks if needed based on the requested period
+    pub fn candle_data_with_period(&self, requested_period_seconds: i64) -> Vec<DataCandle> {
+        // If period is 0 and we have raw data, we need to aggregate
+        if self.period == 0 && self.needs_aggregation() {
+            self.aggregate_raw_ticks(requested_period_seconds)
+        } else {
+            // Use existing data as-is
+            self.candle_data()
+        }
+    }
+    
+    /// Check if the data needs aggregation (contains raw ticks instead of processed candles)
+    fn needs_aggregation(&self) -> bool {
+        self.data.iter().any(|candle| matches!(candle, Candle::Raw(_)))
+    }
+    
+    /// Aggregate raw tick data into candles for the specified period
+    fn aggregate_raw_ticks(&self, period_seconds: i64) -> Vec<DataCandle> {
+        if self.data.is_empty() {
+            return Vec::new();
+        }
+        
+        let mut result = Vec::new();
+        let mut current_bucket: Option<(DateTime<Utc>, Vec<f64>)> = None;
+        
+        for candle in &self.data {
+            if let Candle::Raw(raw_candle) = candle {
+                let bucket_start = get_bucket_start(raw_candle.time, period_seconds);
+                
+                match &mut current_bucket {
+                    Some((start_time, prices)) if *start_time == bucket_start => {
+                        // Add to current bucket
+                        prices.push(raw_candle.price);
+                    }
+                    _ => {
+                        // Finalize previous bucket if exists
+                        if let Some((start_time, prices)) = current_bucket.take() {
+                            if let Some(aggregated) = create_aggregated_candle(start_time, prices, period_seconds) {
+                                result.push(aggregated);
+                            }
+                        }
+                        
+                        // Start new bucket
+                        current_bucket = Some((bucket_start, vec![raw_candle.price]));
+                    }
+                }
+            }
+        }
+        
+        // Finalize last bucket
+        if let Some((start_time, prices)) = current_bucket {
+            if let Some(aggregated) = create_aggregated_candle(start_time, prices, period_seconds) {
+                result.push(aggregated);
+            }
+        }
+        
+        result
+    }
 }
 
 impl UpdateHistoryNewFast {
     pub fn candle_data(&self) -> Vec<DataCandle> {
         self.history.iter().map(DataCandle::from).collect()
     }
+}
+
+/// Get the start time of the bucket for a given timestamp and period
+fn get_bucket_start(timestamp: DateTime<Utc>, period_seconds: i64) -> DateTime<Utc> {
+    let timestamp_secs = timestamp.timestamp();
+    let bucket_start_secs = (timestamp_secs / period_seconds) * period_seconds;
+    DateTime::from_timestamp(bucket_start_secs, 0).unwrap_or(timestamp)
+}
+
+/// Create an aggregated candle from a list of prices for a time bucket
+fn create_aggregated_candle(start_time: DateTime<Utc>, prices: Vec<f64>, _period_seconds: i64) -> Option<DataCandle> {
+    if prices.is_empty() {
+        return None;
+    }
+    
+    let open = *prices.first()?;
+    let close = *prices.last()?;
+    let high = prices.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+    let low = prices.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+    
+    Some(DataCandle::new(start_time, open, close, high, low))
 }
 
 impl Default for UpdateBalance {
@@ -374,6 +454,54 @@ mod tests {
         let history_new: LoadHistoryPeriodResult = serde_json::from_reader(bufreader)?;
         dbg!(history_new);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_candle_aggregation() -> Result<(), Box<dyn Error>> {
+        // Test aggregation of raw tick data into 60-second candles
+        let history_raw = File::open("tests/load_history_period2.json")?;
+        let bufreader = BufReader::new(history_raw);
+        let history: LoadHistoryPeriodResult = serde_json::from_reader(bufreader)?;
+        
+        // This should aggregate the raw ticks into 60-second candles
+        let aggregated_candles = history.candle_data_with_period(60);
+        
+        println!("Original data points: {}", history.data.len());
+        println!("Aggregated candles: {}", aggregated_candles.len());
+        
+        // Should have significantly fewer candles after aggregation
+        assert!(aggregated_candles.len() < history.data.len());
+        assert!(aggregated_candles.len() > 0);
+        
+        // Check that the first candle has proper OHLC values
+        if let Some(first_candle) = aggregated_candles.first() {
+            assert!(first_candle.high >= first_candle.low);
+            assert!(first_candle.high >= first_candle.open);
+            assert!(first_candle.high >= first_candle.close);
+            assert!(first_candle.low <= first_candle.open);
+            assert!(first_candle.low <= first_candle.close);
+            
+            println!("First aggregated candle: open={}, high={}, low={}, close={}", 
+                     first_candle.open, first_candle.high, first_candle.low, first_candle.close);
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_no_aggregation_for_processed_candles() -> Result<(), Box<dyn Error>> {
+        // Test that processed candles are not re-aggregated
+        let history_raw = File::open("tests/load_history_period.json")?;
+        let bufreader = BufReader::new(history_raw);
+        let history: LoadHistoryPeriodResult = serde_json::from_reader(bufreader)?;
+        
+        let regular_candles = history.candle_data();
+        let aggregated_candles = history.candle_data_with_period(60);
+        
+        // Should be the same since these are already processed candles
+        assert_eq!(regular_candles.len(), aggregated_candles.len());
+        
         Ok(())
     }
 }
