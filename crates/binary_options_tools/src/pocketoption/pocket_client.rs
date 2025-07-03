@@ -1074,8 +1074,7 @@ mod tests {
                     .await?;
                 let duration = res?;
                 println!(
-                    "Test passed for expiration of '{time}' seconds in '{:#?}'!",
-                    duration
+                    "Test passed for expiration of '{time}' seconds in '{duration:#?}'!"
                 );
             }
         }
@@ -1136,7 +1135,7 @@ mod tests {
             let time = item?.time;
             let now_test = Utc::now() + Duration::from_secs(2 * 3600);
             let dif = time - now_test;
-            println!("Difference: {:?}", dif);
+            println!("Difference: {dif:?}");
         }
         Ok(())
     }
@@ -1152,7 +1151,7 @@ mod tests {
             last_candles = candles.clone();
             println!("Candles n°{} len: {}, ", i + 1, candles.len());
         }
-        println!("Candles: {:#?}", last_candles);
+        println!("Candles: {last_candles:#?}");
         Ok(())
     }
 
