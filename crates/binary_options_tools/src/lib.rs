@@ -1,4 +1,5 @@
 pub mod pocketoption;
+pub mod pocketoption_pre;
 pub mod reimports;
 
 pub mod stream {

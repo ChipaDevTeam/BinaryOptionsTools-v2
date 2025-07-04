@@ -24,15 +24,15 @@ pub struct StreamAsset {
 /// This enum tells the StreamAsset when to send new data
 #[derive(Clone)]
 pub enum ConditonnalUpdate {
-    None,           // No condition, once data is received, data is sent
+    None, // No condition, once data is received, data is sent
     Size {
-        count: usize,      // Current count of candles
-        target: usize,     // Target size to reach
+        count: usize,        // Current count of candles
+        target: usize,       // Target size to reach
         current: DataCandle, // Aggregated candle data
     },
     Time {
-        start_time: Option<DateTime<Utc>>,  // Time of first candle
-        duration: Duration,                 // Target duration
+        start_time: Option<DateTime<Utc>>, // Time of first candle
+        duration: Duration,                // Target duration
         current: DataCandle,               // Aggregated candle data
     },
 }
@@ -57,8 +57,12 @@ impl ConditonnalUpdate {
     pub fn update_and_check(&mut self, new_candle: &DataCandle) -> PocketResult<bool> {
         match self {
             Self::None => Ok(true),
-            
-            Self::Size { count, target, current } => {
+
+            Self::Size {
+                count,
+                target,
+                current,
+            } => {
                 // Update the aggregated candle
                 if *count == 0 {
                     *current = new_candle.clone();
@@ -69,7 +73,7 @@ impl ConditonnalUpdate {
                     current.close = new_candle.close;
                 }
                 *count += 1;
-                
+
                 if *count >= *target {
                     *count = 0; // Reset for next batch
                     Ok(true)
@@ -77,8 +81,12 @@ impl ConditonnalUpdate {
                     Ok(false)
                 }
             }
-            
-            Self::Time { start_time, duration, current } => {
+
+            Self::Time {
+                start_time,
+                duration,
+                current,
+            } => {
                 if start_time.is_none() {
                     *start_time = Some(new_candle.time);
                     *current = new_candle.clone();
@@ -90,14 +98,16 @@ impl ConditonnalUpdate {
                 current.high = current.high.max(new_candle.high);
                 current.low = current.low.min(new_candle.low);
                 current.close = new_candle.close;
-                
+
                 let elapsed = (new_candle.time - start_time.unwrap())
                     .to_std()
-                    .map_err(|_| PocketOptionError::UnreachableError(
-                        "Time calculation error in conditional update".to_string()
-                    ))?;
+                    .map_err(|_| {
+                        PocketOptionError::UnreachableError(
+                            "Time calculation error in conditional update".to_string(),
+                        )
+                    })?;
 
-                if elapsed >= *duration { 
+                if elapsed >= *duration {
                     *start_time = None; // Reset for next period
                     Ok(true)
                 } else {
@@ -147,7 +157,7 @@ impl StreamAsset {
 
     pub async fn recieve(&self) -> PocketResult<DataCandle> {
         let mut condition = self.condition.clone();
-        
+
         while let Ok(msg) = self.reciever.recv().await {
             debug!(target: "StreamAsset", "Received UpdateStream!");
             if let WebSocketMessage::UpdateStream(stream) = msg {
@@ -160,9 +170,7 @@ impl StreamAsset {
             }
         }
 
-        Err(BinaryOptionsToolsError::ChannelRequestRecievingError(
-            RecvError,
-        ).into())
+        Err(BinaryOptionsToolsError::ChannelRequestRecievingError(RecvError).into())
     }
 
     // pub async fn _recieve(&self) -> PocketResult<DataCandle> {

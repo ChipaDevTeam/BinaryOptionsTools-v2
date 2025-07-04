@@ -13,6 +13,14 @@ pub enum CoreError {
     /// Error for when a module is not found.
     #[error("Module '{0}' not found.")]
     ModuleNotFound(String),
+
+    #[error("Failed to parse ssid: {0}")]
+    SsidParsing(String),
+    #[error("HTTP request error: {0}")]
+    HttpRequest(String),
+
+    #[error("Lightweight [{0} Module] loop exited unexpectedly.")]
+    LightweightModuleLoop(String),
 }
 
 pub type CoreResult<T> = std::result::Result<T, CoreError>;

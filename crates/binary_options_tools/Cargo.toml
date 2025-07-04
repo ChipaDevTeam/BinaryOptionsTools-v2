@@ -16,6 +16,7 @@ license = "MIT"
 [dependencies]
 binary-options-tools-core = { path = "../core", version = "0.1.5" }
 binary-options-tools-macros = { path = "../macros", version = "0.1.1" }
+binary-options-tools-core-pre = { path = "../core-pre", version = "0.1.0" }
 
 anyhow = "1.0.98"
 async-channel = "2.3.1"
@@ -35,3 +36,6 @@ tracing = "0.1.41"
 uuid = { version = "1.16.0", features = ["serde"] }
 url = "2.5.4"
 serde-enum-str = "0.4.0"
+
+[dev-dependencies]
+tracing-subscriber = "0.3.19"

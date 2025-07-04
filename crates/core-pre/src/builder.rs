@@ -24,7 +24,7 @@ type LightweightHandlersFn<S> = Box<dyn FnOnce(&mut Router<S>, AsyncSender<Messa
 
 pub struct ClientBuilder<S: AppState> {
     state: Arc<S>,
-    connector: Arc<dyn Connector>,
+    connector: Arc<dyn Connector<S>>,
     connection_callback: ConnectionCallback<S>,
     lightweight_handlers: Vec<LightweightHandler<S>>,
     // Stores functions that know how to create and register each module.
@@ -34,7 +34,7 @@ pub struct ClientBuilder<S: AppState> {
 
 impl<S: AppState> ClientBuilder<S> {
     /// Creates a new builder with the essential components.
-    pub fn new(connector: impl Connector + 'static, state: S) -> Self {
+    pub fn new(connector: impl Connector<S> + 'static, state: S) -> Self {
         Self {
             state: Arc::new(state),
             connector: Arc::new(connector),
@@ -234,6 +234,11 @@ impl<S: AppState> ClientBuilder<S> {
                 to_ws_tx.clone(),
             );
         }
+
+        for factory in self.lightweight_factories {
+            factory(&mut router, to_ws_tx.clone());
+        }
+        
         // Wait for all the handles to be added to the handles hashmap.
         while let Some(h) = join_set.join_next().await {
             match h {

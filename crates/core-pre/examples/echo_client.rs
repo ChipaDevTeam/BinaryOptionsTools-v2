@@ -1,10 +1,10 @@
 use async_trait::async_trait;
-use core_pre::builder::ClientBuilder;
-use core_pre::client::Client;
-use core_pre::connector::Result;
-use core_pre::connector::{Connector, WsStream};
-use core_pre::error::{CoreError, CoreResult};
-use core_pre::traits::ApiModule;
+use binary_options_tools_core_pre::builder::ClientBuilder;
+use binary_options_tools_core_pre::client::Client;
+use binary_options_tools_core_pre::connector::ConnectorResult;
+use binary_options_tools_core_pre::connector::{Connector, WsStream};
+use binary_options_tools_core_pre::error::{CoreError, CoreResult};
+use binary_options_tools_core_pre::traits::ApiModule;
 use futures_util::stream::unfold;
 use futures_util::{Stream, StreamExt};
 use kanal::{AsyncReceiver, AsyncSender};
@@ -25,15 +25,15 @@ impl DummyConnector {
 }
 
 #[async_trait::async_trait]
-impl Connector for DummyConnector {
-    async fn connect(&self) -> Result<WsStream> {
+impl Connector<()> for DummyConnector {
+    async fn connect(&self, _: Arc<()>) -> ConnectorResult<WsStream> {
         // Simulate a WebSocket connection
         println!("Connecting to {}", self.url);
         let wsstream = connect_async(&self.url).await.unwrap();
         Ok(wsstream.0)
     }
 
-    async fn disconnect(&self) -> Result<()> {
+    async fn disconnect(&self) -> ConnectorResult<()> {
         // Simulate disconnection
         println!("Disconnecting from {}", self.url);
         Ok(())

@@ -12,7 +12,7 @@ pub fn get_index() -> PocketResult<u64> {
 
     let rand = rng.random_range(10..99);
     let time = (Utc::now() + Duration::hours(2)).timestamp();
-    format!("{}{}", time, rand)
+    format!("{time}{rand}")
         .parse::<u64>()
         .map_err(|e| PocketOptionError::GeneralParsingError(e.to_string()))
 }

@@ -56,7 +56,9 @@ impl From<String> for RawWebsocketMessage {
 
 impl From<&str> for RawWebsocketMessage {
     fn from(value: &str) -> Self {
-        Self { value: value.to_string() }
+        Self {
+            value: value.to_string(),
+        }
     }
 }
 

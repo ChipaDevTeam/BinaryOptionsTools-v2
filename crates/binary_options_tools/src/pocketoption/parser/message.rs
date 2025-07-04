@@ -22,7 +22,8 @@ use crate::pocketoption::{
         },
         success::SuccessAuth,
         update::{
-            LoadHistoryPeriodResult, UpdateAssets, UpdateBalance, UpdateHistoryNewFast, UpdateStream,
+            LoadHistoryPeriodResult, UpdateAssets, UpdateBalance, UpdateHistoryNewFast,
+            UpdateStream,
         },
     },
     ws::ssid::Ssid,
@@ -296,7 +297,8 @@ impl fmt::Display for WebSocketMessage {
             WebSocketMessage::Raw(text) => text.fmt(f),
 
             WebSocketMessage::UpdateStream(update_stream) => write!(f, "{:?}", update_stream),
-            WebSocketMessage::UpdateHistoryNewFast(update_history_new) | WebSocketMessage::UpdateHistoryNew(update_history_new)=> {
+            WebSocketMessage::UpdateHistoryNewFast(update_history_new)
+            | WebSocketMessage::UpdateHistoryNew(update_history_new) => {
                 write!(f, "{:?}", update_history_new)
             }
             WebSocketMessage::UpdateAssets(update_assets) => write!(f, "{:?}", update_assets),

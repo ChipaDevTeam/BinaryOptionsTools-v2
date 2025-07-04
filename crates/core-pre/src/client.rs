@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 use tokio_tungstenite::tungstenite::Message;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 // --- Callbacks and Lightweight Handlers ---
 pub type OnConnectCallback<S> = Box<
@@ -107,16 +107,17 @@ impl<S: AppState> Router<S> {
 
     async fn route(&self, message: Arc<Message>, sender: &AsyncSender<Message>) -> CoreResult<()> {
         // Route to all lightweight handlers first
+        debug!(target: "Router", "Routing message: {message:?}");
+        
         for handler in &self.lightweight_handlers {
             if let Err(err) = handler(Arc::clone(&message), Arc::clone(&self.state), sender).await {
                 error!(
-                    target: "Router",
-                    "Lightweight handler error: {err:#?}"
+                     "Lightweight handler error: {err:#?}"
                 );
             }
         }
-        
         for (rule, sender) in &self.lightweight_rules {
+            // If the rule matches, send the message to the lightweight handler
             if rule(&message) && sender.send(message.clone()).await.is_err() {
                 error!(target: "Router", "A lightweight handler has shut down and its channel is closed.");
             }
@@ -140,7 +141,6 @@ pub struct Client<S: AppState> {
     pub to_ws_sender: AsyncSender<Message>,
 
     runner_command_tx: AsyncSender<RunnerCommand>,
-    _marker: std::marker::PhantomData<S>,
 }
 
 impl<S: AppState> Client<S> {
@@ -155,7 +155,6 @@ impl<S: AppState> Client<S> {
             module_handles: Arc::new(RwLock::new(HashMap::new())),
             runner_command_tx,
             to_ws_sender: sender,
-            _marker: std::marker::PhantomData,
         }
     }
 
@@ -169,8 +168,21 @@ impl<S: AppState> Client<S> {
     }
 
     /// Commands the runner to disconnect, clear state, and perform a "hard" reconnect.
-    pub async fn disconnect(&self) -> Result<(), kanal::SendError> {
-        self.runner_command_tx.send(RunnerCommand::Disconnect).await
+    pub async fn disconnect(&self) -> CoreResult<()> {
+        Ok(self.runner_command_tx.send(RunnerCommand::Disconnect).await?)
+    }
+
+    /// Commands the runner to disconnect, and perform a "soft" reconnect.
+    pub async fn reconnect(&self) -> CoreResult<()> {
+        Ok(self.runner_command_tx.send(RunnerCommand::Reconnect).await?)
+    }
+
+    /// Commands the runner to shutdown, this action is final as the runner and client will stop working and will be dropped.
+    pub async fn shutdown(self) -> CoreResult<()> {
+        self.runner_command_tx.send(RunnerCommand::Shutdown).await?;
+        drop(self);
+        info!(target: "Client", "Runner shutdown command sent.");
+        Ok(())
     }
 }
 
@@ -210,13 +222,14 @@ impl<S: AppState> Client<S> {
 /// - Ensures proper cleanup of tasks and state on disconnect or shutdown.
 /// - Prints status messages for key events and errors.
 pub struct ClientRunner<S: AppState> {
-    pub(crate) connector: Arc<dyn Connector>,
+    pub(crate) connector: Arc<dyn Connector<S>>,
     pub(crate) router: Arc<Router<S>>,
     pub(crate) state: Arc<S>,
     // Flag to determine if the next connection is a fresh one.
     pub(crate) is_hard_disconnect: bool,
     // Flag to terminate the main run loop.
     pub(crate) shutdown_requested: bool,
+
     pub(crate) connection_callback: ConnectionCallback<S>,
     pub(crate) to_ws_sender: AsyncSender<Message>,
     pub(crate) to_ws_receiver: AsyncReceiver<Message>,
@@ -224,16 +237,16 @@ pub struct ClientRunner<S: AppState> {
 }
 
 impl<S: AppState> ClientRunner<S> {
-    pub async fn run(&mut self) {
+    pub async fn run(&mut self) { // TODO: Add a way to disconnect and keep the connection closed intill specified otherwhise
         // The outermost loop runs until a shutdown is commanded.
         while !self.shutdown_requested {
             info!(target: "Runner", "Starting connection cycle...");
 
             // Use the correct connection method based on the flag.
             let stream_result = if self.is_hard_disconnect {
-                self.connector.connect().await
+                self.connector.connect(self.state.clone()).await
             } else {
-                self.connector.reconnect().await
+                self.connector.reconnect(self.state.clone()).await
             };
 
             let ws_stream = match stream_result {
@@ -281,6 +294,7 @@ impl<S: AppState> ClientRunner<S> {
                 async move {
                     while let Ok(msg) = to_ws_rx.recv().await {
                         if ws_writer.send(msg).await.is_err() {
+                            error!(target: "Runner", "WebSocket writer task failed to send message.");
                             break;
                         }
                     }

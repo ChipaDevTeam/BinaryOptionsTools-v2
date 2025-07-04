@@ -3,3 +3,4 @@ pub use tokio_tungstenite::{
     tungstenite::{Bytes, Message, handshake::client::generate_key, http::Request},
 };
 
+pub use kanal::{AsyncReceiver, AsyncSender, bounded_async};

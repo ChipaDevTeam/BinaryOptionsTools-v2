@@ -5,9 +5,7 @@ use futures_util::future::try_join;
 use tokio::time::sleep;
 use tracing::{debug, info, instrument};
 
-use crate::pocketoption::{
-    parser::message::WebSocketMessage, types::info::MessageInfo,
-};
+use crate::pocketoption::{parser::message::WebSocketMessage, types::info::MessageInfo};
 use binary_options_tools_core::{
     error::{BinaryOptionsResult, BinaryOptionsToolsError},
     general::{config::Config, send::SenderMessage, traits::WCallback, types::Data},
@@ -26,9 +24,18 @@ impl PocketCallback {
         for asset in data.stream_assets().await {
             // Send 3 messages, 1: change symbol, 2: unsubscribe symbol, 3: subscribe symbol
             debug!("Updating asset: {asset}");
-            sender.send(WebSocketMessage::ChangeSymbol(ChangeSymbol::new(asset.to_string(), 1))).await?;
-            sender.send(WebSocketMessage::Unsubfor(asset.to_string())).await?;
-            sender.send(WebSocketMessage::Subfor(asset.to_string())).await?;
+            sender
+                .send(WebSocketMessage::ChangeSymbol(ChangeSymbol::new(
+                    asset.to_string(),
+                    1,
+                )))
+                .await?;
+            sender
+                .send(WebSocketMessage::Unsubfor(asset.to_string()))
+                .await?;
+            sender
+                .send(WebSocketMessage::Subfor(asset.to_string()))
+                .await?;
             sleep(Duration::from_secs(1)).await;
         }
         Ok(())

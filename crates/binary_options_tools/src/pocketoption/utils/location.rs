@@ -3,7 +3,7 @@ use serde_json::Value;
 use crate::pocketoption::error::PocketResult;
 
 pub async fn get_user_location(ip_address: &str) -> PocketResult<(f64, f64)> {
-    let response = reqwest::get(format!("http://ip-api.com/json/{}", ip_address)).await?;
+    let response = reqwest::get(format!("http://ip-api.com/json/{ip_address}")).await?;
     let json: Value = response.json().await?;
 
     let lat = json["lat"].as_f64().unwrap();

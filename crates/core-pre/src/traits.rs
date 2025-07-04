@@ -132,3 +132,31 @@ pub trait LightweightModule<S: AppState>: Send + 'static {
     /// Route only messages for which this returns true.
     fn routing_rule(msg: &Message) -> bool;
 }
+
+
+// #[async_trait]
+// pub trait LightweightHandle<S: AppState>: Send + 'static {
+//     /// Process a message.
+//     async fn process(&self, msg: Arc<Message>, state: Arc<S>, sender: &AsyncSender<Message>) -> CoreResult<()>;
+
+//     /// Route only messages for which this returns true.
+//     fn routing_rule(msg: &Message) -> bool;
+// }
+
+
+// /// Automatically implement `LightweightHandle` for any async function that matches the signature.
+// #[async_trait]
+// impl<S: AppState, F> LightweightHandle<S> for F
+// where 
+//     F: Send + Sync + 'static + Fn(Arc<Message>, Arc<S>, &AsyncSender<Message>) -> futures_util::future::BoxFuture<'static, CoreResult<()>>,
+// {
+//     async fn process(&self, msg: Arc<Message>, state: Arc<S>, sender: &AsyncSender<Message>) -> CoreResult<()> {
+//         (self)(msg, state, sender).await
+//     }
+
+//     fn routing_rule(_msg: &Message) -> bool {
+//         true
+//     }
+// }
+
+
