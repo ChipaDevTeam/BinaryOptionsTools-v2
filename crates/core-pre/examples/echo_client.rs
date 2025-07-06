@@ -4,7 +4,7 @@ use binary_options_tools_core_pre::client::Client;
 use binary_options_tools_core_pre::connector::ConnectorResult;
 use binary_options_tools_core_pre::connector::{Connector, WsStream};
 use binary_options_tools_core_pre::error::{CoreError, CoreResult};
-use binary_options_tools_core_pre::traits::ApiModule;
+use binary_options_tools_core_pre::traits::{ApiModule, Rule};
 use futures_util::stream::unfold;
 use futures_util::{Stream, StreamExt};
 use kanal::{AsyncReceiver, AsyncSender};
@@ -101,8 +101,8 @@ impl ApiModule<()> for EchoModule {
         }
     }
 
-    fn routing_rule(msg: &Message) -> bool {
-        msg.is_text()
+    fn rule() -> Box<dyn Rule + Send + Sync> {
+        Box::new(move |msg: &Message| msg.is_text())
     }
 }
 
@@ -179,8 +179,11 @@ impl ApiModule<()> for StreamModule {
         }
     }
 
-    fn routing_rule(_msg: &Message) -> bool {
-        true // Accept all messages
+    fn rule() -> Box<dyn Rule + Send + Sync> {
+        Box::new(move |_msg: &Message| {
+            // Accept all messages
+            true
+        })
     }
 }
 
@@ -252,8 +255,11 @@ impl ApiModule<()> for PeriodicSenderModule {
         }
     }
 
-    fn routing_rule(_msg: &Message) -> bool {
-        false // This module does not process incoming messages
+    fn rule() -> Box<dyn Rule + Send + Sync> {
+        Box::new(move |_msg: &Message| {
+            // This module does not process incoming messages
+            false
+        })
     }
 }
 
@@ -345,3 +351,4 @@ async fn main() -> CoreResult<()> {
     }
     Ok(())
 }
+// can you make some kind of new implementation / wrapper around a client / runner that tests it a lot like check the connection lattency, checks the time since las disconnection, the time the system kept connected before calling the connect or reconnect functions, also i want it to work like for structs like the EchoPlatform like with a cupple of lines i pass the configuration of the struct (like functions to call espected return )

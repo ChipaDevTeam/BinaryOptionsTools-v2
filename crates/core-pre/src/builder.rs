@@ -14,6 +14,7 @@ use tracing::{error, info, warn};
 use crate::client::{Client, ClientRunner, ConnectionCallback, LightweightHandler, Router};
 use crate::connector::Connector;
 use crate::error::{CoreError, CoreResult};
+use crate::middleware::{WebSocketMiddleware, MiddlewareStack};
 use crate::traits::{ApiModule, AppState, LightweightModule};
 
 type HandlerMap = Arc<RwLock<HashMap<TypeId, Box<dyn Any + Send + Sync>>>>;
@@ -30,6 +31,8 @@ pub struct ClientBuilder<S: AppState> {
     // Stores functions that know how to create and register each module.
     module_factories: Vec<HandlersFn<S>>,
     lightweight_factories: Vec<LightweightHandlersFn<S>>,
+    // Middleware stack for WebSocket message processing
+    middleware_stack: MiddlewareStack<S>,
 }
 
 impl<S: AppState> ClientBuilder<S> {
@@ -46,6 +49,7 @@ impl<S: AppState> ClientBuilder<S> {
             lightweight_handlers: Vec::new(),
             module_factories: Vec::new(),
             lightweight_factories: Vec::new(),
+            middleware_stack: MiddlewareStack::new(),
         }
     }
 
@@ -105,11 +109,11 @@ impl<S: AppState> ClientBuilder<S> {
             router.spawn_lightweight_module(async move {
                 let mut failures = 0;
                 // make the first timestamp far enough in the past
-                let mut last_fail = Instant::now() - Duration::from_secs(3600);
+                let mut last_fail = Instant::now().checked_sub(Duration::from_secs(3600)).unwrap_or(Instant::now());
 
-                // create the module once
-                let mut module = M::new(state.clone(), to_ws_tx.clone(), msg_rx);
                 loop {
+                    // create the module once
+                    let mut module = M::new(state.clone(), to_ws_tx.clone(), msg_rx.clone());
                     match module.run().await {
                         Ok(()) => {
                             info!(target: "LightweightModule", "[Lightweight {}] exited cleanly", type_name::<M>());
@@ -140,7 +144,7 @@ impl<S: AppState> ClientBuilder<S> {
                     }
                 }
             });
-            router.add_lightweight_rule(M::routing_rule, msg_tx);
+            router.add_lightweight_rule(M::rule(), msg_tx);
         };
 
         self.lightweight_factories.push(Box::new(factory));
@@ -170,7 +174,7 @@ impl<S: AppState> ClientBuilder<S> {
             let state = router.state.clone();
             router.spawn_module(async move {
                 let mut failures = 0;
-                let mut last_fail = Instant::now() - Duration::from_secs(3600);
+                let mut last_fail = Instant::now().checked_sub(Duration::from_secs(3600)).unwrap_or(Instant::now());
 
                 loop {
                     let mut module = M::new(
@@ -207,10 +211,133 @@ impl<S: AppState> ClientBuilder<S> {
                 }
             });
 
-            router.add_module_rule(M::routing_rule, msg_tx);
+            router.add_module_rule(M::rule(), msg_tx);
         };
 
         self.module_factories.push(Box::new(factory));
+        self
+    }
+
+    /// Adds a middleware layer to the client.
+    ///
+    /// Middleware will be executed in the order they are added.
+    /// They will be called for all WebSocket messages sent and received.
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// # use binary_options_tools_core_pre::builder::ClientBuilder;
+    /// # use binary_options_tools_core_pre::middleware::WebSocketMiddleware;
+    /// # use binary_options_tools_core_pre::traits::AppState;
+    /// # use binary_options_tools_core_pre::connector::{Connector, ConnectorResult, WsStream};
+    /// # use async_trait::async_trait;
+    /// # use std::sync::Arc;
+    /// # #[derive(Debug)]
+    /// # struct MyState;
+    /// # impl AppState for MyState {
+    /// #     fn clear_temporal_data(&self) {}
+    /// # }
+    /// # struct MyConnector;
+    /// # #[async_trait]
+    /// # impl Connector<MyState> for MyConnector {
+    /// #     async fn connect(&self, _state: Arc<MyState>) -> ConnectorResult<WsStream> {
+    /// #         unimplemented!()
+    /// #     }
+    /// #     async fn disconnect(&self) -> ConnectorResult<()> {
+    /// #         unimplemented!()
+    /// #     }
+    /// # }
+    /// # struct MyMiddleware;
+    /// # #[async_trait]
+    /// # impl WebSocketMiddleware<MyState> for MyMiddleware {}
+    /// let builder = ClientBuilder::new(MyConnector, MyState)
+    ///     .with_middleware(Box::new(MyMiddleware));
+    /// ```
+    pub fn with_middleware(mut self, middleware: Box<dyn WebSocketMiddleware<S>>) -> Self {
+        self.middleware_stack.add_layer(middleware);
+        self
+    }
+
+    /// Adds multiple middleware layers at once.
+    ///
+    /// This is a convenience method for adding multiple middleware layers.
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// # use binary_options_tools_core_pre::builder::ClientBuilder;
+    /// # use binary_options_tools_core_pre::middleware::WebSocketMiddleware;
+    /// # use binary_options_tools_core_pre::traits::AppState;
+    /// # use binary_options_tools_core_pre::connector::{Connector, ConnectorResult, WsStream};
+    /// # use async_trait::async_trait;
+    /// # use std::sync::Arc;
+    /// # #[derive(Debug)]
+    /// # struct MyState;
+    /// # impl AppState for MyState {
+    /// #     fn clear_temporal_data(&self) {}
+    /// # }
+    /// # struct MyConnector;
+    /// # #[async_trait]
+    /// # impl Connector<MyState> for MyConnector {
+    /// #     async fn connect(&self, _state: Arc<MyState>) -> ConnectorResult<WsStream> {
+    /// #         unimplemented!()
+    /// #     }
+    /// #     async fn disconnect(&self) -> ConnectorResult<()> {
+    /// #         unimplemented!()
+    /// #     }
+    /// # }
+    /// # struct MyMiddleware;
+    /// # #[async_trait]
+    /// # impl WebSocketMiddleware<MyState> for MyMiddleware {}
+    /// let builder = ClientBuilder::new(MyConnector, MyState)
+    ///     .with_middleware_layers(vec![
+    ///         Box::new(MyMiddleware),
+    ///         Box::new(MyMiddleware),
+    ///     ]);
+    /// ```
+    pub fn with_middleware_layers(mut self, middleware: Vec<Box<dyn WebSocketMiddleware<S>>>) -> Self {
+        for layer in middleware {
+            self.middleware_stack.add_layer(layer);
+        }
+        self
+    }
+
+    /// Applies a middleware stack to the client.
+    ///
+    /// This replaces any existing middleware with the provided stack.
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// # use binary_options_tools_core_pre::builder::ClientBuilder;
+    /// # use binary_options_tools_core_pre::middleware::{MiddlewareStack, WebSocketMiddleware};
+    /// # use binary_options_tools_core_pre::traits::AppState;
+    /// # use binary_options_tools_core_pre::connector::{Connector, ConnectorResult, WsStream};
+    /// # use async_trait::async_trait;
+    /// # use std::sync::Arc;
+    /// # #[derive(Debug)]
+    /// # struct MyState;
+    /// # impl AppState for MyState {
+    /// #     fn clear_temporal_data(&self) {}
+    /// # }
+    /// # struct MyConnector;
+    /// # #[async_trait]
+    /// # impl Connector<MyState> for MyConnector {
+    /// #     async fn connect(&self, _state: Arc<MyState>) -> ConnectorResult<WsStream> {
+    /// #         unimplemented!()
+    /// #     }
+    /// #     async fn disconnect(&self) -> ConnectorResult<()> {
+    /// #         unimplemented!()
+    /// #     }
+    /// # }
+    /// # struct MyMiddleware;
+    /// # #[async_trait]
+    /// # impl WebSocketMiddleware<MyState> for MyMiddleware {}
+    /// let mut stack = MiddlewareStack::new();
+    /// stack.add_layer(Box::new(MyMiddleware));
+    /// 
+    /// let builder = ClientBuilder::new(MyConnector, MyState)
+    ///     .with_middleware_stack(stack);
+    /// ```
+    pub fn with_middleware_stack(mut self, stack: MiddlewareStack<S>) -> Self {
+        self.middleware_stack = stack;
         self
     }
 
@@ -223,6 +350,7 @@ impl<S: AppState> ClientBuilder<S> {
 
         let mut router = Router::new(self.state.clone());
         router.lightweight_handlers = self.lightweight_handlers;
+        router.middleware_stack = self.middleware_stack;
 
         let mut join_set = JoinSet::new();
         // Execute all the deferred module setup functions.

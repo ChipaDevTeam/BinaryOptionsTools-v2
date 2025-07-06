@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use binary_options_tools_core::reimports::Message;
-use binary_options_tools_core_pre::{error::{CoreError, CoreResult}, reimports::{AsyncReceiver, AsyncSender}, traits::LightweightModule};
+use binary_options_tools_core_pre::{error::{CoreError, CoreResult}, reimports::{AsyncReceiver, AsyncSender}, traits::{LightweightModule, Rule}};
+use tracing::{debug, warn};
 // use tracing::info;
 
 use crate::pocketoption_pre::state::State;
@@ -39,40 +40,63 @@ impl LightweightModule<State> for InitModule {
 
     /// The module's asynchronous run loop.
     async fn run(&mut self) -> CoreResult<()> {
-        while let Ok(msg) = self.ws_receiver.recv().await {
-            if let Message::Text(text) = &*msg {
-                match text {
-                    _ if text.starts_with(SID_BASE) => {
-                        self.ws_sender.send(Message::text("40")).await?;
-                    },
-                    _ if text.starts_with(SID) => {
-                        self.ws_sender.send(Message::text(self.state.ssid.to_string())).await?;
-                    },
-                    _ if text.starts_with(SUCCESSAUTH) => {
-                        self.ws_sender.send(Message::text(r#"42["indicator/load"]"#)).await?;
-                        self.ws_sender.send(Message::text(r#"42["favorite/load"]"#)).await?;
-                        self.ws_sender.send(Message::text(r#"42["price-alert/load"]"#)).await?;
-                        self.ws_sender.send(Message::text(format!("42[\"changeSymbol\",{{\"asset\":\"{}\",\"period\":1}}]", self.state.default_symbol))).await?;
-                        self.ws_sender.send(Message::text(format!("42[\"subfor\",\"{}\"]", self.state.default_symbol))).await?;
+        
+        loop {
+            let msg = self.ws_receiver.recv().await;
+            match msg {
+                Ok(msg) => {
+                    if let Message::Text(text) = &*msg {
+                        match text {
+                            _ if text.starts_with(SID_BASE) => {
+                                self.ws_sender.send(Message::text("40")).await?;
+                            },
+                            _ if text.starts_with(SID) => {
+                                self.ws_sender.send(Message::text(self.state.ssid.to_string())).await.inspect_err(|e| {
+                                    warn!(target: "KeepAliveModule", "Failed to send SSID: {}", e);
+                                })?;
+                            },
+                            _ if text.starts_with(SUCCESSAUTH) => {
+                                self.ws_sender.send(Message::text(r#"42["indicator/load"]"#)).await.inspect_err(|e| {
+                                    warn!(target: "KeepAliveModule", "Failed to send indicator/load message: {}", e);
+                                })?;
+                                self.ws_sender.send(Message::text(r#"42["favorite/load"]"#)).await.inspect_err(|e| {
+                                    warn!(target: "KeepAliveModule", "Failed to send favorite/load message: {}", e);
+                                })?;
+                                self.ws_sender.send(Message::text(r#"42["price-alert/load"]"#)).await.inspect_err(|e| {
+                                    warn!(target: "KeepAliveModule", "Failed to send price-alert/load message: {}", e);
+                                })?;
+                                self.ws_sender.send(Message::text(format!("42[\"changeSymbol\",{{\"asset\":\"{}\",\"period\":1}}]", self.state.default_symbol))).await.inspect_err(|e| {
+                                    warn!(target: "KeepAliveModule", "Failed to send changeSymbol message: {}", e);
+                                })?;
+                                self.ws_sender.send(Message::text(format!("42[\"subfor\",\"{}\"]", self.state.default_symbol))).await.inspect_err(|e| {
+                                    warn!(target: "KeepAliveModule", "Failed to send subfor message: {}", e);
+                                })?;
+                            }
+                            _ if text == &"2" => {
+                                self.ws_sender.send(Message::text("3")).await?;
+                            }
+                            _ => continue
+                        }
+                    } else {
+                        // If the message is not a text message, we can ignore it.
+                        continue;
                     }
-                    _ if text == &"2" => {
-                        self.ws_sender.send(Message::text("3")).await?;
-                    }
-                    _ => continue
                 }
-            } else {
-                // If the message is not a text message, we can ignore it.
-                continue;
+                ,
+                Err(e) => {
+                    warn!(target: "InitModule", "Error receiving message: {}", e);
+                    return Err(CoreError::LightweightModuleLoop("InitModule run loop exited unexpectedly".into()));
+                }
             }
-        } 
-
-        Err(CoreError::LightweightModuleLoop("KeepAlive module run loop exited unexpectedly".into()))
+        }
     }
 
     /// Route only messages for which this returns true.
-    fn routing_rule(msg: &Message) -> bool {
-        // info!(target: "LightweightModule", "Routing rule for InitModule: {msg:?}");
-        matches!(msg, Message::Text(text) if text.starts_with(SID_BASE) || text.starts_with(SID) || text.starts_with(SUCCESSAUTH) || text == &"2")
+    fn rule() -> Box<dyn Rule + Send + Sync> {
+        Box::new(|msg: &Message| {
+            debug!(target: "LightweightModule", "Routing rule for InitModule: {msg:?}");
+            matches!(msg, Message::Text(text) if text.starts_with(SID_BASE) || text.starts_with(SID) || text.starts_with(SUCCESSAUTH) || text == &"2")
+        })
     }
 }
 
@@ -96,7 +120,10 @@ impl LightweightModule<State> for KeepAliveModule {
         }
     }
 
-    fn routing_rule(_: &Message) -> bool {
-        false
+    fn rule() -> Box<dyn Rule + Send + Sync> {
+        Box::new(|msg: &Message| {
+            debug!(target: "LightweightModule", "Routing rule for KeepAliveModule: {msg:?}");
+            false
+        })
     }
 }

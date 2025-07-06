@@ -1,11 +1,19 @@
+use std::sync::RwLock;
+
 use binary_options_tools_core_pre::traits::AppState;
 
 use crate::pocketoption_pre::{error::{PocketError, PocketResult}, ssid::Ssid};
 
 pub struct State {
+    /// Unique identifier for the session.
+    /// This is used to identify the session across different operations.
     pub ssid: Ssid,
+    /// Default connection URL, if none is specified.
     pub default_connection_url: Option<String>,
+    /// Default symbol to use if none is specified.
     pub default_symbol: String,
+    /// Current balance, if available.
+    pub balance: RwLock<Option<f64>>,
 }
 
 #[derive(Default)]
@@ -36,6 +44,7 @@ impl StateBuilder {
                     ssid: self.ssid.ok_or(PocketError::StateBuilder("SSID is required".into()))?,
                     default_connection_url: self.default_connection_url,
                     default_symbol: self.default_symbol.unwrap_or_else(|| "EURUSD_otc".to_string()),
+                    balance: RwLock::new(None),
                 })
     }
 }

@@ -77,20 +77,7 @@ pub trait ApiModule<S: AppState>: Send + 'static {
     /// The main run loop for the module's background task.
     async fn run(&mut self) -> CoreResult<()>;
 
-    /// A function that determines if an incoming WebSocket message is intended for this module. It is very important
-    /// that this function is efficient, as it will be called for every incoming message.
-    /// # Arguments
-    /// * `message`: The incoming WebSocket message to check.
-    /// # Returns
-    /// * `true` if the message is intended for this module, `false` otherwise.
-    /// # Note
-    /// This function should be as efficient as possible, as it will be called for
-    /// every incoming WebSocket message. It should not perform any blocking operations.
-    /// It is recommended to use pattern matching or other efficient checks to determine if the message is
-    /// intended for this module.
-    /// It is not intended to make sure the message is one of the expected types, but rather to check if it is
-    /// routed to this module.
-    fn routing_rule(message: &Message) -> bool;
+    fn rule() -> Box<dyn Rule + Send + Sync>;
 }
 
 /// A self‐contained module that runs independently,
@@ -130,33 +117,43 @@ pub trait LightweightModule<S: AppState>: Send + 'static {
     async fn run(&mut self) -> CoreResult<()>;
 
     /// Route only messages for which this returns true.
-    fn routing_rule(msg: &Message) -> bool;
+    fn rule() -> Box<dyn Rule + Send + Sync>;
 }
 
+/// Data returned by the rule function of a module.
+/// This trait is used to define the rules that determine whether a message should be processed by a module.
+/// It allows for flexible and reusable rules that can be applied to different modules.
+/// The rules can be implemented as standalone functions or as methods on the module itself.
+/// The rules should be lightweight and efficient, as they will be called for every incoming message.
+/// The rules should not perform any blocking operations and should be designed to be as efficient as possible
+/// to avoid slowing down the message processing pipeline.
+/// The rules can be used to filter messages, transform them, or perform any other necessary operations
+pub trait Rule {
+    /// Validate wherever the messsage follows the rule and needs to be processed by this module.
+    fn call(&self, msg: &Message) -> bool;
 
-// #[async_trait]
-// pub trait LightweightHandle<S: AppState>: Send + 'static {
-//     /// Process a message.
-//     async fn process(&self, msg: Arc<Message>, state: Arc<S>, sender: &AsyncSender<Message>) -> CoreResult<()>;
+    /// Resets the rule to its initial state.
+    /// This is useful for rules that maintain state and need to be reset
+    /// when the module is reset or reinitialized.
+    /// Implementations should ensure that the rule is in a clean state after this call.
+    /// # Note
+    /// This method is not required to be asynchronous, as it is expected to be a lightweight
+    /// operation that does not involve any I/O or long-running tasks.
+    /// It should be implemented in a way that allows the rule to be reused without
+    /// needing to recreate it, thus improving performance and reducing overhead.
+    fn reset(&self); 
+}
 
-//     /// Route only messages for which this returns true.
-//     fn routing_rule(msg: &Message) -> bool;
-// }
+impl<F> Rule for F 
+where 
+    F: Fn(&Message) -> bool + Send + Sync + 'static,
+{
+    fn call(&self, msg: &Message) -> bool {
+        self(msg)
+    }
 
-
-// /// Automatically implement `LightweightHandle` for any async function that matches the signature.
-// #[async_trait]
-// impl<S: AppState, F> LightweightHandle<S> for F
-// where 
-//     F: Send + Sync + 'static + Fn(Arc<Message>, Arc<S>, &AsyncSender<Message>) -> futures_util::future::BoxFuture<'static, CoreResult<()>>,
-// {
-//     async fn process(&self, msg: Arc<Message>, state: Arc<S>, sender: &AsyncSender<Message>) -> CoreResult<()> {
-//         (self)(msg, state, sender).await
-//     }
-
-//     fn routing_rule(_msg: &Message) -> bool {
-//         true
-//     }
-// }
-
-
+    fn reset(&self) {
+        // Default implementation does nothing.
+        // This is useful for stateless rules.
+    }
+}

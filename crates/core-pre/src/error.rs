@@ -21,6 +21,12 @@ pub enum CoreError {
 
     #[error("Lightweight [{0} Module] loop exited unexpectedly.")]
     LightweightModuleLoop(String),
+    
+    #[error("Other error: {0}")]
+    Other(String),
+
+    #[error("Poison error: {0}")]
+    Poison(String)
 }
 
 pub type CoreResult<T> = std::result::Result<T, CoreError>;

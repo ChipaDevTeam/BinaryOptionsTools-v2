@@ -1,6 +1,7 @@
 use crate::connector::Connector;
 use crate::error::CoreResult;
-use crate::traits::{ApiModule, AppState};
+use crate::middleware::{MiddlewareContext, MiddlewareStack};
+use crate::traits::{ApiModule, AppState, Rule};
 use futures_util::{SinkExt, stream::StreamExt};
 use kanal::{AsyncReceiver, AsyncSender};
 use std::any::{Any, TypeId};
@@ -38,7 +39,7 @@ pub type LightweightHandler<S> = Box<
         + Sync,
 >;
 
-type Rule = (fn(&Message) -> bool, AsyncSender<Arc<Message>>);
+type RuleTp = (Box<dyn Rule + Send + Sync>, AsyncSender<Arc<Message>>);
 // --- Control Commands for the Runner ---
 
 pub struct ConnectionCallback<S: AppState> {
@@ -58,11 +59,12 @@ pub enum RunnerCommand {
 // --- Internal Router ---
 pub struct Router<S: AppState> {
     pub(crate) state: Arc<S>,
-    pub(crate) module_rules: Vec<Rule>,
+    pub(crate) module_rules: Vec<RuleTp>,
     pub(crate) module_set: JoinSet<()>,
-    pub(crate) lightweight_rules: Vec<Rule>,
+    pub(crate) lightweight_rules: Vec<RuleTp>,
     pub(crate) lightweight_handlers: Vec<LightweightHandler<S>>,
     pub(crate) lightweight_set: JoinSet<()>,
+    pub(crate) middleware_stack: MiddlewareStack<S>,
 }
 
 impl<S: AppState> Router<S> {
@@ -74,6 +76,7 @@ impl<S: AppState> Router<S> {
             lightweight_rules: Vec::new(),
             lightweight_handlers: Vec::new(),
             lightweight_set: JoinSet::new(),
+            middleware_stack: MiddlewareStack::new(),
         }
     }
 
@@ -83,7 +86,7 @@ impl<S: AppState> Router<S> {
 
     pub fn add_module_rule(
         &mut self,
-        rule: fn(&Message) -> bool,
+        rule: Box<dyn Rule + Send + Sync>,
         sender: AsyncSender<Arc<Message>>,
     ) {
         self.module_rules.push((rule, sender));
@@ -91,7 +94,7 @@ impl<S: AppState> Router<S> {
 
     pub fn add_lightweight_rule(
         &mut self,
-        rule: fn(&Message) -> bool,
+        rule: Box<dyn Rule + Send + Sync>,
         sender: AsyncSender<Arc<Message>>,
     ) {
         self.lightweight_rules.push((rule, sender));
@@ -105,27 +108,50 @@ impl<S: AppState> Router<S> {
         self.lightweight_set.spawn(task);
     }
 
+    /// Routes incoming WebSocket messages to appropriate handlers and modules.
+    /// 
+    /// This method implements the core message routing logic with middleware integration:
+    /// 1. **Middleware on_receive**: Called first for all incoming messages
+    /// 2. **Lightweight handlers**: Processed for quick operations
+    /// 3. **Lightweight modules**: Routed based on routing rules
+    /// 4. **API modules**: Routed to matching modules
+    /// 
+    /// # Middleware Integration
+    /// The `on_receive` middleware hook is called at the beginning of message processing,
+    /// allowing middleware to observe, log, or transform incoming messages before they
+    /// reach the application logic.
+    /// 
+    /// # Arguments
+    /// - `message`: The incoming WebSocket message wrapped in Arc for sharing
+    /// - `sender`: Channel for sending outgoing messages
     async fn route(&self, message: Arc<Message>, sender: &AsyncSender<Message>) -> CoreResult<()> {
         // Route to all lightweight handlers first
         debug!(target: "Router", "Routing message: {message:?}");
         
+        // Create middleware context
+        let middleware_context = MiddlewareContext::new(Arc::clone(&self.state), sender.clone());
+        
+        // 🎯 MIDDLEWARE HOOK: on_receive - called for ALL incoming messages
+        // This is where middleware can observe, log, or process incoming messages
+        self.middleware_stack.on_receive(&message, &middleware_context).await;
+        
         for handler in &self.lightweight_handlers {
             if let Err(err) = handler(Arc::clone(&message), Arc::clone(&self.state), sender).await {
-                error!(
+                error!(target: "Router",
                      "Lightweight handler error: {err:#?}"
                 );
             }
         }
         for (rule, sender) in &self.lightweight_rules {
             // If the rule matches, send the message to the lightweight handler
-            if rule(&message) && sender.send(message.clone()).await.is_err() {
-                error!(target: "Router", "A lightweight handler has shut down and its channel is closed.");
+            if rule.call(&message) && sender.send(message.clone()).await.is_err() {
+                error!(target: "Router", "A lightweight module has shut down and its channel is closed.");
             }
         }
 
         // Route to the first matching API module
         for (rule, sender) in &self.module_rules {
-            if rule(&message) && sender.send(message.clone()).await.is_err() {
+            if rule.call(&message) && sender.send(message.clone()).await.is_err() {
                 error!(target: "Router", "A module has shut down and its channel is closed.");
             }
         }
@@ -179,11 +205,34 @@ impl<S: AppState> Client<S> {
 
     /// Commands the runner to shutdown, this action is final as the runner and client will stop working and will be dropped.
     pub async fn shutdown(self) -> CoreResult<()> {
-        self.runner_command_tx.send(RunnerCommand::Shutdown).await?;
+        self.runner_command_tx.send(RunnerCommand::Shutdown).await
+            .inspect_err(|e| {
+                error!(target: "Client", "Failed to send shutdown command: {e}");
+            })?;
         drop(self);
         info!(target: "Client", "Runner shutdown command sent.");
         Ok(())
     }
+
+        /// Send a message to the WebSocket
+    pub async fn send_message(&self, message: Message) -> CoreResult<()> {
+        self.to_ws_sender.send(message).await
+            .inspect_err(|e| {
+                error!(target: "Client", "Failed to send message to WebSocket: {e}");
+            })?;
+        Ok(())
+    }
+
+    /// Send a text message to the WebSocket
+    pub async fn send_text(&self, text: String) -> CoreResult<()> {
+        self.send_message(Message::text(text)).await
+    }
+
+    /// Send a binary message to the WebSocket
+    pub async fn send_binary(&self, data: Vec<u8>) -> CoreResult<()> {
+        self.send_message(Message::binary(data)).await
+    }
+
 }
 
 // --- The Background Worker ---
@@ -237,10 +286,31 @@ pub struct ClientRunner<S: AppState> {
 }
 
 impl<S: AppState> ClientRunner<S> {
+    /// Main client runner loop that manages WebSocket connections and message processing.
+    /// 
+    /// # Middleware Integration Points
+    /// 
+    /// This method integrates middleware at four key points:
+    /// 
+    /// 1. **Connection Establishment** (`on_connect`): Called after successful connection
+    /// 2. **Message Sending** (`on_send`): Called before each message is sent to WebSocket
+    /// 3. **Message Receiving** (`on_receive`): Called for each incoming message (in Router::route)
+    /// 4. **Disconnection** (`on_disconnect`): Called on manual disconnect, shutdown, or connection loss
+    /// 
+    /// # Connection Lifecycle
+    /// 
+    /// - **Connection**: Middleware `on_connect` is called after successful WebSocket connection
+    /// - **Active Session**: Middleware `on_send`/`on_receive` called for each message
+    /// - **Disconnection**: Middleware `on_disconnect` called before cleanup
     pub async fn run(&mut self) { // TODO: Add a way to disconnect and keep the connection closed intill specified otherwhise
         // The outermost loop runs until a shutdown is commanded.
         while !self.shutdown_requested {
+            // Execute middleware on_connect hook
+            let middleware_context = MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
             info!(target: "Runner", "Starting connection cycle...");
+
+            // Call middleware to record connection attempt
+            self.router.middleware_stack.record_connection_attempt(&middleware_context).await;
 
             // Use the correct connection method based on the flag.
             let stream_result = if self.is_hard_disconnect {
@@ -248,6 +318,8 @@ impl<S: AppState> ClientRunner<S> {
             } else {
                 self.connector.reconnect(self.state.clone()).await
             };
+
+            
 
             let ws_stream = match stream_result {
                 Ok(stream) => stream,
@@ -260,7 +332,11 @@ impl<S: AppState> ClientRunner<S> {
                 }
             };
 
+            // 🎯 MIDDLEWARE HOOK: on_connect - called after successful connection
+            // Location: After WebSocket connection is established
             info!(target: "Runner", "Connection successful.");
+            self.router.middleware_stack.on_connect(&middleware_context).await;
+            
             // Execute the correct callback.
             if self.is_hard_disconnect {
                 // Handle any error from on_connect
@@ -288,11 +364,18 @@ impl<S: AppState> ClientRunner<S> {
             self.is_hard_disconnect = false;
 
             let (mut ws_writer, mut ws_reader) = ws_stream.split();
-
+            
+            // 🎯 MIDDLEWARE HOOK: on_send - called in writer task for outgoing messages
             let writer_task = tokio::spawn({
                 let to_ws_rx = self.to_ws_receiver.clone();
+                let router = Arc::clone(&self.router);
+                let state = Arc::clone(&self.state);
+                let to_ws_sender = self.to_ws_sender.clone();
                 async move {
+                    let middleware_context = MiddlewareContext::new(state, to_ws_sender);
                     while let Ok(msg) = to_ws_rx.recv().await {
+                        // Execute middleware on_send hook
+                        router.middleware_stack.on_send(&msg, &middleware_context).await;
                         if ws_writer.send(msg).await.is_err() {
                             error!(target: "Runner", "WebSocket writer task failed to send message.");
                             break;
@@ -316,9 +399,12 @@ impl<S: AppState> ClientRunner<S> {
             // --- Active Session Loop ---
             // This loop runs as long as the connection is stable or no commands are received.
             let mut writer_task_opt = Some(writer_task);
-            let mut reader_task_opt = Some(reader_task);
+            let mut reader_task_opt: Option<tokio::task::JoinHandle<()>> = Some(reader_task);
 
             let mut session_active = true;
+
+            // Temporal timer so we i can check the duration of a connection
+            // let temporal_timer = std::time::Instant::now();
             while session_active {
                 tokio::select! {
                     biased;
@@ -326,7 +412,20 @@ impl<S: AppState> ClientRunner<S> {
                     Ok(cmd) = self.runner_command_rx.recv() => {
                         match cmd {
                             RunnerCommand::Disconnect => {
+                                // 🎯 MIDDLEWARE HOOK: on_disconnect - manual disconnect
+
                                 info!(target: "Runner", "Disconnect command received.");
+                                
+                                // Execute middleware on_disconnect hook
+                                let middleware_context = MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
+                                self.router.middleware_stack.on_disconnect(&middleware_context).await;
+                                
+                                // Call connector's disconnect method to properly close the connection
+                                if let Err(e) = self.connector.disconnect().await {
+                                    warn!(target: "Runner", "Connector disconnect failed: {e}");
+                                }
+
+
                                 self.state.clear_temporal_data();
                                 self.is_hard_disconnect = true;
                                 if let Some(writer_task) = writer_task_opt.take() {
@@ -338,7 +437,19 @@ impl<S: AppState> ClientRunner<S> {
                                 session_active = false;
                             },
                             RunnerCommand::Shutdown => {
+                                // 🎯 MIDDLEWARE HOOK: on_disconnect - shutdown
+
                                 info!(target: "Runner", "Shutdown command received.");
+                                
+                                // Execute middleware on_disconnect hook
+                                let middleware_context = MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
+                                self.router.middleware_stack.on_disconnect(&middleware_context).await;
+                                
+                                // Call connector's disconnect method to properly close the connection
+                                if let Err(e) = self.connector.disconnect().await {
+                                    warn!(target: "Runner", "Connector disconnect failed: {e}");
+                                }
+
                                 self.shutdown_requested = true;
                                 if let Some(writer_task) = writer_task_opt.take() {
                                     writer_task.abort();
@@ -356,7 +467,13 @@ impl<S: AppState> ClientRunner<S> {
                             let _ = reader_task.await;
                         }
                     } => {
+                        // 🎯 MIDDLEWARE HOOK: on_disconnect - unexpected connection loss
                         warn!(target: "Runner", "Connection lost unexpectedly.");
+                        
+                        // Execute middleware on_disconnect hook
+                        let middleware_context = MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
+                        self.router.middleware_stack.on_disconnect(&middleware_context).await;
+                        
                         if let Some(writer_task) = writer_task_opt.take() {
                             writer_task.abort();
                         }
@@ -365,6 +482,7 @@ impl<S: AppState> ClientRunner<S> {
                             reader_task.abort();
                         }
                         session_active = false;
+                        // panic!("Connection lost unexpectedly, exiting session loop. Duration: {:?}", temporal_timer.elapsed());
                     }
                 }
             }
