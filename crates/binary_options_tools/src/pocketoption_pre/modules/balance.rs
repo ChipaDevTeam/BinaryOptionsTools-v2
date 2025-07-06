@@ -1,40 +1,37 @@
-use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use binary_options_tools_core::reimports::Message;
-use binary_options_tools_core_pre::{error::{CoreError, CoreResult}, reimports::{AsyncReceiver, AsyncSender}, traits::{ApiModule, LightweightModule, Rule}};
+use binary_options_tools_core_pre::{error::CoreResult, reimports::{AsyncReceiver, AsyncSender}, traits::{LightweightModule, Rule}};
 use serde::Deserialize;
+use serde_json::Value;
 use tracing::{debug, warn};
 
-use crate::pocketoption_pre::state::State;
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)] // Allows matching against different struct patterns
-enum BalanceMessage {
-    Demo(DemoBalance),
-    Live(LiveBalance),
-}
+use crate::pocketoption_pre::{state::State, types::TwoStepRule};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct DemoBalance {
-    is_demo: u8,
+struct BalanceMessage {
     balance: f64,
+    #[serde(flatten)]
+    _extra: HashMap<String, Value>
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct LiveBalance {
-    uid: u64,
-    login: u64,
-    is_demo: u8,
-    balance: f64,
-}
+// #[derive(Debug, Deserialize)]
+// #[serde(rename_all = "camelCase")]
+// struct DemoBalance {
+//     is_demo: u8,
+//     balance: f64,
+// }
 
-
-struct BalanceRule {
-    is_balance: AtomicBool
-}
+// #[derive(Debug, Deserialize)]
+// #[serde(rename_all = "camelCase")]
+// struct LiveBalance {
+//     uid: u64,
+//     login: u64,
+//     is_demo: u8,
+//     balance: f64,
+// }
 
 pub struct BalanceModule {
     state: Arc<State>,
@@ -51,13 +48,15 @@ impl LightweightModule<State> for BalanceModule {
         while let Ok(msg) = self.receiver.recv().await {
             if let Message::Binary(text) = &*msg {
                 if let Ok(balance_msg) = serde_json::from_slice::<BalanceMessage>(text) {
-                    match balance_msg {
-                        BalanceMessage::Demo(DemoBalance {balance, .. }) | BalanceMessage::Live(LiveBalance { balance, ..})=> {
-                            debug!("Received balance update: {}", balance);
-                            let mut state = self.state.balance.write().map_err(|e| CoreError::Poison(e.to_string()))?;
-                            *state = Some(balance);
-                        }
-                    }
+                    debug!("Received balance message: {:?}", balance_msg);
+                    self.state.set_balance(balance_msg.balance)?;
+                    // If you want to handle demo/live balance differently, you can add logic here
+                    // For example, if you had a field to distinguish between demo and live:
+                    // if balance_msg.is_demo == 1 {
+                    //     self.state.set_demo_balance(balance_msg.balance);
+                    // } else {
+                    //     self.state.set_live_balance(balance_msg.balance);
+                    // }
                 } else {
                     warn!("Failed to parse balance message: {:?}", text);
                 }
@@ -67,30 +66,7 @@ impl LightweightModule<State> for BalanceModule {
     }
 
     fn rule() -> Box<dyn Rule + Send + Sync> {
-        Box::new(BalanceRule {
-            is_balance: AtomicBool::new(false),
-        })
+        Box::new(TwoStepRule::new(r#"451-["successupdateBalance","#))
     }
 } 
 
-impl Rule for BalanceRule {
-    fn call(&self, msg: &Message) -> bool {
-        match msg {
-            Message::Text(text) => {
-                if text.starts_with(r#"451-["successupdateBalance","#) {
-                    self.is_balance.store(true, Ordering::SeqCst);
-                }
-                false
-            },
-            Message::Binary(_) if self.is_balance.load(Ordering::SeqCst) => {
-                self.is_balance.store(false, Ordering::SeqCst);
-                true
-            },
-            _ => false
-        }
-    }
-
-    fn reset(&self) {
-        self.is_balance.store(false, Ordering::SeqCst);
-    }
-}

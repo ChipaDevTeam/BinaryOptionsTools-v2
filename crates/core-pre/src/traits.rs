@@ -77,6 +77,20 @@ pub trait ApiModule<S: AppState>: Send + 'static {
     /// The main run loop for the module's background task.
     async fn run(&mut self) -> CoreResult<()>;
 
+    /// An optional callback that can be executed when a reconnection event occurs.
+    /// This function is useful for modules that need to perform specific actions
+    /// when a reconnection happens, such as reinitializing state or resending messages.
+    /// It allows for custom behavior to be defined that can be executed in the context of the
+    /// module, providing flexibility and extensibility to the module's functionality.
+    fn callback(&self) -> CoreResult<Option<Box<dyn ReconnectCallback<S>>>> {
+        // Default implementation does nothing.
+        // This is useful for modules that do not require a callback.
+        Ok(None)
+    }
+
+    /// Route only messages for which this returns true.
+    /// This function is used to determine whether a message should be processed by this module.
+    /// It allows for flexible and reusable rules that can be applied to different modules.
     fn rule() -> Box<dyn Rule + Send + Sync>;
 }
 
@@ -144,6 +158,35 @@ pub trait Rule {
     fn reset(&self); 
 }
 
+
+/// A trait for callback functions that can be executed within the context of a module.
+/// This trait is designed to allow modules to define custom behavior that can be executed
+/// when a reconnection event occurs.
+#[async_trait]
+pub trait ReconnectCallback<S: AppState>: Send + Sync {
+    /// The asynchronous function that will be called when a reconnection event occurs.
+    /// This function receives the shared state and a sender for outgoing WebSocket messages.
+    /// It should return a `CoreResult<()>` indicating the success or failure of the operation.
+    /// /// # Arguments
+    /// * `state`: The shared application state that the callback can use.
+    /// * `ws_sender`: The sender for outgoing WebSocket messages, allowing the callback to
+    ///   send messages to the WebSocket connection.
+    /// # Returns
+    /// A `CoreResult<()>` indicating the success or failure of the operation.
+    /// # Note
+    /// This function is expected to be asynchronous, allowing it to perform I/O operations
+    /// or other tasks that may take time without blocking the event loop.
+    /// Implementations should ensure that they handle any potential errors gracefully
+    /// and return appropriate results.
+    /// It is also important to ensure that the callback does not block the event loop,
+    /// as this could lead to performance issues in the application.
+    /// Implementations should be designed to be efficient and non-blocking,
+    /// allowing the application to continue processing other events while the callback is executed.
+    /// This trait is useful for defining custom behavior that can be executed when a reconnection event
+    /// occurs, allowing modules to handle reconnections in a flexible and reusable way.    
+    async fn call(&self, state: Arc<S>, ws_sender: &AsyncSender<Message>) -> CoreResult<()>;
+}
+
 impl<F> Rule for F 
 where 
     F: Fn(&Message) -> bool + Send + Sync + 'static,
@@ -155,5 +198,12 @@ where
     fn reset(&self) {
         // Default implementation does nothing.
         // This is useful for stateless rules.
+    }
+}
+
+#[async_trait]
+impl<S: AppState> ReconnectCallback<S> for () {
+    async fn call(&self, _state: Arc<S>, _ws_sender: &AsyncSender<Message>) -> CoreResult<()> {
+        Ok(())
     }
 }

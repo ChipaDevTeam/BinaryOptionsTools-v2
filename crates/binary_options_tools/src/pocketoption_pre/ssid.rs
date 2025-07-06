@@ -118,6 +118,7 @@ impl Ssid {
         }
     }
 
+    /// Returns true if the session is a demo session.
     pub fn demo(&self) -> bool {
         match self {
             Self::Demo(_) => true,

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use binary_options_tools_core_pre::{builder::ClientBuilder, client::Client, error::CoreError, testing::{TestingWrapper, TestingWrapperBuilder}};
 
-use crate::pocketoption_pre::{connect::PocketConnect, error::{PocketError, PocketResult}, modules::{balance::BalanceModule, keep_alive::{InitModule, KeepAliveModule}, print_handler}, ssid::Ssid, state::{State, StateBuilder}};
+use crate::pocketoption_pre::{connect::PocketConnect, error::{PocketError, PocketResult}, modules::{balance::BalanceModule, keep_alive::{InitModule, KeepAliveModule}, print_handler, server_time::ServerTimeModule}, ssid::Ssid, state::{State, StateBuilder}};
 
 
 pub struct PocketOption {
@@ -18,6 +18,7 @@ impl PocketOption {
                 .with_lightweight_module::<KeepAliveModule>()
                 .with_lightweight_module::<InitModule>()
                 .with_lightweight_module::<BalanceModule>()
+                .with_lightweight_module::<ServerTimeModule>()
                 .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state))))
 
     }
@@ -27,6 +28,7 @@ impl PocketOption {
             .build().await?;
 
         let _runner = tokio::spawn(async move { runner.run().await });
+        client.wait_connected().await;
 
         Ok(Self {
                     client,
@@ -105,11 +107,23 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_balance() {
         tracing_subscriber::fmt::init();
-        let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"\";s:10:\"ip_address\";s:15:\"191.113.139.200\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/119.\";s:13:\"last_activity\";i:1751057233;}b9d0db50cb32d406f935c63a41484f27","isDemo":0,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#; // r#"42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]"#;
+        let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"3e1823a796c1fe61491e309136cf9861\";s:10:\"ip_address\";s:15:\"191.113.139.200\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/119.\";s:13:\"last_activity\";i:1751681442;}e2cf2ff21c927851dbb4a781aa81a10e","isDemo":0,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]"#; // 42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
         let balance = api.balance().unwrap();
         println!("Balance: {balance}");
+        api.shutdown().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_pocket_option_server_time() {
+        tracing_subscriber::fmt::init();
+        let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"3e1823a796c1fe61491e309136cf9861\";s:10:\"ip_address\";s:15:\"191.113.139.200\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/119.\";s:13:\"last_activity\";i:1751681442;}e2cf2ff21c927851dbb4a781aa81a10e","isDemo":0,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]"#; // 42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	
+        let api = PocketOption::new(ssid).await.unwrap();
+        tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
+        let server_time = api.client.state.get_server_datetime().await;
+        println!("Server Time: {server_time}");
+        println!("Server time complete: {}", api.client.state.server_time.read().await);
         api.shutdown().await.unwrap();
     }
 }

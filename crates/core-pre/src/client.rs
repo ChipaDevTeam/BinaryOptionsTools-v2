@@ -1,7 +1,9 @@
+use crate::callback::ConnectionCallback;
 use crate::connector::Connector;
 use crate::error::CoreResult;
 use crate::middleware::{MiddlewareContext, MiddlewareStack};
-use crate::traits::{ApiModule, AppState, Rule};
+use crate::signals::Signals;
+use crate::traits::{ApiModule, AppState, ReconnectCallback, Rule};
 use futures_util::{SinkExt, stream::StreamExt};
 use kanal::{AsyncReceiver, AsyncSender};
 use std::any::{Any, TypeId};
@@ -11,16 +13,6 @@ use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, error, info, warn};
-
-// --- Callbacks and Lightweight Handlers ---
-pub type OnConnectCallback<S> = Box<
-    dyn Fn(
-            Arc<S>,
-            &AsyncSender<Message>,
-        ) -> futures_util::future::BoxFuture<'static, CoreResult<()>>
-        + Send
-        + Sync,
->;
 
 /// A lightweight handler is a function that can process messages without being tied to a specific module.
 /// It can be used for quick, non-blocking operations that don't require a full module lifecycle
@@ -42,10 +34,6 @@ pub type LightweightHandler<S> = Box<
 type RuleTp = (Box<dyn Rule + Send + Sync>, AsyncSender<Arc<Message>>);
 // --- Control Commands for the Runner ---
 
-pub struct ConnectionCallback<S: AppState> {
-    pub on_connect: OnConnectCallback<S>,
-    pub on_reconnect: OnConnectCallback<S>,
-}
 
 #[derive(Debug)]
 pub enum RunnerCommand {
@@ -162,6 +150,8 @@ impl<S: AppState> Router<S> {
 // --- The Public-Facing Handle ---
 #[derive(Debug)]
 pub struct Client<S: AppState> {
+    pub signal: Signals,
+    /// The shared application state, which can be used by modules and handlers.
     pub state: Arc<S>,
     pub module_handles: Arc<RwLock<HashMap<TypeId, Box<dyn Any + Send + Sync>>>>,
     pub to_ws_sender: AsyncSender<Message>,
@@ -172,16 +162,30 @@ pub struct Client<S: AppState> {
 impl<S: AppState> Client<S> {
     // In a real implementation, this would be created by the builder.
     pub fn new(
+        signal: Signals,
         runner_command_tx: AsyncSender<RunnerCommand>,
         state: Arc<S>,
         sender: AsyncSender<Message>,
     ) -> Self {
         Self {
+            signal,
             state,
             module_handles: Arc::new(RwLock::new(HashMap::new())),
             runner_command_tx,
             to_ws_sender: sender,
         }
+    }
+
+    /// Waits until the client is connected to the WebSocket server.
+    /// This method will block until the connection is established.
+    /// It is useful for ensuring that the client is ready to send and receive messages.
+    pub async fn wait_connected(&self) {
+        self.signal.wait_connected().await
+    }
+
+    /// Checks if the client is connected to the WebSocket server.
+    pub fn is_connected(&self) -> bool {
+        self.signal.is_connected()
     }
 
     /// Retrieves a clonable, typed handle to an already-registered module.
@@ -271,6 +275,8 @@ impl<S: AppState> Client<S> {
 /// - Ensures proper cleanup of tasks and state on disconnect or shutdown.
 /// - Prints status messages for key events and errors.
 pub struct ClientRunner<S: AppState> {
+    /// Notify the client of connection status changes.
+    pub(crate) signal: Signals,
     pub(crate) connector: Arc<dyn Connector<S>>,
     pub(crate) router: Arc<Router<S>>,
     pub(crate) state: Arc<S>,
@@ -335,6 +341,7 @@ impl<S: AppState> ClientRunner<S> {
             // 🎯 MIDDLEWARE HOOK: on_connect - called after successful connection
             // Location: After WebSocket connection is established
             info!(target: "Runner", "Connection successful.");
+            self.signal.set_connected();
             self.router.middleware_stack.on_connect(&middleware_context).await;
             
             // Execute the correct callback.
@@ -352,7 +359,7 @@ impl<S: AppState> ClientRunner<S> {
             } else {
                 // Handle any error from on_reconnect
                 if let Err(err) =
-                    (self.connection_callback.on_reconnect)(self.state.clone(), &self.to_ws_sender)
+                    self.connection_callback.on_reconnect.call(self.state.clone(), &self.to_ws_sender)
                         .await
                 {
                     warn!(
@@ -434,6 +441,7 @@ impl<S: AppState> ClientRunner<S> {
                                 if let Some(reader_task) = reader_task_opt.take() {
                                     reader_task.abort();
                                 }
+                                self.signal.set_disconnected();
                                 session_active = false;
                             },
                             RunnerCommand::Shutdown => {
@@ -457,6 +465,7 @@ impl<S: AppState> ClientRunner<S> {
                                 if let Some(reader_task) = reader_task_opt.take() {
                                     reader_task.abort();
                                 }
+                                self.signal.set_disconnected();
                                 session_active = false;
                             }
                             _ => {}
@@ -481,6 +490,7 @@ impl<S: AppState> ClientRunner<S> {
                             // Already finished, but abort for completeness
                             reader_task.abort();
                         }
+                        self.signal.set_disconnected();
                         session_active = false;
                         // panic!("Connection lost unexpectedly, exiting session loop. Duration: {:?}", temporal_timer.elapsed());
                     }

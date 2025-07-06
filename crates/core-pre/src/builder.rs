@@ -11,15 +11,17 @@ use tokio::task::JoinSet;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{error, info, warn};
 
-use crate::client::{Client, ClientRunner, ConnectionCallback, LightweightHandler, Router};
+use crate::callback::{ConnectionCallback, ReconnectCallbackStack};
+use crate::client::{Client, ClientRunner, LightweightHandler, Router};
 use crate::connector::Connector;
 use crate::error::{CoreError, CoreResult};
 use crate::middleware::{WebSocketMiddleware, MiddlewareStack};
-use crate::traits::{ApiModule, AppState, LightweightModule};
+use crate::signals::Signals;
+use crate::traits::{ApiModule, AppState, LightweightModule, ReconnectCallback};
 
 type HandlerMap = Arc<RwLock<HashMap<TypeId, Box<dyn Any + Send + Sync>>>>;
 type HandlersFn<S> =
-    Box<dyn FnOnce(&mut Router<S>, &mut JoinSet<()>, HandlerMap, AsyncSender<Message>)>;
+    Box<dyn FnOnce(&mut Router<S>, &mut JoinSet<()>, HandlerMap, AsyncSender<Message>, &mut ReconnectCallbackStack<S>)>;
 
 type LightweightHandlersFn<S> = Box<dyn FnOnce(&mut Router<S>, AsyncSender<Message>)>;
 
@@ -44,7 +46,7 @@ impl<S: AppState> ClientBuilder<S> {
             // Provide empty default callbacks.
             connection_callback: ConnectionCallback {
                 on_connect: Box::new(|_, _| Box::pin(async { Ok(()) })),
-                on_reconnect: Box::new(|_, _| Box::pin(async { Ok(()) })),
+                on_reconnect: ReconnectCallbackStack::default(),
             },
             lightweight_handlers: Vec::new(),
             module_factories: Vec::new(),
@@ -71,15 +73,9 @@ impl<S: AppState> ClientBuilder<S> {
     /// Sets the callback for subsequent reconnections.
     pub fn on_reconnect(
         mut self,
-        callback: impl Fn(
-            Arc<S>,
-            &AsyncSender<Message>,
-        ) -> futures_util::future::BoxFuture<'static, CoreResult<()>>
-        + Send
-        + Sync
-        + 'static,
+        callback: Box<dyn ReconnectCallback<S> + Send + Sync + 'static>,
     ) -> Self {
-        self.connection_callback.on_reconnect = Box::new(callback);
+        self.connection_callback.on_reconnect.add_layer(callback);
         self
     }
 
@@ -156,7 +152,8 @@ impl<S: AppState> ClientBuilder<S> {
         let factory = |router: &mut Router<S>,
                        join_set: &mut JoinSet<()>,
                        handles: Arc<RwLock<HashMap<TypeId, Box<dyn Any + Send + Sync>>>>,
-                       to_ws_tx: AsyncSender<Message>| {
+                       to_ws_tx: AsyncSender<Message>,
+                       reconnect_callback_stack: &mut ReconnectCallbackStack<S>| {
             let (cmd_tx, cmd_rx) = bounded_async(32);
             let (cmd_ret_tx, cmd_ret_rx) = bounded_async(32);
             let (msg_tx, msg_rx) = bounded_async(256);
@@ -170,8 +167,20 @@ impl<S: AppState> ClientBuilder<S> {
                     .await
                     .insert(TypeId::of::<M>(), Box::new(handle));
             });
-
+            
             let state = router.state.clone();
+            let m_temp = M::new(state.clone(), cmd_rx.clone(), cmd_ret_tx.clone(), msg_rx.clone(), to_ws_tx.clone());
+            match m_temp.callback() {
+                Ok(Some(callback)) => {
+                    reconnect_callback_stack.add_layer(callback);
+                }
+                Ok(None) => {
+                    // No callback needed, continue.
+                }
+                Err(e) => {
+                    error!(target: "ApiModule", "Failed to get callback for module {}: {:?}", type_name::<M>(), e);
+                }
+            }
             router.spawn_module(async move {
                 let mut failures = 0;
                 let mut last_fail = Instant::now().checked_sub(Duration::from_secs(3600)).unwrap_or(Instant::now());
@@ -345,8 +354,8 @@ impl<S: AppState> ClientBuilder<S> {
     pub async fn build(self) -> CoreResult<(Client<S>, ClientRunner<S>)> {
         let (runner_cmd_tx, runner_cmd_rx) = bounded_async(8);
         let (to_ws_tx, to_ws_rx) = bounded_async(256);
-
-        let client = Client::new(runner_cmd_tx, self.state.clone(), to_ws_tx.clone());
+        let signals = Signals::default();
+        let client = Client::new(signals.clone(), runner_cmd_tx, self.state.clone(), to_ws_tx.clone());
 
         let mut router = Router::new(self.state.clone());
         router.lightweight_handlers = self.lightweight_handlers;
@@ -354,12 +363,14 @@ impl<S: AppState> ClientBuilder<S> {
 
         let mut join_set = JoinSet::new();
         // Execute all the deferred module setup functions.
+        let mut connection_callback = self.connection_callback;
         for factory in self.module_factories {
             factory(
                 &mut router,
                 &mut join_set,
                 client.module_handles.clone(),
                 to_ws_tx.clone(),
+                &mut connection_callback.on_reconnect
             );
         }
 
@@ -379,6 +390,7 @@ impl<S: AppState> ClientBuilder<S> {
         }
 
         let runner = ClientRunner {
+            signal: signals,
             connector: self.connector,
             state: self.state,
             router: Arc::new(router),
@@ -387,7 +399,7 @@ impl<S: AppState> ClientBuilder<S> {
             to_ws_sender: to_ws_tx,
             to_ws_receiver: to_ws_rx,
             runner_command_rx: runner_cmd_rx,
-            connection_callback: self.connection_callback,
+            connection_callback,
         };
 
         Ok((client, runner))
