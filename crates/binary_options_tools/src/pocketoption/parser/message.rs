@@ -101,6 +101,9 @@ impl WebSocketMessage {
                 if let Ok(stream) = from_str::<UpdateStream>(&data) {
                     return Self::UpdateStream(stream);
                 }
+                if let Ok(stream) = from_str::<LoadHistoryPeriodResult>(&data) {
+                    return Self::LoadHistoryPeriod(stream);
+                }
             }
             MessageInfo::UpdateHistoryNew => {
                 if let Ok(history) = from_str::<UpdateHistoryNewFast>(&data) {
