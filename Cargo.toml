@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
 
+exclude = [
+    "BinaryOptionsToolsJs"
+]
+
 members = [
     "crates/binary_options_tools",
     "crates/core", "crates/core-pre",
