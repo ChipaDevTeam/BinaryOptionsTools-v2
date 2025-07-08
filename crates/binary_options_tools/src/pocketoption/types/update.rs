@@ -36,7 +36,18 @@ pub struct LoadHistoryPeriodResult {
 pub enum Candle {
     Raw(RawCandle),
     Processed(ProcessedCandle),
+    ProcessedNew(ProcessedCandleNew),
     Update(UpdateCandle),
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ProcessedCandleNew {
+    symbol_id: i32,
+    time: i64, // use i64 for timestamp to avoid precision issues
+    open: f64,
+    close: f64,
+    high: f64,
+    low: f64,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -154,6 +165,13 @@ impl From<&Candle> for DataCandle {
             Candle::Raw(candle) => Self::new_price(candle.time, candle.price),
             Candle::Processed(candle) => Self::new(
                 candle.time,
+                candle.open,
+                candle.close,
+                candle.high,
+                candle.low,
+            ),
+            Candle::ProcessedNew(candle) => Self::new(
+                DateTime::from_timestamp(candle.time, 0).expect("REASON"),
                 candle.open,
                 candle.close,
                 candle.high,
