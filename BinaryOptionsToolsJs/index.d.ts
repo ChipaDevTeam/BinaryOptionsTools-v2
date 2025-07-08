@@ -281,6 +281,26 @@ export declare class PocketOption {
    */
   getCandles(asset: string, period: number, offset: number): Promise<any>
   /**
+   * Retrieves historical candle data for an asset with time
+   *
+   * # Arguments
+   * * `asset` - The trading asset/symbol (e.g., "EUR/USD")
+   * * `time` - The UNIX timestamp for the start of the candle data
+   * * `period` - The candle period in seconds
+   * * `offset` - Time offset for historical data
+   *
+   * # Returns
+   * A JSON string containing the candle data
+   *
+   * # Examples
+   * ```javascript
+   * const candles = await client.getCandlesAdvanced("EUR/USD", 1751925016, 60, 6000);
+   * const data = JSON.parse(candles);
+   * console.log(`Retrieved ${data.length} candles`);
+   * ```
+   */
+  getCandlesAdvanced(asset: string, time: number, period: number, offset: number): Promise<any>
+  /**
    * Retrieves the current account balance.
    *
    * # Returns
@@ -558,6 +578,8 @@ export declare class PocketOption {
    * ```
    */
   createRawIterator(message: string, validator: Validator, timeout?: number | undefined | null): Promise<RawStreamIterator>
+  /** Returns the current server time as a UNIX timestamp */
+  getServerTime(): Promise<number>
 }
 /**
  * A validator for WebSocket messages that provides various matching strategies.

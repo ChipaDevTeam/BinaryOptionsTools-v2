@@ -278,6 +278,33 @@ impl PocketOption {
         serde_json::to_value(&res).map_err(|e| Error::from_reason(e.to_string()))
     }
 
+    /// Retrieves historical candle data for an asset with time
+    ///
+    /// # Arguments
+    /// * `asset` - The trading asset/symbol (e.g., "EUR/USD")
+    /// * `time` - The UNIX timestamp for the start of the candle data
+    /// * `period` - The candle period in seconds
+    /// * `offset` - Time offset for historical data
+    ///
+    /// # Returns
+    /// A JSON string containing the candle data
+    ///
+    /// # Examples
+    /// ```javascript
+    /// const candles = await client.getCandlesAdvanced("EUR/USD", 1751925016, 60, 6000);
+    /// const data = JSON.parse(candles);
+    /// console.log(`Retrieved ${data.length} candles`);
+    /// ```
+    #[napi]
+    pub async fn get_candles_advanced(&self, asset: String, time: i64, period: i64, offset: i64) -> Result<Value> {
+        let res = self
+            .client
+            .get_candles_advanced(asset, time, period, offset)
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        serde_json::to_value(&res).map_err(|e| Error::from_reason(e.to_string()))
+    }
+
     /// Retrieves the current account balance.
     ///
     /// # Returns
