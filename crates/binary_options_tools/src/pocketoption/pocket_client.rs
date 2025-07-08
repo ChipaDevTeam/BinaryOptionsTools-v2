@@ -57,17 +57,18 @@ use super::{
 /// Basic usage:
 /// ```rust
 /// use binary_options_tools::pocketoption::pocket_client::PocketOption;
+/// use futures_util::StreamExt;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     // Initialize client with session ID
-///     let client = PocketOption::new("your-ssid-here").await?;
+/// let client = PocketOption::new("your-ssid-here").await?;
 ///
 ///     // Execute a trade
 ///     let trade = client.buy("EURUSD", 100.0, 60).await?;
 ///
 ///     // Check trade result
-///     let result = client.check_win(&trade.id).await?;
+///     let result = client.check_results(trade.0).await?;
 ///
 ///     // Stream market data
 ///     let stream = client.subscribe_symbol("EURUSD").await?;
@@ -121,7 +122,10 @@ impl PocketOption {
     ///
     /// # Examples
     /// ```rust
-    /// let client = PocketOption::new("your-session-id").await?;
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;
+    /// async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    /// }
     /// ```
     pub async fn new(ssid: impl ToString) -> PocketResult<Self> {
         let ssid = Ssid::parse(ssid).map_err(|e| PocketOptionError::SsidParsingError(e.to_string()))?;
@@ -157,8 +161,13 @@ impl PocketOption {
     /// # Examples
     /// ```rust
     /// use url::Url;
-    /// let url = Url::parse("wss://custom.pocketoption.com/websocket")?;
-    /// let client = PocketOption::new_with_url("your-session-id", url).await?;
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;
+    ///
+    /// async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let url = Url::parse("wss://custom.pocketoption.com/websocket")?;
+    ///     let client = PocketOption::new_with_url("your-session-id", url).await?;
+    /// }
     /// ```
     pub async fn new_with_url(ssid: impl ToString, url: Url) -> PocketResult<Self> {
         let ssid = Ssid::parse(ssid).map_err(|e| PocketOptionError::SsidParsingError(e.to_string()))?;
@@ -192,15 +201,6 @@ impl PocketOption {
     ///
     /// # Returns
     /// A Result containing the initialized PocketOption client or an error
-    ///
-    /// # Examples
-    /// ```rust
-    /// let config = Config::new(timeout, vec![], Box::new(()))
-    ///     .builder()
-    ///     .reconnect_time(5)
-    ///     .build()?;
-    /// let client = PocketOption::new_with_config("your-session-id", config).await?;
-    /// ```
     pub async fn new_with_config(
         ssid: impl ToString,
         config: Config<PocketData, WebSocketMessage, ()>,
@@ -236,7 +236,13 @@ impl PocketOption {
     ///
     /// # Examples
     /// ```rust
-    /// let (trade_id, deal) = client.trade("EURUSD", Action::Call, 100.0, 60).await?;
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;
+    /// use binary_options_tools::pocketoption::types::order::Action;
+    ///
+    /// async fn main() {
+    ///   let client = PocketOption::new("your-session-id").await?;
+    ///   let (trade_id, deal) = client.trade("EURUSD", Action::Call, 100.0, 60).await?;
+    /// }
     /// ```
     pub async fn trade(
         &self,
@@ -284,7 +290,11 @@ impl PocketOption {
     ///
     /// # Examples
     /// ```rust
-    /// let (trade_id, deal) = client.buy("EURUSD", 100.0, 60).await?;
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;
+    /// async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let (trade_id, deal) = client.buy("EURUSD", 100.0, 60).await?;
+    /// }
     /// ```
     pub async fn buy(
         &self,
@@ -308,7 +318,11 @@ impl PocketOption {
     ///
     /// # Examples
     /// ```rust
-    /// let (trade_id, deal) = client.sell("EURUSD", 100.0, 60).await?;
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;
+    /// async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let (trade_id, deal) = client.sell("EURUSD", 100.0, 60).await?;
+    /// }
     /// ```
     pub async fn sell(
         &self,
@@ -366,8 +380,13 @@ impl PocketOption {
     ///
     /// # Examples
     /// ```rust
-    /// let result = client.check_results(trade_id).await?;
-    /// println!("Trade profit: {}", result.profit);
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;
+    /// async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let trade_id = "your-trade-id-here".parse().unwrap();
+    ///     let result = client.check_results(trade_id).await?;
+    ///     println!("Trade profit: {}", result.profit);
+    /// }
     /// ```
     pub async fn check_results(&self, trade_id: Uuid) -> PocketResult<Deal> {
         info!(target: "CheckResults", "Checking results for trade of id {}", trade_id);
@@ -492,7 +511,11 @@ impl PocketOption {
     ///
     /// # Examples
     /// ```rust
-    /// let candles = client.get_candles("EURUSD", 60, 0).await?; // Get current minute candles
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;
+    /// async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let candles = client.get_candles("EURUSD", 60, 0).await?; // Get current minute candles
+    /// }
     /// ```
     pub async fn get_candles(
         &self,
@@ -515,7 +538,11 @@ impl PocketOption {
     ///
     /// # Examples
     /// ```rust
-    /// let recent_data = client.history("EURUSD", 60).await?; // Get recent minute data
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;
+    /// async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let recent_data = client.history("EURUSD", 60).await?; // Get recent minute data
+    /// }
     /// ```
     pub async fn history(
         &self,
@@ -583,9 +610,14 @@ impl PocketOption {
     ///
     /// # Examples
     /// ```rust
-    /// let stream = client.subscribe_symbol("EURUSD").await?;
-    /// while let Some(update) = stream.next().await {
-    ///     println!("New price: {:?}", update);
+    ///  use binary_options_tools::pocketoption::pocket_client::PocketOption;
+    ///  use futures_util::StreamExt;
+    ///  async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let stream = client.subscribe_symbol("EURUSD").await?;
+    ///     while let Some(update) = stream.to_stream().next().await {
+    ///         println!("New price: {:?}", update);
+    ///     }
     /// }
     /// ```
     pub async fn subscribe_symbol(&self, asset: impl ToString) -> PocketResult<StreamAsset> {
@@ -618,8 +650,12 @@ impl PocketOption {
     ///
     /// # Examples
     /// ```rust
-    /// let stream = client.subscribe_symbol_chuncked("EURUSD", 5).await?;
-    /// // Will receive updates in groups of 5
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;
+    /// async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let stream = client.subscribe_symbol_chuncked("EURUSD", 5.into()).await?;
+    ///     // Will receive updates in groups of 5
+    /// }
     /// ```
     pub async fn subscribe_symbol_chuncked(
         &self,
@@ -660,8 +696,12 @@ impl PocketOption {
     /// # Examples
     /// ```rust
     /// use std::time::Duration;
-    /// let stream = client.subscribe_symbol_timed("EURUSD", Duration::from_secs(5)).await?;
-    /// // Will receive updates every 5 seconds
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;
+    /// async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let stream = client.subscribe_symbol_timed("EURUSD", Duration::from_secs(5)).await?;
+    ///     // Will receive updates every 5 seconds
+    /// }
     /// ```
     pub async fn subscribe_symbol_timed(
         &self,
@@ -700,7 +740,11 @@ impl PocketOption {
     ///
     /// # Examples
     /// ```rust
-    /// client.send_raw_message(r#"42["signals/subscribe"]"#).await?;
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;
+    /// async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     client.send_raw_message(r#"42["signals/subscribe"]"#).await?;
+    /// }
     /// ```
     pub async fn send_raw_message(&self, message: impl ToString) -> PocketResult<()> {
         self.client
@@ -720,11 +764,23 @@ impl PocketOption {
     ///
     /// # Examples
     /// ```rust
-    /// let validator = Box::new(RawValidator::starts_with(r#"42["signals/load""#));
-    /// let response = client.create_raw_order(
-    ///     r#"42["signals/subscribe"]"#,
-    ///     validator
-    /// ).await?;
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;    ///
+    /// use binary_options_tools::pocketoption::types::base::RawWebsocketMessage;
+    ///
+    /// fn raw_iterator() -> impl Fn(&RawWebsocketMessage) -> bool + Send + Sync {
+    ///      move |msg| {
+    ///          let msg = msg.to_string();
+    ///          msg.starts_with(r#"42["signals/load""#)
+    ///      }
+    ///  }
+    /// async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let validator = Box::new(raw_iterator());
+    ///     let response = client.create_raw_order(
+    ///         r#"42["signals/subscribe"]"#,
+    ///         validator
+    ///     ).await?;
+    /// }
     /// ```
     pub async fn create_raw_order(
         &self,
@@ -758,13 +814,24 @@ impl PocketOption {
     /// # Examples
     /// ```rust
     /// use std::time::Duration;
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;    ///
+    /// use binary_options_tools::pocketoption::types::base::RawWebsocketMessage;
     ///
-    /// let validator = Box::new(RawValidator::starts_with(r#"42["signals/load""#));
-    /// let response = client.create_raw_order_with_timeout(
-    ///     r#"42["signals/subscribe"]"#,
-    ///     validator,
-    ///     Duration::from_secs(5)
-    /// ).await?;
+    /// fn raw_iterator() -> impl Fn(&RawWebsocketMessage) -> bool + Send + Sync {
+    ///      move |msg| {
+    ///          let msg = msg.to_string();
+    ///          msg.starts_with(r#"42["signals/load""#)
+    ///      }
+    ///  }
+    /// async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let validator = Box::new(raw_iterator());
+    ///     let response = client.create_raw_order_with_timeout(
+    ///         r#"42["signals/subscribe"]"#,
+    ///         validator,
+    ///         Duration::from_secs(5)
+    ///     ).await?;
+    /// }
     /// ```
     pub async fn create_raw_order_with_timeout(
         &self,
@@ -799,13 +866,24 @@ impl PocketOption {
     /// # Examples
     /// ```rust
     /// use std::time::Duration;
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;    ///
+    /// use binary_options_tools::pocketoption::types::base::RawWebsocketMessage;
     ///
-    /// let validator = Box::new(RawValidator::starts_with(r#"42["signals/load""#));
-    /// let response = client.create_raw_order_with_timeout_and_retry(
-    ///     r#"42["signals/subscribe"]"#,
-    ///     validator,
-    ///     Duration::from_secs(5)
-    /// ).await?;
+    /// fn raw_iterator() -> impl Fn(&RawWebsocketMessage) -> bool + Send + Sync {
+    ///      move |msg| {
+    ///          let msg = msg.to_string();
+    ///          msg.starts_with(r#"42["signals/load""#)
+    ///      }
+    ///  }
+    /// async fn main() {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let validator = Box::new(raw_iterator());
+    ///     let response = client.create_raw_order_with_timeout_and_retry(
+    ///         r#"42["signals/subscribe"]"#,
+    ///         validator,
+    ///         Duration::from_secs(5)
+    ///     ).await?;
+    /// }
     /// ```
     pub async fn create_raw_order_with_timeout_and_retry(
         &self,
@@ -837,16 +915,29 @@ impl PocketOption {
     /// # Examples
     /// ```rust
     /// use std::time::Duration;
+    /// use binary_options_tools::pocketoption::pocket_client::PocketOption;    ///
+    /// use binary_options_tools::pocketoption::types::base::RawWebsocketMessage;
+    /// use futures_util::StreamExt;
     ///
-    /// let validator = Box::new(RawValidator::starts_with(r#"42["signals/load""#));
-    /// let stream = client.create_raw_iterator(
-    ///     r#"42["signals/subscribe"]"#,
-    ///     validator,
-    ///     Some(Duration::from_secs(60))
-    /// ).await?;
+    /// fn raw_iterator() -> impl Fn(&RawWebsocketMessage) -> bool + Send + Sync {
+    ///      move |msg| {
+    ///          let msg = msg.to_string();
+    ///          msg.starts_with(r#"42["signals/load""#)
+    ///      }
+    ///  }
+    /// async fn main() {
+    /// let client = PocketOption::new("your-session-id").await?;
+    ///     let validator = Box::new(raw_iterator());
+    ///     let stream = client.create_raw_iterator(
+    ///         r#"42["signals/subscribe"]"#,
+    ///         validator,
+    ///         Some(Duration::from_secs(60))
+    ///     ).
+    ///     await?;
     ///
-    /// while let Some(message) = stream.next().await {
-    ///     println!("Received: {}", message?);
+    ///     while let Some(message) = stream.to_stream().next().await {
+    ///         println!("Received: {}", message?);
+    ///     }
     /// }
     /// ```
     pub async fn create_raw_iterator(
@@ -1025,7 +1116,7 @@ mod tests {
     async fn test_check_win_v1() -> anyhow::Result<()> {
         start_tracing(true)?;
         let ssid = r#"42["auth",{"session":"t0mc6nefcv7ncr21g4fmtioidb","isDemo":1,"uid":90000798,"platform":2}]	"#;
-        let client = PocketOption::new(ssid).await.unwrap();
+        let client = PocketOption::new(ssid).await?;
         let mut test = 0;
         let mut checks = Vec::new();
         while test < 1000 {
@@ -1034,7 +1125,7 @@ mod tests {
                 let res = client.sell("EURUSD_otc", 1.0, 15).await?;
                 dbg!("Trade id: {}", res.0);
                 let m_client = client.clone();
-                let res: tokio::task::JoinHandle<Result<(), BinaryOptionsToolsError>> =
+                let res: JoinHandle<Result<(), BinaryOptionsToolsError>> =
                     tokio::spawn(async move {
                         let result = m_client.check_results(res.0).await?;
                         dbg!("Trade result: {}", result.profit);
@@ -1055,7 +1146,7 @@ mod tests {
     async fn test_check_win_v2() -> anyhow::Result<()> {
         start_tracing(true)?;
         let ssid = r#"42["auth",{"session":"t0mc6nefcv7ncr21g4fmtioidb","isDemo":1,"uid":90000798,"platform":2}]	"#;
-        let client = PocketOption::new(ssid).await.unwrap();
+        let client = PocketOption::new(ssid).await?;
         let times = [5, 15, 30, 60, 300];
         for time in times {
             info!("Checkind for an expiration of '{time}' seconds!");
@@ -1079,7 +1170,7 @@ mod tests {
     #[tokio::test]
     async fn test_check_win_v3() -> anyhow::Result<()> {
         let ssid = r#"42["auth",{"session":"t0mc6nefcv7ncr21g4fmtioidb","isDemo":1,"uid":90000798,"platform":2}]	"#;
-        let client = PocketOption::new(ssid).await.unwrap();
+        let client = PocketOption::new(ssid).await?;
         let times = [5, 15, 30, 60, 300];
         let assets = ["#AAPL_otc", "#MSFT_otc", "EURUSD_otc", "YERUSD_otc"];
         for asset in assets {
@@ -1125,7 +1216,7 @@ mod tests {
     async fn test_buy_check() -> anyhow::Result<()> {
         start_tracing(false)?;
         let ssid = r#"42["auth",{"session":"t0mc6nefcv7ncr21g4fmtioidb","isDemo":1,"uid":90000798,"platform":2}]	"#;
-        let client = PocketOption::new(ssid).await.unwrap();
+        let client = PocketOption::new(ssid).await?;
         let time_frames = [5, 15, 30, 60, 300];
         let assets = ["EURUSD_otc"];
         let mut rng = rng();
@@ -1169,7 +1260,7 @@ mod tests {
     async fn test_get_candles() -> anyhow::Result<()> {
         let ssid = r#"42["auth",{"session":"t0mc6nefcv7ncr21g4fmtioidb","isDemo":1,"uid":90000798,"platform":2}]	"#;
         // time: 1733040000, offset: 540000, period: 3600
-        let client = PocketOption::new(ssid).await.unwrap();
+        let client = PocketOption::new(ssid).await?;
         let mut last_candles = Vec::new();
         for i in 0..10 {
             let candles = client.get_candles("EURUSD_otc", 60, 6000).await?;
@@ -1184,7 +1275,7 @@ mod tests {
     async fn test_history() -> anyhow::Result<()> {
         let ssid = r#"42["auth",{"session":"t0mc6nefcv7ncr21g4fmtioidb","isDemo":1,"uid":90000798,"platform":2}]	"#;
         // time: 1733040000, offset: 540000, period: 3600
-        let client = PocketOption::new(ssid).await.unwrap();
+        let client = PocketOption::new(ssid).await?;
         for i in 0..1000 {
             let candles = client.history("EURUSD_otc", 6000).await?;
             println!("Candles n°{} len: {}, ", i + 1, candles.len());
