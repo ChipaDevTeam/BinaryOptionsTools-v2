@@ -13,8 +13,9 @@ use tracing::info;
 #[derive(Debug)]
 struct ExampleState;
 
+#[async_trait]
 impl AppState for ExampleState {
-    fn clear_temporal_data(&self) {}
+    async fn clear_temporal_data(&self) {}
 }
 
 // Example statistics middleware
@@ -171,6 +172,7 @@ impl ApiModule<ExampleState> for ExampleModule {
     fn create_handle(
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
+        
     ) -> Self::Handle {
         ExampleHandle { sender, receiver }
     }

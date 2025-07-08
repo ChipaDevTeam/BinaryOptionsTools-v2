@@ -9,8 +9,9 @@ use tokio_tungstenite::tungstenite::Message;
 #[derive(Debug)]
 struct TestState;
 
+#[async_trait]
 impl AppState for TestState {
-    fn clear_temporal_data(&self) {}
+    async fn clear_temporal_data(&self) {}
 }
 
 struct TestMiddleware {

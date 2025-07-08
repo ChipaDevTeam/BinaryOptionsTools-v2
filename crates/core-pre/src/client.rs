@@ -433,7 +433,7 @@ impl<S: AppState> ClientRunner<S> {
                                 }
 
 
-                                self.state.clear_temporal_data();
+                                self.state.clear_temporal_data().await;
                                 self.is_hard_disconnect = true;
                                 if let Some(writer_task) = writer_task_opt.take() {
                                     writer_task.abort();

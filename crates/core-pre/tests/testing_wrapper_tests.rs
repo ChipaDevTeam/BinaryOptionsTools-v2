@@ -51,6 +51,7 @@ impl ApiModule<()> for TestModule {
     fn create_handle(
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
+        
     ) -> Self::Handle {
         TestHandle { sender, receiver }
     }

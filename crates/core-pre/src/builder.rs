@@ -158,6 +158,7 @@ impl<S: AppState> ClientBuilder<S> {
             let (cmd_ret_tx, cmd_ret_rx) = bounded_async(32);
             let (msg_tx, msg_rx) = bounded_async(256);
 
+            let state = router.state.clone();
             let handle = M::create_handle(cmd_tx, cmd_ret_rx);
 
             // Must spawn this write to avoid blocking if called from an async context.
@@ -168,7 +169,6 @@ impl<S: AppState> ClientBuilder<S> {
                     .insert(TypeId::of::<M>(), Box::new(handle));
             });
             
-            let state = router.state.clone();
             let m_temp = M::new(state.clone(), cmd_rx.clone(), cmd_ret_tx.clone(), msg_rx.clone(), to_ws_tx.clone());
             match m_temp.callback() {
                 Ok(Some(callback)) => {

@@ -103,7 +103,7 @@ pub struct Asset {
     pub in8: i32,
     pub arr: Vec<String>,
     pub in9: i64,
-    pub val: bool,
+    pub valid: bool,
     pub times: Vec<TimeCandle>,
     pub in10: i32,
     pub in11: i32,

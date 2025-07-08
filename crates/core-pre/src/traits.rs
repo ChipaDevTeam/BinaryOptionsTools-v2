@@ -7,13 +7,15 @@ use tokio_tungstenite::tungstenite::Message;
 use crate::error::CoreResult;
 
 /// The contract for the application's shared state.
+#[async_trait]
 pub trait AppState: Send + Sync + 'static {
     /// Clears any temporary data from the state, called on a manual disconnect.
-    fn clear_temporal_data(&self);
+    async fn clear_temporal_data(&self);
 }
 
+#[async_trait]
 impl AppState for () {
-    fn clear_temporal_data(&self) {
+    async fn clear_temporal_data(&self) {
         // Default implementation does nothing.
     }
 }

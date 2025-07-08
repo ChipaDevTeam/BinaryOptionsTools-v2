@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use binary_options_tools_core::reimports::Message;
-use binary_options_tools_core_pre::{error::CoreResult, reimports::{AsyncReceiver, AsyncSender}, traits::{LightweightModule, Rule}};
+use binary_options_tools_core_pre::{error::{CoreError, CoreResult}, reimports::{AsyncReceiver, AsyncSender}, traits::{LightweightModule, Rule}};
 use serde::Deserialize;
 use serde_json::Value;
 use tracing::{debug, warn};
@@ -49,7 +49,7 @@ impl LightweightModule<State> for BalanceModule {
             if let Message::Binary(text) = &*msg {
                 if let Ok(balance_msg) = serde_json::from_slice::<BalanceMessage>(text) {
                     debug!("Received balance message: {:?}", balance_msg);
-                    self.state.set_balance(balance_msg.balance)?;
+                    self.state.set_balance(balance_msg.balance).await;
                     // If you want to handle demo/live balance differently, you can add logic here
                     // For example, if you had a field to distinguish between demo and live:
                     // if balance_msg.is_demo == 1 {
@@ -62,7 +62,7 @@ impl LightweightModule<State> for BalanceModule {
                 }
             }
         }
-        Ok(())
+        Err(CoreError::LightweightModuleLoop("BalanceModule".into()))
     }
 
     fn rule() -> Box<dyn Rule + Send + Sync> {
