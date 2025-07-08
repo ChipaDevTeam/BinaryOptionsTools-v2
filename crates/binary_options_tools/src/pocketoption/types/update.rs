@@ -170,13 +170,20 @@ impl From<&Candle> for DataCandle {
                 candle.high,
                 candle.low,
             ),
-            Candle::ProcessedNew(candle) => Self::new(
-                DateTime::from_timestamp(candle.time, 0).expect("REASON"),
-                candle.open,
-                candle.close,
-                candle.high,
-                candle.low,
-            ),
+            Candle::ProcessedNew(candle) => {
+                let timestamp = DateTime::from_timestamp(candle.time, 0)
+                    .unwrap_or_else(|| {
+                        eprintln!("Invalid timestamp {}, using current time", candle.time);
+                        Utc::now()
+                    });
+                Self::new(
+                    timestamp,
+                    candle.open,
+                    candle.close,
+                    candle.high,
+                    candle.low,
+                )
+            },
             Candle::Update(candle) => Self::new_price(candle.time, candle.price),
         }
     }
