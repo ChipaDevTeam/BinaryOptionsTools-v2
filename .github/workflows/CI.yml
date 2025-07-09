@@ -44,9 +44,10 @@ jobs:
       - name: Setup cross-compilation for armv7
         if: matrix.platform.target == 'armv7'
         run: |
+          sudo dpkg --add-architecture armhf
           sudo apt-get update
           sudo apt-get install -y gcc-arm-linux-gnueabihf libssl-dev:armhf pkg-config
-          
+
           echo "OPENSSL_DIR=/usr/arm-linux-gnueabihf" >> $GITHUB_ENV
           echo "PKG_CONFIG_PATH=/usr/arm-linux-gnueabihf/pkgconfig" >> $GITHUB_ENV
           echo "CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV

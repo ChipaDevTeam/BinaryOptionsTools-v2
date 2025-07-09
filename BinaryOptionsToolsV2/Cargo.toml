@@ -5,7 +5,7 @@ edition = "2021"
 description = "A library to connect to PocketOption using python with async and sync support."
 license = "BSD License (BSD)"
 homepage = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
-readme = "Readme.md"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
