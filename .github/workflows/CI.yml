@@ -49,13 +49,12 @@ jobs:
             build-essential \
             pkg-config \
             zlib1g-dev \
-            libssl-dev \
-            perl
+            libssl-dev
           
-#          # Tell openssl-sys to use the system-installed OpenSSL
-#          echo "OPENSSL_NO_VENDOR=1" >> $GITHUB_ENV
-#          # if you need static linkage, keep this; otherwise you can omit
-#          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
+          # Tell openssl-sys to use the system-installed OpenSSL
+          echo "OPENSSL_NO_VENDOR=1" >> $GITHUB_ENV
+          # if you need static linkage, keep this; otherwise you can omit
+          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
 
       - name: Configure vendored OpenSSL for armv7
         if: matrix.platform.target == 'armv7'
