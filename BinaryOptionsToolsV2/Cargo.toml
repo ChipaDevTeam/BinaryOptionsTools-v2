@@ -29,3 +29,5 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 chrono = "0.4.41"
 url = "2.5.4"
 regex = "1.11.1"
+
+openssl = { version = "0.10", features = ["vendored"] }
