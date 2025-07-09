@@ -44,12 +44,19 @@ jobs:
       - name: Configure vendored OpenSSL for armv7
         if: matrix.platform.target == 'armv7'
         run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabihf
+          
+          # Force openssl-sys to build vendored OpenSSL
           echo "OPENSSL_NO_VENDOR=0" >> $GITHUB_ENV
           echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
-          echo "CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
+          
+          # Use the cross-compiler as CC and tell Cargo to use it
+          echo "CC=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
+          echo "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
+
       - name: Install perl dependencies for OpenSSL
         run: |
-          # Install Perl and required modules for OpenSSL build
           sudo apt-get update
           sudo apt-get install -y perl make cpanminus libssl-dev
           sudo cpanm IPC::Cmd Locale::Maketext::Simple Text::Template Params::Check
