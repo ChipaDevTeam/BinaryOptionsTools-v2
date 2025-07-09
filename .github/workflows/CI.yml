@@ -40,6 +40,23 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
+      # 🛠 Install ARM toolchain and OpenSSL for armv7
+      - name: Setup cross-compilation for armv7
+        if: matrix.platform.target == 'armv7'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabihf libssl-dev:armhf pkg-config
+          
+          echo "OPENSSL_DIR=/usr/arm-linux-gnueabihf" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=/usr/arm-linux-gnueabihf/pkgconfig" >> $GITHUB_ENV
+          echo "CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
+          echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+
+        # 🛠 Enable vendored OpenSSL for all platforms as fallback
+      - name: Set OPENSSL vendored fallback
+        run: |
+          echo "OPENSSL_NO_VENDOR=0" >> $GITHUB_ENV
+          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
       - name: Build wheels
         uses: PyO3/maturin-action@v1
 
