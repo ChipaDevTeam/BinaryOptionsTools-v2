@@ -142,6 +142,7 @@ jobs:
           name: wheels-windows-${{ matrix.platform.target }}
           path: BinaryOptionsToolsV2/dist
       - name: Publish
+        if: ${{ secrets.PYPI_API_TOKEN != '' }}
         run:
           maturin publish -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
 
@@ -176,6 +177,7 @@ jobs:
           name: wheels-macos-${{ matrix.platform.target }}
           path: BinaryOptionsToolsV2/dist
       - name: Publish
+        if: ${{ secrets.PYPI_API_TOKEN != '' }}
         run:
           maturin publish -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
 
@@ -216,6 +218,7 @@ jobs:
         with:
           python-version: 3.x
       - name: Publish to PyPi
+        if: ${{ secrets.PYPI_API_TOKEN != '' }}
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
