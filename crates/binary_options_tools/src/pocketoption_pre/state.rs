@@ -237,18 +237,63 @@ pub struct TradeState {
 }
 
 impl TradeState {
+    /// Adds a new opened deal.
+    pub async fn add_opened_deal(&self, deal: Deal) {
+        self.opened_deals.write().await.insert(deal.id, deal);
+    }
+
     /// Adds or updates deals in the opened_deals map.
     pub async fn update_opened_deals(&self, deals: Vec<Deal>) {
         // TODO: Implement the logic to update the opened deals map.
+        self.opened_deals.write().await.extend(deals.into_iter().map(|deal| (deal.id, deal)));
     }
 
     /// Moves deals from opened to closed and adds new closed deals.
     pub async fn update_closed_deals(&self, deals: Vec<Deal>) {
         // TODO: Implement the logic to update opened and closed deal maps.
+        let ids = deals.iter().map(|deal| deal.id).collect::<Vec<_>>();
+        self.opened_deals.write().await.retain(|id, _| !ids.contains(id));
+        self.closed_deals.write().await.extend(deals.into_iter().map(|deal| (deal.id, deal)));
     }
 
     /// Removes all deals from the closed_deals map.
     pub async fn clear_closed_deals(&self) {
-        // TODO: Implement the logic to clear the closed deals map.
+        self.closed_deals.write().await.clear();
     }
+
+    /// Clears all opened deals.
+    pub async fn clear_opened_deals(&self) {
+        self.opened_deals.write().await.clear();
+    }
+
+    /// Retrieves all opened deals.
+    pub async fn get_opened_deals(&self) -> HashMap<Uuid, Deal> {
+        self.opened_deals.read().await.clone()
+    }
+
+    /// Retrieves all closed deals.
+    pub async fn get_closed_deals(&self) -> HashMap<Uuid, Deal> {
+        self.closed_deals.read().await.clone()
+    }
+
+    /// Checks if a deal with the given ID exists in opened deals.
+    pub async fn contains_opened_deal(&self, deal_id: Uuid) -> bool {
+        self.opened_deals.read().await.contains_key(&deal_id)
+    }
+
+    /// Checks if a deal with the given ID exists in closed deals.
+    pub async fn contains_closed_deal(&self, deal_id: Uuid) -> bool {
+        self.closed_deals.read().await.contains_key(&deal_id)
+    }
+
+        /// Retrieves an opened deal by its ID.
+    pub async fn get_opened_deal(&self, deal_id: Uuid) -> Option<Deal> {
+        self.opened_deals.read().await.get(&deal_id).cloned()
+    }
+    
+    /// Retrieves a closed deal by its ID.
+    pub async fn get_closed_deal(&self, deal_id: Uuid) -> Option<Deal> {
+        self.closed_deals.read().await.get(&deal_id).cloned()
+    }
+
 }

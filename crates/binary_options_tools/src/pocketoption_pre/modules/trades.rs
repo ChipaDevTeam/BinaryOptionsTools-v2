@@ -8,7 +8,7 @@ use binary_options_tools_core_pre::{
 };
 use serde::Deserialize;
 use tokio::select;
-use tracing::warn;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::pocketoption_pre::{
@@ -171,8 +171,10 @@ impl ApiModule<State> for TradesApiModule {
                             ServerResponse::Success(deal) => {
                                 // Handle successopenOrder.
                                 // Send CommandResponse::Success to command_responder.
+                                self.state.trade_state.add_opened_deal(*deal.clone()).await;
+                                info!(target: "TradesApiModule", "Trade opened: {}", deal.id);
                                 self.command_responder.send(CommandResponse::Success {
-                                    req_id: deal.request_id,
+                                    req_id: deal.request_id.unwrap_or_default(), // A request should always have a request_id, only for when returning updateOpenedDeals or updateClosedDeals it can not have any
                                     deal,
                                 }).await?;
                             }

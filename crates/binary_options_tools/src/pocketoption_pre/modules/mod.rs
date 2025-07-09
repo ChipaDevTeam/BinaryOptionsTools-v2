@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use binary_options_tools_core_pre::{error::CoreResult, reimports::Message};
-use tracing::debug;
 
 use crate::pocketoption_pre::state::State;
 
@@ -81,9 +80,9 @@ pub mod deals;
 ///
 /// ```rust
 /// // Add as a lightweight handler to the client
-/// client.add_lightweight_handler(print_handler);
+/// client.with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)));
 /// ```
 pub async fn print_handler(msg: Arc<Message>, _state: Arc<State>) -> CoreResult<()> {
-    debug!(target: "Lightweight", "Received: {msg:?}");
+    tracing::debug!(target: "Lightweight", "Received: {msg:?}");
     Ok(())
 }
