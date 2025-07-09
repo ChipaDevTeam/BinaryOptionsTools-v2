@@ -45,7 +45,7 @@ jobs:
             target: x86_64-unknown-linux-musl
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-alpine
             build: yarn build --target x86_64-unknown-linux-musl
-          - host: macos-latest # (arm64 processor)
+          - host: macos-15 # (arm64 processor, Apple Silicon)
             target: aarch64-apple-darwin
             build: yarn build --target aarch64-apple-darwin
           - host: ubuntu-latest
@@ -420,7 +420,7 @@ jobs:
     name: Build universal macOS binary
     needs:
       - build
-    runs-on: macos-latest
+    runs-on: macos-15 # (arm64 processor, Apple Silicon)
     steps:
       - uses: actions/checkout@v4
       - name: Setup node
