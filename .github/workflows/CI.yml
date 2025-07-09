@@ -41,6 +41,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
+
+      - name: Install system deps & use system OpenSSL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            pkg-config \
+            zlib1g-dev \
+            libssl-dev \
+            perl
+          
+          # Tell openssl-sys to use the system-installed OpenSSL
+          echo "OPENSSL_NO_VENDOR=1" >> $GITHUB_ENV
+          # if you need static linkage, keep this; otherwise you can omit
+          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
+          
       - name: Configure vendored OpenSSL for armv7
         if: matrix.platform.target == 'armv7'
         run: |
@@ -51,18 +67,18 @@ jobs:
           echo "CC=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
           echo "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
 
-      - name: Install perl dependencies for OpenSSL
-        run: |
-          
-          # Force openssl-sys to build vendored OpenSSL
-          echo "OPENSSL_NO_VENDOR=0" >> $GITHUB_ENV
-          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
-          
-          sudo apt-get update
-          sudo apt-get install -y \
-            perl make cpanminus libssl-dev pkg-config zlib1g-dev
-          # Use cpanminus to install all needed Perl modules
-          sudo cpanm IPC::Cmd Locale::Maketext::Simple Text::Template Params::Check
+      #      - name: Install perl dependencies for OpenSSL
+      #        run: |
+      #
+      #          # Force openssl-sys to build vendored OpenSSL
+      #          echo "OPENSSL_NO_VENDOR=0" >> $GITHUB_ENV
+      #          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
+      #
+      #          sudo apt-get update
+      #          sudo apt-get install -y \
+      #            perl make cpanminus libssl-dev pkg-config zlib1g-dev
+      #          # Use cpanminus to install all needed Perl modules
+      #          sudo cpanm IPC::Cmd Locale::Maketext::Simple Text::Template Params::Check
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -217,7 +233,7 @@ jobs:
       run:
         working-directory: BinaryOptionsToolsV2
 
-    needs: [macos, windows] # [macos, windows, linux, musllinux]
+    needs: [ macos, windows ] # [macos, windows, linux, musllinux]
     steps:
       - uses: actions/download-artifact@v3
         with:
@@ -232,6 +248,6 @@ jobs:
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ env.PYPI_API_TOKEN }}
-        run: 
+        run:
           uv pip install --upgrade twine
           twine upload --skip-existing *
