@@ -45,6 +45,14 @@ jobs:
         if: matrix.platform.target == 'armv7'
         run: |
           sudo dpkg --add-architecture armhf
+          
+          # point armhf repos at ports.ubuntu.com
+          sudo tee -a /etc/apt/sources.list <<EOF
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+          EOF
+          
           sudo apt-get update
           sudo apt-get install -y gcc-arm-linux-gnueabihf libssl-dev:armhf pkg-config
 
