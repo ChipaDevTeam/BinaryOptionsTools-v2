@@ -50,7 +50,7 @@ jobs:
         run: |
           # Install Perl and required modules for OpenSSL build
           sudo apt-get update
-          sudo apt-get install -y perl make cpanminus
+          sudo apt-get install -y perl make cpanminus libssl-dev
           sudo cpanm IPC::Cmd Locale::Maketext::Simple Text::Template Params::Check
       - name: Build wheels
         uses: PyO3/maturin-action@v1
