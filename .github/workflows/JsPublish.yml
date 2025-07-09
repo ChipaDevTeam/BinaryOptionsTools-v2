@@ -142,13 +142,13 @@ jobs:
           image: ${{ matrix.settings.docker }}
           options: >
             --user 0:0
-            # cache your cargo registry/git db from the JS folder as before
+            # cache your cargo registry/git db
             -v ${{ github.workspace }}/BinaryOptionsToolsJs/.cargo-cache/git/db:/usr/local/cargo/git/db
             -v ${{ github.workspace }}/BinaryOptionsToolsJs/.cargo/registry/cache:/usr/local/cargo/registry/cache
             -v ${{ github.workspace }}/BinaryOptionsToolsJs/.cargo/registry/index:/usr/local/cargo/registry/index
-            # mount the *entire* repo so cargo can see ../crates
-            -v ${{ github.workspace }}:/work
-            -w /work/BinaryOptionsToolsJs
+            # use the runner’s built-in mount of the whole repo at /github/workspace,
+            # then cd into the JS project folder:
+            -w /github/workspace/BinaryOptionsToolsJs
           run: ${{ matrix.settings.build }}
       - name: Build
         run: ${{ matrix.settings.build }}
