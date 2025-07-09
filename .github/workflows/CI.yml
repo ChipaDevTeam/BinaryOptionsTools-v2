@@ -46,7 +46,12 @@ jobs:
           echo "OPENSSL_NO_VENDOR=0" >> $GITHUB_ENV
           echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
           echo "CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
-
+          
+          # Install Perl and required modules for OpenSSL build
+          sudo apt-get update
+          sudo apt-get install -y perl make
+          # Optional: install missing Perl modules
+          sudo cpan IPC::Cmd Text::Template
       - name: Build wheels
         uses: PyO3/maturin-action@v1
 
