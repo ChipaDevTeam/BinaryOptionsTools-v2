@@ -58,8 +58,12 @@ jobs:
       - name: Install perl dependencies for OpenSSL
         run: |
           sudo apt-get update
-          sudo apt-get install -y perl make cpanminus libssl-dev
+          sudo apt-get install -y \
+            perl make cpanminus libssl-dev \
+            libipc-cmd-perl liblocale-maketext-simple-perl \
+            libtext-template-perl libparams-check-perl
           sudo cpanm IPC::Cmd Locale::Maketext::Simple Text::Template Params::Check
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
 
