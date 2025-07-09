@@ -29,7 +29,10 @@ pub enum CoreError {
     Other(String),
 
     #[error("Poison error: {0}")]
-    Poison(String)
+    Poison(String),
+
+    #[error("Serialization error: {0}")]
+    Serde(#[from] serde_json::Error),
 }
 
 pub type CoreResult<T> = std::result::Result<T, CoreError>;

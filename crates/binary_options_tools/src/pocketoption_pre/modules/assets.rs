@@ -8,7 +8,7 @@ use binary_options_tools_core_pre::{
     reimports::{AsyncReceiver, AsyncSender},
     traits::{LightweightModule, Rule},
 };
-use tracing::{info, warn};
+use tracing::{debug, warn};
 
 /// Module for handling asset updates in PocketOption
 /// This module listens for asset-related messages and processes them accordingly.
@@ -33,7 +33,7 @@ impl LightweightModule<State> for AssetsModule {
         while let Ok(msg) = self.receiver.recv().await {
             if let Message::Binary(text) = &*msg {
                 if let Ok(assets) = serde_json::from_slice::<Assets>(text) {
-                    info!("Loaded assets: {:?}", assets.names());
+                    debug!("Loaded assets: {:?}", assets.names());
                     self.state.set_assets(assets).await;
                 } else {
                     warn!("Failed to parse assets message: {:?}", text);

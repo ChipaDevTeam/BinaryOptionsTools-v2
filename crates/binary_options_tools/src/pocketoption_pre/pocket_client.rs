@@ -1,9 +1,10 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use binary_options_tools_core_pre::{builder::ClientBuilder, client::Client, error::CoreError, testing::{TestingWrapper, TestingWrapperBuilder}};
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
 
-use crate::pocketoption_pre::{connect::PocketConnect, error::{PocketError, PocketResult}, modules::{assets::AssetsModule, balance::BalanceModule, keep_alive::{InitModule, KeepAliveModule}, print_handler, server_time::ServerTimeModule, trades::TradesApiModule}, ssid::Ssid, state::{State, StateBuilder}, types::{Action, Assets, Deal}};
+use crate::pocketoption_pre::{connect::PocketConnect, error::{PocketError, PocketResult}, modules::{assets::AssetsModule, balance::BalanceModule, deals::DealsApiModule, keep_alive::{InitModule, KeepAliveModule}, print_handler, server_time::ServerTimeModule, trades::TradesApiModule}, ssid::Ssid, state::{State, StateBuilder}, types::{Action, Assets, Deal}};
 
 const MINIMUM_TRADE_AMOUNT: f64 = 1.0;
 const MAXIMUM_TRADE_AMOUNT: f64 = 20000.0;
@@ -18,12 +19,14 @@ impl PocketOption {
     let state = StateBuilder::default().ssid(Ssid::parse(ssid)?).build()?;
 
     Ok(ClientBuilder::new(PocketConnect, state)
+                .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)))
                 .with_lightweight_module::<KeepAliveModule>()
                 .with_lightweight_module::<InitModule>()
                 .with_lightweight_module::<BalanceModule>()
                 .with_lightweight_module::<ServerTimeModule>()
                 .with_lightweight_module::<AssetsModule>()
                 .with_module::<TradesApiModule>()
+                .with_module::<DealsApiModule>()
                 .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state))))
 
     }
@@ -83,7 +86,7 @@ impl PocketOption {
     /// # Returns
     /// A `PocketResult` containing the `Deal` if successful, or an error if
     /// the trade fails.
-    pub async fn trade(&self, asset: impl ToString, action: Action, time: u32, amount: f64) -> PocketResult<Deal> {
+    pub async fn trade(&self, asset: impl ToString, action: Action, time: u32, amount: f64) -> PocketResult<(Uuid, Deal)> {
         if let Some(assets) = self.assets().await {
             assets.validate(&asset.to_string(), time)?;
             if amount < MINIMUM_TRADE_AMOUNT {
@@ -93,7 +96,7 @@ impl PocketOption {
                 return Err(PocketError::General(format!("Amount must be at most {MAXIMUM_TRADE_AMOUNT}")));
             }
             if let Some(handle) = self.client.get_handle::<TradesApiModule>().await {
-                handle.trade(asset.to_string(), action, amount, time).await
+                handle.trade(asset.to_string(), action, amount, time).await.map(|d| (d.id, d))
             } else {
                 Err(CoreError::ModuleNotFound("TradesApiModule".into()).into())
             }
@@ -110,7 +113,7 @@ impl PocketOption {
     /// * `amount` - The amount to trade.
     /// # Returns
     /// A `PocketResult` containing the `Deal` if successful, or an error if the trade fails.
-    pub async fn buy(&self, asset: impl ToString, time: u32, amount: f64) -> PocketResult<Deal> {
+    pub async fn buy(&self, asset: impl ToString, time: u32, amount: f64) -> PocketResult<(Uuid, Deal)> {
         self.trade(asset, Action::Call, time, amount).await
     }
 
@@ -122,7 +125,7 @@ impl PocketOption {
     /// * `amount` - The amount to trade.
     /// # Returns
     /// A `PocketResult` containing the `Deal` if successful, or an error if the trade fails.
-    pub async fn sell(&self, asset: impl ToString, time: u32, amount: f64) -> PocketResult<Deal> {
+    pub async fn sell(&self, asset: impl ToString, time: u32, amount: f64) -> PocketResult<(Uuid, Deal)> {
         self.trade(asset, Action::Put, time, amount).await
     }
 
@@ -132,6 +135,7 @@ impl PocketOption {
         self.client.state.get_server_datetime().await
     }
 
+    /// Gets the current assets.
     pub async fn assets(&self) -> Option<Assets> {
         let state = &self.client.state;
         let assets = state.assets.read().await;
@@ -141,8 +145,39 @@ impl PocketOption {
         None
     }
 
+    /// Checks the result of a trade by its ID.
+    /// # Arguments
+    /// * `id` - The ID of the trade to check.
+    /// # Returns
+    /// A `PocketResult` containing the `Deal` if successful, or an error if the trade fails.
+    pub async fn result(&self, id: Uuid) -> PocketResult<Deal> {
+        if let Some(handle) = self.client.get_handle::<DealsApiModule>().await {
+            handle.check_result(id).await
+        } else {
+            Err(CoreError::ModuleNotFound("DealsApiModule".into()).into())
+        }
+    }
+
+    /// Checks the result of a trade by its ID with a timeout.
+    /// # Arguments
+    /// * `id` - The ID of the trade to check.
+    /// * `timeout` - The duration to wait before timing out.
+    /// # Returns
+    /// A `PocketResult` containing the `Deal` if successful, or an error if the trade fails.
+    pub async fn result_with_timeout(&self, id: Uuid, timeout: Duration) -> PocketResult<Deal> {
+        if let Some(handle) = self.client.get_handle::<DealsApiModule>().await {
+            handle.check_result_with_timeout(id, timeout).await
+        } else {
+            Err(CoreError::ModuleNotFound("DealsApiModule".into()).into())
+        }
+    }
+
+    /// Gets the currently opened deals.
+    pub async fn get_opened_deals(&self) -> HashMap<Uuid, Deal> {
+        self.client.state.trade_state.get_opened_deals().await
+    }
+
     /// Shuts down the client and stops the runner.
-    ///
     pub async fn shutdown(self) -> PocketResult<()> {
         self.client.shutdown().await.map_err(PocketError::from)
     }
@@ -214,6 +249,23 @@ mod tests {
         println!("Buy Result: {buy_result:?}");
         let sell_result = api.sell("EURUSD_otc", 60, 1.0).await.unwrap();
         println!("Sell Result: {sell_result:?}");
+        api.shutdown().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_pocket_option_result() {
+        tracing_subscriber::fmt::init();
+        let ssid = r#"42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]"#;
+        let api = PocketOption::new(ssid).await.unwrap();
+        tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
+        let (buy_id, _) = api.buy("EURUSD_otc", 60, 1.0).await.unwrap();
+        let (sell_id, _) = api.sell("EURUSD_otc", 60, 1.0).await.unwrap();
+
+        let buy_result = api.result(buy_id).await.unwrap();
+        println!("Result ID: {buy_id}, Result: {buy_result:?}");
+        tokio::time::sleep(Duration::from_secs(5)).await; // Wait for the trade to be complete to test retrieving the trade form the list of closed trades
+        let sell_result = api.result(sell_id).await.unwrap();
+        println!("Result ID: {sell_id}, Result: {sell_result:?}");
         api.shutdown().await.unwrap();
     }
 }

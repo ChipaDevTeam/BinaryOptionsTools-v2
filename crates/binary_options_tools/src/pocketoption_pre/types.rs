@@ -602,7 +602,7 @@ pub struct Deal {
     pub refund_time: Option<Value>,
     pub refund_timestamp: Option<Value>,
     pub uid: u64,
-    pub request_id: Uuid,
+    pub request_id: Option<Uuid>,
     pub amount: f64,
     pub profit: f64,
     pub percent_profit: i32,

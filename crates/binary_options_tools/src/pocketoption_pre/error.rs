@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use binary_options_tools_core_pre::error::CoreError;
+use uuid::Uuid;
 
 
 #[derive(thiserror::Error, Debug)]
@@ -18,8 +21,21 @@ pub enum PocketError {
         asset: String,
     },
 
+    /// Error finding deal.
+    #[error("Failed to find deal: {0}")]
+    DealNotFound(Uuid),
+
+    /// Timeout error.
+    #[error("Timeout error: {task} in {context} after {duration:?}")]
+    Timeout {
+        task: String, // The task that timed out, eg "check-results",
+        context: String,
+        duration: Duration,
+    },
+
     #[error("General error: {0}")]
     General(String),
+
 }
 
 pub type PocketResult<T> = Result<T, PocketError>;
