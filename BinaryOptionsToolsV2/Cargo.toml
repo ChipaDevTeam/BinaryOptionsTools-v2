@@ -30,4 +30,4 @@ chrono = "0.4.41"
 url = "2.5.4"
 regex = "1.11.1"
 
-openssl = { version = "0.10", optional = true, features = ["vendored"] }
+openssl = { version = "0.10", features = ["vendored"] }
