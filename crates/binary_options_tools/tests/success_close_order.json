@@ -1,0 +1,28 @@
+{
+  "profit": 0,
+  "deals": [
+    {
+      "id": "2b565a3d-30aa-48c8-a06e-2eb63f9c04f8",
+      "openTime": "2025-07-07 23:53:30",
+      "closeTime": "2025-07-07 23:54:30",
+      "openTimestamp": 1751932410,
+      "closeTimestamp": 1751932470,
+      "uid": 104155994,
+      "amount": 5,
+      "profit": -5,
+      "percentProfit": 92,
+      "percentLoss": 100,
+      "openPrice": 69.317,
+      "closePrice": 69.313,
+      "command": 0,
+      "asset": "#CSCO_otc",
+      "isDemo": 1,
+      "copyTicket": "",
+      "closeMs": 293,
+      "optionType": 100,
+      "openMs": 174,
+      "currency": "USD",
+      "amountUSD": 5
+    }
+  ]
+}

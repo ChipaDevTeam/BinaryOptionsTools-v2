@@ -1,114 +1,14 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::pocketoption_pre::{state::State, types::TwoStepRule};
+use crate::pocketoption_pre::{state::State, types::{Assets, TwoStepRule}};
 use async_trait::async_trait;
 use binary_options_tools_core::reimports::Message;
 use binary_options_tools_core_pre::{
-    error::CoreResult,
+    error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender},
     traits::{LightweightModule, Rule},
 };
-use serde::{Deserialize, Deserializer};
-
-/// CandleLength is a wrapper around u32 for allowed candle durations (in seconds)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
-pub struct CandleLength {
-    time: u32
-}
-
-impl From<u32> for CandleLength {
-    fn from(val: u32) -> Self {
-        CandleLength { time: val }
-    }
-}
-impl From<CandleLength> for u32 {
-    fn from(val: CandleLength) -> u32 {
-        val.time
-    }
-}
-
-/// Asset struct for processed asset data
-#[derive(Debug, Clone)]
-pub struct Asset {
-    pub id: i32, // This field is not used in the current implementation but can be useful for debugging
-    pub name: String,
-    pub symbol: String,
-    pub is_otc: bool,
-    pub payout: i32,
-    pub allowed_candles: Vec<CandleLength>,
-    pub asset_type: AssetType,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum AssetType {
-    Stock,
-    Currency,
-    Commodity,
-    Cryptocurrency,
-    Index,
-}
-
-
-impl<'de> Deserialize<'de> for Asset {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct Asset {
-            id: i32,
-            symbol: String,
-            name: String,
-            asset_type: AssetType,
-            in1: i32,
-            payout: i32,
-            in3: i32,
-            in4: i32,
-            in5: i32,
-            in6: i32,
-            in7: i32,
-            in8: i32,
-            arr: Vec<String>,
-            in9: i64,
-            val: bool,
-            times: Vec<CandleLength>,
-            in10: i32,
-            in11: i32,
-            in12: i64,
-        }
-
-        todo!()
-    }
-}
-
-/// Helper struct for parsing allowed_candles
-#[derive(Debug, Deserialize)]
-struct RawCandleTime {
-    time: u32,
-}
-
-/// Wrapper around HashMap<String, Asset>
-#[derive(Debug, Default, Clone)]
-pub struct Assets(pub HashMap<String, Asset>);
-
-impl Assets {
-    pub fn get(&self, symbol: &str) -> Option<&Asset> {
-        self.0.get(symbol)
-    }
-}
-
-impl<'de> Deserialize<'de> for Assets {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let assets: Vec<Asset> = Vec::deserialize(deserializer)?;
-        let map = assets.into_iter().map(|a| (a.symbol.clone(), a)).collect();
-        Ok(Assets(map))
-    }
-}
+use tracing::{info, warn};
 
 /// Module for handling asset updates in PocketOption
 /// This module listens for asset-related messages and processes them accordingly.
@@ -130,11 +30,17 @@ impl LightweightModule<State> for AssetsModule {
     }
 
     async fn run(&mut self) -> CoreResult<()> {
-        // Example: receive a message, parse assets, and update state.assets
-        // let msg = self.receiver.recv().await?;
-        // let assets: Assets = serde_json::from_value(msg.payload.clone())?;
-        // self.state.assets.write().unwrap().replace(assets);
-        todo!()
+        while let Ok(msg) = self.receiver.recv().await {
+            if let Message::Binary(text) = &*msg {
+                if let Ok(assets) = serde_json::from_slice::<Assets>(text) {
+                    info!("Loaded assets: {:?}", assets.names());
+                    self.state.set_assets(assets).await;
+                } else {
+                    warn!("Failed to parse assets message: {:?}", text);
+                }
+            }
+        }
+        Err(CoreError::LightweightModuleLoop("AssetsModule".into()))
     }
 
     fn rule() -> Box<dyn Rule + Send + Sync> {
@@ -145,7 +51,7 @@ impl LightweightModule<State> for AssetsModule {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::pocketoption_pre::types::Asset;
 
     #[test]
     fn test_asset_deserialization() {

@@ -1,11 +1,15 @@
 use core::fmt;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{collections::HashMap, sync::atomic::{AtomicBool, Ordering}};
+use std::hash::Hash;
 
-use binary_options_tools_core::reimports::Message;
-use binary_options_tools_core_pre::traits::Rule;
+use binary_options_tools_core_pre::{traits::Rule, reimports::Message};
 use chrono::{DateTime, Duration, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::Value;
+use uuid::Uuid;
 
+use crate::pocketoption_pre::error::{PocketError, PocketResult};
+use crate::pocketoption_pre::utils::float_time;
 /// Server time management structure for synchronizing with PocketOption servers
 ///
 /// This structure maintains the relationship between server time and local time,
@@ -346,16 +350,352 @@ impl Rule for TwoStepRule {
             Message::Text(text) => {
                 if text.starts_with(&self.pattern) {
                     self.valid.store(true, Ordering::SeqCst);
+                }
+                false
+            }
+            Message::Binary(_) => {
+                if self.valid.load(Ordering::SeqCst) {
+                    self.valid.store(false, Ordering::SeqCst);
                     true
                 } else {
                     false
                 }
             }
-            _ => false,
+            _ => false
         }
     }
 
     fn reset(&self) {
         self.valid.store(false, Ordering::SeqCst)
+    }
+}
+
+/// More advanced implementation of the TwoStepRule that allows for multipple patterns
+pub struct MultiPatternRule {
+    valid: AtomicBool,
+    patterns: Vec<String>,
+}
+
+impl MultiPatternRule {
+    /// Create a new MultiPatternRule with the specified patterns
+    ///
+    /// # Arguments
+    /// * `patterns` - The string patterns to match against incoming messages
+    pub fn new(patterns: Vec<impl ToString>) -> Self {
+        Self {
+            valid: AtomicBool::new(false),
+            patterns: patterns.into_iter().map(|p| p.to_string()).collect(),
+        }
+    }
+}
+
+impl Rule for MultiPatternRule {
+    fn call(&self, msg: &Message) -> bool {
+        match msg {
+            Message::Text(text) => {
+                for pattern in &self.patterns {
+                    if text.starts_with(pattern) {
+                        self.valid.store(true, Ordering::SeqCst);
+                        return false;
+                    }
+                }
+                false
+            }
+            Message::Binary(_) => {
+                if self.valid.load(Ordering::SeqCst) {
+                    self.valid.store(false, Ordering::SeqCst);
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false        }
+    }
+
+    fn reset(&self) {
+        self.valid.store(false, Ordering::SeqCst)
+    }
+}
+
+/// CandleLength is a wrapper around u32 for allowed candle durations (in seconds)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+pub struct CandleLength {
+    time: u32
+}
+
+impl From<u32> for CandleLength {
+    fn from(val: u32) -> Self {
+        CandleLength { time: val }
+    }
+}
+impl From<CandleLength> for u32 {
+    fn from(val: CandleLength) -> u32 {
+        val.time
+    }
+}
+
+/// Asset struct for processed asset data
+#[derive(Debug, Clone)]
+pub struct Asset {
+    pub id: i32, // This field is not used in the current implementation but can be useful for debugging
+    pub name: String,
+    pub symbol: String,
+    pub is_otc: bool,
+    pub is_active: bool,
+    pub payout: i32,
+    pub allowed_candles: Vec<CandleLength>,
+    pub asset_type: AssetType,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum AssetType {
+    Stock,
+    Currency,
+    Commodity,
+    Cryptocurrency,
+    Index,
+}
+
+impl Asset {
+    pub fn is_otc(&self) -> bool {
+        self.is_otc
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.is_active
+    }
+
+    pub fn allowed_candles(&self) -> &[CandleLength] {
+        &self.allowed_candles
+    }
+
+    /// Validates if the asset can be used for trading at the given time
+    /// It checks, if the time is in the allowed candle durations
+    /// and also if the asset is active.
+    /// The error thrown allows users to understand why the asset is not valid for trading.
+    pub fn validate(&self, time: u32) -> PocketResult<()> {
+        if !self.is_active {
+            return Err(PocketError::InvalidAsset("Asset is not active".into()));
+        }
+        if !self.allowed_candles.contains(&CandleLength::from(time)) {
+            return Err(PocketError::InvalidAsset(format!("Time is not in allowed candle durations, available {:?}", self.allowed_candles().iter().map(|c| c.time).collect::<Vec<_>>())));
+        }
+        Ok(())
+    }
+}
+
+
+impl<'de> Deserialize<'de> for Asset {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[allow(unused)]
+        struct AssetRaw {
+            id: i32,
+            symbol: String,
+            name: String,
+            asset_type: AssetType,
+            in1: i32,
+            payout: i32,
+            in3: i32,
+            in4: i32,
+            in5: i32,
+            otc: i32,
+            in7: i32,
+            in8: i32,
+            arr: Vec<String>,
+            in9: i64,
+            valid: bool,
+            times: Vec<CandleLength>,
+            in10: i32,
+            in11: i32,
+            in12: i64,
+        }
+
+        let raw: AssetRaw = AssetRaw::deserialize(deserializer)?;
+        Ok(Asset {
+            id: raw.id,
+            symbol: raw.symbol,
+            name: raw.name,
+            is_otc: raw.otc == 1,
+            is_active: raw.valid,
+            payout: raw.payout,
+            allowed_candles: raw.times,
+            asset_type: raw.asset_type,
+        })
+    }
+}
+
+
+/// Wrapper around HashMap<String, Asset>
+#[derive(Debug, Default, Clone)]
+pub struct Assets(pub HashMap<String, Asset>);
+
+impl Assets {
+    pub fn get(&self, symbol: &str) -> Option<&Asset> {
+        self.0.get(symbol)
+    }
+
+    pub fn validate(&self, symbol: &str, time: u32) -> PocketResult<()> {
+        if let Some(asset) = self.get(symbol) {
+            asset.validate(time)
+        } else {
+            Err(PocketError::InvalidAsset(format!("Asset with symbol `{symbol}` not found")))
+        }
+    }
+
+    pub fn names(&self) -> Vec<&str> {
+        self.0.values().map(|a| a.name.as_str()).collect()
+    }
+}
+
+impl<'de> Deserialize<'de> for Assets {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let assets: Vec<Asset> = Vec::deserialize(deserializer)?;
+        let map = assets.into_iter().map(|a| (a.symbol.clone(), a)).collect();
+        Ok(Assets(map))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum Action {
+    Call, // Buy
+    Put,  // Sell
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FailOpenOrder {
+    pub error: String,
+    pub amount: f64,
+    pub asset: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenOrder {
+    asset: String,
+    action: Action,
+    amount: f64,
+    is_demo: u32,
+    option_type: u32,
+    request_id: Uuid,
+    time: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Deal {
+    pub id: Uuid,
+    pub open_time: String,
+    pub close_time: String,
+    #[serde(with = "float_time")]
+    pub open_timestamp: DateTime<Utc>,
+    #[serde(with = "float_time")]
+    pub close_timestamp: DateTime<Utc>,
+    pub refund_time: Option<Value>,
+    pub refund_timestamp: Option<Value>,
+    pub uid: u64,
+    pub request_id: Uuid,
+    pub amount: f64,
+    pub profit: f64,
+    pub percent_profit: i32,
+    pub percent_loss: i32,
+    pub open_price: f64,
+    pub close_price: f64,
+    pub command: i32,
+    pub asset: String,
+    pub is_demo: u32,
+    pub copy_ticket: String,
+    pub open_ms: i32,
+    pub close_ms: Option<i32>,
+    pub option_type: i32,
+    pub is_rollover: Option<bool>,
+    pub is_copy_signal: Option<bool>,
+    #[serde(rename = "isAI")]
+    pub is_ai: Option<bool>,
+    pub currency: String,
+    pub amount_usd: Option<f64>,
+    #[serde(rename = "amountUSD")]
+    pub amount_usd2: Option<f64>,
+}
+
+impl Hash for Deal {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+        self.uid.hash(state);
+    }
+}
+
+impl Eq for Deal {}
+
+impl OpenOrder {
+    pub fn new(
+        amount: f64,
+        asset: String,
+        action: Action,
+        duration: u32,
+        demo: u32,
+        request_id: Uuid
+    ) -> Self {
+        Self {
+            amount,
+            asset,
+            action,
+            is_demo: demo,
+            option_type: 100, // FIXME: Check why it always is 100
+            request_id,
+            time: duration,
+        }
+    }
+}
+
+impl std::cmp::PartialEq<Uuid> for Deal {
+    fn eq(&self, other: &Uuid) -> bool {
+        &self.id == other
+    }
+}
+
+pub fn serialize_action<S>(action: &Action, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match action {
+        Action::Call => 0.serialize(serializer),
+        Action::Put => 1.serialize(serializer),
+    }
+}
+
+impl fmt::Display for OpenOrder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+
+        // returns data in this format (using serde_json): 42["openOrder",{"asset":"EURUSD_otc","amount":1.0,"action":"call","isDemo":1,"requestId":"abcde-12345","optionType":100,"time":60}]
+        let data = serde_json::to_string(&self).map_err(|_| fmt::Error)?;
+        write!(f, "42[\"openOrder\",{data}]")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_open_order_format() {
+        let order = OpenOrder::new(1.0, "EURUSD_otc".to_string(), Action::Call, 60, 1, Uuid::new_v4());
+        let formatted = format!("{order}");
+        assert!(formatted.starts_with("42[\"openOrder\","));
+        assert!(formatted.contains("\"asset\":\"EURUSD_otc\""));
+        assert!(formatted.contains("\"amount\":1.0"));
+        assert!(formatted.contains("\"action\":\"call\""));
+        assert!(formatted.contains("\"isDemo\":1"));
+        assert!(formatted.contains("\"optionType\":100"));
+        assert!(formatted.contains("\"time\":60"));
+        dbg!(formatted);
     }
 }

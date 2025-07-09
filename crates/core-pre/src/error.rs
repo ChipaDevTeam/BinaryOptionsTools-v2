@@ -22,6 +22,9 @@ pub enum CoreError {
     #[error("Lightweight [{0} Module] loop exited unexpectedly.")]
     LightweightModuleLoop(String),
     
+    #[error("Api [{0} Module] loop exited unexpectedly.")]
+    ApiModuleLoop(String),
+    
     #[error("Other error: {0}")]
     Other(String),
 

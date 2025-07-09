@@ -49,6 +49,8 @@ pub mod balance;
 pub mod keep_alive;
 pub mod assets;
 pub mod server_time;
+pub mod trades;
+pub mod deals;
 // pub mod subscriptions;
 
 // pub use subscriptions::{

@@ -40,7 +40,7 @@ impl LightweightModule<State> for ServerTimeModule {
             }
         }
         Err(CoreError::LightweightModuleLoop(
-            "ServerTimeModule run loop exited unexpectedly".to_string(),
+            "ServerTimeModule".to_string(),
         ))
     }
 

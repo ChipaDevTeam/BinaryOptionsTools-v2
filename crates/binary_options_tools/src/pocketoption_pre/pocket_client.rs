@@ -1,9 +1,12 @@
 use std::time::Duration;
 
 use binary_options_tools_core_pre::{builder::ClientBuilder, client::Client, error::CoreError, testing::{TestingWrapper, TestingWrapperBuilder}};
+use chrono::{DateTime, Utc};
 
-use crate::pocketoption_pre::{connect::PocketConnect, error::{PocketError, PocketResult}, modules::{balance::BalanceModule, keep_alive::{InitModule, KeepAliveModule}, print_handler, server_time::ServerTimeModule}, ssid::Ssid, state::{State, StateBuilder}};
+use crate::pocketoption_pre::{connect::PocketConnect, error::{PocketError, PocketResult}, modules::{assets::AssetsModule, balance::BalanceModule, keep_alive::{InitModule, KeepAliveModule}, print_handler, server_time::ServerTimeModule, trades::TradesApiModule}, ssid::Ssid, state::{State, StateBuilder}, types::{Action, Assets, Deal}};
 
+const MINIMUM_TRADE_AMOUNT: f64 = 1.0;
+const MAXIMUM_TRADE_AMOUNT: f64 = 20000.0;
 
 pub struct PocketOption {
     client: Client<State>,
@@ -19,6 +22,8 @@ impl PocketOption {
                 .with_lightweight_module::<InitModule>()
                 .with_lightweight_module::<BalanceModule>()
                 .with_lightweight_module::<ServerTimeModule>()
+                .with_lightweight_module::<AssetsModule>()
+                .with_module::<TradesApiModule>()
                 .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state))))
 
     }
@@ -55,13 +60,85 @@ impl PocketOption {
     /// Gets the current balance of the user.
     /// If the balance is not set, it returns -1.
     ///
-    pub fn balance(&self) -> PocketResult<f64> {
+    pub async fn balance(&self) -> f64 {
         let state = &self.client.state;
-        let balance = state.balance.read().map_err(|e| PocketError::from(CoreError::Poison(e.to_string())))?;
+        let balance = state.balance.read().await;
         if let Some(balance) = *balance {
-            return Ok(balance);
+            return balance;
         }
-        Ok(-1.0)
+        -1.0
+    }
+
+    pub fn is_demo(&self) -> bool {
+        let state = &self.client.state;
+        state.ssid.demo()
+    }
+
+    /// Executes a trade on the specified asset.
+    /// # Arguments
+    /// * `asset` - The asset to trade.
+    /// * `action` - The action to perform (Call or Put).
+    /// * `time` - The time to trade.
+    /// * `amount` - The amount to trade.
+    /// # Returns
+    /// A `PocketResult` containing the `Deal` if successful, or an error if
+    /// the trade fails.
+    pub async fn trade(&self, asset: impl ToString, action: Action, time: u32, amount: f64) -> PocketResult<Deal> {
+        if let Some(assets) = self.assets().await {
+            assets.validate(&asset.to_string(), time)?;
+            if amount < MINIMUM_TRADE_AMOUNT {
+                return Err(PocketError::General(format!("Amount must be at least {MINIMUM_TRADE_AMOUNT}")));
+            }
+            if amount > MAXIMUM_TRADE_AMOUNT {
+                return Err(PocketError::General(format!("Amount must be at most {MAXIMUM_TRADE_AMOUNT}")));
+            }
+            if let Some(handle) = self.client.get_handle::<TradesApiModule>().await {
+                handle.trade(asset.to_string(), action, amount, time).await
+            } else {
+                Err(CoreError::ModuleNotFound("TradesApiModule".into()).into())
+            }
+        } else {
+            Err(PocketError::General("Assets not loaded".to_string()))
+        }
+    }
+
+    /// Places a new buy trade.
+    /// This method is a convenience wrapper around the `trade` method.
+    /// # Arguments
+    /// * `asset` - The asset to trade.
+    /// * `time` - The time to trade.
+    /// * `amount` - The amount to trade.
+    /// # Returns
+    /// A `PocketResult` containing the `Deal` if successful, or an error if the trade fails.
+    pub async fn buy(&self, asset: impl ToString, time: u32, amount: f64) -> PocketResult<Deal> {
+        self.trade(asset, Action::Call, time, amount).await
+    }
+
+    /// Places a new sell trade.
+    /// This method is a convenience wrapper around the `trade` method.
+    /// # Arguments
+    /// * `asset` - The asset to trade. 
+    /// * `time` - The time to trade.
+    /// * `amount` - The amount to trade.
+    /// # Returns
+    /// A `PocketResult` containing the `Deal` if successful, or an error if the trade fails.
+    pub async fn sell(&self, asset: impl ToString, time: u32, amount: f64) -> PocketResult<Deal> {
+        self.trade(asset, Action::Put, time, amount).await
+    }
+
+    /// Gets the current server time.
+    /// If the server time is not set, it returns None.
+    pub async fn server_time(&self) -> DateTime<Utc> {        
+        self.client.state.get_server_datetime().await
+    }
+
+    pub async fn assets(&self) -> Option<Assets> {
+        let state = &self.client.state;
+        let assets = state.assets.read().await;
+        if let Some(assets) = assets.as_ref() {
+            return Some(assets.clone());
+        }
+        None
     }
 
     /// Shuts down the client and stops the runner.
@@ -107,10 +184,10 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_balance() {
         tracing_subscriber::fmt::init();
-        let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"3e1823a796c1fe61491e309136cf9861\";s:10:\"ip_address\";s:15:\"191.113.139.200\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/119.\";s:13:\"last_activity\";i:1751681442;}e2cf2ff21c927851dbb4a781aa81a10e","isDemo":0,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]"#; // 42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	
+        let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"\";s:10:\"ip_address\";s:15:\"191.113.139.200\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/119.\";s:13:\"last_activity\";i:1751681442;}e2cf2ff21c927851dbb4a781aa81a10e","isDemo":0,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]"#; // 42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
-        let balance = api.balance().unwrap();
+        let balance = api.balance().await;
         println!("Balance: {balance}");
         api.shutdown().await.unwrap();
     }
@@ -118,12 +195,25 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_server_time() {
         tracing_subscriber::fmt::init();
-        let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"3e1823a796c1fe61491e309136cf9861\";s:10:\"ip_address\";s:15:\"191.113.139.200\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/119.\";s:13:\"last_activity\";i:1751681442;}e2cf2ff21c927851dbb4a781aa81a10e","isDemo":0,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]"#; // 42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	
+        let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"\";s:10:\"ip_address\";s:15:\"191.113.139.200\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/119.\";s:13:\"last_activity\";i:1751681442;}e2cf2ff21c927851dbb4a781aa81a10e","isDemo":0,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]"#; // 42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
         let server_time = api.client.state.get_server_datetime().await;
         println!("Server Time: {server_time}");
         println!("Server time complete: {}", api.client.state.server_time.read().await);
+        api.shutdown().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_pocket_option_buy_sell() {
+        tracing_subscriber::fmt::init();
+        let ssid = r#"42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#;
+        let api = PocketOption::new(ssid).await.unwrap();
+        tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
+        let buy_result = api.buy("EURUSD_otc", 60, 1.0).await.unwrap();
+        println!("Buy Result: {buy_result:?}");
+        let sell_result = api.sell("EURUSD_otc", 60, 1.0).await.unwrap();
+        println!("Sell Result: {sell_result:?}");
         api.shutdown().await.unwrap();
     }
 }

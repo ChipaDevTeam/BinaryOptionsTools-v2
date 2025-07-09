@@ -1,12 +1,12 @@
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use std::sync::{Arc, RwLock};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
+use uuid::Uuid;
 
-use binary_options_tools_core_pre::{
-    error::{CoreError, CoreResult},
-    traits::AppState,
-};
+use binary_options_tools_core_pre::traits::AppState;
 
-use crate::pocketoption_pre::modules::assets::Assets;
+use crate::pocketoption_pre::types::{Assets, Deal};
 use crate::pocketoption_pre::types::ServerTimeState;
 use crate::pocketoption_pre::{
     error::{PocketError, PocketResult},
@@ -37,6 +37,8 @@ pub struct State {
     pub server_time: ServerTimeState,
     /// Assets information
     pub assets: RwLock<Option<Assets>>,
+    /// Holds the state for all trading-related data.
+    pub trade_state: Arc<TradeState>,
 }
 
 /// Builder pattern for creating State instances
@@ -94,16 +96,20 @@ impl StateBuilder {
             balance: RwLock::new(None),
             server_time: ServerTimeState::default(),
             assets: RwLock::new(None),
+            trade_state: Arc::new(TradeState::default()),
         })
     }
 }
 
+#[async_trait]
 impl AppState for State {
-    fn clear_temporal_data(&self) {
+    async fn clear_temporal_data(&self) {
         // Clear any temporary data associated with the state
-        if let Ok(mut balance) = self.balance.write() {
-            *balance = None;
-        }
+        let mut balance = self
+            .balance
+            .write()
+            .await;
+        *balance = None; // Clear balance
         // Note: We don't clear server time as it's useful to maintain
         // time synchronization across reconnections
     }
@@ -118,25 +124,24 @@ impl State {
     ///
     /// # Returns
     /// Result indicating success or failure
-    pub fn set_balance(&self, balance: f64) -> CoreResult<()> {
+    pub async fn set_balance(&self, balance: f64) {
         let mut state = self
             .balance
             .write()
-            .map_err(|e| CoreError::Poison(e.to_string()))?;
+            .await;
         *state = Some(balance);
-        Ok(())
     }
 
     /// Get the current balance
     ///
     /// # Returns
     /// Current balance if available
-    pub fn get_balance(&self) -> CoreResult<Option<f64>> {
+    pub async fn get_balance(&self) -> Option<f64> {
         let state = self
             .balance
             .read()
-            .map_err(|e| CoreError::Poison(e.to_string()))?;
-        Ok(*state)
+            .await;
+        *state
     }
 
     /// Check if the current account is a demo account
@@ -203,5 +208,47 @@ impl State {
             .read()
             .await
             .server_to_local(server_timestamp)
+    }
+
+    /// Set the current assets.
+    /// This method updates the assets in a thread-safe manner.
+    /// # Arguments
+    /// * `assets` - New assets information
+    /// # Returns
+    /// Result indicating success or failure
+    pub async fn set_assets(&self, assets: Assets) {
+        let mut state = self
+            .assets
+            .write()
+            .await;
+            *state = Some(assets);
+    }
+
+
+}
+
+/// Holds all state related to trades and deals.
+#[derive(Debug, Default)]
+pub struct TradeState {
+    /// A map of currently opened deals, keyed by their UUID.
+    pub opened_deals: RwLock<HashMap<Uuid, Deal>>,
+    /// A map of recently closed deals, keyed by their UUID.
+    pub closed_deals: RwLock<HashMap<Uuid, Deal>>,
+}
+
+impl TradeState {
+    /// Adds or updates deals in the opened_deals map.
+    pub async fn update_opened_deals(&self, deals: Vec<Deal>) {
+        // TODO: Implement the logic to update the opened deals map.
+    }
+
+    /// Moves deals from opened to closed and adds new closed deals.
+    pub async fn update_closed_deals(&self, deals: Vec<Deal>) {
+        // TODO: Implement the logic to update opened and closed deal maps.
+    }
+
+    /// Removes all deals from the closed_deals map.
+    pub async fn clear_closed_deals(&self) {
+        // TODO: Implement the logic to clear the closed deals map.
     }
 }
