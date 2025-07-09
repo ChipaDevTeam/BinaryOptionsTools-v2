@@ -47,16 +47,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-arm-linux-gnueabihf
           
-          # Force openssl-sys to build vendored OpenSSL
-          echo "OPENSSL_NO_VENDOR=0" >> $GITHUB_ENV
-          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
-          
           # Use the cross-compiler as CC and tell Cargo to use it
           echo "CC=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
           echo "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
 
       - name: Install perl dependencies for OpenSSL
         run: |
+          
+          # Force openssl-sys to build vendored OpenSSL
+          echo "OPENSSL_NO_VENDOR=0" >> $GITHUB_ENV
+          echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
+          
           sudo apt-get update
           sudo apt-get install -y \
             perl make cpanminus libssl-dev pkg-config zlib1g-dev
