@@ -2,8 +2,7 @@
 resolver = "2"
 
 exclude = [
-    "BinaryOptionsToolsJs",
-    "BinaryOptionsToolsV2"
+    "BinaryOptionsToolsJs"
 ]
 
 members = [
