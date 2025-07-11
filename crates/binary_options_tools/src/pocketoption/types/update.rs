@@ -1,7 +1,7 @@
-use core::fmt;
-
 use chrono::{DateTime, Duration, Utc};
+use core::fmt;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 use crate::pocketoption::error::PocketOptionError;
 
@@ -21,6 +21,7 @@ pub struct UpdateHistoryNewFast {
     pub asset: String,
     pub period: i64,
     pub history: Vec<Candle>,
+    pub candles: Vec<Candle>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -38,6 +39,7 @@ pub enum Candle {
     Processed(ProcessedCandle),
     ProcessedNew(ProcessedCandleNew),
     Update(UpdateCandle),
+    UpdateNew(UpdateCandleNew),
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -84,6 +86,16 @@ pub struct UpdateCandle {
     #[serde(with = "float_time")]
     time: DateTime<Utc>,
     price: f64,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct UpdateCandleNew {
+    #[serde(with = "float_time")]
+    time: DateTime<Utc>,
+    open: f64,
+    close: f64,
+    high: f64,
+    low: f64,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -171,11 +183,10 @@ impl From<&Candle> for DataCandle {
                 candle.low,
             ),
             Candle::ProcessedNew(candle) => {
-                let timestamp = DateTime::from_timestamp(candle.time, 0)
-                    .unwrap_or_else(|| {
-                        eprintln!("Invalid timestamp {}, using current time", candle.time);
-                        Utc::now()
-                    });
+                let timestamp = DateTime::from_timestamp(candle.time, 0).unwrap_or_else(|| {
+                    eprintln!("Invalid timestamp {}, using current time", candle.time);
+                    Utc::now()
+                });
                 Self::new(
                     timestamp,
                     candle.open,
@@ -183,8 +194,18 @@ impl From<&Candle> for DataCandle {
                     candle.high,
                     candle.low,
                 )
-            },
+            }
             Candle::Update(candle) => Self::new_price(candle.time, candle.price),
+            Candle::UpdateNew(candle) => {
+                let timestamp = candle.time;
+                Self::new(
+                    timestamp,
+                    candle.open,
+                    candle.close,
+                    candle.high,
+                    candle.low,
+                )
+            }
         }
     }
 }
@@ -210,7 +231,63 @@ impl LoadHistoryPeriodResult {
 
 impl UpdateHistoryNewFast {
     pub fn candle_data(&self) -> Vec<DataCandle> {
-        self.history.iter().map(DataCandle::from).collect()
+        // 1) snapshot candles (descending)
+        let existing: Vec<DataCandle> = self.candles.iter().map(DataCandle::from).collect();
+        let mut history_dc: Vec<DataCandle> = self.history.iter().map(DataCandle::from).collect();
+
+        history_dc.sort_unstable_by_key(|c| c.time.timestamp());
+
+        // 3) cutoff: up through the last snapshot candle
+        let last_cutoff = existing
+            .first()
+            .map(|c| c.time.timestamp())
+            .unwrap_or_else(|| {
+                let ts = history_dc
+                    .first()
+                    .expect("history cannot be empty")
+                    .time
+                    .timestamp();
+                (ts / self.period) * self.period - self.period
+            });
+
+        // 4) aggregate into period-buckets via a BTreeMap
+        let mut buckets: BTreeMap<i64, (f64, f64, f64, f64)> = BTreeMap::new();
+        for dc in &history_dc {
+            let ts = dc.time.timestamp();
+            let bucket = (ts / self.period) * self.period;
+            if bucket <= last_cutoff {
+                continue;
+            }
+
+            let price = dc.close; // or whichever price you want
+            buckets
+                .entry(bucket)
+                .and_modify(|e| {
+                    e.1 = e.1.max(price); // high
+                    e.2 = e.2.min(price); // low
+                    e.3 = price; // close
+                })
+                .or_insert((price, price, price, price));
+        }
+
+        // 5) build new candles (descending) and prepend snapshot
+        let mut new_candles: Vec<DataCandle> = buckets
+            .into_iter()
+            .rev()
+            .map(|(bucket_ts, (open, high, low, close))| {
+                let dt = DateTime::from_timestamp(bucket_ts, 0).unwrap();
+                DataCandle {
+                    time: dt,
+                    open,
+                    high,
+                    low,
+                    close,
+                }
+            })
+            .collect();
+
+        new_candles.extend(existing);
+        new_candles
     }
 }
 
