@@ -118,7 +118,7 @@ impl fmt::Display for ServerTime {
 ///
 /// This represents OHLC (Open, High, Low, Close) price data for a specific time period.
 /// Note: PocketOption doesn't provide volume data, so the volume field is always None.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default)]
 pub struct Candle {
     /// Trading symbol (e.g., "EURUSD_otc")
     pub symbol: String,
@@ -133,7 +133,7 @@ pub struct Candle {
     /// Closing price
     pub close: f64,
     /// Volume is not provided by PocketOption
-    #[serde(skip_serializing_if = "Option::is_none")]
+    // #[serde(skip_serializing_if = "Option::is_none")]
     pub volume: Option<f64>,
     /// Whether this candle is closed/finalized
     pub is_closed: bool,
@@ -173,6 +173,21 @@ impl Candle {
         self.high = self.high.max(price);
         self.low = self.low.min(price);
         self.close = price;
+    }
+
+    /// Update the candle with a new timestamp and price
+    /// 
+    /// This method updates the high, low, and close prices while maintaining
+    /// the open price from the initial candle creation.
+    ///
+    /// # Arguments
+    /// * `timestamp` - New timestamp for the candle
+    /// * `price` - New price to incorporate into the candle
+    pub fn update(&mut self, timestamp: f64, price: f64) {
+        self.high = self.high.max(price);
+        self.low = self.low.min(price);
+        self.close = price;
+        self.timestamp = timestamp;
     }
 
     /// Mark the candle as closed/finalized

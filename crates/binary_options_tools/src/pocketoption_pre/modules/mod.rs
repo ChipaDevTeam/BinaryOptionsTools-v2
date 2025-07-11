@@ -50,7 +50,7 @@ pub mod assets;
 pub mod server_time;
 pub mod trades;
 pub mod deals;
-// pub mod subscriptions;
+pub mod subscriptions;
 
 // pub use subscriptions::{
 //     CandleConfig, MAX_SUBSCRIPTIONS, SubscriptionCommand, SubscriptionHandle, SubscriptionModule,

@@ -3,6 +3,8 @@ use std::time::Duration;
 use binary_options_tools_core_pre::error::CoreError;
 use uuid::Uuid;
 
+use crate::pocketoption_pre::modules::subscriptions::SubscriptionError;
+
 
 #[derive(thiserror::Error, Debug)]
 pub enum PocketError {
@@ -35,6 +37,9 @@ pub enum PocketError {
 
     #[error("General error: {0}")]
     General(String),
+
+    #[error("Subscription error: {0}")]
+    Subscription(#[from] SubscriptionError),
 
 }
 
