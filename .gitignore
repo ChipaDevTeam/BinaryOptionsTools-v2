@@ -3,3 +3,6 @@
 /examples/*.log
 .qodo
 /target
+*/errors.log
+node_modules
+

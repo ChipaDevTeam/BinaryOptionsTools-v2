@@ -1,7 +1,7 @@
 name: JS Package Publish
 env:
   DEBUG: napi:*
-  APP_NAME: '@rick-29/binary-options-tools'
+  APP_NAME: 'binary-options-tools'
   MACOSX_DEPLOYMENT_TARGET: '10.13'
 permissions:
   contents: write
@@ -10,6 +10,7 @@ permissions:
   push:
     branches:
       - main
+      - master
     tags-ignore:
       - '**'
     paths-ignore:
@@ -18,15 +19,14 @@ permissions:
       - '**/*.gitignore'
       - .editorconfig
       - docs/**
-  pull_request: null
-  workflow_dispatch: null
+  workflow_dispatch:
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
         settings:
-          - host: macos-latest
+          - host: macos-13 # (intel processor)
             target: x86_64-apple-darwin
             build: yarn build --target x86_64-apple-darwin
           - host: windows-latest
@@ -37,37 +37,37 @@ jobs:
               yarn build --target i686-pc-windows-msvc
               yarn test
             target: i686-pc-windows-msvc
-          - host: ubuntu-latest
+          - host: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
             build: yarn build --target x86_64-unknown-linux-gnu
-          - host: ubuntu-latest
+          - host: ubuntu-22.04
             target: x86_64-unknown-linux-musl
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-alpine
             build: yarn build --target x86_64-unknown-linux-musl
-          - host: macos-latest
+          - host: macos-15 # (arm64 processor, Apple Silicon)
             target: aarch64-apple-darwin
             build: yarn build --target aarch64-apple-darwin
-          - host: ubuntu-latest
+          - host: ubuntu-22.04
             target: aarch64-unknown-linux-gnu
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
             build: yarn build --target aarch64-unknown-linux-gnu
-          - host: ubuntu-latest
+          - host: ubuntu-22.04
             target: armv7-unknown-linux-gnueabihf
             setup: |
               sudo apt-get update
               sudo apt-get install gcc-arm-linux-gnueabihf -y
             build: yarn build --target armv7-unknown-linux-gnueabihf
-          - host: ubuntu-latest
+          - host: ubuntu-22.04
             target: armv7-unknown-linux-musleabihf
             build: yarn build --target armv7-unknown-linux-musleabihf
-          - host: ubuntu-latest
+          - host: ubuntu-22.04
             target: aarch64-linux-android
             build: yarn build --target aarch64-linux-android
-          - host: ubuntu-latest
+          - host: ubuntu-22.04
             target: armv7-linux-androideabi
             build: yarn build --target armv7-linux-androideabi
-          - host: ubuntu-latest
+          - host: ubuntu-22.04
             target: aarch64-unknown-linux-musl
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-alpine
             build: |-
@@ -77,7 +77,7 @@ jobs:
           - host: windows-latest
             target: aarch64-pc-windows-msvc
             build: yarn build --target aarch64-pc-windows-msvc
-          - host: ubuntu-latest
+          - host: ubuntu-22.04
             target: riscv64gc-unknown-linux-gnu
             setup: |
               sudo apt-get update
@@ -140,7 +140,13 @@ jobs:
         if: ${{ matrix.settings.docker }}
         with:
           image: ${{ matrix.settings.docker }}
-          options: '--user 0:0 -v ${{ github.workspace }}/BinaryOptionsToolsJs/.cargo-cache/git/db:/usr/local/cargo/git/db -v ${{ github.workspace }}/BinaryOptionsToolsJs/.cargo/registry/cache:/usr/local/cargo/registry/cache -v ${{ github.workspace }}/BinaryOptionsToolsJs/.cargo/registry/index:/usr/local/cargo/registry/index -v ${{ github.workspace }}/BinaryOptionsToolsJs:/build -w /build'
+          options: >
+            --user 0:0
+            -v ${{ github.workspace }}/BinaryOptionsToolsJs/.cargo-cache/git/db:/usr/local/cargo/git/db
+            -v ${{ github.workspace }}/BinaryOptionsToolsJs/.cargo/registry/cache:/usr/local/cargo/registry/cache
+            -v ${{ github.workspace }}/BinaryOptionsToolsJs/.cargo/registry/index:/usr/local/cargo/registry/index
+            -v ${{ github.workspace }}:/build
+            -w /build/BinaryOptionsToolsJs
           run: ${{ matrix.settings.build }}
       - name: Build
         run: ${{ matrix.settings.build }}
@@ -211,7 +217,7 @@ jobs:
       fail-fast: false
       matrix:
         settings:
-          - host: macos-latest
+          - host: macos-13
             target: x86_64-apple-darwin
           - host: windows-latest
             target: x86_64-pc-windows-msvc
@@ -420,7 +426,7 @@ jobs:
     name: Build universal macOS binary
     needs:
       - build
-    runs-on: macos-latest
+    runs-on: macos-15 # (arm64 processor, Apple Silicon)
     steps:
       - uses: actions/checkout@v4
       - name: Setup node

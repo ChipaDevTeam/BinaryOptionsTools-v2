@@ -675,6 +675,14 @@ where
                             ))
                             .await?;
                     }
+                    "loadHistoryPeriodFast" => {
+                        event_manager
+                            .emit(Event::new(
+                                EventType::Custom("candles_received".to_string()),
+                                event_data.clone(),
+                            ))
+                            .await?;
+                    }
                     _ => {
                         event_manager
                             .emit(Event::new(

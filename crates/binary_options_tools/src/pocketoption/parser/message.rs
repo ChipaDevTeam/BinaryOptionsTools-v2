@@ -42,6 +42,8 @@ pub enum WebSocketMessage {
     GetCandles(LoadHistoryPeriod),
 
     LoadHistoryPeriod(LoadHistoryPeriodResult),
+    LoadHistoryPeriodFast(LoadHistoryPeriodResult),
+
     UpdateStream(UpdateStream),
     UpdateHistoryNew(UpdateHistoryNewFast),
 
@@ -100,6 +102,9 @@ impl WebSocketMessage {
             MessageInfo::UpdateStream => {
                 if let Ok(stream) = from_str::<UpdateStream>(&data) {
                     return Self::UpdateStream(stream);
+                }
+                if let Ok(stream) = from_str::<LoadHistoryPeriodResult>(&data) {
+                    return Self::LoadHistoryPeriod(stream);
                 }
             }
             MessageInfo::UpdateHistoryNew => {
@@ -177,6 +182,11 @@ impl WebSocketMessage {
                     return Self::LoadHistoryPeriod(history);
                 }
             }
+            MessageInfo::LoadHistoryPeriodFast => {
+                if let Ok(history) = from_str::<LoadHistoryPeriodResult>(&data) {
+                    return Self::LoadHistoryPeriod(history);
+                }
+            }
             // MessageInfo::UpdateCharts => {
             //     return Err(PocketOptionError::GeneralParsingError(
             //         "This is expected, there is no parser for the 'updateCharts' message"
@@ -240,6 +250,7 @@ impl WebSocketMessage {
             Self::UpdateOpenedDeals(_) => MessageInfo::UpdateOpenedDeals,
             Self::SubscribeSymbol(_) => MessageInfo::SubscribeSymbol,
             Self::LoadHistoryPeriod(_) => MessageInfo::LoadHistoryPeriod,
+            Self::LoadHistoryPeriodFast(_) => MessageInfo::LoadHistoryPeriodFast,
             Self::GetCandles(_) => MessageInfo::GetCandles,
             Self::FailOpenOrder(_) => MessageInfo::FailopenOrder,
             Self::SuccessupdatePending(_) => MessageInfo::SuccessupdatePending,
@@ -329,6 +340,16 @@ impl fmt::Display for WebSocketMessage {
                 write!(
                     f,
                     "42[{}, {}]",
+                    serde_json::to_string(&MessageInfo::LoadHistoryPeriod)
+                        .map_err(|_| fmt::Error)?,
+                    serde_json::to_string(&period).map_err(|_| fmt::Error)?
+                )
+            }
+            // 451-["loadHistoryPeriodFast",{"_placeholder":true,"num":0}]
+            WebSocketMessage::LoadHistoryPeriodFast(period) => {
+                write!(
+                    f,
+                    "451-[{}, {}]",
                     serde_json::to_string(&MessageInfo::LoadHistoryPeriod)
                         .map_err(|_| fmt::Error)?,
                     serde_json::to_string(&period).map_err(|_| fmt::Error)?
