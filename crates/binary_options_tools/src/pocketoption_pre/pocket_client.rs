@@ -4,7 +4,7 @@ use binary_options_tools_core_pre::{builder::ClientBuilder, client::Client, erro
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::pocketoption_pre::{connect::PocketConnect, error::{PocketError, PocketResult}, modules::{assets::AssetsModule, balance::BalanceModule, deals::DealsApiModule, keep_alive::{InitModule, KeepAliveModule}, print_handler, server_time::ServerTimeModule, trades::TradesApiModule}, ssid::Ssid, state::{State, StateBuilder}, types::{Action, Assets, Deal}};
+use crate::pocketoption_pre::{connect::PocketConnect, error::{PocketError, PocketResult}, modules::{assets::AssetsModule, balance::BalanceModule, deals::DealsApiModule, keep_alive::{InitModule, KeepAliveModule}, print_handler, server_time::ServerTimeModule, subscriptions::{SubscriptionStream, SubscriptionType, SubscriptionsApiModule}, trades::TradesApiModule}, ssid::Ssid, state::{State, StateBuilder}, types::{Action, Assets, Deal}};
 
 const MINIMUM_TRADE_AMOUNT: f64 = 1.0;
 const MAXIMUM_TRADE_AMOUNT: f64 = 20000.0;
@@ -27,6 +27,7 @@ impl PocketOption {
                 .with_lightweight_module::<AssetsModule>()
                 .with_module::<TradesApiModule>()
                 .with_module::<DealsApiModule>()
+                .with_module::<SubscriptionsApiModule>()
                 .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state))))
 
     }
@@ -105,6 +106,8 @@ impl PocketOption {
         }
     }
 
+
+
     /// Places a new buy trade.
     /// This method is a convenience wrapper around the `trade` method.
     /// # Arguments
@@ -175,6 +178,30 @@ impl PocketOption {
     /// Gets the currently opened deals.
     pub async fn get_opened_deals(&self) -> HashMap<Uuid, Deal> {
         self.client.state.trade_state.get_opened_deals().await
+    }
+
+    pub async fn subscribe(&self, asset: impl ToString, sub_type: SubscriptionType) -> PocketResult<SubscriptionStream> {
+        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await && let Some(assets) = self.assets().await {
+            if let Some(_) = assets.get(&asset.to_string()) {
+                handle.subscribe(asset.to_string(), sub_type).await
+            } else {
+                Err(PocketError::InvalidAsset(asset.to_string()))
+            }
+        } else {
+            Err(CoreError::ModuleNotFound("SubscriptionsApiModule".into()).into())
+        }
+    }
+
+    pub async fn unsubscribe(&self, asset: impl ToString) -> PocketResult<()> {
+        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await && let Some(assets) = self.assets().await {
+            if let Some(_) = assets.get(&asset.to_string()) {
+                handle.unsubscribe(asset.to_string()).await
+            } else {
+                Err(PocketError::InvalidAsset(asset.to_string()))
+            }
+        } else {
+            Err(CoreError::ModuleNotFound("SubscriptionsApiModuel".into()).into())
+        }
     }
 
     /// Shuts down the client and stops the runner.

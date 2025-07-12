@@ -353,6 +353,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             // 3. Send WebSocket subscription message
                             // 4. Store subscription info
                             // 5. Send success response with stream receiver
+                            
                             if self.is_max_subscriptions_reached().await {
                                 self.command_responder.send(CommandResponse::SubscriptionFailed {
                                     command_id,
