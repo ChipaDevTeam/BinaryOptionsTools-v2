@@ -5,6 +5,7 @@ pub mod regions;
 pub mod state;
 pub mod error;
 pub mod modules;
+pub mod candle;
 
 /// Contains utility functions and types used across the PocketOption module.
 pub mod utils;

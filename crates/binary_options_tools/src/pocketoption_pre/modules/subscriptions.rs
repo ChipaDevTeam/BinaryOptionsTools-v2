@@ -11,19 +11,19 @@ use binary_options_tools_core_pre::{
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, Rule},
 };
-use chrono::{DateTime, Utc};
 use serde::Serialize;
 use tokio::select;
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
 use uuid::Uuid;
 
+use crate::pocketoption_pre::candle::{BaseCandle, SubscriptionType};
 use crate::pocketoption_pre::error::PocketError;
 use crate::pocketoption_pre::types::{StreamData as RawCandle, TwoStepRule};
 use crate::pocketoption_pre::{
     error::PocketResult,
     state::State,
-    types::Candle, // Assuming this exists in your types
+    candle::Candle, // Assuming this exists in your types
 };
 
 #[derive(Serialize)]
@@ -96,24 +96,6 @@ pub struct SubscriptionStream {
     sender: AsyncSender<Command>,
     asset: String,
     sub_type: SubscriptionType,
-}
-
-pub enum SubscriptionType {
-    None,
-    Chunk {
-        size: usize,    // Number of candles to aggregate
-        current: usize, // Current aggregated candle count
-        candle: Option<Candle>, // Current aggregated candle
-    },
-    Time {
-        start_time: Option<f64>,
-        duration: Duration,
-        candle: Option<Candle>,
-    },
-    TimeAligned {
-        duration: Duration, // No need for start_time
-        candle: Option<Candle>,
-    },
 }
 
 /// Data sent through the subscription stream
@@ -599,7 +581,7 @@ impl SubscriptionStream {
                     timestamp,
                 }) => {
                     if asset == self.asset {
-                        let candle = self.process_update(price, timestamp)?;
+                        let candle = self.process_update(timestamp, price)?;
                         if let Some(candle) = candle {
                             return Ok(candle);
                         }
@@ -621,133 +603,17 @@ impl SubscriptionStream {
     }
 
     /// Process an incoming price update based on subscription type
-    fn process_update(&mut self, price: f64, timestamp: f64) -> PocketResult<Option<Candle>> {
+    fn process_update(&mut self, timestamp: f64, price: f64) -> PocketResult<Option<Candle>> {
         let asset = self.asset().to_string();
-        match &mut self.sub_type {
-            SubscriptionType::None => {
-                // Return immediately with a simple candle
-                Ok(Some(Candle::new(asset.clone(), timestamp, price)))
-            }
-
-            SubscriptionType::Chunk {
-                size,
-                current,
-                candle,
-            } => {
-                // Update the aggregated candle
-                if *current == 0 {
-                    *candle = Some(Candle::new(asset.clone(), timestamp, price))
-                } else if let Some(c) = candle.as_mut() { c.update(timestamp, price) }
-
-                *current += 1;
-
-                if *current >= *size {
-                    let result = candle.clone();
-                    *current = 0; // Reset for next chunk
-                    Ok(result)
-                } else {
-                    Ok(None)
-                }
-            }
-
-            SubscriptionType::Time {
-                start_time,
-                duration,
-                candle,
-            } => {
-                if start_time.is_none() {
-                    *start_time = Some(timestamp);
-                    *candle = Some(Candle::new(asset.clone(), timestamp, price));
-                    return Ok(None);
-                }
-
-                // Update the aggregated candle
-                if let Some(c) = candle.as_mut() { c.update(timestamp, price) }
-
-                let elapsed = if let Some(c) = candle {
-                    c.datetime()
-                    .signed_duration_since(
-                        DateTime::from_timestamp(start_time.unwrap() as i64, 0)
-                            .unwrap_or_else(Utc::now),
-                    )
-                    .to_std()
-                    .map_err(|_| PocketError::General("Time calculation error".to_string()))?
-                } else {
-                    Duration::ZERO
-                };
-                
-
-                if elapsed >= *duration {
-                    let result = candle.clone();
-                    *start_time = None; // Reset for next period
-                    Ok(result)
-                } else {
-                    Ok(None)
-                }
-            }
-
-            SubscriptionType::TimeAligned { duration, candle } => {
-                Self::process_time_aligned_update_static(
-                    price,
-                    timestamp,
-                    duration,
-                    candle,
-                    &self.asset,
-                )
-            }
-        }
-    }
-
-    /// Process time-aligned updates that align with PocketOption's candle intervals
-    fn process_time_aligned_update_static(  // FIXME: This doesn't work for some reason
-        price: f64,
-        timestamp: f64,
-        duration: &Duration,
-        candle: &mut Option<Candle>,
-        asset: &str,
-    ) -> PocketResult<Option<Candle>> {
-        let duration_secs = duration.as_secs();
-
-        // Calculate the aligned time boundaries
-        let timestamp_secs = timestamp as i64;
-        let aligned_start = Self::align_timestamp_to_interval(timestamp_secs, duration_secs);
-        let aligned_end = aligned_start + duration_secs as i64;
-
-        // Check if we need to initialize or if we've crossed into a new interval
-        let timestamp = candle.as_ref().map(|c| c.timestamp).unwrap_or(0.0);
-        let current_interval_start =
-            Self::align_timestamp_to_interval(timestamp as i64, duration_secs);
-
-        if timestamp == 0.0 || aligned_start != current_interval_start {
-            // Starting a new interval
-            *candle = Some(Candle::new(asset.to_string(), aligned_start as f64, price));
-
-            // Check if we should immediately return (for intervals that have already passed)
-            if timestamp_secs >= aligned_end {
-                let result = candle.clone();
-                return Ok(result);
-            }
-
+        if let Some(c) =self.sub_type.update(&BaseCandle::from((timestamp, price)))? {
+            // Successfully updated candle
+            return Ok(Some(Candle::from((c, asset))));
+        } else {
+            // No complete candle yet, continue waiting
             return Ok(None);
         }
-
-        // Update the current candle
-        if let Some(c) = candle.as_mut() { c.update_price(price) }
-        
-        // Check if we've reached the end of the current interval
-        if timestamp_secs >= aligned_end {
-            let result = candle.clone();
-            Ok(result)
-        } else {
-            Ok(None)
-        }
     }
 
-    /// Align a timestamp to the nearest interval boundary
-    fn align_timestamp_to_interval(timestamp: i64, interval_secs: u64) -> i64 {
-        let interval = interval_secs as i64;
-        (timestamp / interval) * interval
-    }
 
     /// Convert to a futures Stream
     pub fn to_stream(self) -> impl futures_util::Stream<Item = PocketResult<Candle>> + 'static {
@@ -790,74 +656,8 @@ impl Clone for SubscriptionStream {
     }
 }
 
-// Add Clone implementation for SubscriptionType
-impl Clone for SubscriptionType {
-    fn clone(&self) -> Self {
-        match self {
-            Self::None => Self::None,
-            Self::Chunk {
-                size,
-                current,
-                candle,
-            } => Self::Chunk {
-                size: *size,
-                current: *current,
-                candle: candle.clone(),
-            },
-            Self::Time {
-                start_time,
-                duration,
-                candle,
-            } => Self::Time {
-                start_time: *start_time,
-                duration: *duration,
-                candle: candle.clone(),
-            },
-            Self::TimeAligned { duration, candle } => Self::TimeAligned {
-                duration: *duration,
-                candle: candle.clone(),
-            },
-        }
-    }
-}
 
-// Helper function to validate duration against PocketOption's supported candle lengths
-impl SubscriptionStream {
-    /// Validate that a duration is supported by PocketOption
-    const SUPPORTED_DURATIONS: &[u64] = &[
-        5, 15, 30, 60, 120, 180, 300, 600, 900, 1800, 2700, 3600, 7200, 10800, 14400,
-    ];
-    pub fn validate_duration(duration: Duration) -> bool {
 
-        let duration_secs = duration.as_secs();
-        Self::SUPPORTED_DURATIONS.contains(&duration_secs)
-    }
-
-    /// Create a new time-aligned subscription stream with validation
-    pub fn new_time_aligned(
-        receiver: AsyncReceiver<StreamData>,
-        sender: AsyncSender<Command>,
-        asset: String,
-        duration: Duration,
-    ) -> PocketResult<Self> {
-        if !Self::validate_duration(duration) {
-            return Err(PocketError::General(format!(
-                "Unsupported candle duration: {}s. Supported durations: 5s, 15s, 30s, 1m, 2m, 3m, 5m, 10m, 15m, 30m, 45m, 1h, 2h, 3h, 4h",
-                duration.as_secs()
-            )));
-        }
-
-        Ok(Self {
-            receiver,
-            sender,
-            asset: asset.clone(),
-            sub_type: SubscriptionType::TimeAligned {
-                duration,
-                candle: None,
-            },
-        })
-    }
-}
 
 async fn send_subscribe_message(ws_sender: &AsyncSender<Message>, asset: &str) -> CoreResult<()> {
     // TODO: Implement WebSocket subscription message
@@ -883,37 +683,3 @@ async fn send_subscribe_message(ws_sender: &AsyncSender<Message>, asset: &str) -
     Ok(())
 }
 
-impl SubscriptionType {
-    pub fn none() -> Self {
-        SubscriptionType::None
-    }
-
-    pub fn chunk(size: usize) -> Self {
-        SubscriptionType::Chunk {
-            size,
-            current: 0,
-            candle: None,
-        }
-    }
-
-    pub fn time(duration: Duration) -> Self {
-        SubscriptionType::Time {
-            start_time: None,
-            duration,
-            candle: None,
-        }
-    }
-
-    pub fn time_aligned(duration: Duration) -> PocketResult<Self> {
-        if !SubscriptionStream::validate_duration(duration) {
-            return Err(PocketError::General(format!(
-                "Unsupported candle duration: {}s",
-                duration.as_secs()
-            )));
-        }
-        Ok(SubscriptionType::TimeAligned {
-                    duration,
-                    candle: None,
-                })
-    }
-}

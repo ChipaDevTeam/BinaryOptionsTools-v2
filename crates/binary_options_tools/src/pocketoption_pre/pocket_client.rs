@@ -4,7 +4,7 @@ use binary_options_tools_core_pre::{builder::ClientBuilder, client::Client, erro
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::pocketoption_pre::{connect::PocketConnect, error::{PocketError, PocketResult}, modules::{assets::AssetsModule, balance::BalanceModule, deals::DealsApiModule, keep_alive::{InitModule, KeepAliveModule}, print_handler, server_time::ServerTimeModule, subscriptions::{SubscriptionStream, SubscriptionType, SubscriptionsApiModule}, trades::TradesApiModule}, ssid::Ssid, state::{State, StateBuilder}, types::{Action, Assets, Deal}};
+use crate::pocketoption_pre::{connect::PocketConnect, error::{PocketError, PocketResult}, modules::{assets::AssetsModule, balance::BalanceModule, deals::DealsApiModule, keep_alive::{InitModule, KeepAliveModule}, print_handler, server_time::ServerTimeModule, subscriptions::{SubscriptionStream, SubscriptionsApiModule}, trades::TradesApiModule}, ssid::Ssid, state::{State, StateBuilder}, types::{Action, Assets, Deal}, candle::SubscriptionType};
 
 const MINIMUM_TRADE_AMOUNT: f64 = 1.0;
 const MAXIMUM_TRADE_AMOUNT: f64 = 20000.0;
@@ -231,14 +231,14 @@ impl PocketOption {
 mod tests {
     use core::time::Duration;
     use futures_util::StreamExt;
-    use crate::pocketoption_pre::modules::subscriptions::SubscriptionType;
+    use crate::pocketoption_pre::candle::SubscriptionType;
 
     use super::PocketOption;
 
     #[tokio::test]
-    async fn test_pocket_option_new() {
+    async fn test_pocket_option_tester() {
         tracing_subscriber::fmt::init();
-        let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"\";s:10:\"ip_address\";s:15:\"191.113.139.200\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/119.\";s:13:\"last_activity\";i:1751057233;}b9d0db50cb32d406f935c63a41484f27","isDemo":0,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#; // 42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	
+        let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"a0e4f10b17cd7a8125bece49f1364c28\";s:10:\"ip_address\";s:13:\"186.41.20.143\";s:10:\"user_agent\";s:101:\"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36\";s:13:\"last_activity\";i:1752283410;}0f18b73ad560f70cd3e02eb7b3242f9f","isDemo":0,"uid":79165265,"platform":3,"isFastHistory":true,"isOptimized":true}]	"#; // 42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	
         let mut tester = PocketOption::new_testing_wrapper(ssid).await.unwrap();
         tester.start().await.unwrap();
         tokio::time::sleep(Duration::from_secs(120)).await; // Wait for 2 minutes to allow the client to run and process messages
@@ -302,7 +302,7 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_subscription() {
         tracing_subscriber::fmt::init();
-        let ssid = r#"42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#;
+        let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"a0e4f10b17cd7a8125bece49f1364c28\";s:10:\"ip_address\";s:13:\"186.41.20.143\";s:10:\"user_agent\";s:101:\"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36\";s:13:\"last_activity\";i:1752283410;}0f18b73ad560f70cd3e02eb7b3242f9f","isDemo":0,"uid":79165265,"platform":3,"isFastHistory":true,"isOptimized":true}]	"#;
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
 
@@ -319,4 +319,5 @@ mod tests {
 
         api.shutdown().await.unwrap();
     }
+    
 }
