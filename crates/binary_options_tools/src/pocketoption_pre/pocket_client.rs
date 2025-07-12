@@ -229,7 +229,9 @@ impl PocketOption {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use core::time::Duration;
+    use futures_util::StreamExt;
+    use crate::pocketoption_pre::modules::subscriptions::SubscriptionType;
 
     use super::PocketOption;
 
@@ -282,7 +284,7 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_result() {
         tracing_subscriber::fmt::init();
-        let ssid = r#"42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]"#;
+        let ssid = r#"42["auth",{"session":"dttf3u62d2kb6v888pjkte4ug6","isDemo":1,"uid":79165265,"platform":3,"isFastHistory":true,"isOptimized":true}]	"#;
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
         let (buy_id, _) = api.buy("EURUSD_otc", 60, 1.0).await.unwrap();
@@ -293,6 +295,28 @@ mod tests {
         tokio::time::sleep(Duration::from_secs(5)).await; // Wait for the trade to be complete to test retrieving the trade form the list of closed trades
         let sell_result = api.result(sell_id).await.unwrap();
         println!("Result ID: {sell_id}, Result: {sell_result:?}");
+        api.shutdown().await.unwrap();
+    }
+
+
+    #[tokio::test]
+    async fn test_pocket_option_subscription() {
+        tracing_subscriber::fmt::init();
+        let ssid = r#"42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#;
+        let api = PocketOption::new(ssid).await.unwrap();
+        tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
+
+        let subscription = api.subscribe("EURUSD_otc", SubscriptionType::time_aligned(Duration::from_secs(5)).unwrap()).await.unwrap();
+        let mut stream = subscription.to_stream();
+        while let Some(msg) = stream.next().await {
+            match msg {
+                Ok(msg) => println!("Received subscription message: {msg:?}"),
+                Err(e) => println!("Error in subscription: {e}"),
+            }
+        }
+        api.unsubscribe("EURUSD_otc").await.unwrap();
+        println!("Unsubscribed from EURUSD_otc");
+
         api.shutdown().await.unwrap();
     }
 }

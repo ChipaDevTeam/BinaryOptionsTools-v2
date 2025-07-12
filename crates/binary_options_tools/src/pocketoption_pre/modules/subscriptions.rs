@@ -1,7 +1,7 @@
 use core::fmt;
 use std::sync::Arc;
 use std::{collections::HashMap, time::Duration};
-
+use futures_util::stream::unfold;
 use async_trait::async_trait;
 use binary_options_tools_core_pre::error::CoreError;
 use binary_options_tools_core_pre::reimports::bounded_async;
@@ -353,7 +353,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             // 3. Send WebSocket subscription message
                             // 4. Store subscription info
                             // 5. Send success response with stream receiver
-                            
+
                             if self.is_max_subscriptions_reached().await {
                                 self.command_responder.send(CommandResponse::SubscriptionFailed {
                                     command_id,
@@ -699,7 +699,7 @@ impl SubscriptionStream {
     }
 
     /// Process time-aligned updates that align with PocketOption's candle intervals
-    fn process_time_aligned_update_static(
+    fn process_time_aligned_update_static(  // FIXME: This doesn't work for some reason
         price: f64,
         timestamp: f64,
         duration: &Duration,
@@ -751,22 +751,21 @@ impl SubscriptionStream {
 
     /// Convert to a futures Stream
     pub fn to_stream(self) -> impl futures_util::Stream<Item = PocketResult<Candle>> + 'static {
-        futures_util::stream::unfold(self, |mut stream| async move {
+        Box::pin(unfold(self, |mut stream| async move {
             let result = stream.receive().await;
             Some((result, stream))
-        })
+        }))
     }
 
-    /// Convert to a futures Stream with a static lifetime using Arc
-    pub fn to_stream_static(
-        self: Arc<Self>,
-    ) -> impl futures_util::Stream<Item = PocketResult<Candle>> + 'static {
-        let stream = (*self).clone();
-        futures_util::stream::unfold(stream, |mut stream| async move {
-            let result = stream.receive().await;
-            Some((result, stream))
-        })
-    }
+    // /// Convert to a futures Stream with a static lifetime using Arc
+    // pub fn to_stream_static(
+    //     self
+    // ) -> impl futures_util::Stream<Item = PocketResult<Candle>> + 'static {
+    //     Box::pin(unfold(self, |mut stream| async move {
+    //         let result = stream.receive().await;
+    //         Some((result, stream))
+    //     }))
+    // }
 
     /// Check if the subscription type uses time alignment
     pub fn is_time_aligned(&self) -> bool {
