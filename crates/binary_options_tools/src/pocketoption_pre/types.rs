@@ -117,162 +117,6 @@ impl fmt::Display for ServerTime {
     }
 }
 
-/// Candle data structure for PocketOption price data
-///
-/// This represents OHLC (Open, High, Low, Close) price data for a specific time period.
-/// Note: PocketOption doesn't provide volume data, so the volume field is always None.
-#[derive(Debug, Clone, Default)]
-pub struct Candle {
-    /// Trading symbol (e.g., "EURUSD_otc")
-    pub symbol: String,
-    /// Unix timestamp of the candle start time
-    pub timestamp: f64,
-    /// Opening price
-    pub open: f64,
-    /// Highest price in the candle period
-    pub high: f64,
-    /// Lowest price in the candle period
-    pub low: f64,
-    /// Closing price
-    pub close: f64,
-    /// Volume is not provided by PocketOption
-    // #[serde(skip_serializing_if = "Option::is_none")]
-    pub volume: Option<f64>,
-    /// Whether this candle is closed/finalized
-    pub is_closed: bool,
-}
-
-impl Candle {
-    /// Create a new candle with initial price
-    ///
-    /// # Arguments
-    /// * `symbol` - Trading symbol
-    /// * `timestamp` - Unix timestamp for the candle start
-    /// * `price` - Initial price (used for open, high, low, close)
-    ///
-    /// # Returns
-    /// New Candle instance with all OHLC values set to the initial price
-    pub fn new(symbol: String, timestamp: f64, price: f64) -> Self {
-        Self {
-            symbol,
-            timestamp,
-            open: price,
-            high: price,
-            low: price,
-            close: price,
-            volume: None, // PocketOption doesn't provide volume
-            is_closed: false,
-        }
-    }
-
-    /// Update the candle with a new price
-    ///
-    /// This method updates the high, low, and close prices while maintaining
-    /// the open price from the initial candle creation.
-    ///
-    /// # Arguments
-    /// * `price` - New price to incorporate into the candle
-    pub fn update_price(&mut self, price: f64) {
-        self.high = self.high.max(price);
-        self.low = self.low.min(price);
-        self.close = price;
-    }
-
-    /// Update the candle with a new timestamp and price
-    ///
-    /// This method updates the high, low, and close prices while maintaining
-    /// the open price from the initial candle creation.
-    ///
-    /// # Arguments
-    /// * `timestamp` - New timestamp for the candle
-    /// * `price` - New price to incorporate into the candle
-    pub fn update(&mut self, timestamp: f64, price: f64) {
-        self.high = self.high.max(price);
-        self.low = self.low.min(price);
-        self.close = price;
-        self.timestamp = timestamp;
-    }
-
-    /// Mark the candle as closed/finalized
-    ///
-    /// Once a candle is closed, it should not be updated with new prices.
-    /// This is typically called when a time-based candle period ends.
-    pub fn close_candle(&mut self) {
-        self.is_closed = true;
-    }
-
-    /// Get the price range (high - low) of the candle
-    ///
-    /// # Returns
-    /// Price range as f64
-    pub fn price_range(&self) -> f64 {
-        self.high - self.low
-    }
-
-    /// Check if the candle is bullish (close > open)
-    ///
-    /// # Returns
-    /// True if the candle closed higher than it opened
-    pub fn is_bullish(&self) -> bool {
-        self.close > self.open
-    }
-
-    /// Check if the candle is bearish (close < open)
-    ///
-    /// # Returns
-    /// True if the candle closed lower than it opened
-    pub fn is_bearish(&self) -> bool {
-        self.close < self.open
-    }
-
-    /// Check if the candle is a doji (close ≈ open)
-    ///
-    /// # Returns
-    /// True if the candle has very little price movement
-    pub fn is_doji(&self) -> bool {
-        let body_size = (self.close - self.open).abs();
-        let range = self.price_range();
-
-        // Consider it a doji if the body is less than 10% of the range
-        if range > 0.0 {
-            body_size / range < 0.1
-        } else {
-            true // No price movement at all
-        }
-    }
-
-    /// Get the body size of the candle (absolute difference between open and close)
-    ///
-    /// # Returns
-    /// Body size as f64
-    pub fn body_size(&self) -> f64 {
-        (self.close - self.open).abs()
-    }
-
-    /// Get the upper shadow length
-    ///
-    /// # Returns
-    /// Upper shadow length as f64
-    pub fn upper_shadow(&self) -> f64 {
-        self.high - self.open.max(self.close)
-    }
-
-    /// Get the lower shadow length
-    ///
-    /// # Returns
-    /// Lower shadow length as f64
-    pub fn lower_shadow(&self) -> f64 {
-        self.open.min(self.close) - self.low
-    }
-
-    /// Convert timestamp to DateTime<Utc>
-    ///
-    /// # Returns
-    /// DateTime<Utc> representation of the candle timestamp
-    pub fn datetime(&self) -> DateTime<Utc> {
-        DateTime::from_timestamp(self.timestamp as i64, 0).unwrap_or_else(Utc::now)
-    }
-}
 
 /// Stream data from WebSocket messages
 ///
@@ -440,6 +284,21 @@ pub struct CandleLength {
     time: u32,
 }
 
+impl CandleLength {
+    /// Create a new CandleLength instance
+    ///
+    /// # Arguments
+    /// * `time` - Duration in seconds
+    pub const fn new(time: u32) -> Self {
+        CandleLength { time }
+    }
+
+    /// Get the duration in seconds
+    pub fn duration(&self) -> u32 {
+        self.time
+    }
+}
+
 impl From<u32> for CandleLength {
     fn from(val: u32) -> Self {
         CandleLength { time: val }
@@ -475,6 +334,18 @@ pub enum AssetType {
 }
 
 impl Asset {
+    const DEFAULT_CANDLE_LENGTHS: [CandleLength; 9] = [
+        CandleLength::new(5),   
+        CandleLength::new(15),  
+        CandleLength::new(30),  
+        CandleLength::new(60), 
+        CandleLength::new(60 * 3),
+        CandleLength::new(60 * 5),
+        CandleLength::new(60 * 30),
+        CandleLength::new(60 * 60),
+        CandleLength::new(60 * 60 * 4),
+    ];
+
     pub fn is_otc(&self) -> bool {
         self.is_otc
     }
@@ -495,12 +366,12 @@ impl Asset {
         if !self.is_active {
             return Err(PocketError::InvalidAsset("Asset is not active".into()));
         }
-        if !self.allowed_candles.contains(&CandleLength::from(time)) {
+        if !self.allowed_candles.contains(&CandleLength::from(time)) && !Self::DEFAULT_CANDLE_LENGTHS.contains(&CandleLength::from(time)) {
             return Err(PocketError::InvalidAsset(format!(
                 "Time is not in allowed candle durations, available {:?}",
                 self.allowed_candles()
                     .iter()
-                    .map(|c| c.time)
+                    .map(|c| c.duration())
                     .collect::<Vec<_>>()
             )));
         }
