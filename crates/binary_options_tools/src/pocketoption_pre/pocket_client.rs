@@ -74,7 +74,21 @@ impl PocketOption {
     }
 
     pub async fn new(ssid: impl ToString) -> PocketResult<Self> {
-        let (client, mut runner) = Self::builder(ssid)?.build().await?;
+        let state = StateBuilder::default()
+            .ssid(Ssid::parse(ssid)?)
+            .build()?;
+        let builder = ClientBuilder::new(PocketConnect, state)
+            .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)))
+            .with_lightweight_module::<KeepAliveModule>()
+            .with_lightweight_module::<InitModule>()
+            .with_lightweight_module::<BalanceModule>()
+            .with_lightweight_module::<ServerTimeModule>()
+            .with_lightweight_module::<AssetsModule>()
+            .with_module::<TradesApiModule>()
+            .with_module::<DealsApiModule>()
+            .with_module::<SubscriptionsApiModule>()
+            .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)));
+        let (client, mut runner) = builder.build().await?;
 
         let _runner = tokio::spawn(async move { runner.run().await });
         client.wait_connected().await;
