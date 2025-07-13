@@ -124,7 +124,8 @@ impl PocketOption {
     /// let client = PocketOption::new("your-session-id").await?;
     /// ```
     pub async fn new(ssid: impl ToString) -> PocketResult<Self> {
-        let ssid = Ssid::parse(ssid).map_err(|e| PocketOptionError::SsidParsingError(e.to_string()))?;
+        let ssid =
+            Ssid::parse(ssid).map_err(|e| PocketOptionError::SsidParsingError(e.to_string()))?;
         let data = Data::new(PocketData::default());
         let handler = Handler::new(ssid.clone());
         let timeout = Duration::from_millis(500);
@@ -161,7 +162,8 @@ impl PocketOption {
     /// let client = PocketOption::new_with_url("your-session-id", url).await?;
     /// ```
     pub async fn new_with_url(ssid: impl ToString, url: Url) -> PocketResult<Self> {
-        let ssid = Ssid::parse(ssid).map_err(|e| PocketOptionError::SsidParsingError(e.to_string()))?;
+        let ssid =
+            Ssid::parse(ssid).map_err(|e| PocketOptionError::SsidParsingError(e.to_string()))?;
         let data = Data::new(PocketData::default());
         let handler = Handler::new(ssid.clone());
         let timeout = Duration::from_millis(500);
@@ -205,7 +207,8 @@ impl PocketOption {
         ssid: impl ToString,
         config: Config<PocketData, WebSocketMessage, ()>,
     ) -> PocketResult<Self> {
-        let ssid = Ssid::parse(ssid).map_err(|e| PocketOptionError::SsidParsingError(e.to_string()))?;
+        let ssid =
+            Ssid::parse(ssid).map_err(|e| PocketOptionError::SsidParsingError(e.to_string()))?;
         let data = Data::new(PocketData::default());
         let handler = Handler::new(ssid.clone());
         let callback = PocketCallback;

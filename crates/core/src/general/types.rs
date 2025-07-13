@@ -27,7 +27,9 @@ where
 }
 
 // Type alias to reduce type complexity for pending_requests
-type PendingRequests<Transfer> = Arc<Mutex<HashMap<<Transfer as MessageTransfer>::Info, (Sender<Transfer>, Receiver<Transfer>)>>>;
+type PendingRequests<Transfer> = Arc<
+    Mutex<HashMap<<Transfer as MessageTransfer>::Info, (Sender<Transfer>, Receiver<Transfer>)>>,
+>;
 
 #[derive(Clone)]
 pub struct Data<T, Transfer>

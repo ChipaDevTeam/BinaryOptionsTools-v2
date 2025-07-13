@@ -11,7 +11,9 @@ use crate::{
 };
 
 use super::{
-    stream::FilteredRecieverStream, traits::{DataHandler, MessageTransfer, RawMessage, ValidatorTrait}, types::Data
+    stream::FilteredRecieverStream,
+    traits::{DataHandler, MessageTransfer, RawMessage, ValidatorTrait},
+    types::Data,
 };
 
 #[derive(Clone)]
@@ -304,14 +306,16 @@ impl SenderMessage {
         }
     }
 
-    pub async fn send_raw_message_iterator<        Transfer: MessageTransfer,
-    T: DataHandler<Transfer = Transfer>,
->(        &self,
-    timeout: Option<Duration>,
-    data: &Data<T, Transfer>,
-    msg: Transfer::Raw,
-    validator: Box<dyn ValidatorTrait<Transfer::Raw> + Send + Sync>,
-) -> BinaryOptionsResult<FilteredRecieverStream<Transfer::Raw>> {
+    pub async fn send_raw_message_iterator<
+        Transfer: MessageTransfer,
+        T: DataHandler<Transfer = Transfer>,
+    >(
+        &self,
+        timeout: Option<Duration>,
+        data: &Data<T, Transfer>,
+        msg: Transfer::Raw,
+        validator: Box<dyn ValidatorTrait<Transfer::Raw> + Send + Sync>,
+    ) -> BinaryOptionsResult<FilteredRecieverStream<Transfer::Raw>> {
         let reciever = self.raw_reciever(data, msg).await?;
         info!("Created new RawStreamIterator");
         Ok(FilteredRecieverStream::new(reciever, timeout, validator))

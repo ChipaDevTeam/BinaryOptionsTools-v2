@@ -5,7 +5,6 @@ use uuid::Uuid;
 
 use crate::pocketoption_pre::modules::subscriptions::SubscriptionError;
 
-
 #[derive(thiserror::Error, Debug)]
 pub enum PocketError {
     #[error("Failed to join task: {0}")]
@@ -40,7 +39,6 @@ pub enum PocketError {
 
     #[error("Subscription error: {0}")]
     Subscription(#[from] SubscriptionError),
-
 }
 
 pub type PocketResult<T> = Result<T, PocketError>;

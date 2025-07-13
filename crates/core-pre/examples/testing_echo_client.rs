@@ -70,7 +70,6 @@ impl ApiModule<()> for EchoModule {
     fn create_handle(
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
-        
     ) -> Self::Handle {
         EchoHandle { sender, receiver }
     }

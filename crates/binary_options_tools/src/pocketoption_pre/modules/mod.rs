@@ -4,7 +4,9 @@ use binary_options_tools_core_pre::{error::CoreResult, reimports::Message};
 
 use crate::pocketoption_pre::state::State;
 
+pub mod assets;
 pub mod balance;
+pub mod deals;
 /// Module implementations for PocketOption client
 ///
 /// This module provides specialized handlers for different aspects of the
@@ -46,11 +48,9 @@ pub mod balance;
 ///
 /// Both patterns allow for clean separation of concerns and easy testing.
 pub mod keep_alive;
-pub mod assets;
 pub mod server_time;
-pub mod trades;
-pub mod deals;
 pub mod subscriptions;
+pub mod trades;
 
 // pub use subscriptions::{
 //     CandleConfig, MAX_SUBSCRIPTIONS, SubscriptionCommand, SubscriptionHandle, SubscriptionModule,

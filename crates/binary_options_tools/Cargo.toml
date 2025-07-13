@@ -1,6 +1,6 @@
 [package]
 name = "binary-options-tools"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2024"
 repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
 readme = "README.md"

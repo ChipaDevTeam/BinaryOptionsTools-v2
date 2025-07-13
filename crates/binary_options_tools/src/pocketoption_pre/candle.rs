@@ -1,16 +1,16 @@
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use tracing::warn;
 
 use crate::pocketoption_pre::error::{PocketError, PocketResult};
-
 
 /// Candle data structure for PocketOption price data
 ///
 /// This represents OHLC (Open, High, Low, Close) price data for a specific time period.
 /// Note: PocketOption doesn't provide volume data, so the volume field is always None.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Candle {
     /// Trading symbol (e.g., "EURUSD_otc")
     pub symbol: String,
@@ -60,7 +60,7 @@ impl Candle {
             low: price,
             close: price,
             volume: None, // PocketOption doesn't provide volume
-            // is_closed: false,
+                          // is_closed: false,
         }
     }
 
@@ -78,7 +78,7 @@ impl Candle {
     }
 
     /// Update the candle with a new timestamp and price
-    /// 
+    ///
     /// This method updates the high, low, and close prices while maintaining
     /// the open price from the initial candle creation.
     ///
@@ -178,8 +178,8 @@ impl Candle {
 pub enum SubscriptionType {
     None,
     Chunk {
-        size: usize,    // Number of candles to aggregate
-        current: usize, // Current aggregated candle count
+        size: usize,        // Number of candles to aggregate
+        current: usize,     // Current aggregated candle count
         candle: BaseCandle, // Current aggregated candle
     },
     Time {
@@ -192,12 +192,18 @@ pub enum SubscriptionType {
         candle: BaseCandle,
         /// Stores the timestamp for the end of the current aggregation window.
         next_boundary: Option<f64>,
-
     },
 }
 
 impl BaseCandle {
-    pub fn new(timestamp: f64, open: f64, high: f64, low: f64, close: f64, volume: Option<f64>) -> Self {
+    pub fn new(
+        timestamp: f64,
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+        volume: Option<f64>,
+    ) -> Self {
         Self {
             timestamp,
             open,
@@ -217,7 +223,6 @@ impl SubscriptionType {
     const SUPPORTED_DURATIONS: &[u64] = &[
         5, 15, 30, 60, 120, 180, 300, 600, 900, 1800, 2700, 3600, 7200, 10800, 14400,
     ];
-
 
     pub fn none() -> Self {
         SubscriptionType::None
@@ -241,24 +246,31 @@ impl SubscriptionType {
 
     pub fn time_aligned(duration: Duration) -> PocketResult<Self> {
         if !Self::SUPPORTED_DURATIONS.contains(&duration.as_secs()) {
-            warn!("Unsupported duration for time-aligned subscription: {:?}", duration);
+            warn!(
+                "Unsupported duration for time-aligned subscription: {:?}",
+                duration
+            );
             return Err(PocketError::General(format!(
                 "Unsupported duration for time-aligned subscription: {:?}",
                 duration
             )));
         }
         Ok(SubscriptionType::TimeAligned {
-                    duration,
-                    candle: BaseCandle::default(),
-                    next_boundary: None,
-                })
+            duration,
+            candle: BaseCandle::default(),
+            next_boundary: None,
+        })
     }
 
     pub fn update(&mut self, new_candle: &BaseCandle) -> PocketResult<Option<BaseCandle>> {
         match self {
             SubscriptionType::None => Ok(Some(new_candle.clone())),
 
-            SubscriptionType::Chunk { size, current, candle } => {
+            SubscriptionType::Chunk {
+                size,
+                current,
+                candle,
+            } => {
                 if *current == 0 {
                     *candle = new_candle.clone();
                 } else {
@@ -272,13 +284,16 @@ impl SubscriptionType {
                 if *current >= *size {
                     *current = 0; // Reset for next batch
                     Ok(Some(candle.clone()))
-
                 } else {
                     Ok(None)
                 }
             }
 
-            SubscriptionType::Time { start_time, duration, candle } => {
+            SubscriptionType::Time {
+                start_time,
+                duration,
+                candle,
+            } => {
                 if start_time.is_none() {
                     *start_time = Some(new_candle.timestamp);
                     *candle = new_candle.clone();
@@ -291,13 +306,13 @@ impl SubscriptionType {
                 candle.low = candle.low.min(new_candle.low);
                 candle.close = new_candle.close;
 
-                let elapsed = (new_candle.timestamp() - DateTime::from_timestamp(start_time.unwrap() as i64, 0).unwrap_or_else(Utc::now))
-                    .to_std()
-                    .map_err(|_| {
-                        PocketError::General(
-                            "Time calculation error in conditional update".to_string(),
-                        )
-                    })?;
+                let elapsed = (new_candle.timestamp()
+                    - DateTime::from_timestamp(start_time.unwrap() as i64, 0)
+                        .unwrap_or_else(Utc::now))
+                .to_std()
+                .map_err(|_| {
+                    PocketError::General("Time calculation error in conditional update".to_string())
+                })?;
 
                 if elapsed >= *duration {
                     *start_time = None; // Reset for next period
@@ -307,7 +322,11 @@ impl SubscriptionType {
                 }
             }
 
-            SubscriptionType::TimeAligned { duration, candle, next_boundary } => {
+            SubscriptionType::TimeAligned {
+                duration,
+                candle,
+                next_boundary,
+            } => {
                 let boundary = match *next_boundary {
                     Some(b) => b,
                     None => {
@@ -317,7 +336,7 @@ impl SubscriptionType {
                         let bucket_id = (new_candle.timestamp / duration_secs).floor();
                         let new_boundary = (bucket_id + 1.0) * duration_secs;
                         *next_boundary = Some(new_boundary);
-                        
+
                         // It's the first candle, so the window can't be complete yet.
                         return Ok(None);
                     }
@@ -355,7 +374,6 @@ impl SubscriptionType {
                     Ok(Some(completed_candle))
                 }
             }
-
         }
     }
 }

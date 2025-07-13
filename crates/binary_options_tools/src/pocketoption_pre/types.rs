@@ -1,8 +1,11 @@
 use core::fmt;
-use std::{collections::HashMap, sync::atomic::{AtomicBool, Ordering}};
 use std::hash::Hash;
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
-use binary_options_tools_core_pre::{traits::Rule, reimports::Message};
+use binary_options_tools_core_pre::{reimports::Message, traits::Rule};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -176,7 +179,7 @@ impl Candle {
     }
 
     /// Update the candle with a new timestamp and price
-    /// 
+    ///
     /// This method updates the high, low, and close prices while maintaining
     /// the open price from the initial candle creation.
     ///
@@ -307,7 +310,6 @@ impl<'de> Deserialize<'de> for StreamData {
     }
 }
 
-
 impl StreamData {
     /// Create new stream data
     ///
@@ -338,12 +340,11 @@ impl StreamData {
 /// using a read-write lock for concurrent access.
 pub type ServerTimeState = tokio::sync::RwLock<ServerTime>;
 
-
 /// Simple rule implementation for when the websocket data is sent using 2 messages
 /// The first one telling which message type it is, and the second one containing the actual data.
 pub struct TwoStepRule {
     valid: AtomicBool,
-    pattern: String
+    pattern: String,
 }
 
 impl TwoStepRule {
@@ -376,7 +377,7 @@ impl Rule for TwoStepRule {
                     false
                 }
             }
-            _ => false
+            _ => false,
         }
     }
 
@@ -424,7 +425,8 @@ impl Rule for MultiPatternRule {
                     false
                 }
             }
-            _ => false        }
+            _ => false,
+        }
     }
 
     fn reset(&self) {
@@ -435,7 +437,7 @@ impl Rule for MultiPatternRule {
 /// CandleLength is a wrapper around u32 for allowed candle durations (in seconds)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 pub struct CandleLength {
-    time: u32
+    time: u32,
 }
 
 impl From<u32> for CandleLength {
@@ -494,12 +496,17 @@ impl Asset {
             return Err(PocketError::InvalidAsset("Asset is not active".into()));
         }
         if !self.allowed_candles.contains(&CandleLength::from(time)) {
-            return Err(PocketError::InvalidAsset(format!("Time is not in allowed candle durations, available {:?}", self.allowed_candles().iter().map(|c| c.time).collect::<Vec<_>>())));
+            return Err(PocketError::InvalidAsset(format!(
+                "Time is not in allowed candle durations, available {:?}",
+                self.allowed_candles()
+                    .iter()
+                    .map(|c| c.time)
+                    .collect::<Vec<_>>()
+            )));
         }
         Ok(())
     }
 }
-
 
 impl<'de> Deserialize<'de> for Asset {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -544,7 +551,6 @@ impl<'de> Deserialize<'de> for Asset {
     }
 }
 
-
 /// Wrapper around HashMap<String, Asset>
 #[derive(Debug, Default, Clone)]
 pub struct Assets(pub HashMap<String, Asset>);
@@ -558,7 +564,9 @@ impl Assets {
         if let Some(asset) = self.get(symbol) {
             asset.validate(time)
         } else {
-            Err(PocketError::InvalidAsset(format!("Asset with symbol `{symbol}` not found")))
+            Err(PocketError::InvalidAsset(format!(
+                "Asset with symbol `{symbol}` not found"
+            )))
         }
     }
 
@@ -657,7 +665,7 @@ impl OpenOrder {
         action: Action,
         duration: u32,
         demo: u32,
-        request_id: Uuid
+        request_id: Uuid,
     ) -> Self {
         Self {
             amount,
@@ -689,7 +697,6 @@ where
 
 impl fmt::Display for OpenOrder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-
         // returns data in this format (using serde_json): 42["openOrder",{"asset":"EURUSD_otc","amount":1.0,"action":"call","isDemo":1,"requestId":"abcde-12345","optionType":100,"time":60}]
         let data = serde_json::to_string(&self).map_err(|_| fmt::Error)?;
         write!(f, "42[\"openOrder\",{data}]")
@@ -702,7 +709,14 @@ mod tests {
 
     #[test]
     fn test_open_order_format() {
-        let order = OpenOrder::new(1.0, "EURUSD_otc".to_string(), Action::Call, 60, 1, Uuid::new_v4());
+        let order = OpenOrder::new(
+            1.0,
+            "EURUSD_otc".to_string(),
+            Action::Call,
+            60,
+            1,
+            Uuid::new_v4(),
+        );
         let formatted = format!("{order}");
         assert!(formatted.starts_with("42[\"openOrder\","));
         assert!(formatted.contains("\"asset\":\"EURUSD_otc\""));

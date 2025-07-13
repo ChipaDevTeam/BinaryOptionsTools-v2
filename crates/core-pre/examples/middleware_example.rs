@@ -1,13 +1,13 @@
+use async_trait::async_trait;
 use binary_options_tools_core_pre::builder::ClientBuilder;
 use binary_options_tools_core_pre::connector::{Connector, ConnectorResult, WsStream};
 use binary_options_tools_core_pre::error::CoreResult;
-use binary_options_tools_core_pre::middleware::{WebSocketMiddleware, MiddlewareContext};
+use binary_options_tools_core_pre::middleware::{MiddlewareContext, WebSocketMiddleware};
 use binary_options_tools_core_pre::traits::{ApiModule, AppState, Rule};
-use async_trait::async_trait;
+use kanal::{AsyncReceiver, AsyncSender};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio_tungstenite::tungstenite::Message;
-use kanal::{AsyncReceiver, AsyncSender};
 use tracing::info;
 
 #[derive(Debug)]
@@ -64,30 +64,38 @@ pub struct StatisticsReport {
 
 #[async_trait]
 impl WebSocketMiddleware<ExampleState> for StatisticsMiddleware {
-    async fn on_send(&self, message: &Message, _context: &MiddlewareContext<ExampleState>) -> CoreResult<()> {
+    async fn on_send(
+        &self,
+        message: &Message,
+        _context: &MiddlewareContext<ExampleState>,
+    ) -> CoreResult<()> {
         self.messages_sent.fetch_add(1, Ordering::Relaxed);
-        
+
         let size = match message {
             Message::Text(text) => text.len() as u64,
             Message::Binary(data) => data.len() as u64,
             _ => 0,
         };
         self.bytes_sent.fetch_add(size, Ordering::Relaxed);
-        
+
         info!("Middleware: Sending message (size: {} bytes)", size);
         Ok(())
     }
 
-    async fn on_receive(&self, message: &Message, _context: &MiddlewareContext<ExampleState>) -> CoreResult<()> {
+    async fn on_receive(
+        &self,
+        message: &Message,
+        _context: &MiddlewareContext<ExampleState>,
+    ) -> CoreResult<()> {
         self.messages_received.fetch_add(1, Ordering::Relaxed);
-        
+
         let size = match message {
             Message::Text(text) => text.len() as u64,
             Message::Binary(data) => data.len() as u64,
             _ => 0,
         };
         self.bytes_received.fetch_add(size, Ordering::Relaxed);
-        
+
         info!("Middleware: Received message (size: {} bytes)", size);
         Ok(())
     }
@@ -110,12 +118,20 @@ struct LoggingMiddleware;
 
 #[async_trait]
 impl WebSocketMiddleware<ExampleState> for LoggingMiddleware {
-    async fn on_send(&self, message: &Message, _context: &MiddlewareContext<ExampleState>) -> CoreResult<()> {
+    async fn on_send(
+        &self,
+        message: &Message,
+        _context: &MiddlewareContext<ExampleState>,
+    ) -> CoreResult<()> {
         info!("Logging: Sending message: {:?}", message);
         Ok(())
     }
 
-    async fn on_receive(&self, message: &Message, _context: &MiddlewareContext<ExampleState>) -> CoreResult<()> {
+    async fn on_receive(
+        &self,
+        message: &Message,
+        _context: &MiddlewareContext<ExampleState>,
+    ) -> CoreResult<()> {
         info!("Logging: Received message: {:?}", message);
         Ok(())
     }
@@ -138,7 +154,11 @@ struct MockConnector;
 impl Connector<ExampleState> for MockConnector {
     async fn connect(&self, _: Arc<ExampleState>) -> ConnectorResult<WsStream> {
         // This would be a real WebSocket connection in practice
-        Err(binary_options_tools_core_pre::connector::ConnectorError::Custom("Mock connector".to_string()))
+        Err(
+            binary_options_tools_core_pre::connector::ConnectorError::Custom(
+                "Mock connector".to_string(),
+            ),
+        )
     }
 
     async fn disconnect(&self) -> ConnectorResult<()> {
@@ -164,15 +184,12 @@ impl ApiModule<ExampleState> for ExampleModule {
         msg_rx: AsyncReceiver<Arc<Message>>,
         _to_ws: AsyncSender<Message>,
     ) -> Self {
-        Self {
-            _msg_rx: msg_rx,
-        }
+        Self { _msg_rx: msg_rx }
     }
 
     fn create_handle(
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
-        
     ) -> Self::Handle {
         ExampleHandle { sender, receiver }
     }
@@ -202,7 +219,7 @@ async fn main() -> CoreResult<()> {
 
     // Create statistics middleware
     let stats_middleware = Arc::new(StatisticsMiddleware::new());
-    
+
     // Build the client with middleware
     let (client, mut runner) = ClientBuilder::new(MockConnector, ExampleState)
         .with_middleware(Box::new(LoggingMiddleware))
@@ -217,7 +234,7 @@ async fn main() -> CoreResult<()> {
     // 1. Start the runner in a background task
     // 2. Use the client to send messages
     // 3. Check statistics periodically
-    
+
     // For demonstration, we'll just show the statistics
     let stats = stats_middleware.get_stats();
     info!("Current statistics: {:?}", stats);

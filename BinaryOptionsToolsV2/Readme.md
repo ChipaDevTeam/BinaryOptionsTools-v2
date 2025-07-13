@@ -1,6 +1,28 @@
 👉 [Join us on Discord](https://discord.gg/T3FGXcmd)
 # [BinaryOptionsToolsV2](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/0.1.6a4)
 
+## ⚠️ Work in Progress Notice
+
+**Current Status**: This version is undergoing major refactoring to use a new, more stable API implementation. Many features are temporarily unavailable while we transition to the new architecture.
+
+**Available Features**:
+- Basic authentication and connection
+- Buy/Sell operations
+- Balance retrieval
+- Basic symbol subscriptions
+- Server time synchronization
+
+**Temporarily Unavailable Features** (returning "work in progress" errors):
+- Historical candle data (`get_candles`, `get_candles_advanced`)
+- Trade history (`history`)
+- Closed deals management
+- Payout information
+- Raw message sending
+- Advanced validators
+- Deal end time queries
+
+We're actively working to restore all functionality with improved stability and performance.
+
 ## How to install
 Install it with PyPi using the following command:
 ```bash
@@ -68,13 +90,13 @@ Key Features of PocketOptionAsync
   - `sell()`: Places a sell trade asynchronously. 
   - `check_win()`: Checks the outcome of a trade ('win', 'draw', or 'loss'). 
 - **Market Data**: 
-  - `get_candles()`: Fetches historical candle data. 
-  - `history()`: Retrieves recent data for a specific asset. 
+  - ~~`get_candles()`: Fetches historical candle data.~~ (Work in Progress)
+  - ~~`history()`: Retrieves recent data for a specific asset.~~ (Work in Progress)
 - **Account Management**: 
   - `balance()`: Returns the current account balance. 
   - `opened_deals()`: Lists all open trades. 
-  - `closed_deals()`: Lists all closed trades. 
-  - `payout()`: Returns payout percentages. 
+  - ~~`closed_deals()`: Lists all closed trades.~~ (Work in Progress)
+  - ~~`payout()`: Returns payout percentages.~~ (Work in Progress)
 - **Real-Time Data**: 
   - `subscribe_symbol()`: Provides an asynchronous iterator for real-time candle updates. 
   - `subscribe_symbol_timed()`: Provides an asynchronous iterator for timed real-time candle updates.
@@ -110,13 +132,13 @@ Key Features of PocketOption
   - `sell()`: Places a sell trade. 
   - `check_win()`: Checks the trade outcome synchronously. 
 - **Market Data**: 
-  - `get_candles()`: Fetches historical candle data. 
-  - `history()`: Retrieves recent data for a specific asset. 
+  - ~~`get_candles()`: Fetches historical candle data.~~ (Work in Progress)
+  - ~~`history()`: Retrieves recent data for a specific asset.~~ (Work in Progress)
 - **Account Management**: 
   - `balance()`: Retrieves account balance. 
   - `opened_deals()`: Lists all open trades. 
-  - `closed_deals()`: Lists all closed trades. 
-  - `payout()`: Returns payout percentages. 
+  - ~~`closed_deals()`: Lists all closed trades.~~ (Work in Progress)
+  - ~~`payout()`: Returns payout percentages.~~ (Work in Progress)
 - **Real-Time Data**: 
   - `subscribe_symbol()`: Provides a synchronous iterator for live data updates. 
   - `subscribe_symbol_timed()`: Provides a synchronous iterator for timed real-time candle updates.

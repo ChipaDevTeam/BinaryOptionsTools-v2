@@ -56,34 +56,6 @@ class PocketOption:
             client = PocketOption("your-session-id", url="wss://custom-server.com/ws")
             ```
 
-            With configuration object:
-            ```python
-            config = Config()
-            config.timeout_secs = 60
-            config.reconnect_time = 10
-            client = PocketOption("your-session-id", config=config)
-            ```
-
-            With configuration dictionary:
-            ```python
-            config_dict = {
-                "timeout_secs": 60,
-                "reconnect_time": 10,
-                "urls": ["wss://backup1.com", "wss://backup2.com"]
-            }
-            client = PocketOption("your-session-id", config=config_dict)
-            ```
-
-            With JSON configuration:
-            ```python
-            config_json = '''
-            {
-                "timeout_secs": 60,
-                "reconnect_time": 10
-            }
-            '''
-            client = PocketOption("your-session-id", config=config_json)
-            ```
 
             Using the client for trading:
             ```python
@@ -104,6 +76,8 @@ class PocketOption:
             - Invalid configuration values will raise appropriate exceptions
             - The event loop is automatically closed when the instance is deleted
             - All async operations are wrapped to provide a synchronous interface
+        
+        Warning: This class does not use the `Config` class for configuration management.
         """        
         self.loop = asyncio.new_event_loop()
         self._client = PocketOptionAsync(ssid, config)
@@ -208,6 +182,13 @@ class PocketOption:
         """
         return SyncSubscription(self.loop.run_until_complete(self._client._subscribe_symbol_timed_inner(asset, time)))
     
+    def subscribe_symbol_time_aligned(self, asset: str, time: timedelta) -> SyncSubscription:
+        """
+        Returns a sync iterator over the associated asset, it will return real time candles formed with candles ranging from time `start_time` to `start_time` + `time` allowing users to get the latest candle of `time` duration and will return new candles while the 'PocketOption' class is loaded if the class is droped then the iterator will fail
+        Please keep in mind the iterator won't return a new candle exactly each `time` duration, there could be a small delay and imperfect timestamps
+        """
+        return SyncSubscription(self.loop.run_until_complete(self._client._subscribe_symbol_time_aligned_inner(asset, time)))
+
     def send_raw_message(self, message: str) -> None:
         """
         Sends a raw WebSocket message without waiting for a response.
@@ -392,4 +373,4 @@ class PocketOption:
                 return client.buy(asset, amount, duration)
             ```
         """
-        return self.loop.run_until_complete(self._client.is_demo())
+        return self._client.is_demo()

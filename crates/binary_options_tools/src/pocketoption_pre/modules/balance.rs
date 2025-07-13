@@ -2,7 +2,11 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use binary_options_tools_core::reimports::Message;
-use binary_options_tools_core_pre::{error::{CoreError, CoreResult}, reimports::{AsyncReceiver, AsyncSender}, traits::{LightweightModule, Rule}};
+use binary_options_tools_core_pre::{
+    error::{CoreError, CoreResult},
+    reimports::{AsyncReceiver, AsyncSender},
+    traits::{LightweightModule, Rule},
+};
 use serde::Deserialize;
 use serde_json::Value;
 use tracing::{debug, warn};
@@ -14,7 +18,7 @@ use crate::pocketoption_pre::{state::State, types::TwoStepRule};
 struct BalanceMessage {
     balance: f64,
     #[serde(flatten)]
-    _extra: HashMap<String, Value>
+    _extra: HashMap<String, Value>,
 }
 
 // #[derive(Debug, Deserialize)]
@@ -40,7 +44,11 @@ pub struct BalanceModule {
 
 #[async_trait]
 impl LightweightModule<State> for BalanceModule {
-    fn new(state: Arc<State>, _: AsyncSender<Message>, receiver: AsyncReceiver<Arc<Message>>) -> Self {
+    fn new(
+        state: Arc<State>,
+        _: AsyncSender<Message>,
+        receiver: AsyncReceiver<Arc<Message>>,
+    ) -> Self {
         Self { state, receiver }
     }
 
@@ -68,5 +76,4 @@ impl LightweightModule<State> for BalanceModule {
     fn rule() -> Box<dyn Rule + Send + Sync> {
         Box::new(TwoStepRule::new(r#"451-["successupdateBalance","#))
     }
-} 
-
+}

@@ -1,13 +1,15 @@
-use binary_options_tools_core_pre::testing::{TestingConfig, TestingWrapper, TestingWrapperBuilder};
+use async_trait::async_trait;
 use binary_options_tools_core_pre::builder::ClientBuilder;
 use binary_options_tools_core_pre::connector::{Connector, ConnectorResult, WsStream};
 use binary_options_tools_core_pre::error::CoreResult;
+use binary_options_tools_core_pre::testing::{
+    TestingConfig, TestingWrapper, TestingWrapperBuilder,
+};
 use binary_options_tools_core_pre::traits::{ApiModule, Rule};
-use async_trait::async_trait;
+use kanal::{AsyncReceiver, AsyncSender};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
-use kanal::{AsyncReceiver, AsyncSender};
 
 // Mock connector for testing
 struct MockConnector;
@@ -17,7 +19,11 @@ impl Connector<()> for MockConnector {
     async fn connect(&self, _: Arc<()>) -> ConnectorResult<WsStream> {
         // This is a mock implementation, it would fail in real usage
         // but it's sufficient for testing the wrapper structure
-        Err(binary_options_tools_core_pre::connector::ConnectorError::Custom("Mock connector".to_string()))
+        Err(
+            binary_options_tools_core_pre::connector::ConnectorError::Custom(
+                "Mock connector".to_string(),
+            ),
+        )
     }
 
     async fn disconnect(&self) -> ConnectorResult<()> {
@@ -43,15 +49,12 @@ impl ApiModule<()> for TestModule {
         msg_rx: AsyncReceiver<Arc<Message>>,
         _to_ws: AsyncSender<Message>,
     ) -> Self {
-        Self {
-            _msg_rx: msg_rx,
-        }
+        Self { _msg_rx: msg_rx }
     }
 
     fn create_handle(
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
-        
     ) -> Self::Handle {
         TestHandle { sender, receiver }
     }
@@ -93,7 +96,7 @@ async fn test_testing_wrapper_creation() {
     };
 
     let wrapper = TestingWrapper::new(client, runner, config);
-    
+
     // Test that we can get initial statistics
     let stats = wrapper.get_stats().await;
     assert_eq!(stats.connection_attempts, 0);
@@ -139,7 +142,7 @@ async fn test_testing_wrapper_with_runner() {
 
     let config = TestingConfig {
         stats_interval: Duration::from_millis(100), // Very short interval for testing
-        log_stats: false, // Don't log during tests
+        log_stats: false,                           // Don't log during tests
         track_events: true,
         max_reconnect_attempts: Some(1),
         reconnect_delay: Duration::from_millis(100),
@@ -148,19 +151,19 @@ async fn test_testing_wrapper_with_runner() {
     };
 
     let mut wrapper = TestingWrapper::new(client, runner, config);
-    
+
     // Test that we can start the wrapper
     // Note: This will fail to connect due to MockConnector, but that's expected for testing
     let start_result = wrapper.start().await;
     assert!(start_result.is_ok());
-    
+
     // Give it a short time to attempt connection
     tokio::time::sleep(Duration::from_millis(200)).await;
-    
+
     // Test that we can get statistics
     let stats = wrapper.get_stats().await;
     assert_eq!(stats.connection_attempts, 1);
-    
+
     // Test shutdown
     let shutdown_result = wrapper.stop().await;
     assert!(shutdown_result.is_ok());
@@ -176,14 +179,14 @@ async fn test_statistics_export() {
         .expect("Failed to build client");
 
     let wrapper = TestingWrapper::new(client, runner, TestingConfig::default());
-    
+
     // Test JSON export
     let json_result = wrapper.export_stats_json().await;
     assert!(json_result.is_ok());
     let json_stats = json_result.unwrap();
     assert!(json_stats.contains("connection_attempts"));
     assert!(json_stats.contains("successful_connections"));
-    
+
     // Test CSV export
     let csv_result = wrapper.export_stats_csv().await;
     assert!(csv_result.is_ok());

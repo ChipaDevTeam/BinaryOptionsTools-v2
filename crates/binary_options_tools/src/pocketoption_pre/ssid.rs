@@ -66,8 +66,8 @@ impl Ssid {
             .ok_or(CoreError::SsidParsing(
                 "Error parsing ssid string into object".into(),
             ))?;
-        let ssid: Demo = serde_json::from_str(parsed)
-            .map_err(|e| CoreError::SsidParsing(e.to_string()))?;
+        let ssid: Demo =
+            serde_json::from_str(parsed).map_err(|e| CoreError::SsidParsing(e.to_string()))?;
         if ssid.is_demo == 1 {
             Ok(Self::Demo(ssid))
         } else {
@@ -90,9 +90,11 @@ impl Ssid {
     pub async fn server(&self) -> CoreResult<String> {
         match self {
             Self::Demo(_) => Ok(Regions::DEMO.0.to_string()),
-            Self::Real(_) => Regions.get_server().await.map(|s| s.to_string()).map_err(|e| {
-                CoreError::HttpRequest(e.to_string())
-            }),
+            Self::Real(_) => Regions
+                .get_server()
+                .await
+                .map(|s| s.to_string())
+                .map_err(|e| CoreError::HttpRequest(e.to_string())),
         }
     }
 
@@ -104,7 +106,8 @@ impl Ssid {
                 .collect()),
             Self::Real(_) => Ok(Regions
                 .get_servers()
-                .await.map_err(|e| CoreError::HttpRequest(e.to_string()))?
+                .await
+                .map_err(|e| CoreError::HttpRequest(e.to_string()))?
                 .iter()
                 .map(|s| s.to_string())
                 .collect()),

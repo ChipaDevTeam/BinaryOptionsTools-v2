@@ -4,7 +4,10 @@ use async_trait::async_trait;
 use kanal::AsyncSender;
 use tokio_tungstenite::tungstenite::Message;
 
-use crate::{error::CoreResult, traits::{AppState, ReconnectCallback}};
+use crate::{
+    error::CoreResult,
+    traits::{AppState, ReconnectCallback},
+};
 
 pub struct ConnectionCallback<S: AppState> {
     pub on_connect: OnConnectCallback<S>,
@@ -20,7 +23,6 @@ pub type OnConnectCallback<S> = Box<
         + Send
         + Sync,
 >;
-
 
 pub struct ReconnectCallbackStack<S: AppState> {
     pub layers: Vec<Box<dyn ReconnectCallback<S>>>,
@@ -40,11 +42,7 @@ impl<S: AppState> ReconnectCallbackStack<S> {
 
 #[async_trait]
 impl<S: AppState> ReconnectCallback<S> for ReconnectCallbackStack<S> {
-    async fn call(
-        &self,
-        state: Arc<S>,
-        sender: &AsyncSender<Message>,
-    ) -> CoreResult<()> {
+    async fn call(&self, state: Arc<S>, sender: &AsyncSender<Message>) -> CoreResult<()> {
         for layer in &self.layers {
             layer.call(state.clone(), sender).await?;
         }

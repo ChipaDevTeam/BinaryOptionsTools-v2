@@ -157,9 +157,8 @@ pub trait Rule {
     /// operation that does not involve any I/O or long-running tasks.
     /// It should be implemented in a way that allows the rule to be reused without
     /// needing to recreate it, thus improving performance and reducing overhead.
-    fn reset(&self); 
+    fn reset(&self);
 }
-
 
 /// A trait for callback functions that can be executed within the context of a module.
 /// This trait is designed to allow modules to define custom behavior that can be executed
@@ -189,8 +188,8 @@ pub trait ReconnectCallback<S: AppState>: Send + Sync {
     async fn call(&self, state: Arc<S>, ws_sender: &AsyncSender<Message>) -> CoreResult<()>;
 }
 
-impl<F> Rule for F 
-where 
+impl<F> Rule for F
+where
     F: Fn(&Message) -> bool + Send + Sync + 'static,
 {
     fn call(&self, msg: &Message) -> bool {

@@ -1,14 +1,26 @@
-use std::{sync::{atomic::{AtomicBool, Ordering}, Arc}, time::Duration};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use binary_options_tools_core_pre::{
-    error::CoreError, reimports::{AsyncReceiver, AsyncSender, Message}, traits::{ApiModule, Rule}
+    error::CoreError,
+    reimports::{AsyncReceiver, AsyncSender, Message},
+    traits::{ApiModule, Rule},
 };
 use serde::Deserialize;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::pocketoption_pre::{error::{PocketError, PocketResult}, state::State, types::Deal};
+use crate::pocketoption_pre::{
+    error::{PocketError, PocketResult},
+    state::State,
+    types::Deal,
+};
 
 const UPDATE_OPENED_DEALS: &str = r#"451-["updateOpenedDeals","#;
 const UPDATE_CLOSED_DEALS: &str = r#"451-["updateClosedDeals","#;
@@ -29,7 +41,7 @@ enum ExpectedMessage {
     UpdateClosedDeals,
     UpdateOpenedDeals,
     SuccessCloseOrder,
-    None
+    None,
 }
 
 #[derive(Deserialize)]
@@ -47,7 +59,10 @@ pub struct DealsHandle {
 
 impl DealsHandle {
     pub async fn check_result(&self, trade_id: Uuid) -> PocketResult<Deal> {
-        self.sender.send(Command::CheckResult(trade_id)).await.map_err(CoreError::from)?;
+        self.sender
+            .send(Command::CheckResult(trade_id))
+            .await
+            .map_err(CoreError::from)?;
         loop {
             match self.receiver.recv().await {
                 Ok(CommandResponse::CheckResult(deal)) => {
@@ -57,19 +72,26 @@ impl DealsHandle {
                         // If the request ID does not match, continue waiting for the correct response
                         continue;
                     }
-                },
+                }
                 Ok(CommandResponse::DealNotFound(id)) => return Err(PocketError::DealNotFound(id)),
                 Err(e) => return Err(CoreError::from(e).into()),
             }
         }
     }
 
-    pub async fn check_result_with_timeout(&self, trade_id: Uuid, timeout: Duration) -> PocketResult<Deal> {
-        self.sender.send(Command::CheckResult(trade_id)).await.map_err(CoreError::from)?;
-        
+    pub async fn check_result_with_timeout(
+        &self,
+        trade_id: Uuid,
+        timeout: Duration,
+    ) -> PocketResult<Deal> {
+        self.sender
+            .send(Command::CheckResult(trade_id))
+            .await
+            .map_err(CoreError::from)?;
+
         let timeout_future = tokio::time::sleep(timeout);
         tokio::pin!(timeout_future);
-        
+
         loop {
             tokio::select! {
                 result = self.receiver.recv() => {
@@ -96,7 +118,6 @@ impl DealsHandle {
             }
         }
     }
-
 }
 
 /// An API module responsible for listening to deal updates,
@@ -219,7 +240,7 @@ impl ApiModule<State> for DealsApiModule {
                         },
                         _ => {}
                     }
-                    
+
                 }
                 Ok(cmd) = self.command_receiver.recv() => {
                     match cmd {
@@ -252,12 +273,12 @@ impl ApiModule<State> for DealsApiModule {
         Box::new(DealsUpdateRule::new(vec![
             UPDATE_CLOSED_DEALS,
             UPDATE_OPENED_DEALS,
-            SUCCESS_CLOSE_ORDER
-        ])) 
+            SUCCESS_CLOSE_ORDER,
+        ]))
     }
 }
 
-/// Create a new custom rule that matches the specific patterns and also returns true for strings 
+/// Create a new custom rule that matches the specific patterns and also returns true for strings
 /// that starts with any of the patterns
 struct DealsUpdateRule {
     valid: AtomicBool,
@@ -297,7 +318,8 @@ impl Rule for DealsUpdateRule {
                     false
                 }
             }
-            _ => false        }
+            _ => false,
+        }
     }
 
     fn reset(&self) {

@@ -6,9 +6,9 @@ use crate::middleware::{MiddlewareContext, WebSocketMiddleware};
 use crate::statistics::{ConnectionStats, StatisticsTracker};
 use crate::traits::AppState;
 use async_trait::async_trait;
-use tokio_tungstenite::tungstenite::Message;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, error, info, warn};
 
 /// Configuration for the testing wrapper
@@ -81,7 +81,11 @@ impl<S: AppState> WebSocketMiddleware<S> for TestingMiddleware<S> {
         Ok(())
     }
 
-    async fn on_connection_failure(&self, _context: &MiddlewareContext<S>, reason: Option<String>) -> CoreResult<()> {
+    async fn on_connection_failure(
+        &self,
+        _context: &MiddlewareContext<S>,
+        reason: Option<String>,
+    ) -> CoreResult<()> {
         // 🎯 This will give you proper failure tracking
         self.stats.record_connection_failure(reason).await;
         debug!(target: "TestingMiddleware", "Connection failure recorded");
@@ -97,7 +101,9 @@ impl<S: AppState> WebSocketMiddleware<S> for TestingMiddleware<S> {
 
     async fn on_disconnect(&self, _context: &MiddlewareContext<S>) -> CoreResult<()> {
         // Record disconnection with reason
-        self.stats.record_disconnection(Some("Connection lost".to_string())).await;
+        self.stats
+            .record_disconnection(Some("Connection lost".to_string()))
+            .await;
         debug!(target: "TestingMiddleware", "Connection lost");
         Ok(())
     }
@@ -109,7 +115,11 @@ impl<S: AppState> WebSocketMiddleware<S> for TestingMiddleware<S> {
         Ok(())
     }
 
-    async fn on_receive(&self, message: &Message, _context: &MiddlewareContext<S>) -> CoreResult<()> {
+    async fn on_receive(
+        &self,
+        message: &Message,
+        _context: &MiddlewareContext<S>,
+    ) -> CoreResult<()> {
         // Record message received with size tracking
         self.stats.record_message_received(message).await;
         debug!(target: "TestingMiddleware", "Message received: {} bytes", Self::get_message_size(message));
@@ -165,7 +175,6 @@ impl<S: AppState> TestingWrapper<S> {
             runner_task: None,
         }
     }
-
 
     /// Create a TestingMiddleware that shares the same StatisticsTracker
     pub fn create_middleware(&self) -> TestingMiddleware<S> {
@@ -599,12 +608,12 @@ impl<S: AppState> TestingWrapperBuilder<S> {
         let middleware = TestingMiddleware::new(Arc::clone(&stats));
         let (client, runner) = builder
             .with_middleware(Box::new(middleware))
-            .build().await?;
+            .build()
+            .await?;
         let wrapper = TestingWrapper::new_with_stats(client, runner, self.config, stats);
 
         Ok(wrapper)
     }
-
 }
 
 impl<S: AppState> Default for TestingWrapperBuilder<S> {
@@ -612,4 +621,3 @@ impl<S: AppState> Default for TestingWrapperBuilder<S> {
         Self::new()
     }
 }
-

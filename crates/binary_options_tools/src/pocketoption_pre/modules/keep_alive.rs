@@ -2,7 +2,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use binary_options_tools_core::reimports::Message;
-use binary_options_tools_core_pre::{error::{CoreError, CoreResult}, reimports::{AsyncReceiver, AsyncSender}, traits::{LightweightModule, Rule}};
+use binary_options_tools_core_pre::{
+    error::{CoreError, CoreResult},
+    reimports::{AsyncReceiver, AsyncSender},
+    traits::{LightweightModule, Rule},
+};
 use tracing::{debug, warn};
 // use tracing::info;
 
@@ -30,7 +34,8 @@ impl LightweightModule<State> for InitModule {
         ws_receiver: AsyncReceiver<Arc<Message>>,
     ) -> Self
     where
-        Self: Sized {
+        Self: Sized,
+    {
         Self {
             ws_sender,
             ws_receiver,
@@ -40,7 +45,6 @@ impl LightweightModule<State> for InitModule {
 
     /// The module's asynchronous run loop.
     async fn run(&mut self) -> CoreResult<()> {
-        
         loop {
             let msg = self.ws_receiver.recv().await;
             match msg {
@@ -49,12 +53,12 @@ impl LightweightModule<State> for InitModule {
                         match text {
                             _ if text.starts_with(SID_BASE) => {
                                 self.ws_sender.send(Message::text("40")).await?;
-                            },
+                            }
                             _ if text.starts_with(SID) => {
                                 self.ws_sender.send(Message::text(self.state.ssid.to_string())).await.inspect_err(|e| {
                                     warn!(target: "KeepAliveModule", "Failed to send SSID: {}", e);
                                 })?;
-                            },
+                            }
                             _ if text.starts_with(SUCCESSAUTH) => {
                                 self.ws_sender.send(Message::text(r#"42["indicator/load"]"#)).await.inspect_err(|e| {
                                     warn!(target: "KeepAliveModule", "Failed to send indicator/load message: {}", e);
@@ -75,17 +79,18 @@ impl LightweightModule<State> for InitModule {
                             _ if text == &"2" => {
                                 self.ws_sender.send(Message::text("3")).await?;
                             }
-                            _ => continue
+                            _ => continue,
                         }
                     } else {
                         // If the message is not a text message, we can ignore it.
                         continue;
                     }
                 }
-                ,
                 Err(e) => {
                     warn!(target: "InitModule", "Error receiving message: {}", e);
-                    return Err(CoreError::LightweightModuleLoop("InitModule run loop exited unexpectedly".into()));
+                    return Err(CoreError::LightweightModuleLoop(
+                        "InitModule run loop exited unexpectedly".into(),
+                    ));
                 }
             }
         }
@@ -102,14 +107,8 @@ impl LightweightModule<State> for InitModule {
 
 #[async_trait]
 impl LightweightModule<State> for KeepAliveModule {
-    fn new(
-        _: Arc<State>,
-        ws_sender: AsyncSender<Message>,
-        _: AsyncReceiver<Arc<Message>>,
-    ) -> Self {
-        Self {
-            ws_sender,
-        }
+    fn new(_: Arc<State>, ws_sender: AsyncSender<Message>, _: AsyncReceiver<Arc<Message>>) -> Self {
+        Self { ws_sender }
     }
 
     async fn run(&mut self) -> CoreResult<()> {

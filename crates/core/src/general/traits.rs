@@ -37,7 +37,7 @@ pub trait WCallback: Send + Sync {
         &self,
         data: Data<Self::T, Self::Transfer>,
         sender: &SenderMessage,
-        config: &Config<Self::T, Self::Transfer, Self::U>
+        config: &Config<Self::T, Self::Transfer, Self::U>,
     ) -> BinaryOptionsResult<()>;
 }
 
@@ -102,7 +102,7 @@ pub trait ValidatorTrait<T> {
 }
 
 impl<F, T> ValidatorTrait<T> for F
-where 
+where
     F: Fn(&T) -> bool + Send + Sync,
 {
     fn validate(&self, message: &T) -> bool {
@@ -110,4 +110,4 @@ where
     }
 }
 
-impl <T> InnerConfig for T where T: DeserializeOwned + Clone + Send {}
+impl<T> InnerConfig for T where T: DeserializeOwned + Clone + Send {}

@@ -1,48 +1,88 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use binary_options_tools_core_pre::{builder::ClientBuilder, client::Client, error::CoreError, testing::{TestingWrapper, TestingWrapperBuilder}};
+use binary_options_tools_core_pre::{
+    builder::ClientBuilder,
+    client::Client,
+    error::CoreError,
+    testing::{TestingWrapper, TestingWrapperBuilder},
+    traits::ApiModule,
+};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::pocketoption_pre::{connect::PocketConnect, error::{PocketError, PocketResult}, modules::{assets::AssetsModule, balance::BalanceModule, deals::DealsApiModule, keep_alive::{InitModule, KeepAliveModule}, print_handler, server_time::ServerTimeModule, subscriptions::{SubscriptionStream, SubscriptionsApiModule}, trades::TradesApiModule}, ssid::Ssid, state::{State, StateBuilder}, types::{Action, Assets, Deal}, candle::SubscriptionType};
+use crate::pocketoption_pre::{
+    candle::SubscriptionType,
+    connect::PocketConnect,
+    error::{PocketError, PocketResult},
+    modules::{
+        assets::AssetsModule,
+        balance::BalanceModule,
+        deals::DealsApiModule,
+        keep_alive::{InitModule, KeepAliveModule},
+        print_handler,
+        server_time::ServerTimeModule,
+        subscriptions::{SubscriptionStream, SubscriptionsApiModule},
+        trades::TradesApiModule,
+    },
+    ssid::Ssid,
+    state::{State, StateBuilder},
+    types::{Action, Assets, Deal},
+};
 
 const MINIMUM_TRADE_AMOUNT: f64 = 1.0;
 const MAXIMUM_TRADE_AMOUNT: f64 = 20000.0;
 
+/// PocketOption client for interacting with the PocketOption trading platform.
+///
+/// This client provides methods for trading, checking balances, subscribing to
+/// asset updates, and managing the connection to the PocketOption platform.
+///
+/// # Example
+/// ```
+/// use binary_options_tools_pocketoption_pre::PocketOption;
+///
+/// #[tokio::main]
+/// async fn main() -> binary_options_tools_core_pre::error::CoreResult<()> {
+///     let pocket_option = PocketOption::new("your_session_id").await?;
+///     let balance = pocket_option.balance().await;
+///     println!("Current balance: {}", balance);
+///     Ok(())
+/// }
+/// ```
+#[derive(Clone)]
+
 pub struct PocketOption {
     client: Client<State>,
-    _runner: tokio::task::JoinHandle<()>
+    _runner: Arc<tokio::task::JoinHandle<()>>,
 }
 
 impl PocketOption {
     fn builder(ssid: impl ToString) -> PocketResult<ClientBuilder<State>> {
-    let state = StateBuilder::default().ssid(Ssid::parse(ssid)?).build()?;
+        let state = StateBuilder::default().ssid(Ssid::parse(ssid)?).build()?;
 
-    Ok(ClientBuilder::new(PocketConnect, state)
-                .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)))
-                .with_lightweight_module::<KeepAliveModule>()
-                .with_lightweight_module::<InitModule>()
-                .with_lightweight_module::<BalanceModule>()
-                .with_lightweight_module::<ServerTimeModule>()
-                .with_lightweight_module::<AssetsModule>()
-                .with_module::<TradesApiModule>()
-                .with_module::<DealsApiModule>()
-                .with_module::<SubscriptionsApiModule>()
-                .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state))))
-
+        Ok(ClientBuilder::new(PocketConnect, state)
+            .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)))
+            .with_lightweight_module::<KeepAliveModule>()
+            .with_lightweight_module::<InitModule>()
+            .with_lightweight_module::<BalanceModule>()
+            .with_lightweight_module::<ServerTimeModule>()
+            .with_lightweight_module::<AssetsModule>()
+            .with_module::<TradesApiModule>()
+            .with_module::<DealsApiModule>()
+            .with_module::<SubscriptionsApiModule>()
+            .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state))))
     }
 
     pub async fn new(ssid: impl ToString) -> PocketResult<Self> {
-        let (client, mut runner) = Self::builder(ssid)?
-            .build().await?;
+        let (client, mut runner) = Self::builder(ssid)?.build().await?;
 
         let _runner = tokio::spawn(async move { runner.run().await });
         client.wait_connected().await;
 
         Ok(Self {
-                    client,
-                    _runner,
-                })
+            client,
+            _runner: Arc::new(_runner),
+        })
     }
 
     pub async fn new_with_url(ssid: impl ToString, url: String) -> PocketResult<Self> {
@@ -50,15 +90,14 @@ impl PocketOption {
             .ssid(Ssid::parse(ssid)?)
             .default_connection_url(url)
             .build()?;
-        let (client, mut runner) = ClientBuilder::new(PocketConnect, state)
-            .build().await?;
+        let (client, mut runner) = ClientBuilder::new(PocketConnect, state).build().await?;
 
         let _runner = tokio::spawn(async move { runner.run().await });
 
         Ok(Self {
-                    client,
-                    _runner,
-                })
+            client,
+            _runner: Arc::new(_runner),
+        })
     }
 
     /// Gets the current balance of the user.
@@ -87,17 +126,30 @@ impl PocketOption {
     /// # Returns
     /// A `PocketResult` containing the `Deal` if successful, or an error if
     /// the trade fails.
-    pub async fn trade(&self, asset: impl ToString, action: Action, time: u32, amount: f64) -> PocketResult<(Uuid, Deal)> {
+    pub async fn trade(
+        &self,
+        asset: impl ToString,
+        action: Action,
+        time: u32,
+        amount: f64,
+    ) -> PocketResult<(Uuid, Deal)> {
         if let Some(assets) = self.assets().await {
             assets.validate(&asset.to_string(), time)?;
             if amount < MINIMUM_TRADE_AMOUNT {
-                return Err(PocketError::General(format!("Amount must be at least {MINIMUM_TRADE_AMOUNT}")));
+                return Err(PocketError::General(format!(
+                    "Amount must be at least {MINIMUM_TRADE_AMOUNT}"
+                )));
             }
             if amount > MAXIMUM_TRADE_AMOUNT {
-                return Err(PocketError::General(format!("Amount must be at most {MAXIMUM_TRADE_AMOUNT}")));
+                return Err(PocketError::General(format!(
+                    "Amount must be at most {MAXIMUM_TRADE_AMOUNT}"
+                )));
             }
             if let Some(handle) = self.client.get_handle::<TradesApiModule>().await {
-                handle.trade(asset.to_string(), action, amount, time).await.map(|d| (d.id, d))
+                handle
+                    .trade(asset.to_string(), action, amount, time)
+                    .await
+                    .map(|d| (d.id, d))
             } else {
                 Err(CoreError::ModuleNotFound("TradesApiModule".into()).into())
             }
@@ -105,8 +157,6 @@ impl PocketOption {
             Err(PocketError::General("Assets not loaded".to_string()))
         }
     }
-
-
 
     /// Places a new buy trade.
     /// This method is a convenience wrapper around the `trade` method.
@@ -116,25 +166,35 @@ impl PocketOption {
     /// * `amount` - The amount to trade.
     /// # Returns
     /// A `PocketResult` containing the `Deal` if successful, or an error if the trade fails.
-    pub async fn buy(&self, asset: impl ToString, time: u32, amount: f64) -> PocketResult<(Uuid, Deal)> {
+    pub async fn buy(
+        &self,
+        asset: impl ToString,
+        time: u32,
+        amount: f64,
+    ) -> PocketResult<(Uuid, Deal)> {
         self.trade(asset, Action::Call, time, amount).await
     }
 
     /// Places a new sell trade.
     /// This method is a convenience wrapper around the `trade` method.
     /// # Arguments
-    /// * `asset` - The asset to trade. 
+    /// * `asset` - The asset to trade.
     /// * `time` - The time to trade.
     /// * `amount` - The amount to trade.
     /// # Returns
     /// A `PocketResult` containing the `Deal` if successful, or an error if the trade fails.
-    pub async fn sell(&self, asset: impl ToString, time: u32, amount: f64) -> PocketResult<(Uuid, Deal)> {
+    pub async fn sell(
+        &self,
+        asset: impl ToString,
+        time: u32,
+        amount: f64,
+    ) -> PocketResult<(Uuid, Deal)> {
         self.trade(asset, Action::Put, time, amount).await
     }
 
     /// Gets the current server time.
     /// If the server time is not set, it returns None.
-    pub async fn server_time(&self) -> DateTime<Utc> {        
+    pub async fn server_time(&self) -> DateTime<Utc> {
         self.client.state.get_server_datetime().await
     }
 
@@ -180,9 +240,15 @@ impl PocketOption {
         self.client.state.trade_state.get_opened_deals().await
     }
 
-    pub async fn subscribe(&self, asset: impl ToString, sub_type: SubscriptionType) -> PocketResult<SubscriptionStream> {
-        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await && let Some(assets) = self.assets().await {
-            if let Some(_) = assets.get(&asset.to_string()) {
+    pub async fn subscribe(
+        &self,
+        asset: impl ToString,
+        sub_type: SubscriptionType,
+    ) -> PocketResult<SubscriptionStream> {
+        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await
+            && let Some(assets) = self.assets().await
+        {
+            if assets.get(&asset.to_string()).is_some() {
                 handle.subscribe(asset.to_string(), sub_type).await
             } else {
                 Err(PocketError::InvalidAsset(asset.to_string()))
@@ -193,7 +259,9 @@ impl PocketOption {
     }
 
     pub async fn unsubscribe(&self, asset: impl ToString) -> PocketResult<()> {
-        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await && let Some(assets) = self.assets().await {
+        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await
+            && let Some(assets) = self.assets().await
+        {
             if let Some(_) = assets.get(&asset.to_string()) {
                 handle.unsubscribe(asset.to_string()).await
             } else {
@@ -202,6 +270,15 @@ impl PocketOption {
         } else {
             Err(CoreError::ModuleNotFound("SubscriptionsApiModuel".into()).into())
         }
+    }
+
+    pub async fn get_handle<M: ApiModule<State>>(&self) -> Option<M::Handle> {
+        self.client.get_handle::<M>().await
+    }
+
+    /// Disconnects and reconnects the client.
+    pub async fn reconnect(&self) -> PocketResult<()> {
+        self.client.reconnect().await.map_err(PocketError::from)
     }
 
     /// Shuts down the client and stops the runner.
@@ -221,17 +298,16 @@ impl PocketOption {
             .with_auto_reconnect(true)
             .build_with_middleware(pocket_builder)
             .await?;
-        
+
         Ok(builder)
     }
 }
 
-
 #[cfg(test)]
 mod tests {
+    use crate::pocketoption_pre::candle::SubscriptionType;
     use core::time::Duration;
     use futures_util::StreamExt;
-    use crate::pocketoption_pre::candle::SubscriptionType;
 
     use super::PocketOption;
 
@@ -264,7 +340,10 @@ mod tests {
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
         let server_time = api.client.state.get_server_datetime().await;
         println!("Server Time: {server_time}");
-        println!("Server time complete: {}", api.client.state.server_time.read().await);
+        println!(
+            "Server time complete: {}",
+            api.client.state.server_time.read().await
+        );
         api.shutdown().await.unwrap();
     }
 
@@ -298,7 +377,6 @@ mod tests {
         api.shutdown().await.unwrap();
     }
 
-
     #[tokio::test]
     async fn test_pocket_option_subscription() {
         tracing_subscriber::fmt::init();
@@ -306,7 +384,13 @@ mod tests {
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
 
-        let subscription = api.subscribe("EURUSD_otc", SubscriptionType::time_aligned(Duration::from_secs(5)).unwrap()).await.unwrap();
+        let subscription = api
+            .subscribe(
+                "AUDUSD_otc",
+                SubscriptionType::time_aligned(Duration::from_secs(5)).unwrap(),
+            )
+            .await
+            .unwrap();
         let mut stream = subscription.to_stream();
         while let Some(msg) = stream.next().await {
             match msg {
@@ -314,10 +398,9 @@ mod tests {
                 Err(e) => println!("Error in subscription: {e}"),
             }
         }
-        api.unsubscribe("EURUSD_otc").await.unwrap();
-        println!("Unsubscribed from EURUSD_otc");
+        api.unsubscribe("AUDUSD_otc").await.unwrap();
+        println!("Unsubscribed from AUDUSD_otc");
 
         api.shutdown().await.unwrap();
     }
-    
 }

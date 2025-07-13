@@ -1,4 +1,4 @@
-use binary_options_tools::{error::BinaryOptionsToolsError, pocketoption::error::PocketOptionError};
+use binary_options_tools::{error::BinaryOptionsToolsError, pocketoption_pre::error::PocketError};
 use pyo3::{exceptions::PyValueError, PyErr};
 use thiserror::Error;
 use uuid::Uuid;
@@ -8,7 +8,8 @@ pub enum BinaryErrorPy {
     #[error("BinaryOptionsError, {0}")]
     BinaryOptionsError(#[from] BinaryOptionsToolsError),
     #[error("PocketOptionError, {0}")]
-    PocketOptionError(#[from] PocketOptionError),
+    PocketOptionError(#[from] PocketError),
+
     #[error("Uninitialized, {0}")]
     Uninitialized(String),
     #[error("Error descerializing data, {0}")]
@@ -20,7 +21,7 @@ pub enum BinaryErrorPy {
     #[error("Operation not allowed")]
     NotAllowed(String),
     #[error("Invalid Regex pattern, {0}")]
-    InvalidRegexError(#[from] regex::Error)
+    InvalidRegexError(#[from] regex::Error),
 }
 
 impl From<BinaryErrorPy> for PyErr {

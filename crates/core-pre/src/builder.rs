@@ -15,13 +15,20 @@ use crate::callback::{ConnectionCallback, ReconnectCallbackStack};
 use crate::client::{Client, ClientRunner, LightweightHandler, Router};
 use crate::connector::Connector;
 use crate::error::{CoreError, CoreResult};
-use crate::middleware::{WebSocketMiddleware, MiddlewareStack};
+use crate::middleware::{MiddlewareStack, WebSocketMiddleware};
 use crate::signals::Signals;
 use crate::traits::{ApiModule, AppState, LightweightModule, ReconnectCallback};
 
 type HandlerMap = Arc<RwLock<HashMap<TypeId, Box<dyn Any + Send + Sync>>>>;
-type HandlersFn<S> =
-    Box<dyn FnOnce(&mut Router<S>, &mut JoinSet<()>, HandlerMap, AsyncSender<Message>, &mut ReconnectCallbackStack<S>)>;
+type HandlersFn<S> = Box<
+    dyn FnOnce(
+        &mut Router<S>,
+        &mut JoinSet<()>,
+        HandlerMap,
+        AsyncSender<Message>,
+        &mut ReconnectCallbackStack<S>,
+    ),
+>;
 
 type LightweightHandlersFn<S> = Box<dyn FnOnce(&mut Router<S>, AsyncSender<Message>)>;
 
@@ -149,39 +156,46 @@ impl<S: AppState> ClientBuilder<S> {
 
     /// Registers a full API module with the client.
     pub fn with_module<M: ApiModule<S>>(mut self) -> Self {
-        let factory = |router: &mut Router<S>,
-                       join_set: &mut JoinSet<()>,
-                       handles: Arc<RwLock<HashMap<TypeId, Box<dyn Any + Send + Sync>>>>,
-                       to_ws_tx: AsyncSender<Message>,
-                       reconnect_callback_stack: &mut ReconnectCallbackStack<S>| {
-            let (cmd_tx, cmd_rx) = bounded_async(32);
-            let (cmd_ret_tx, cmd_ret_rx) = bounded_async(32);
-            let (msg_tx, msg_rx) = bounded_async(256);
+        let factory =
+            |router: &mut Router<S>,
+             join_set: &mut JoinSet<()>,
+             handles: Arc<RwLock<HashMap<TypeId, Box<dyn Any + Send + Sync>>>>,
+             to_ws_tx: AsyncSender<Message>,
+             reconnect_callback_stack: &mut ReconnectCallbackStack<S>| {
+                let (cmd_tx, cmd_rx) = bounded_async(32);
+                let (cmd_ret_tx, cmd_ret_rx) = bounded_async(32);
+                let (msg_tx, msg_rx) = bounded_async(256);
 
-            let state = router.state.clone();
-            let handle = M::create_handle(cmd_tx, cmd_ret_rx);
+                let state = router.state.clone();
+                let handle = M::create_handle(cmd_tx, cmd_ret_rx);
 
-            // Must spawn this write to avoid blocking if called from an async context.
-            join_set.spawn(async move {
-                handles
-                    .write()
-                    .await
-                    .insert(TypeId::of::<M>(), Box::new(handle));
-            });
-            
-            let m_temp = M::new(state.clone(), cmd_rx.clone(), cmd_ret_tx.clone(), msg_rx.clone(), to_ws_tx.clone());
-            match m_temp.callback() {
-                Ok(Some(callback)) => {
-                    reconnect_callback_stack.add_layer(callback);
+                // Must spawn this write to avoid blocking if called from an async context.
+                join_set.spawn(async move {
+                    handles
+                        .write()
+                        .await
+                        .insert(TypeId::of::<M>(), Box::new(handle));
+                });
+
+                let m_temp = M::new(
+                    state.clone(),
+                    cmd_rx.clone(),
+                    cmd_ret_tx.clone(),
+                    msg_rx.clone(),
+                    to_ws_tx.clone(),
+                );
+                match m_temp.callback() {
+                    Ok(Some(callback)) => {
+                        reconnect_callback_stack.add_layer(callback);
+                    }
+                    Ok(None) => {
+                        // No callback needed, continue.
+                    }
+                    Err(e) => {
+                        error!(target: "ApiModule", "Failed to get callback for module {}: {:?}", type_name::<M>(), e);
+                    }
                 }
-                Ok(None) => {
-                    // No callback needed, continue.
-                }
-                Err(e) => {
-                    error!(target: "ApiModule", "Failed to get callback for module {}: {:?}", type_name::<M>(), e);
-                }
-            }
-            router.spawn_module(async move {
+                router.spawn_module(async move {
                 let mut failures = 0;
                 let mut last_fail = Instant::now().checked_sub(Duration::from_secs(3600)).unwrap_or(Instant::now());
 
@@ -220,8 +234,8 @@ impl<S: AppState> ClientBuilder<S> {
                 }
             });
 
-            router.add_module_rule(M::rule(), msg_tx);
-        };
+                router.add_module_rule(M::rule(), msg_tx);
+            };
 
         self.module_factories.push(Box::new(factory));
         self
@@ -302,7 +316,10 @@ impl<S: AppState> ClientBuilder<S> {
     ///         Box::new(MyMiddleware),
     ///     ]);
     /// ```
-    pub fn with_middleware_layers(mut self, middleware: Vec<Box<dyn WebSocketMiddleware<S>>>) -> Self {
+    pub fn with_middleware_layers(
+        mut self,
+        middleware: Vec<Box<dyn WebSocketMiddleware<S>>>,
+    ) -> Self {
         for layer in middleware {
             self.middleware_stack.add_layer(layer);
         }
@@ -341,7 +358,7 @@ impl<S: AppState> ClientBuilder<S> {
     /// # impl WebSocketMiddleware<MyState> for MyMiddleware {}
     /// let mut stack = MiddlewareStack::new();
     /// stack.add_layer(Box::new(MyMiddleware));
-    /// 
+    ///
     /// let builder = ClientBuilder::new(MyConnector, MyState)
     ///     .with_middleware_stack(stack);
     /// ```
@@ -355,7 +372,12 @@ impl<S: AppState> ClientBuilder<S> {
         let (runner_cmd_tx, runner_cmd_rx) = bounded_async(8);
         let (to_ws_tx, to_ws_rx) = bounded_async(256);
         let signals = Signals::default();
-        let client = Client::new(signals.clone(), runner_cmd_tx, self.state.clone(), to_ws_tx.clone());
+        let client = Client::new(
+            signals.clone(),
+            runner_cmd_tx,
+            self.state.clone(),
+            to_ws_tx.clone(),
+        );
 
         let mut router = Router::new(self.state.clone());
         router.lightweight_handlers = self.lightweight_handlers;
@@ -370,14 +392,14 @@ impl<S: AppState> ClientBuilder<S> {
                 &mut join_set,
                 client.module_handles.clone(),
                 to_ws_tx.clone(),
-                &mut connection_callback.on_reconnect
+                &mut connection_callback.on_reconnect,
             );
         }
 
         for factory in self.lightweight_factories {
             factory(&mut router, to_ws_tx.clone());
         }
-        
+
         // Wait for all the handles to be added to the handles hashmap.
         while let Some(h) = join_set.join_next().await {
             match h {

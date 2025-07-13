@@ -1,14 +1,14 @@
 #![allow(non_snake_case)]
 
+mod config;
 mod error;
 mod logs;
 mod pocketoption;
 mod runtime;
 mod stream;
 mod validator;
-mod config;
 
-use config::PyConfig;
+// use config::PyConfig;
 use logs::{start_tracing, LogBuilder, Logger, StreamLogsIterator, StreamLogsLayer};
 use pocketoption::{RawPocketOption, RawStreamIterator, StreamIterator};
 use pyo3::prelude::*;
@@ -25,7 +25,7 @@ fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<StreamIterator>()?;
     m.add_class::<RawStreamIterator>()?;
     m.add_class::<RawValidator>()?;
-    m.add_class::<PyConfig>()?;
+    // m.add_class::<PyConfig>()?;
 
     m.add_function(wrap_pyfunction!(start_tracing, m)?)?;
     Ok(())

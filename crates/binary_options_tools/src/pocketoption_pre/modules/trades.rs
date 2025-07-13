@@ -38,15 +38,14 @@ pub enum CommandResponse {
         req_id: Uuid,
         deal: Box<Deal>,
     },
-    Error(Box<FailOpenOrder>)
-
+    Error(Box<FailOpenOrder>),
 }
 
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum ServerResponse {
     Success(Box<Deal>),
-    Fail(Box<FailOpenOrder>)
+    Fail(Box<FailOpenOrder>),
 }
 
 /// Handle for interacting with the `TradesApiModule`.
@@ -70,9 +69,16 @@ impl TradesHandle {
         // 1. Send `Command::OpenOrder`.
         // 2. Await and return `CommandResponse::OpenOrder`.
         let id = Uuid::new_v4(); // Generate a unique request ID for this order
-        self.sender.send(
-            Command::OpenOrder { asset, action, amount, time, req_id: id }
-        ).await.map_err(CoreError::from)?;
+        self.sender
+            .send(Command::OpenOrder {
+                asset,
+                action,
+                amount,
+                time,
+                req_id: id,
+            })
+            .await
+            .map_err(CoreError::from)?;
         loop {
             match self.receiver.recv().await {
                 Ok(CommandResponse::Success { req_id, deal }) => {
@@ -82,7 +88,7 @@ impl TradesHandle {
                         // If the request ID does not match, continue waiting for the correct response
                         continue;
                     }
-                },
+                }
                 Ok(CommandResponse::Error(fail)) => {
                     return Err(PocketError::FailOpenOrder {
                         error: fail.error,
@@ -93,7 +99,6 @@ impl TradesHandle {
                 Err(e) => return Err(CoreError::from(e).into()),
             }
         }
-
     }
 
     /// Places a new BUY trade.
@@ -151,50 +156,49 @@ impl ApiModule<State> for TradesApiModule {
         // and incoming WebSocket messages for trade responses.
         //
         loop {
-          select! {
-            Ok(cmd) = self.command_receiver.recv() => {
-                match cmd {
-                    Command::OpenOrder { asset, action, amount, time, req_id } => {
-                    // Create OpenOrder and send to WebSocket.
-                    let order = OpenOrder::new(amount, asset, action, time, self.state.is_demo() as u32, req_id);
-                    self.to_ws_sender.send(Message::text(order.to_string())).await?;
-                    }
-                }
-              // Handle OpenOrder: send to websocket.
-              // Handle CheckResult: check state, maybe wait for update.
-            },
-            Ok(msg) = self.message_receiver.recv() => {
-                if let Message::Binary(data) = &*msg {
-                    // Parse the message as a server response.
-                    if let Ok(response) = serde_json::from_slice::<ServerResponse>(data) {
-                        match response {
-                            ServerResponse::Success(deal) => {
-                                // Handle successopenOrder.
-                                // Send CommandResponse::Success to command_responder.
-                                self.state.trade_state.add_opened_deal(*deal.clone()).await;
-                                info!(target: "TradesApiModule", "Trade opened: {}", deal.id);
-                                self.command_responder.send(CommandResponse::Success {
-                                    req_id: deal.request_id.unwrap_or_default(), // A request should always have a request_id, only for when returning updateOpenedDeals or updateClosedDeals it can not have any
-                                    deal,
-                                }).await?;
-                            }
-                            ServerResponse::Fail(fail) => {
-                                // Handle failopenOrder.
-                                // Send CommandResponse::Error to command_responder.
-                                self.command_responder.send(CommandResponse::Error(fail)).await?;
-                            }
-                        }
-                    } else {
-                        // Handle other messages or errors.
-                        warn!(target: "TradesApiModule", "Received unrecognized message: {:?}", msg);
-                    }
-                }
-              // Handle successopenOrder/failopenOrder.
-              // Find the corresponding pending request and send response via command_responder.
+            select! {
+              Ok(cmd) = self.command_receiver.recv() => {
+                  match cmd {
+                      Command::OpenOrder { asset, action, amount, time, req_id } => {
+                      // Create OpenOrder and send to WebSocket.
+                      let order = OpenOrder::new(amount, asset, action, time, self.state.is_demo() as u32, req_id);
+                      self.to_ws_sender.send(Message::text(order.to_string())).await?;
+                      }
+                  }
+                // Handle OpenOrder: send to websocket.
+                // Handle CheckResult: check state, maybe wait for update.
+              },
+              Ok(msg) = self.message_receiver.recv() => {
+                  if let Message::Binary(data) = &*msg {
+                      // Parse the message as a server response.
+                      if let Ok(response) = serde_json::from_slice::<ServerResponse>(data) {
+                          match response {
+                              ServerResponse::Success(deal) => {
+                                  // Handle successopenOrder.
+                                  // Send CommandResponse::Success to command_responder.
+                                  self.state.trade_state.add_opened_deal(*deal.clone()).await;
+                                  info!(target: "TradesApiModule", "Trade opened: {}", deal.id);
+                                  self.command_responder.send(CommandResponse::Success {
+                                      req_id: deal.request_id.unwrap_or_default(), // A request should always have a request_id, only for when returning updateOpenedDeals or updateClosedDeals it can not have any
+                                      deal,
+                                  }).await?;
+                              }
+                              ServerResponse::Fail(fail) => {
+                                  // Handle failopenOrder.
+                                  // Send CommandResponse::Error to command_responder.
+                                  self.command_responder.send(CommandResponse::Error(fail)).await?;
+                              }
+                          }
+                      } else {
+                          // Handle other messages or errors.
+                          warn!(target: "TradesApiModule", "Received unrecognized message: {:?}", msg);
+                      }
+                  }
+                // Handle successopenOrder/failopenOrder.
+                // Find the corresponding pending request and send response via command_responder.
+              }
             }
-          }
         }
-        
     }
 
     fn rule() -> Box<dyn Rule + Send + Sync> {

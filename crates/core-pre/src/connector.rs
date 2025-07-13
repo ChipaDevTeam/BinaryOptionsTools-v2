@@ -13,11 +13,10 @@ pub enum ConnectorError {
     ConnectionFailed(Box<tokio_tungstenite::tungstenite::Error>),
     #[error("Connection timeout")]
     Timeout,
-    #[error("Could not connect to the server after multiple attempts: {attempts} attempts on platform {platform}")]
-    MultipleAttemptsConnection {
-        attempts: usize,
-        platform: String,
-    },
+    #[error(
+        "Could not connect to the server after multiple attempts: {attempts} attempts on platform {platform}"
+    )]
+    MultipleAttemptsConnection { attempts: usize, platform: String },
     #[error("Connection is closed")]
     ConnectionClosed,
     #[error("Custom: {0}")]
@@ -46,7 +45,7 @@ pub trait Connector<S: AppState>: Send + Sync {
     /// Reconnect to the WebSocket server with automatic retry logic and return the stream
     async fn reconnect(&self, state: Arc<S>) -> ConnectorResult<WsStream> {
         self.disconnect().await?;
-        
+
         // Retry logic can be implemented here if needed
         self.connect(state).await
     }

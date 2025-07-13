@@ -1,7 +1,12 @@
-use binary_options_tools_core::
-    error::BinaryOptionsToolsError;
+use binary_options_tools_core::error::BinaryOptionsToolsError;
 
-use binary_options_tools_core_pre::{connector::{ConnectorError, ConnectorResult}, reimports::{connect_async_tls_with_config, MaybeTlsStream, WebSocketStream, Connector, Request, generate_key}};
+use binary_options_tools_core_pre::{
+    connector::{ConnectorError, ConnectorResult},
+    reimports::{
+        Connector, MaybeTlsStream, Request, WebSocketStream, connect_async_tls_with_config,
+        generate_key,
+    },
+};
 
 use tokio::net::TcpStream;
 use url::Url;
@@ -50,13 +55,14 @@ pub async fn try_connect2(
     ssid: Ssid,
     url: String,
 ) -> ConnectorResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
-    let tls_connector: native_tls::TlsConnector = native_tls::TlsConnector::builder().build().map_err(|e| ConnectorError::Tls(e.to_string()))?;
+    let tls_connector: native_tls::TlsConnector = native_tls::TlsConnector::builder()
+        .build()
+        .map_err(|e| ConnectorError::Tls(e.to_string()))?;
 
     let connector = Connector::NativeTls(tls_connector);
 
     let user_agent = ssid.user_agent();
-    let t_url = Url::parse(&url)
-        .map_err(|e| ConnectorError::UrlParsing(e.to_string()))?;
+    let t_url = Url::parse(&url).map_err(|e| ConnectorError::UrlParsing(e.to_string()))?;
     let host = t_url
         .host_str()
         .ok_or(ConnectorError::UrlParsing("Host not found".into()))?;

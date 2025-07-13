@@ -3,7 +3,10 @@ use std::{sync::Arc, time::Duration};
 use async_channel::{Receiver, RecvError};
 use futures_util::{Stream, stream::unfold};
 
-use crate::{error::{BinaryOptionsResult, BinaryOptionsToolsError}, utils::time::timeout};
+use crate::{
+    error::{BinaryOptionsResult, BinaryOptionsToolsError},
+    utils::time::timeout,
+};
 
 use super::traits::ValidatorTrait;
 
@@ -15,9 +18,8 @@ pub struct RecieverStream<T> {
 pub struct FilteredRecieverStream<T> {
     inner: Receiver<T>,
     timeout: Option<Duration>,
-    filter: Box<dyn ValidatorTrait<T> + Send + Sync>
+    filter: Box<dyn ValidatorTrait<T> + Send + Sync>,
 }
-
 
 impl<T> RecieverStream<T> {
     pub fn new(inner: Receiver<T>) -> Self {
@@ -30,7 +32,6 @@ impl<T> RecieverStream<T> {
     pub fn new_timed(inner: Receiver<T>, timeout: Option<Duration>) -> Self {
         Self { inner, timeout }
     }
-
 
     async fn receive(&self) -> BinaryOptionsResult<T> {
         match self.timeout {
@@ -57,20 +58,29 @@ impl<T> RecieverStream<T> {
     }
 }
 
-
 impl<T> FilteredRecieverStream<T> {
-    pub fn new(inner: Receiver<T>, timeout: Option<Duration>, filter: Box<dyn ValidatorTrait<T> + Send + Sync>) -> Self {
-        Self { inner, timeout, filter }
+    pub fn new(
+        inner: Receiver<T>,
+        timeout: Option<Duration>,
+        filter: Box<dyn ValidatorTrait<T> + Send + Sync>,
+    ) -> Self {
+        Self {
+            inner,
+            timeout,
+            filter,
+        }
     }
 
     pub fn new_base(inner: Receiver<T>) -> Self {
         Self::new(inner, None, default_filter())
     }
 
-    pub fn new_filtered(inner: Receiver<T>, filter: Box<dyn ValidatorTrait<T> + Send + Sync>) -> Self {
+    pub fn new_filtered(
+        inner: Receiver<T>,
+        filter: Box<dyn ValidatorTrait<T> + Send + Sync>,
+    ) -> Self {
         Self::new(inner, None, filter)
     }
-
 
     async fn recv(&self) -> BinaryOptionsResult<T> {
         while let Ok(msg) = self.inner.recv().await {
@@ -109,7 +119,5 @@ impl<T> FilteredRecieverStream<T> {
 }
 
 fn default_filter<T>() -> Box<dyn ValidatorTrait<T> + Send + Sync> {
-    Box::new(move |_: &T| {
-        true
-    })
+    Box::new(move |_: &T| true)
 }

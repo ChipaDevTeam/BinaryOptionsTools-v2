@@ -1,7 +1,3 @@
-use core::fmt;
-use std::sync::Arc;
-use std::{collections::HashMap, time::Duration};
-use futures_util::stream::unfold;
 use async_trait::async_trait;
 use binary_options_tools_core_pre::error::CoreError;
 use binary_options_tools_core_pre::reimports::bounded_async;
@@ -11,7 +7,11 @@ use binary_options_tools_core_pre::{
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, Rule},
 };
+use core::fmt;
+use futures_util::stream::unfold;
 use serde::Serialize;
+use std::sync::Arc;
+use std::{collections::HashMap, time::Duration};
 use tokio::select;
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
@@ -21,9 +21,9 @@ use crate::pocketoption_pre::candle::{BaseCandle, SubscriptionType};
 use crate::pocketoption_pre::error::PocketError;
 use crate::pocketoption_pre::types::{StreamData as RawCandle, TwoStepRule};
 use crate::pocketoption_pre::{
+    candle::Candle, // Assuming this exists in your types
     error::PocketResult,
     state::State,
-    candle::Candle, // Assuming this exists in your types
 };
 
 #[derive(Serialize)]
@@ -113,7 +113,7 @@ pub enum StreamData {
     Unsubscribe,
 }
 
-/// Callback for when there is a disconnection 
+/// Callback for when there is a disconnection
 struct SubscriptionCallback {
     /// Active subscriptions mapped by subscription symbol
     active_subscriptions: Arc<RwLock<HashMap<String, AsyncSender<StreamData>>>>,
@@ -425,10 +425,10 @@ impl ApiModule<State> for SubscriptionsApiModule {
     fn callback(&self) -> CoreResult<Option<Box<dyn ReconnectCallback<State>>>> {
         // Default implementation does nothing.
         // This is useful for modules that do not require a callback.
-        
-        Ok(Some(Box::new(
-            SubscriptionCallback { active_subscriptions: self.active_subscriptions.clone() }
-        )))
+
+        Ok(Some(Box::new(SubscriptionCallback {
+            active_subscriptions: self.active_subscriptions.clone(),
+        })))
     }
 
     fn rule() -> Box<dyn Rule + Send + Sync> {
@@ -474,7 +474,10 @@ impl SubscriptionsApiModule {
         }
 
         // Add to active subscriptions
-        self.active_subscriptions.write().await.insert(asset, stream_sender);
+        self.active_subscriptions
+            .write()
+            .await
+            .insert(asset, stream_sender);
         Ok(())
     }
 
@@ -547,8 +550,6 @@ impl SubscriptionsApiModule {
     }
 }
 
-
-
 impl SubscriptionStream {
     /// Get the asset symbol for this subscription stream
     pub fn asset(&self) -> &str {
@@ -605,7 +606,10 @@ impl SubscriptionStream {
     /// Process an incoming price update based on subscription type
     fn process_update(&mut self, timestamp: f64, price: f64) -> PocketResult<Option<Candle>> {
         let asset = self.asset().to_string();
-        if let Some(c) =self.sub_type.update(&BaseCandle::from((timestamp, price)))? {
+        if let Some(c) = self
+            .sub_type
+            .update(&BaseCandle::from((timestamp, price)))?
+        {
             // Successfully updated candle
             return Ok(Some(Candle::from((c, asset))));
         } else {
@@ -613,7 +617,6 @@ impl SubscriptionStream {
             return Ok(None);
         }
     }
-
 
     /// Convert to a futures Stream
     pub fn to_stream(self) -> impl futures_util::Stream<Item = PocketResult<Candle>> + 'static {
@@ -656,9 +659,6 @@ impl Clone for SubscriptionStream {
     }
 }
 
-
-
-
 async fn send_subscribe_message(ws_sender: &AsyncSender<Message>, asset: &str) -> CoreResult<()> {
     // TODO: Implement WebSocket subscription message
     // Create and send appropriate subscription message format
@@ -682,4 +682,3 @@ async fn send_subscribe_message(ws_sender: &AsyncSender<Message>, asset: &str) -
         .map_err(CoreError::from)?;
     Ok(())
 }
-

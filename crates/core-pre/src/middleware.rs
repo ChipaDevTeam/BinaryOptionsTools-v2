@@ -163,10 +163,13 @@ pub trait WebSocketMiddleware<S: AppState>: Send + Sync + 'static {
     }
 
     /// Called when a connection attempt fails
-    async fn on_connection_failure(&self, _context: &MiddlewareContext<S>, _reason: Option<String>) -> CoreResult<()> {
+    async fn on_connection_failure(
+        &self,
+        _context: &MiddlewareContext<S>,
+        _reason: Option<String>,
+    ) -> CoreResult<()> {
         Ok(())
     }
-
 }
 
 /// A composable stack of middleware layers.
@@ -312,9 +315,16 @@ impl<S: AppState> MiddlewareStack<S> {
     }
 
     /// Record a connection failure across all middleware
-    pub async fn record_connection_failure(&self, context: &MiddlewareContext<S>, reason: Option<String>) {
+    pub async fn record_connection_failure(
+        &self,
+        context: &MiddlewareContext<S>,
+        reason: Option<String>,
+    ) {
         for (index, middleware) in self.layers.iter().enumerate() {
-            if let Err(e) = middleware.on_connection_failure(context, reason.clone()).await {
+            if let Err(e) = middleware
+                .on_connection_failure(context, reason.clone())
+                .await
+            {
                 warn!(
                     target: "Middleware",
                     "Error in middleware layer {} on_connection_failure: {:?}",

@@ -1,26 +1,25 @@
+use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
 use std::time::Duration;
 
-use binary_options_tools::error::{BinaryOptionsResult, BinaryOptionsToolsError};
-use binary_options_tools::pocketoption::error::PocketResult;
-use binary_options_tools::pocketoption::pocket_client::PocketOption;
-use binary_options_tools::pocketoption::types::base::RawWebsocketMessage;
-use binary_options_tools::pocketoption::types::update::DataCandle;
-use binary_options_tools::pocketoption::ws::stream::StreamAsset;
-use binary_options_tools::reimports::FilteredRecieverStream;
+use binary_options_tools::pocketoption_pre::candle::{Candle, SubscriptionType};
+use binary_options_tools::pocketoption_pre::error::PocketResult;
+use binary_options_tools::pocketoption_pre::pocket_client::PocketOption;
+// use binary_options_tools::pocketoption::types::base::RawWebsocketMessage;
+// use binary_options_tools::pocketoption::types::update::DataCandle;
+// use binary_options_tools::pocketoption::ws::stream::StreamAsset;
+// use binary_options_tools::reimports::FilteredRecieverStream;
 use futures_util::stream::{BoxStream, Fuse};
 use futures_util::StreamExt;
 use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python};
 use pyo3_async_runtimes::tokio::future_into_py;
-use url::Url;
 use uuid::Uuid;
 
 use crate::error::BinaryErrorPy;
 use crate::runtime::get_runtime;
 use crate::stream::next_stream;
 use crate::validator::RawValidator;
-use crate::config::PyConfig;
 use tokio::sync::Mutex;
 
 #[pyclass]
@@ -31,61 +30,40 @@ pub struct RawPocketOption {
 
 #[pyclass]
 pub struct StreamIterator {
-    stream: Arc<Mutex<Fuse<BoxStream<'static, PocketResult<DataCandle>>>>>,
+    stream: Arc<Mutex<Fuse<BoxStream<'static, PocketResult<Candle>>>>>,
 }
 
 #[pyclass]
 pub struct RawStreamIterator {
-    stream: Arc<Mutex<Fuse<BoxStream<'static, BinaryOptionsResult<RawWebsocketMessage>>>>>,
+    stream: Arc<Mutex<Fuse<BoxStream<'static, PocketResult<String>>>>>,
 }
 
 #[pymethods]
 impl RawPocketOption {
     #[new]
-    #[pyo3(signature = (ssid, config = None))]
-    pub fn new(ssid: String, config: Option<PyConfig>, py: Python<'_>) -> PyResult<Self> {
+    #[pyo3(signature = (ssid))]
+    pub fn new(ssid: String, py: Python<'_>) -> PyResult<Self> {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
-            let client = if let Some(config) = config {
-                let builder = config.build()?;
-                let config = builder.build().map_err(BinaryOptionsToolsError::from).map_err(BinaryErrorPy::from)?;
-                PocketOption::new_with_config(ssid, config)
-                    .await
-                    .map_err(BinaryErrorPy::from)?
-            } else {
-                PocketOption::new(ssid).await.map_err(BinaryErrorPy::from)?
-            };
+            let client = PocketOption::new(ssid).await.map_err(BinaryErrorPy::from)?;
             Ok(Self { client })
         })
     }
 
     #[staticmethod]
-    #[pyo3(signature = (ssid, url, config = None))]
-    pub fn new_with_url(py: Python<'_>, ssid: String, url: String, config: Option<PyConfig>) -> PyResult<Self> {
+    #[pyo3(signature = (ssid, url))]
+    pub fn new_with_url(py: Python<'_>, ssid: String, url: String) -> PyResult<Self> {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
-            let parsed_url = Url::parse(&url)
-                .map_err(|e| BinaryErrorPy::from(BinaryOptionsToolsError::from(e)))?;
-            
-            let client = if let Some(config) = config {
-                let builder = config.build()?;
-                let config = builder.build().map_err(BinaryOptionsToolsError::from).map_err(BinaryErrorPy::from)?;
-                PocketOption::new_with_config(ssid, config)
-                    .await
-                    .map_err(BinaryErrorPy::from)?
-            } else {
-                PocketOption::new_with_url(ssid, parsed_url)
-                    .await
-                    .map_err(BinaryErrorPy::from)?
-            };
+            let client = PocketOption::new_with_url(ssid, url)
+                .await
+                .map_err(BinaryErrorPy::from)?;
             Ok(Self { client })
         })
     }
 
-    
-
-    pub async fn is_demo(&self) -> bool {
-        self.client.is_demo().await
+    pub fn is_demo(&self) -> bool {
+        self.client.is_demo()
     }
 
     pub fn buy<'py>(
@@ -98,7 +76,7 @@ impl RawPocketOption {
         let client = self.client.clone();
         future_into_py(py, async move {
             let res = client
-                .buy(asset, amount, time)
+                .buy(asset, time, amount)
                 .await
                 .map_err(BinaryErrorPy::from)?;
             let deal = serde_json::to_string(&res.1).map_err(BinaryErrorPy::from)?;
@@ -117,7 +95,7 @@ impl RawPocketOption {
         let client = self.client.clone();
         future_into_py(py, async move {
             let res = client
-                .sell(asset, amount, time)
+                .sell(asset, time, amount)
                 .await
                 .map_err(BinaryErrorPy::from)?;
             let deal = serde_json::to_string(&res.1).map_err(BinaryErrorPy::from)?;
@@ -130,7 +108,7 @@ impl RawPocketOption {
         let client = self.client.clone();
         future_into_py(py, async move {
             let res = client
-                .check_results(Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?)
+                .result(Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?)
                 .await
                 .map_err(BinaryErrorPy::from)?;
             Python::with_gil(|py| {
@@ -141,93 +119,93 @@ impl RawPocketOption {
         })
     }
 
-    pub async fn get_deal_end_time(&self, trade_id: String) -> PyResult<Option<i64>> {
-        Ok(self
-            .client
-            .get_deal_end_time(Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?)
-            .await
-            .map(|d| d.timestamp()))
+    pub async fn get_deal_end_time(&self, _trade_id: String) -> PyResult<Option<i64>> {
+        // Work in progress - this feature is not yet implemented in the new API
+        Err(BinaryErrorPy::NotAllowed(
+            "get_deal_end_time is work in progress and not yet available".into(),
+        )
+        .into())
     }
 
     pub fn get_candles<'py>(
         &self,
-        py: Python<'py>,
-        asset: String,
-        period: i64,
-        offset: i64,
+        _py: Python<'py>,
+        _asset: String,
+        _period: i64,
+        _offset: i64,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let client = self.client.clone();
-        future_into_py(py, async move {
-            let res = client
-                .get_candles(asset, period, offset)
-                .await
-                .map_err(BinaryErrorPy::from)?;
-            Python::with_gil(|py| {
-                serde_json::to_string(&res)
-                    .map_err(BinaryErrorPy::from)?
-                    .into_py_any(py)
-            })
-        })
+        // Work in progress - this feature is not yet implemented in the new API
+
+        Err(BinaryErrorPy::NotAllowed(
+            "get_candles is work in progress and not yet available".into(),
+        )
+        .into())
     }
 
-    pub fn get_candles_advanced<'py>(&self, py: Python<'py>, asset: String, period: i64, offset: i64, time: i64) -> PyResult<Bound<'py, PyAny>> {
-        let client = self.client.clone();
-
-        future_into_py(py, async move {
-            let res = client
-                .get_candles_advanced(asset, period, offset, time)
-                .await
-                .map_err(BinaryErrorPy::from)?;
-            Python::with_gil(|py| {
-                serde_json::to_string(&res)
-                    .map_err(BinaryErrorPy::from)?
-                    .into_py_any(py)
-            })
-        })    
+    pub fn get_candles_advanced<'py>(
+        &self,
+        _py: Python<'py>,
+        _asset: String,
+        _period: i64,
+        _offset: i64,
+        _time: i64,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        // Work in progress - this feature is not yet implemented in the new API
+        Err(BinaryErrorPy::NotAllowed(
+            "get_candles_advanced is work in progress and not yet available".into(),
+        )
+        .into())
     }
 
     pub async fn balance(&self) -> PyResult<String> {
-        let res = self.client.get_balance().await;
-        Ok(serde_json::to_string(&res).map_err(BinaryErrorPy::from)?)
+        let balance = self.client.balance().await;
+        Ok(serde_json::to_string(&balance).map_err(BinaryErrorPy::from)?)
     }
 
     pub async fn closed_deals(&self) -> PyResult<String> {
-        let res = self.client.get_closed_deals().await;
-        Ok(serde_json::to_string(&res).map_err(BinaryErrorPy::from)?)
+        // Work in progress - this feature is not yet implemented in the new API
+        Err(BinaryErrorPy::NotAllowed(
+            "closed_deals is work in progress and not yet available".into(),
+        )
+        .into())
     }
 
     pub async fn clear_closed_deals(&self) {
-        self.client.clear_closed_deals().await
+        // Work in progress - this feature is not yet implemented in the new API
+        // No-op for now
     }
 
     pub async fn opened_deals(&self) -> PyResult<String> {
-        let res = self.client.get_opened_deals().await;
-        Ok(serde_json::to_string(&res).map_err(BinaryErrorPy::from)?)
+        let deals = self.client.get_opened_deals().await;
+        Ok(serde_json::to_string(&deals).map_err(BinaryErrorPy::from)?)
     }
 
     pub async fn payout(&self) -> PyResult<String> {
-        let res = self.client.get_payout().await;
-        Ok(serde_json::to_string(&res).map_err(BinaryErrorPy::from)?)
+        // Work in progress - this feature is not yet implemented in the new API
+        match self.client.assets().await {
+            Some(assets) => {
+                let payouts: HashMap<&String, i32> = assets
+                    .0
+                    .iter()
+                    .map(|(asset, symbol)| (asset, symbol.payout))
+                    .collect();
+                Ok(serde_json::to_string(&payouts).map_err(BinaryErrorPy::from)?)
+            }
+            None => Err(BinaryErrorPy::Uninitialized("Assets not initialized yet.".into()).into()),
+        }
     }
 
     pub fn history<'py>(
         &self,
-        py: Python<'py>,
-        asset: String,
-        period: i64,
+        _py: Python<'py>,
+        _asset: String,
+        _period: i64,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let client = self.client.clone();
-        future_into_py(py, async move {
-            let res = client
-                .history(asset, period)
-                .await
-                .map_err(BinaryErrorPy::from)?;
-            Python::with_gil(|py| {
-                serde_json::to_string(&res)
-                    .map_err(BinaryErrorPy::from)?
-                    .into_py_any(py)
-            })
-        })
+        // Work in progress - this feature is not yet implemented in the new API
+        Err(
+            BinaryErrorPy::NotAllowed("history is work in progress and not yet available".into())
+                .into(),
+        )
     }
 
     pub fn subscribe_symbol<'py>(
@@ -237,17 +215,12 @@ impl RawPocketOption {
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
-            let stream_asset = client
-                .subscribe_symbol(symbol)
+            let subscription = client
+                .subscribe(symbol, SubscriptionType::none())
                 .await
                 .map_err(BinaryErrorPy::from)?;
 
-            // Clone the stream_asset and convert it to a BoxStream
-            let boxed_stream = StreamAsset::to_stream_static(Arc::new(stream_asset))
-                .boxed()
-                .fuse();
-
-            // Wrap the BoxStream in an Arc and Mutex
+            let boxed_stream = subscription.to_stream().boxed().fuse();
             let stream = Arc::new(Mutex::new(boxed_stream));
 
             Python::with_gil(|py| StreamIterator { stream }.into_py_any(py))
@@ -262,17 +235,12 @@ impl RawPocketOption {
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
-            let stream_asset = client
-                .subscribe_symbol_chuncked(symbol, chunck_size)
+            let subscription = client
+                .subscribe(symbol, SubscriptionType::chunk(chunck_size))
                 .await
                 .map_err(BinaryErrorPy::from)?;
 
-            // Clone the stream_asset and convert it to a BoxStream
-            let boxed_stream = StreamAsset::to_stream_static(Arc::new(stream_asset))
-                .boxed()
-                .fuse();
-
-            // Wrap the BoxStream in an Arc and Mutex
+            let boxed_stream = subscription.to_stream().boxed().fuse();
             let stream = Arc::new(Mutex::new(boxed_stream));
 
             Python::with_gil(|py| StreamIterator { stream }.into_py_any(py))
@@ -287,17 +255,35 @@ impl RawPocketOption {
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
-            let stream_asset = client
-                .subscribe_symbol_timed(symbol, time)
+            let subscription = client
+                .subscribe(symbol, SubscriptionType::time(time))
                 .await
                 .map_err(BinaryErrorPy::from)?;
 
-            // Clone the stream_asset and convert it to a BoxStream
-            let boxed_stream = StreamAsset::to_stream_static(Arc::new(stream_asset))
-                .boxed()
-                .fuse();
+            let boxed_stream = subscription.to_stream().boxed().fuse();
+            let stream = Arc::new(Mutex::new(boxed_stream));
 
-            // Wrap the BoxStream in an Arc and Mutex
+            Python::with_gil(|py| StreamIterator { stream }.into_py_any(py))
+        })
+    }
+
+    pub fn subscribe_symbol_time_aligned<'py>(
+        &self,
+        py: Python<'py>,
+        symbol: String,
+        time: Duration,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let subscription = client
+                .subscribe(
+                    symbol,
+                    SubscriptionType::time_aligned(time).map_err(BinaryErrorPy::from)?,
+                )
+                .await
+                .map_err(BinaryErrorPy::from)?;
+
+            let boxed_stream = subscription.to_stream().boxed().fuse();
             let stream = Arc::new(Mutex::new(boxed_stream));
 
             Python::with_gil(|py| StreamIterator { stream }.into_py_any(py))
@@ -306,106 +292,78 @@ impl RawPocketOption {
 
     pub fn send_raw_message<'py>(
         &self,
-        py: Python<'py>,
-        message: String,
+        _py: Python<'py>,
+        _message: String,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let client = self.client.clone();
-        future_into_py(py, async move {
-            client
-                .send_raw_message(message)
-                .await
-                .map_err(BinaryErrorPy::from)?;
-            // Clone the stream_asset and convert it to a BoxStream
-            Ok(())
-        })
+        // Work in progress - this feature is not yet implemented in the new API
+        Err(BinaryErrorPy::NotAllowed(
+            "send_raw_message is work in progress and not yet available".into(),
+        )
+        .into())
     }
 
     pub fn create_raw_order<'py>(
         &self,
-        py: Python<'py>,
-        message: String,
-        validator: Bound<'py, RawValidator>,
+        _py: Python<'py>,
+        _message: String,
+        _validator: Bound<'py, RawValidator>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let client = self.client.clone();
-        let validator = validator.get().clone();
-        future_into_py(py, async move {
-            let res = client
-                .create_raw_order(message, Box::new(validator))
-                .await
-                .map_err(BinaryErrorPy::from)?;
-            Ok(res.to_string())
-        })
+        // Work in progress - this feature is not yet implemented in the new API
+        Err(BinaryErrorPy::NotAllowed(
+            "create_raw_order is work in progress and not yet available".into(),
+        )
+        .into())
     }
 
     pub fn create_raw_order_with_timeout<'py>(
         &self,
-        py: Python<'py>,
-        message: String,
-        validator: Bound<'py, RawValidator>,
-        timeout: Duration,
+        _py: Python<'py>,
+        _message: String,
+        _validator: Bound<'py, RawValidator>,
+        _timeout: Duration,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let client = self.client.clone();
-        let validator = validator.get().clone();
-        future_into_py(py, async move {
-            let res = client
-                .create_raw_order_with_timeout(message, Box::new(validator), timeout)
-                .await
-                .map_err(BinaryErrorPy::from)?;
-            Ok(res.to_string())
-        })
+        // Work in progress - this feature is not yet implemented in the new API
+        Err(BinaryErrorPy::NotAllowed(
+            "create_raw_order_with_timeout is work in progress and not yet available".into(),
+        )
+        .into())
     }
 
     pub fn create_raw_order_with_timeout_and_retry<'py>(
         &self,
-        py: Python<'py>,
-        message: String,
-        validator: Bound<'py, RawValidator>,
-        timeout: Duration,
+        _py: Python<'py>,
+        _message: String,
+        _validator: Bound<'py, RawValidator>,
+        _timeout: Duration,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let client = self.client.clone();
-        let validator = validator.get().clone();
-        future_into_py(py, async move {
-            let res = client
-                .create_raw_order_with_timeout_and_retry(message, Box::new(validator), timeout)
-                .await
-                .map_err(BinaryErrorPy::from)?;
-            Ok(res.to_string())
-        })
+        // Work in progress - this feature is not yet implemented in the new API
+        Err(BinaryErrorPy::NotAllowed(
+            "create_raw_order_with_timeout_and_retry is work in progress and not yet available"
+                .into(),
+        )
+        .into())
     }
 
-    #[pyo3(signature = (message, validator, timeout=None))]
+    #[pyo3(signature = (_message, _validator, _timeout=None))]
     pub fn create_raw_iterator<'py>(
         &self,
-        py: Python<'py>,
-        message: String,
-        validator: Bound<'py, RawValidator>,
-        timeout: Option<Duration>,
+        _py: Python<'py>,
+        _message: String,
+        _validator: Bound<'py, RawValidator>,
+        _timeout: Option<Duration>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let client = self.client.clone();
-        let validator = validator.get().clone();
-        future_into_py(py, async move {
-            let raw_stream = client
-                .create_raw_iterator(message, Box::new(validator), timeout)
-                .await
-                .map_err(BinaryErrorPy::from)?;
-
-            // Clone the stream_asset and convert it to a BoxStream
-            let boxed_stream = FilteredRecieverStream::to_stream_static(Arc::new(raw_stream))
-                .boxed()
-                .fuse();
-
-            // Wrap the BoxStream in an Arc and Mutex
-            let stream = Arc::new(Mutex::new(boxed_stream));
-
-            Python::with_gil(|py| RawStreamIterator { stream }.into_py_any(py))
-        })
+        // Work in progress - this feature is not yet implemented in the new API
+        Err(BinaryErrorPy::NotAllowed(
+            "create_raw_iterator is work in progress and not yet available".into(),
+        )
+        .into())
     }
 
     pub fn get_server_time<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(
             py,
-            async move { Ok(client.get_server_time().await.timestamp()) },
+            async move { Ok(client.server_time().await.timestamp()) },
         )
     }
 }
@@ -424,7 +382,7 @@ impl StreamIterator {
         let stream = self.stream.clone();
         future_into_py(py, async move {
             let res = next_stream(stream, false).await;
-            res.map(|res| res.to_string())
+            res.map(|res| serde_json::to_string(&res).unwrap_or_default())
         })
     }
 
@@ -433,7 +391,7 @@ impl StreamIterator {
         let stream = self.stream.clone();
         runtime.block_on(async move {
             let res = next_stream(stream, true).await;
-            res.map(|res| res.to_string())
+            res.map(|res| serde_json::to_string(&res).unwrap_or_default())
         })
     }
 }
@@ -465,4 +423,3 @@ impl RawStreamIterator {
         })
     }
 }
-

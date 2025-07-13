@@ -42,4 +42,3 @@ pub mod float_time {
             .ok_or(serde::de::Error::custom("Error parsing ints to time"))
     }
 }
-

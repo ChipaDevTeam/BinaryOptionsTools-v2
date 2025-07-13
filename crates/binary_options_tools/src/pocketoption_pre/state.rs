@@ -6,8 +6,8 @@ use uuid::Uuid;
 
 use binary_options_tools_core_pre::traits::AppState;
 
-use crate::pocketoption_pre::types::{Assets, Deal};
 use crate::pocketoption_pre::types::ServerTimeState;
+use crate::pocketoption_pre::types::{Assets, Deal};
 use crate::pocketoption_pre::{
     error::{PocketError, PocketResult},
     ssid::Ssid,
@@ -105,10 +105,7 @@ impl StateBuilder {
 impl AppState for State {
     async fn clear_temporal_data(&self) {
         // Clear any temporary data associated with the state
-        let mut balance = self
-            .balance
-            .write()
-            .await;
+        let mut balance = self.balance.write().await;
         *balance = None; // Clear balance
         // Note: We don't clear server time as it's useful to maintain
         // time synchronization across reconnections
@@ -125,10 +122,7 @@ impl State {
     /// # Returns
     /// Result indicating success or failure
     pub async fn set_balance(&self, balance: f64) {
-        let mut state = self
-            .balance
-            .write()
-            .await;
+        let mut state = self.balance.write().await;
         *state = Some(balance);
     }
 
@@ -137,10 +131,7 @@ impl State {
     /// # Returns
     /// Current balance if available
     pub async fn get_balance(&self) -> Option<f64> {
-        let state = self
-            .balance
-            .read()
-            .await;
+        let state = self.balance.read().await;
         *state
     }
 
@@ -217,14 +208,9 @@ impl State {
     /// # Returns
     /// Result indicating success or failure
     pub async fn set_assets(&self, assets: Assets) {
-        let mut state = self
-            .assets
-            .write()
-            .await;
-            *state = Some(assets);
+        let mut state = self.assets.write().await;
+        *state = Some(assets);
     }
-
-
 }
 
 /// Holds all state related to trades and deals.
@@ -245,15 +231,24 @@ impl TradeState {
     /// Adds or updates deals in the opened_deals map.
     pub async fn update_opened_deals(&self, deals: Vec<Deal>) {
         // TODO: Implement the logic to update the opened deals map.
-        self.opened_deals.write().await.extend(deals.into_iter().map(|deal| (deal.id, deal)));
+        self.opened_deals
+            .write()
+            .await
+            .extend(deals.into_iter().map(|deal| (deal.id, deal)));
     }
 
     /// Moves deals from opened to closed and adds new closed deals.
     pub async fn update_closed_deals(&self, deals: Vec<Deal>) {
         // TODO: Implement the logic to update opened and closed deal maps.
         let ids = deals.iter().map(|deal| deal.id).collect::<Vec<_>>();
-        self.opened_deals.write().await.retain(|id, _| !ids.contains(id));
-        self.closed_deals.write().await.extend(deals.into_iter().map(|deal| (deal.id, deal)));
+        self.opened_deals
+            .write()
+            .await
+            .retain(|id, _| !ids.contains(id));
+        self.closed_deals
+            .write()
+            .await
+            .extend(deals.into_iter().map(|deal| (deal.id, deal)));
     }
 
     /// Removes all deals from the closed_deals map.
@@ -286,14 +281,13 @@ impl TradeState {
         self.closed_deals.read().await.contains_key(&deal_id)
     }
 
-        /// Retrieves an opened deal by its ID.
+    /// Retrieves an opened deal by its ID.
     pub async fn get_opened_deal(&self, deal_id: Uuid) -> Option<Deal> {
         self.opened_deals.read().await.get(&deal_id).cloned()
     }
-    
+
     /// Retrieves a closed deal by its ID.
     pub async fn get_closed_deal(&self, deal_id: Uuid) -> Option<Deal> {
         self.closed_deals.read().await.get(&deal_id).cloned()
     }
-
 }

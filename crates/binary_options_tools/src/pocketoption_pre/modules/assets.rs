@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use crate::pocketoption_pre::{state::State, types::{Assets, TwoStepRule}};
+use crate::pocketoption_pre::{
+    state::State,
+    types::{Assets, TwoStepRule},
+};
 use async_trait::async_trait;
 use binary_options_tools_core::reimports::Message;
 use binary_options_tools_core_pre::{
@@ -47,7 +50,6 @@ impl LightweightModule<State> for AssetsModule {
         Box::new(TwoStepRule::new(r#"451-["updateAssets","#))
     }
 }
-
 
 #[cfg(test)]
 mod tests {

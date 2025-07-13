@@ -22,7 +22,8 @@ use super::config::Config;
 use super::send::SenderMessage;
 use super::stream::FilteredRecieverStream;
 use super::traits::{
-    Connect, Credentials, DataHandler, InnerConfig, MessageHandler, MessageTransfer, ValidatorTrait, WCallback
+    Connect, Credentials, DataHandler, InnerConfig, MessageHandler, MessageTransfer,
+    ValidatorTrait, WCallback,
 };
 use super::types::{Callback, Data};
 

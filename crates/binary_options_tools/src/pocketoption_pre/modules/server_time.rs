@@ -2,15 +2,21 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use binary_options_tools_core::reimports::Message;
-use binary_options_tools_core_pre::{error::{CoreError, CoreResult}, reimports::{AsyncReceiver, AsyncSender}, traits::{LightweightModule, Rule}};
+use binary_options_tools_core_pre::{
+    error::{CoreError, CoreResult},
+    reimports::{AsyncReceiver, AsyncSender},
+    traits::{LightweightModule, Rule},
+};
 use tracing::debug;
 
-use crate::pocketoption_pre::{state::State, types::{StreamData, TwoStepRule}};
-
+use crate::pocketoption_pre::{
+    state::State,
+    types::{StreamData, TwoStepRule},
+};
 
 pub struct ServerTimeModule {
     receiver: AsyncReceiver<Arc<Message>>,
-    state: Arc<State>
+    state: Arc<State>,
 }
 
 #[async_trait]
@@ -21,7 +27,8 @@ impl LightweightModule<State> for ServerTimeModule {
         ws_receiver: AsyncReceiver<Arc<Message>>,
     ) -> Self
     where
-        Self: Sized {
+        Self: Sized,
+    {
         Self {
             receiver: ws_receiver,
             state,
@@ -49,4 +56,3 @@ impl LightweightModule<State> for ServerTimeModule {
         Box::new(TwoStepRule::new(r#"451-["updateStream","#))
     }
 }
-

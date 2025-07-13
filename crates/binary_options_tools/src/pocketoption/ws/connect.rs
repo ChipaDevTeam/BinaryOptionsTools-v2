@@ -57,7 +57,10 @@ impl Connect for PocketConnect {
             res = reciever.recv() => return Ok(res.map(|(r, _)| r)?),
             _ = join_all(default_connections) => {}
         }
-        let urls = creds.servers().await.map_err(|e| PocketOptionError::SsidParsingError(e.to_string()))?;
+        let urls = creds
+            .servers()
+            .await
+            .map_err(|e| PocketOptionError::SsidParsingError(e.to_string()))?;
         let connections = urls
             .iter()
             .map(|url| tokio::spawn(send_ws(creds.clone(), url.to_owned(), sender.clone())));

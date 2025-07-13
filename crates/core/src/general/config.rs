@@ -30,7 +30,11 @@ pub struct _Config<T: DataHandler, Transfer: MessageTransfer, U: InnerConfig> {
 }
 
 impl<T: DataHandler, Transfer: MessageTransfer, U: InnerConfig> _Config<T, Transfer, U> {
-    pub fn new(initialization_timeout: Duration, callbacks: Vec<Callback<T, Transfer, U>>, extra: U) -> Self {
+    pub fn new(
+        initialization_timeout: Duration,
+        callbacks: Vec<Callback<T, Transfer, U>>,
+        extra: U,
+    ) -> Self {
         Self {
             max_allowed_loops: MAX_ALLOWED_LOOPS,
             sleep_interval: SLEEP_INTERVAL,
