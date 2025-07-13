@@ -27,10 +27,10 @@ type HandlersFn<S> = Box<
         HandlerMap,
         AsyncSender<Message>,
         &mut ReconnectCallbackStack<S>,
-    ),
+    ) + Send  + Sync,
 >;
 
-type LightweightHandlersFn<S> = Box<dyn FnOnce(&mut Router<S>, AsyncSender<Message>)>;
+type LightweightHandlersFn<S> = Box<dyn FnOnce(&mut Router<S>, AsyncSender<Message>) + Send + Sync>;
 
 pub struct ClientBuilder<S: AppState> {
     state: Arc<S>,
@@ -43,6 +43,7 @@ pub struct ClientBuilder<S: AppState> {
     // Middleware stack for WebSocket message processing
     middleware_stack: MiddlewareStack<S>,
 }
+
 
 impl<S: AppState> ClientBuilder<S> {
     /// Creates a new builder with the essential components.
@@ -425,5 +426,20 @@ impl<S: AppState> ClientBuilder<S> {
         };
 
         Ok((client, runner))
+    }
+}
+
+
+// Add this test at the bottom of the file
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    fn assert_send_sync<T: Send + Sync>() {}
+    
+    #[test]
+    fn test_client_builder_send_sync() {
+        // This will fail to compile if ClientBuilder is not Send + Sync
+        assert_send_sync::<ClientBuilder<()>>();
     }
 }

@@ -203,7 +203,7 @@ pub trait WebSocketMiddleware<S: AppState>: Send + Sync + 'static {
 /// stack.add_layer(Box::new(StatisticsMiddleware::new()));
 /// ```
 pub struct MiddlewareStack<S: AppState> {
-    layers: Vec<Box<dyn WebSocketMiddleware<S>>>,
+    layers: Vec<Box<dyn WebSocketMiddleware<S> + Send + Sync>>,
 }
 
 impl<S: AppState> MiddlewareStack<S> {
@@ -215,7 +215,7 @@ impl<S: AppState> MiddlewareStack<S> {
     /// Adds a middleware layer to the stack.
     ///
     /// Middleware will be executed in the order they are added.
-    pub fn add_layer(&mut self, middleware: Box<dyn WebSocketMiddleware<S>>) {
+    pub fn add_layer(&mut self, middleware: Box<dyn WebSocketMiddleware<S> + Send + Sync>) {
         self.layers.push(middleware);
     }
 
