@@ -369,3 +369,90 @@ document.addEventListener('DOMContentLoaded', () => {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = DocumentationApp;
 }
+    handleSearch(query) {
+        const searchableElements = document.querySelectorAll('.feature-card, .card, .install-step');
+        const normalizedQuery = query.toLowerCase().trim();
+        
+        searchableElements.forEach(element => {
+            const text = element.textContent.toLowerCase();
+            const isVisible = text.includes(normalizedQuery) || normalizedQuery === '';
+            element.style.display = isVisible ? 'block' : 'none';
+        });
+    }
+
+    // Utility Methods
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    throttle(func, limit) {
+        let inThrottle;
+        return function() {
+            const args = arguments;
+            const context = this;
+            if (!inThrottle) {
+                func.apply(context, args);
+                inThrottle = true;
+                setTimeout(() => inThrottle = false, limit);
+            }
+        };
+    }
+}
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const app = new DocumentationApp();
+        window.documentationApp = app; // Make globally accessible for debugging
+    } catch (error) {
+        console.error('Failed to initialize DocumentationApp:', error);
+    }
+});
+
+// Handle page visibility changes
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        console.log('Page hidden');
+    } else {
+        console.log('Page visible');
+    }
+});
+
+// Handle online/offline status
+window.addEventListener('online', () => {
+    console.log('Connection restored');
+});
+
+window.addEventListener('offline', () => {
+    console.log('Connection lost');
+});
+
+// Page lifecycle events
+window.addEventListener('load', () => {
+    // Remove any loading states
+    document.querySelectorAll('.loading').forEach(el => {
+        el.classList.remove('loading');
+    });
+
+    // Initialize hero animations
+    const heroElements = document.querySelectorAll('.hero-title, .hero-subtitle, .hero-cta, .hero-stats, .hero-code-demo');
+    heroElements.forEach((el, index) => {
+        setTimeout(() => {
+            el.style.opacity = '1';
+            el.style.transform = 'translateY(0)';
+        }, index * 200);
+    });
+});
+
+// Export for module usage
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = DocumentationApp;
+}
