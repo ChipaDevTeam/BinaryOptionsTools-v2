@@ -1,22 +1,4 @@
-// Main JavaScript functionality for BinaryOptionsToolsV2 Documentation
-class DocumentationApp {
-    constructor() {
-        this.currentLanguage = 'python';
-        this.isScrolling = false;
-        this.init();
-    }    init() {
-        this.setupLanguageTabs();
-        this.setupInstallationTabs();
-        this.setupScrollAnimations();
-        this.setupNavigation();
-        this.setupCopyButtons();
-        this.setupMobileMenu();
-        this.setupTypewriter();
-        this.setupParallaxEffects();
-        this.setupThemeToggle();
-        this.setupSmoothScrolling();
-        this.trackPerformance();
-    }
+undefined
 
     // Language Tab Functionality
     setupLanguageTabs() {
