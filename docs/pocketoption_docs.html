@@ -1,0 +1,2964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BinaryOptionsToolsV2 - Professional API Documentation</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --background-color: #f8f9fa;
+            --text-color: #2c3e50;
+            --border-color: #e9ecef;
+            --code-bg: #f4f4f4;
+            --dark-bg: #1a1a1a;
+            --dark-text: #e9ecef;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        /* Navigation */
+        .nav {
+            background: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav ul {
+            list-style: none;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .nav li {
+            margin: 0 1rem;
+        }
+
+        .nav a {
+            color: var(--text-color);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .nav a:hover {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        /* Main Content */
+        .main {
+            padding: 2rem 0;
+        }
+
+        .section {
+            margin-bottom: 3rem;
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .section h2 {
+            color: var(--primary-color);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 3px solid var(--secondary-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .section h3 {
+            color: var(--secondary-color);
+            font-size: 1.5rem;
+            margin: 1.5rem 0 1rem 0;
+        }
+
+        .section h4 {
+            color: var(--text-color);
+            font-size: 1.2rem;
+            margin: 1rem 0 0.5rem 0;
+        }
+
+        /* Code Blocks */
+        .code-block {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 1rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+        }
+
+        .code-block pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+
+        .inline-code {
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        /* Method Documentation */
+        .method {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin: 1rem 0;
+            overflow: hidden;
+        }
+
+        .method-header {
+            background: var(--secondary-color);
+            color: white;
+            padding: 1rem;
+            font-weight: 600;
+        }
+
+        .method-body {
+            padding: 1rem;
+        }
+
+        .method-signature {
+            background: var(--code-bg);
+            padding: 0.5rem;
+            border-radius: 5px;
+            font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+            margin: 0.5rem 0;
+        }
+
+        /* Parameters */
+        .params {
+            margin: 1rem 0;
+        }
+
+        .param {
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            border-left: 3px solid var(--secondary-color);
+            background: rgba(52, 152, 219, 0.1);
+        }
+
+        .param-name {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .param-type {
+            color: var(--success-color);
+            font-style: italic;
+        }
+
+        /* Returns */
+        .returns {
+            background: rgba(39, 174, 96, 0.1);
+            border-left: 3px solid var(--success-color);
+            padding: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        /* Examples */
+        .example {
+            background: rgba(243, 156, 18, 0.1);
+            border-left: 3px solid var(--warning-color);
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .example h5 {
+            color: var(--warning-color);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+        }
+
+        .alert-info {
+            background: rgba(52, 152, 219, 0.1);
+            border-left: 4px solid var(--secondary-color);
+        }
+
+        .alert-warning {
+            background: rgba(243, 156, 18, 0.1);
+            border-left: 4px solid var(--warning-color);
+        }
+
+        .alert-danger {
+            background: rgba(231, 76, 60, 0.1);
+            border-left: 4px solid var(--accent-color);
+        }
+
+        /* Table */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .table th,
+        .table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table th {
+            background: var(--secondary-color);
+            color: white;
+            font-weight: 600;
+        }
+
+        .table tr:hover {
+            background: rgba(52, 152, 219, 0.1);
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--primary-color);
+            color: white;
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 3rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav ul {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .nav li {
+                margin: 0.25rem 0;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .section {
+                padding: 1rem;
+            }
+        }
+
+        /* Syntax highlighting */
+        .keyword { color: #0000ff; }
+        .string { color: #008000; }
+        .comment { color: #808080; font-style: italic; }
+        .number { color: #ff0000; }
+        .function { color: #800080; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h1>BinaryOptionsToolsV2</h1>
+            <p>Professional Python API for Pocket Option Trading Platform</p>
+        </div>
+    </div>
+
+    <nav class="nav">
+        <div class="container">
+            <ul>
+                <li><a href="#overview">Overview</a></li>
+                <li><a href="#installation">Installation</a></li>
+                <li><a href="#quick-start">Quick Start</a></li>
+                <li><a href="#pocketoption">PocketOption (Sync)</a></li>
+                <li><a href="#pocketoptionasync">PocketOptionAsync</a></li>
+                <li><a href="#configuration">Configuration</a></li>
+                <li><a href="#validation">Validation</a></li>
+                <li><a href="#logging">Logging</a></li>
+                <li><a href="#examples">Examples</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="main">
+        <div class="container">
+            <!-- Overview Section -->
+            <section id="overview" class="section">
+                <h2>Overview</h2>
+                <p>BinaryOptionsToolsV2 is a comprehensive Python library for interacting with the Pocket Option trading platform. It provides both synchronous and asynchronous interfaces for placing trades, retrieving market data, and managing account information.</p>
+                
+                <h3>Key Features</h3>
+                <ul>
+                    <li><strong>Dual Interface:</strong> Both synchronous and asynchronous APIs</li>
+                    <li><strong>Real-time Data:</strong> WebSocket connections for live market updates</li>
+                    <li><strong>Trade Management:</strong> Place, monitor, and analyze trades</li>
+                    <li><strong>Account Management:</strong> Balance, history, and account information</li>
+                    <li><strong>Advanced Configuration:</strong> Customizable connection settings</li>
+                    <li><strong>Professional Logging:</strong> Comprehensive logging system</li>
+                    <li><strong>Validation System:</strong> Robust message validation</li>
+                </ul>
+
+                <h3>Supported Platforms</h3>
+                <ul>
+                    <li>Pocket Option (Demo and Real accounts)</li>
+                    <li>Python 3.9 - 3.12</li>
+                    <li>Windows, macOS, Linux</li>
+                </ul>
+            </section>
+
+            <!-- Installation Section -->
+            <section id="installation" class="section">
+                <h2>Installation</h2>
+                
+                <h3>Requirements</h3>
+                <ul>
+                    <li>Python 3.9 or higher</li>
+                    <li>Rust and Cargo (for building from source)</li>
+                </ul>
+
+                <h3>Install from PyPI</h3>
+                <div class="code-block">
+                    <pre>pip install binaryoptionstoolsv2</pre>
+                </div>
+
+                <h3>Install from Source</h3>
+                <div class="code-block">
+                    <pre># Clone the repository
+git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git
+cd BinaryOptionsTools-v2/BinaryOptionsToolsV2
+
+# Build and install
+maturin build -r
+pip install path/to/built/wheel.whl</pre>
+                </div>
+
+                <h3>Development Installation</h3>
+                <div class="code-block">
+                    <pre># Install in development mode
+cd BinaryOptionsTools-v2/BinaryOptionsToolsV2
+maturin develop</pre>
+                </div>
+            </section>
+
+            <!-- Quick Start Section -->
+            <section id="quick-start" class="section">
+                <h2>Quick Start</h2>
+                
+                <h3>Getting Your Session ID</h3>
+                <div class="alert alert-info">
+                    <strong>Important:</strong> You need to extract your session ID from the Pocket Option website after logging in. This is typically found in your browser's developer tools under Network or Application tabs.
+                </div>
+
+                <h3>Basic Usage - Synchronous</h3>
+                <div class="code-block">
+                    <pre><span class="keyword">from</span> BinaryOptionsToolsV2.pocketoption <span class="keyword">import</span> PocketOption
+<span class="keyword">import</span> time
+
+<span class="comment"># Initialize client with your session ID</span>
+client = PocketOption(<span class="string">"your-session-id"</span>)
+
+<span class="comment"># Wait for connection to establish</span>
+time.sleep(5)
+
+<span class="comment"># Get account balance</span>
+balance = client.balance()
+<span class="function">print</span>(<span class="string">f"Account Balance: {balance}"</span>)
+
+<span class="comment"># Place a trade</span>
+trade_id, trade_data = client.buy(<span class="string">"EURUSD"</span>, <span class="number">1.0</span>, <span class="number">60</span>)
+<span class="function">print</span>(<span class="string">f"Trade placed: {trade_id}"</span>)
+
+<span class="comment"># Check trade result</span>
+result = client.check_win(trade_id)
+<span class="function">print</span>(<span class="string">f"Trade result: {result}"</span>)</pre>
+                </div>
+
+                <h3>Basic Usage - Asynchronous</h3>
+                <div class="code-block">
+                    <pre><span class="keyword">from</span> BinaryOptionsToolsV2.pocketoption <span class="keyword">import</span> PocketOptionAsync
+<span class="keyword">import</span> asyncio
+
+<span class="keyword">async</span> <span class="keyword">def</span> <span class="function">main</span>():
+    <span class="comment"># Initialize async client</span>
+    client = PocketOptionAsync(<span class="string">"your-session-id"</span>)
+    
+    <span class="comment"># Wait for connection</span>
+    <span class="keyword">await</span> asyncio.sleep(5)
+    
+    <span class="comment"># Get account balance</span>
+    balance = <span class="keyword">await</span> client.balance()
+    <span class="function">print</span>(<span class="string">f"Account Balance: {balance}"</span>)
+    
+    <span class="comment"># Place a trade</span>
+    trade_id, trade_data = <span class="keyword">await</span> client.buy(<span class="string">"EURUSD"</span>, <span class="number">1.0</span>, <span class="number">60</span>)
+    <span class="function">print</span>(<span class="string">f"Trade placed: {trade_id}"</span>)
+
+<span class="comment"># Run the async function</span>
+asyncio.run(main())</pre>
+                </div>
+            </section>
+
+            <!-- PocketOption (Sync) Section -->
+            <section id="pocketoption" class="section">
+                <h2>PocketOption (Synchronous API)</h2>
+                <p>The synchronous API wrapper that provides blocking operations for easier integration with traditional Python code.</p>
+
+                <h3>Constructor</h3>
+                <div class="method">
+                    <div class="method-header">
+                        PocketOption.__init__
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            PocketOption(ssid: str, config: Config | dict | str = None, **_)
+                        </div>
+                        <p>Initializes a new PocketOption instance with synchronous wrapper around the asynchronous interface.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">ssid</span> <span class="param-type">(str)</span>: Session ID for authentication with Pocket Option platform
+                            </div>
+                            <div class="param">
+                                <span class="param-name">config</span> <span class="param-type">(Config | dict | str, optional)</span>: Configuration options for connection behavior
+                            </div>
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="comment"># Basic initialization</span>
+client = PocketOption(<span class="string">"your-session-id"</span>)
+
+<span class="comment"># With custom configuration</span>
+config = {
+    <span class="string">"timeout_secs"</span>: <span class="number">60</span>,
+    <span class="string">"reconnect_time"</span>: <span class="number">10</span>
+}
+client = PocketOption(<span class="string">"your-session-id"</span>, config=config)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Trading Methods</h3>
+                
+                <div class="method">
+                    <div class="method-header">
+                        buy
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            buy(asset: str, amount: float, time: int, check_win: bool = False) -> tuple[str, dict]
+                        </div>
+                        <p>Places a buy (call) trade on the specified asset.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">asset</span> <span class="param-type">(str)</span>: Trading asset (e.g., "EURUSD", "EURUSD_otc")
+                            </div>
+                            <div class="param">
+                                <span class="param-name">amount</span> <span class="param-type">(float)</span>: Trade amount in account currency
+                            </div>
+                            <div class="param">
+                                <span class="param-name">time</span> <span class="param-type">(int)</span>: Expiry time in seconds
+                            </div>
+                            <div class="param">
+                                <span class="param-name">check_win</span> <span class="param-type">(bool)</span>: Whether to wait for trade result
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">tuple[str, dict]</span>: Trade ID and trade data
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="comment"># Place a $10 buy trade on EURUSD for 60 seconds</span>
+trade_id, trade_data = client.buy(<span class="string">"EURUSD"</span>, <span class="number">10.0</span>, <span class="number">60</span>)
+
+<span class="comment"># Place trade and wait for result</span>
+trade_id, result = client.buy(<span class="string">"EURUSD"</span>, <span class="number">10.0</span>, <span class="number">60</span>, check_win=<span class="keyword">True</span>)
+<span class="function">print</span>(<span class="string">f"Trade result: {result['result']}"</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        sell
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            sell(asset: str, amount: float, time: int, check_win: bool = False) -> tuple[str, dict]
+                        </div>
+                        <p>Places a sell (put) trade on the specified asset.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">asset</span> <span class="param-type">(str)</span>: Trading asset (e.g., "EURUSD", "EURUSD_otc")
+                            </div>
+                            <div class="param">
+                                <span class="param-name">amount</span> <span class="param-type">(float)</span>: Trade amount in account currency
+                            </div>
+                            <div class="param">
+                                <span class="param-name">time</span> <span class="param-type">(int)</span>: Expiry time in seconds
+                            </div>
+                            <div class="param">
+                                <span class="param-name">check_win</span> <span class="param-type">(bool)</span>: Whether to wait for trade result
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">tuple[str, dict]</span>: Trade ID and trade data
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        check_win
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            check_win(id: str) -> dict
+                        </div>
+                        <p>Checks the result of a specific trade by ID.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">id</span> <span class="param-type">(str)</span>: Trade ID to check
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">dict</span>: Trade result with "win", "draw", or "loss" status
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="comment"># Check trade result</span>
+result = client.check_win(trade_id)
+<span class="function">print</span>(<span class="string">f"Result: {result['result']}"</span>)
+<span class="function">print</span>(<span class="string">f"Profit: {result['profit']}"</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Account Methods</h3>
+
+                <div class="method">
+                    <div class="method-header">
+                        balance
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            balance() -> float
+                        </div>
+                        <p>Retrieves the current account balance.</p>
+                        
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">float</span>: Account balance in account currency
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre>balance = client.balance()
+<span class="function">print</span>(<span class="string">f"Current balance: ${balance}"</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        is_demo
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            is_demo() -> bool
+                        </div>
+                        <p>Checks if the current account is a demo account.</p>
+                        
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">bool</span>: True if demo account, False if real account
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre>is_demo = client.is_demo()
+<span class="function">print</span>(<span class="string">f"Using {'demo' if is_demo else 'real'} account"</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        opened_deals
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            opened_deals() -> list[dict]
+                        </div>
+                        <p>Returns a list of all currently opened trades.</p>
+                        
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">list[dict]</span>: List of open trade dictionaries
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        closed_deals
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            closed_deals() -> list[dict]
+                        </div>
+                        <p>Returns a list of all closed trades.</p>
+                        
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">list[dict]</span>: List of closed trade dictionaries
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        clear_closed_deals
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            clear_closed_deals() -> None
+                        </div>
+                        <p>Removes all closed deals from memory.</p>
+                    </div>
+                </div>
+
+                <h3>Market Data Methods</h3>
+
+                <div class="method">
+                    <div class="method-header">
+                        get_candles
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            get_candles(asset: str, period: int, offset: int) -> list[dict]
+                        </div>
+                        <p>Retrieves historical candle data for an asset.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">asset</span> <span class="param-type">(str)</span>: Trading asset (e.g., "EURUSD_otc")
+                            </div>
+                            <div class="param">
+                                <span class="param-name">period</span> <span class="param-type">(int)</span>: Candle period in seconds
+                            </div>
+                            <div class="param">
+                                <span class="param-name">offset</span> <span class="param-type">(int)</span>: Number of candles to retrieve
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">list[dict]</span>: List of candles with time, open, high, low, close data
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="comment"># Get last 100 1-minute candles</span>
+candles = client.get_candles(<span class="string">"EURUSD_otc"</span>, <span class="number">60</span>, <span class="number">100</span>)
+<span class="keyword">for</span> candle <span class="keyword">in</span> candles:
+    <span class="function">print</span>(<span class="string">f"Time: {candle['time']}, Close: {candle['close']}"</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        get_candles_advanced
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            get_candles_advanced(asset: str, period: int, offset: int, time: int) -> list[dict]
+                        </div>
+                        <p>Retrieves historical candle data with specific time reference.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">asset</span> <span class="param-type">(str)</span>: Trading asset
+                            </div>
+                            <div class="param">
+                                <span class="param-name">period</span> <span class="param-type">(int)</span>: Candle period in seconds
+                            </div>
+                            <div class="param">
+                                <span class="param-name">offset</span> <span class="param-type">(int)</span>: Number of candles
+                            </div>
+                            <div class="param">
+                                <span class="param-name">time</span> <span class="param-type">(int)</span>: Reference time (Unix timestamp)
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">list[dict]</span>: List of candle data
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        payout
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            payout(asset: None | str | list[str] = None) -> dict | list[str] | int
+                        </div>
+                        <p>Retrieves payout percentages for assets.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">asset</span> <span class="param-type">(None | str | list[str])</span>: Specific asset(s) or None for all
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">dict | list[str] | int</span>: Payout data based on input type
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="comment"># Get all payouts</span>
+payouts = client.payout()
+<span class="function">print</span>(payouts)
+
+<span class="comment"># Get specific asset payout</span>
+eurusd_payout = client.payout(<span class="string">"EURUSD"</span>)
+<span class="function">print</span>(<span class="string">f"EURUSD payout: {eurusd_payout}%"</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        history
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            history(asset: str, period: int) -> list[dict]
+                        </div>
+                        <p>Returns historical data for the specified asset.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">asset</span> <span class="param-type">(str)</span>: Trading asset
+                            </div>
+                            <div class="param">
+                                <span class="param-name">period</span> <span class="param-type">(int)</span>: Period in seconds
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">list[dict]</span>: Historical data in candle format
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        get_server_time
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            get_server_time() -> int
+                        </div>
+                        <p>Returns the current server time as Unix timestamp.</p>
+                        
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">int</span>: Server time as Unix timestamp
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Real-time Subscriptions</h3>
+
+                <div class="method">
+                    <div class="method-header">
+                        subscribe_symbol
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            subscribe_symbol(asset: str) -> SyncSubscription
+                        </div>
+                        <p>Creates a real-time subscription for raw price data.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">asset</span> <span class="param-type">(str)</span>: Asset to subscribe to
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">SyncSubscription</span>: Iterator for real-time updates
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="comment"># Subscribe to EURUSD price updates</span>
+subscription = client.subscribe_symbol(<span class="string">"EURUSD"</span>)
+<span class="keyword">for</span> update <span class="keyword">in</span> subscription:
+    <span class="function">print</span>(<span class="string">f"Price update: {update}"</span>)
+    <span class="comment"># Break after some condition</span>
+    <span class="keyword">if</span> some_condition:
+        <span class="keyword">break</span></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        subscribe_symbol_chuncked
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            subscribe_symbol_chuncked(asset: str, chunck_size: int) -> SyncSubscription
+                        </div>
+                        <p>Creates a subscription that chunks raw candles into groups.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">asset</span> <span class="param-type">(str)</span>: Asset to subscribe to
+                            </div>
+                            <div class="param">
+                                <span class="param-name">chunck_size</span> <span class="param-type">(int)</span>: Number of raw candles per chunk
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">SyncSubscription</span>: Iterator for chunked updates
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        subscribe_symbol_timed
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            subscribe_symbol_timed(asset: str, time: timedelta) -> SyncSubscription
+                        </div>
+                        <p>Creates a time-based subscription for candle data.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">asset</span> <span class="param-type">(str)</span>: Asset to subscribe to
+                            </div>
+                            <div class="param">
+                                <span class="param-name">time</span> <span class="param-type">(timedelta)</span>: Time interval for updates
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">SyncSubscription</span>: Iterator for timed updates
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="keyword">from</span> datetime <span class="keyword">import</span> timedelta
+
+<span class="comment"># Get 1-minute candles</span>
+subscription = client.subscribe_symbol_timed(<span class="string">"EURUSD"</span>, timedelta(minutes=<span class="number">1</span>))
+<span class="keyword">for</span> candle <span class="keyword">in</span> subscription:
+    <span class="function">print</span>(<span class="string">f"1-minute candle: {candle}"</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        subscribe_symbol_time_aligned
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            subscribe_symbol_time_aligned(asset: str, time: timedelta) -> SyncSubscription
+                        </div>
+                        <p>Creates a time-aligned subscription for precise timing.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">asset</span> <span class="param-type">(str)</span>: Asset to subscribe to
+                            </div>
+                            <div class="param">
+                                <span class="param-name">time</span> <span class="param-type">(timedelta)</span>: Time alignment interval
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">SyncSubscription</span>: Iterator for time-aligned updates
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Raw WebSocket Methods</h3>
+
+                <div class="method">
+                    <div class="method-header">
+                        send_raw_message
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            send_raw_message(message: str) -> None
+                        </div>
+                        <p>Sends a raw WebSocket message without waiting for response.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">message</span> <span class="param-type">(str)</span>: Raw WebSocket message
+                            </div>
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="comment"># Send ping message</span>
+client.send_raw_message(<span class="string">'42["ping"]'</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        create_raw_order
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            create_raw_order(message: str, validator: Validator) -> str
+                        </div>
+                        <p>Sends a raw message and waits for validated response.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">message</span> <span class="param-type">(str)</span>: Raw WebSocket message
+                            </div>
+                            <div class="param">
+                                <span class="param-name">validator</span> <span class="param-type">(Validator)</span>: Response validator
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">str</span>: First matching response message
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="keyword">from</span> BinaryOptionsToolsV2.validator <span class="keyword">import</span> Validator
+
+validator = Validator.contains(<span class="string">"success"</span>)
+response = client.create_raw_order(<span class="string">'42["some_command"]'</span>, validator)
+<span class="function">print</span>(<span class="string">f"Response: {response}"</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        create_raw_order_with_timout
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            create_raw_order_with_timout(message: str, validator: Validator, timeout: timedelta) -> str
+                        </div>
+                        <p>Sends a raw message with timeout for response.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">message</span> <span class="param-type">(str)</span>: Raw WebSocket message
+                            </div>
+                            <div class="param">
+                                <span class="param-name">validator</span> <span class="param-type">(Validator)</span>: Response validator
+                            </div>
+                            <div class="param">
+                                <span class="param-name">timeout</span> <span class="param-type">(timedelta)</span>: Response timeout
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">str</span>: First matching response message
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <strong>Raises:</strong> TimeoutError if no response within timeout period
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        create_raw_order_with_timeout_and_retry
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            create_raw_order_with_timeout_and_retry(message: str, validator: Validator, timeout: timedelta) -> str
+                        </div>
+                        <p>Sends a raw message with timeout and automatic retry.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">message</span> <span class="param-type">(str)</span>: Raw WebSocket message
+                            </div>
+                            <div class="param">
+                                <span class="param-name">validator</span> <span class="param-type">(Validator)</span>: Response validator
+                            </div>
+                            <div class="param">
+                                <span class="param-name">timeout</span> <span class="param-type">(timedelta)</span>: Timeout per attempt
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">str</span>: First matching response message
+                        </div>
+
+                        <div class="alert alert-info">
+                            <strong>Note:</strong> Uses exponential backoff for retries
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        create_raw_iterator
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            create_raw_iterator(message: str, validator: Validator, timeout: timedelta | None = None) -> SyncSubscription
+                        </div>
+                        <p>Creates an iterator for validated WebSocket messages.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">message</span> <span class="param-type">(str)</span>: Initial WebSocket message
+                            </div>
+                            <div class="param">
+                                <span class="param-name">validator</span> <span class="param-type">(Validator)</span>: Message validator
+                            </div>
+                            <div class="param">
+                                <span class="param-name">timeout</span> <span class="param-type">(timedelta | None)</span>: Optional timeout
+                            </div>
+                        </div>
+
+                        <div class="returns">
+                            <h4>Returns:</h4>
+                            <span class="param-type">SyncSubscription</span>: Iterator for validated messages
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="keyword">from</span> datetime <span class="keyword">import</span> timedelta
+<span class="keyword">from</span> BinaryOptionsToolsV2.validator <span class="keyword">import</span> Validator
+
+validator = Validator.contains(<span class="string">"price"</span>)
+stream = client.create_raw_iterator(
+    <span class="string">'42["subscribe_prices"]'</span>,
+    validator,
+    timeout=timedelta(minutes=<span class="number">5</span>)
+)
+
+<span class="keyword">for</span> message <span class="keyword">in</span> stream:
+    <span class="function">print</span>(<span class="string">f"Price update: {message}"</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PocketOptionAsync Section -->
+            <section id="pocketoptionasync" class="section">
+                <h2>PocketOptionAsync (Asynchronous API)</h2>
+                <p>The asynchronous API provides non-blocking operations for high-performance applications.</p>
+
+                <div class="alert alert-info">
+                    <strong>Note:</strong> PocketOptionAsync has the same method signatures as PocketOption, but all methods are async and must be awaited. Some methods may not be implemented in the async version - check the method documentation for availability.
+                </div>
+
+                <h3>Constructor</h3>
+                <div class="method">
+                    <div class="method-header">
+                        PocketOptionAsync.__init__
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            PocketOptionAsync(ssid: str, url: str | None = None, config: Config | dict | str = None, **_)
+                        </div>
+                        <p>Initializes a new asynchronous PocketOption client.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">ssid</span> <span class="param-type">(str)</span>: Session ID for authentication
+                            </div>
+                            <div class="param">
+                                <span class="param-name">url</span> <span class="param-type">(str | None)</span>: Custom WebSocket URL (optional)
+                            </div>
+                            <div class="param">
+                                <span class="param-name">config</span> <span class="param-type">(Config | dict | str)</span>: Configuration options
+                            </div>
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="keyword">import</span> asyncio
+<span class="keyword">from</span> BinaryOptionsToolsV2.pocketoption <span class="keyword">import</span> PocketOptionAsync
+
+<span class="keyword">async</span> <span class="keyword">def</span> <span class="function">main</span>():
+    client = PocketOptionAsync(<span class="string">"your-session-id"</span>)
+    
+    <span class="comment"># Wait for connection</span>
+    <span class="keyword">await</span> asyncio.sleep(5)
+    
+    <span class="comment"># Use the client</span>
+    balance = <span class="keyword">await</span> client.balance()
+    <span class="function">print</span>(<span class="string">f"Balance: {balance}"</span>)
+
+asyncio.run(main())</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Key Differences from Synchronous API</h3>
+                <ul>
+                    <li>All methods are async and must be awaited</li>
+                    <li>Better performance for concurrent operations</li>
+                    <li>Some methods may not be implemented (check documentation)</li>
+                    <li>Uses AsyncSubscription instead of SyncSubscription for real-time data</li>
+                </ul>
+
+                <h3>Async Subscription Example</h3>
+                <div class="example">
+                    <h5>Real-time Price Subscription:</h5>
+                    <div class="code-block">
+                        <pre><span class="keyword">async</span> <span class="keyword">def</span> <span class="function">stream_prices</span>():
+    client = PocketOptionAsync(<span class="string">"your-session-id"</span>)
+    <span class="keyword">await</span> asyncio.sleep(5)
+    
+    subscription = <span class="keyword">await</span> client.subscribe_symbol(<span class="string">"EURUSD"</span>)
+    <span class="keyword">async</span> <span class="keyword">for</span> update <span class="keyword">in</span> subscription:
+        <span class="function">print</span>(<span class="string">f"Price: {update}"</span>)
+        <span class="comment"># Process update asynchronously</span>
+        <span class="keyword">await</span> process_price_update(update)</pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Configuration Section -->
+            <section id="configuration" class="section">
+                <h2>Configuration</h2>
+                <p>The Config class provides comprehensive configuration options for connection behavior and timeouts.</p>
+
+                <h3>Config Class</h3>
+                <div class="method">
+                    <div class="method-header">
+                        Config
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            Config(max_allowed_loops: int = 100, sleep_interval: int = 100, reconnect_time: int = 5, 
+                                   connection_initialization_timeout_secs: int = 30, timeout_secs: int = 30, 
+                                   urls: List[str] = None, extra_duration: int = 5)
+                        </div>
+                        <p>Configuration class for customizing client behavior.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">max_allowed_loops</span> <span class="param-type">(int)</span>: Maximum event loop iterations (default: 100)
+                            </div>
+                            <div class="param">
+                                <span class="param-name">sleep_interval</span> <span class="param-type">(int)</span>: Sleep interval in milliseconds (default: 100)
+                            </div>
+                            <div class="param">
+                                <span class="param-name">reconnect_time</span> <span class="param-type">(int)</span>: Reconnection wait time in seconds (default: 5)
+                            </div>
+                            <div class="param">
+                                <span class="param-name">connection_initialization_timeout_secs</span> <span class="param-type">(int)</span>: Connection timeout (default: 30)
+                            </div>
+                            <div class="param">
+                                <span class="param-name">timeout_secs</span> <span class="param-type">(int)</span>: General operation timeout (default: 30)
+                            </div>
+                            <div class="param">
+                                <span class="param-name">urls</span> <span class="param-type">(List[str])</span>: List of fallback WebSocket URLs
+                            </div>
+                            <div class="param">
+                                <span class="param-name">extra_duration</span> <span class="param-type">(int)</span>: Extra duration for trade checks (default: 5)
+                            </div>
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="keyword">from</span> BinaryOptionsToolsV2.config <span class="keyword">import</span> Config
+
+<span class="comment"># Create custom configuration</span>
+config = Config(
+    timeout_secs=<span class="number">60</span>,
+    reconnect_time=<span class="number">10</span>,
+    extra_duration=<span class="number">8</span>
+)
+
+<span class="comment"># Use with client</span>
+client = PocketOption(<span class="string">"your-session-id"</span>, config=config)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Configuration Methods</h3>
+
+                <div class="method">
+                    <div class="method-header">
+                        from_dict
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            Config.from_dict(config_dict: Dict[str, Any]) -> Config
+                        </div>
+                        <p>Creates a Config instance from a dictionary.</p>
+                        
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre>config_dict = {
+    <span class="string">"timeout_secs"</span>: <span class="number">45</span>,
+    <span class="string">"reconnect_time"</span>: <span class="number">8</span>
+}
+config = Config.from_dict(config_dict)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        from_json
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            Config.from_json(json_str: str) -> Config
+                        </div>
+                        <p>Creates a Config instance from a JSON string.</p>
+                        
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre>json_config = <span class="string">'{"timeout_secs": 45, "reconnect_time": 8}'</span>
+config = Config.from_json(json_config)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        to_dict / to_json
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            to_dict() -> Dict[str, Any]
+                            to_json() -> str
+                        </div>
+                        <p>Converts configuration to dictionary or JSON format.</p>
+                        
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre>config = Config(timeout_secs=<span class="number">60</span>)
+config_dict = config.to_dict()
+config_json = config.to_json()</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning">
+                    <strong>Important:</strong> Configuration becomes locked after first use and cannot be modified. Create a new Config instance if changes are needed.
+                </div>
+            </section>
+
+            <!-- Validation Section -->
+            <section id="validation" class="section">
+                <h2>Validation System</h2>
+                <p>The Validator class provides powerful message validation capabilities for WebSocket responses.</p>
+
+                <h3>Validator Class</h3>
+                <div class="method">
+                    <div class="method-header">
+                        Validator
+                    </div>
+                    <div class="method-body">
+                        <p>High-level wrapper for message validation with various matching strategies.</p>
+                    </div>
+                </div>
+
+                <h3>Static Methods</h3>
+
+                <div class="method">
+                    <div class="method-header">
+                        regex
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            Validator.regex(pattern: str) -> Validator
+                        </div>
+                        <p>Creates a validator using regular expression pattern matching.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">pattern</span> <span class="param-type">(str)</span>: Regular expression pattern
+                            </div>
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="comment"># Match messages starting with numbers</span>
+validator = Validator.regex(<span class="string">r"^\d+"</span>)
+
+<span class="comment"># Match JSON with specific structure</span>
+json_validator = Validator.regex(<span class="string">r'{"status":\s*"success"}'</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        starts_with
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            Validator.starts_with(prefix: str) -> Validator
+                        </div>
+                        <p>Creates a validator that checks message prefixes.</p>
+                        
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre>validator = Validator.starts_with(<span class="string">'42["trade"'</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        ends_with
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            Validator.ends_with(suffix: str) -> Validator
+                        </div>
+                        <p>Creates a validator that checks message suffixes.</p>
+                        
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre>validator = Validator.ends_with(<span class="string">'"]'</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        contains
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            Validator.contains(substring: str) -> Validator
+                        </div>
+                        <p>Creates a validator that checks for substring presence.</p>
+                        
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre>validator = Validator.contains(<span class="string">"success"</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        ne (not equal)
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            Validator.ne(validator: Validator) -> Validator
+                        </div>
+                        <p>Creates a validator that negates another validator's result.</p>
+                        
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="comment"># Match messages that don't contain "error"</span>
+validator = Validator.ne(Validator.contains(<span class="string">"error"</span>))</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        all
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            Validator.all(validators: List[Validator]) -> Validator
+                        </div>
+                        <p>Creates a validator requiring all input validators to match.</p>
+                        
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="comment"># Match messages with both "success" and "trade"</span>
+validator = Validator.all([
+    Validator.contains(<span class="string">"success"</span>),
+    Validator.contains(<span class="string">"trade"</span>)
+])</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        any
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            Validator.any(validators: List[Validator]) -> Validator
+                        </div>
+                        <p>Creates a validator requiring at least one input validator to match.</p>
+                        
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="comment"># Match messages with either "success" or "completed"</span>
+validator = Validator.any([
+    Validator.contains(<span class="string">"success"</span>),
+    Validator.contains(<span class="string">"completed"</span>)
+])</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <div class="method-header">
+                        custom
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            Validator.custom(func: callable) -> Validator
+                        </div>
+                        <p>Creates a validator using a custom function.</p>
+                        
+                        <div class="alert alert-danger">
+                            <strong>CRITICAL SAFETY WARNING:</strong> Custom validators are extremely dangerous and can crash your program with unrecoverable Rust panics. Only use if absolutely necessary and follow all requirements exactly.
+                        </div>
+
+                        <div class="params">
+                            <h4>Requirements:</h4>
+                            <div class="param">
+                                Function MUST take exactly one string parameter and return a boolean
+                            </div>
+                            <div class="param">
+                                Function MUST be synchronous (not async)
+                            </div>
+                            <div class="param">
+                                Function MUST NOT raise exceptions (will crash program)
+                            </div>
+                            <div class="param">
+                                Cannot be used in async/threaded contexts
+                            </div>
+                        </div>
+
+                        <div class="example">
+                            <h5>Safe Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="keyword">def</span> <span class="function">json_checker</span>(msg: str) -> bool:
+    <span class="keyword">try</span>:
+        data = json.loads(msg)
+        <span class="keyword">return</span> <span class="string">"status"</span> <span class="keyword">in</span> data <span class="keyword">and</span> <span class="string">"timestamp"</span> <span class="keyword">in</span> data
+    <span class="keyword">except</span>:
+        <span class="keyword">return</span> <span class="keyword">False</span>
+
+validator = Validator.custom(json_checker)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Complex Validation Examples</h3>
+                <div class="example">
+                    <h5>Trading Response Validator:</h5>
+                    <div class="code-block">
+                        <pre><span class="comment"># Validate successful trade responses</span>
+trade_validator = Validator.all([
+    Validator.starts_with(<span class="string">'42["trade'</span>),
+    Validator.contains(<span class="string">"success"</span>),
+    Validator.regex(<span class="string">r'"id":\s*"\d+"'</span>)
+])
+
+<span class="comment"># Validate error responses</span>
+error_validator = Validator.any([
+    Validator.contains(<span class="string">"error"</span>),
+    Validator.contains(<span class="string">"failed"</span>),
+    Validator.regex(<span class="string">r'"status":\s*"error"'</span>)
+])
+
+<span class="comment"># Combined validator</span>
+response_validator = Validator.any([trade_validator, error_validator])</pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Logging Section -->
+            <section id="logging" class="section">
+                <h2>Logging System</h2>
+                <p>Professional logging system with file and terminal output, log levels, and real-time log streaming.</p>
+
+                <h3>Quick Start</h3>
+                <div class="method">
+                    <div class="method-header">
+                        start_logs
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            start_logs(path: str, level: str = "DEBUG", terminal: bool = True, layers: list = None)
+                        </div>
+                        <p>Initialize the logging system with basic configuration.</p>
+                        
+                        <div class="params">
+                            <h4>Parameters:</h4>
+                            <div class="param">
+                                <span class="param-name">path</span> <span class="param-type">(str)</span>: Directory path for log files
+                            </div>
+                            <div class="param">
+                                <span class="param-name">level</span> <span class="param-type">(str)</span>: Minimum log level (DEBUG, INFO, WARN, ERROR)
+                            </div>
+                            <div class="param">
+                                <span class="param-name">terminal</span> <span class="param-type">(bool)</span>: Whether to display logs in terminal
+                            </div>
+                            <div class="param">
+                                <span class="param-name">layers</span> <span class="param-type">(list)</span>: Additional log layers
+                            </div>
+                        </div>
+
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="keyword">from</span> BinaryOptionsToolsV2.tracing <span class="keyword">import</span> start_logs
+
+<span class="comment"># Initialize logging</span>
+start_logs(path=<span class="string">"logs/"</span>, level=<span class="string">"INFO"</span>, terminal=<span class="keyword">True</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Logger Class</h3>
+                <div class="method">
+                    <div class="method-header">
+                        Logger
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            Logger()
+                        </div>
+                        <p>Main logger class for writing log messages.</p>
+                        
+                        <div class="example">
+                            <h5>Example:</h5>
+                            <div class="code-block">
+                                <pre><span class="keyword">from</span> BinaryOptionsToolsV2.tracing <span class="keyword">import</span> Logger
+
+logger = Logger()
+logger.debug(<span class="string">"Debug message"</span>)
+logger.info(<span class="string">"Info message"</span>)
+logger.warn(<span class="string">"Warning message"</span>)
+logger.error(<span class="string">"Error message"</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>LogBuilder Class</h3>
+                <div class="method">
+                    <div class="method-header">
+                        LogBuilder
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            LogBuilder()
+                        </div>
+                        <p>Advanced logging configuration builder.</p>
+                        
+                        <div class="example">
+                            <h5>Advanced Configuration:</h5>
+                            <div class="code-block">
+                                <pre><span class="keyword">from</span> BinaryOptionsToolsV2.tracing <span class="keyword">import</span> LogBuilder
+
+<span class="comment"># Create custom logging setup</span>
+builder = LogBuilder()
+builder.log_file(<span class="string">"app.log"</span>, <span class="string">"INFO"</span>)
+builder.log_file(<span class="string">"errors.log"</span>, <span class="string">"ERROR"</span>)
+builder.terminal(<span class="string">"DEBUG"</span>)
+builder.build()</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Log Streaming</h3>
+                <div class="method">
+                    <div class="method-header">
+                        create_logs_iterator
+                    </div>
+                    <div class="method-body">
+                        <div class="method-signature">
+                            create_logs_iterator(level: str = "DEBUG", timeout: None | timedelta = None) -> LogSubscription
+                        </div>
+                        <p>Creates a real-time log stream iterator.</p>
+                        
+                        <div class="example">
+                            <h5>Real-time Log Monitoring:</h5>
+                            <div class="code-block">
+                                <pre><span class="keyword">from</span> BinaryOptionsToolsV2.tracing <span class="keyword">import</span> LogBuilder
+<span class="keyword">from</span> datetime <span class="keyword">import</span> timedelta
+
+builder = LogBuilder()
+log_stream = builder.create_logs_iterator(
+    level=<span class="string">"INFO"</span>,
+    timeout=timedelta(minutes=<span class="number">10</span>)
+)
+
+<span class="comment"># Monitor logs in real-time</span>
+<span class="keyword">for</span> log_entry <span class="keyword">in</span> log_stream:
+    <span class="function">print</span>(<span class="string">f"Log: {log_entry}"</span>)</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Log Levels</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Level</th>
+                            <th>Description</th>
+                            <th>Use Case</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>DEBUG</td>
+                            <td>Detailed diagnostic information</td>
+                            <td>Development and troubleshooting</td>
+                        </tr>
+                        <tr>
+                            <td>INFO</td>
+                            <td>General information messages</td>
+                            <td>Normal operation tracking</td>
+                        </tr>
+                        <tr>
+                            <td>WARN</td>
+                            <td>Warning messages</td>
+                            <td>Potential issues that don't stop execution</td>
+                        </tr>
+                        <tr>
+                            <td>ERROR</td>
+                            <td>Error messages</td>
+                            <td>Serious problems that may stop execution</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Examples Section -->
+            <section id="examples" class="section">
+                <h2>Comprehensive Examples</h2>
+
+                <h3>Basic Trading Bot</h3>
+                <div class="example">
+                    <h5>Simple Trading Strategy:</h5>
+                    <div class="code-block">
+                        <pre><span class="keyword">from</span> BinaryOptionsToolsV2.pocketoption <span class="keyword">import</span> PocketOption
+<span class="keyword">from</span> BinaryOptionsToolsV2.tracing <span class="keyword">import</span> start_logs, Logger
+<span class="keyword">import</span> time
+
+<span class="comment"># Initialize logging</span>
+start_logs(<span class="string">"trading_logs/"</span>, level=<span class="string">"INFO"</span>)
+logger = Logger()
+
+<span class="comment"># Initialize client</span>
+client = PocketOption(<span class="string">"your-session-id"</span>)
+time.sleep(5)  <span class="comment"># Wait for connection</span>
+
+<span class="comment"># Check account type</span>
+<span class="keyword">if</span> <span class="keyword">not</span> client.is_demo():
+    logger.warn(<span class="string">"Using real account - be careful!"</span>)
+
+<span class="comment"># Trading parameters</span>
+ASSET = <span class="string">"EURUSD"</span>
+AMOUNT = <span class="number">1.0</span>
+DURATION = <span class="number">60</span>  <span class="comment"># 1 minute</span>
+
+<span class="comment"># Simple trading logic</span>
+<span class="keyword">def</span> <span class="function">should_buy</span>(candles):
+    <span class="comment"># Simple strategy: buy if last candle closed higher than previous</span>
+    <span class="keyword">if</span> len(candles) < <span class="number">2</span>:
+        <span class="keyword">return</span> <span class="keyword">False</span>
+    <span class="keyword">return</span> candles[-1][<span class="string">"close"</span>] > candles[-2][<span class="string">"close"</span>]
+
+<span class="comment"># Main trading loop</span>
+<span class="keyword">try</span>:
+    <span class="keyword">while</span> <span class="keyword">True</span>:
+        <span class="comment"># Get recent candles</span>
+        candles = client.get_candles(ASSET, <span class="number">60</span>, <span class="number">10</span>)
+        
+        <span class="comment"># Make trading decision</span>
+        <span class="keyword">if</span> should_buy(candles):
+            logger.info(<span class="string">f"Placing BUY trade for {ASSET}"</span>)
+            trade_id, trade_data = client.buy(ASSET, AMOUNT, DURATION, check_win=<span class="keyword">True</span>)
+            
+            result = trade_data[<span class="string">"result"</span>]
+            profit = trade_data[<span class="string">"profit"</span>]
+            
+            logger.info(<span class="string">f"Trade result: {result}, Profit: {profit}"</span>)
+            
+            <span class="comment"># Log balance</span>
+            balance = client.balance()
+            logger.info(<span class="string">f"Current balance: {balance}"</span>)
+        
+        <span class="comment"># Wait before next iteration</span>
+        time.sleep(<span class="number">30</span>)
+        
+<span class="keyword">except</span> KeyboardInterrupt:
+    logger.info(<span class="string">"Trading bot stopped by user"</span>)
+<span class="keyword">except</span> Exception <span class="keyword">as</span> e:
+    logger.error(<span class="string">f"Trading bot error: {e}"</span>)</pre>
+                    </div>
+                </div>
+
+                <h3>Real-time Price Monitor</h3>
+                <div class="example">
+                    <h5>Price Monitoring with Alerts:</h5>
+                    <div class="code-block">
+                        <pre><span class="keyword">from</span> BinaryOptionsToolsV2.pocketoption <span class="keyword">import</span> PocketOption
+<span class="keyword">from</span> datetime <span class="keyword">import</span> timedelta
+<span class="keyword">import</span> time
+<span class="keyword">import</span> json
+
+<span class="comment"># Initialize client</span>
+client = PocketOption(<span class="string">"your-session-id"</span>)
+time.sleep(5)
+
+<span class="comment"># Price monitoring setup</span>
+ASSETS = [<span class="string">"EURUSD"</span>, <span class="string">"GBPUSD"</span>, <span class="string">"USDJPY"</span>]
+PRICE_ALERTS = {
+    <span class="string">"EURUSD"</span>: {<span class="string">"high"</span>: <span class="number">1.1000</span>, <span class="string">"low"</span>: <span class="number">1.0800</span>},
+    <span class="string">"GBPUSD"</span>: {<span class="string">"high"</span>: <span class="number">1.2800</span>, <span class="string">"low"</span>: <span class="number">1.2600</span>},
+    <span class="string">"USDJPY"</span>: {<span class="string">"high"</span>: <span class="number">150.00</span>, <span class="string">"low"</span>: <span class="number">148.00</span>}
+}
+
+<span class="keyword">def</span> <span class="function">check_price_alerts</span>(asset, price):
+    <span class="keyword">if</span> asset <span class="keyword">in</span> PRICE_ALERTS:
+        alerts = PRICE_ALERTS[asset]
+        <span class="keyword">if</span> price >= alerts[<span class="string">"high"</span>]:
+            <span class="function">print</span>(<span class="string">f"🔴 HIGH ALERT: {asset} reached {price}"</span>)
+        <span class="keyword">elif</span> price <= alerts[<span class="string">"low"</span>]:
+            <span class="function">print</span>(<span class="string">f"🟢 LOW ALERT: {asset} reached {price}"</span>)
+
+<span class="comment"># Monitor multiple assets</span>
+<span class="keyword">for</span> asset <span class="keyword">in</span> ASSETS:
+    <span class="function">print</span>(<span class="string">f"Starting monitor for {asset}"</span>)
+    
+    <span class="comment"># Create time-aligned subscription for 1-minute candles</span>
+    subscription = client.subscribe_symbol_time_aligned(asset, timedelta(minutes=<span class="number">1</span>))
+    
+    <span class="comment"># Process real-time data</span>
+    <span class="keyword">for</span> candle <span class="keyword">in</span> subscription:
+        current_price = candle[<span class="string">"close"</span>]
+        timestamp = candle[<span class="string">"time"</span>]
+        
+        <span class="function">print</span>(<span class="string">f"{asset}: {current_price} at {timestamp}"</span>)
+        check_price_alerts(asset, current_price)
+        
+        <span class="comment"># Optional: break after certain conditions</span>
+        <span class="keyword">if</span> some_stop_condition:
+            <span class="keyword">break</span></pre>
+                    </div>
+                </div>
+
+                <h3>Advanced Async Trading</h3>
+                <div class="example">
+                    <h5>Concurrent Trading with Multiple Assets:</h5>
+                    <div class="code-block">
+                        <pre><span class="keyword">import</span> asyncio
+<span class="keyword">from</span> BinaryOptionsToolsV2.pocketoption <span class="keyword">import</span> PocketOptionAsync
+<span class="keyword">from</span> BinaryOptionsToolsV2.tracing <span class="keyword">import</span> Logger
+
+logger = Logger()
+
+<span class="keyword">async</span> <span class="keyword">def</span> <span class="function">monitor_asset</span>(client, asset):
+    <span class="string">"""Monitor single asset for trading opportunities"""</span>
+    <span class="keyword">try</span>:
+        <span class="comment"># Subscribe to real-time data</span>
+        subscription = <span class="keyword">await</span> client.subscribe_symbol(asset)
+        
+        <span class="keyword">async</span> <span class="keyword">for</span> update <span class="keyword">in</span> subscription:
+            <span class="comment"># Process price update</span>
+            current_price = update[<span class="string">"price"</span>]
+            
+            <span class="comment"># Simple trading logic</span>
+            <span class="keyword">if</span> should_trade(update):
+                logger.info(<span class="string">f"Trading opportunity for {asset}"</span>)
+                
+                <span class="comment"># Place trade asynchronously</span>
+                trade_id, trade_data = <span class="keyword">await</span> client.buy(asset, <span class="number">1.0</span>, <span class="number">60</span>)
+                logger.info(<span class="string">f"Trade placed: {trade_id}"</span>)
+                
+                <span class="comment"># Check result asynchronously</span>
+                result = <span class="keyword">await</span> client.check_win(trade_id)
+                logger.info(<span class="string">f"Trade result: {result}"</span>)
+                
+    <span class="keyword">except</span> Exception <span class="keyword">as</span> e:
+        logger.error(<span class="string">f"Error monitoring {asset}: {e}"</span>)
+
+<span class="keyword">async</span> <span class="keyword">def</span> <span class="function">main</span>():
+    <span class="comment"># Initialize async client</span>
+    client = PocketOptionAsync(<span class="string">"your-session-id"</span>)
+    <span class="keyword">await</span> asyncio.sleep(5)
+    
+    <span class="comment"># Assets to monitor</span>
+    assets = [<span class="string">"EURUSD"</span>, <span class="string">"GBPUSD"</span>, <span class="string">"USDJPY"</span>]
+    
+    <span class="comment"># Create concurrent monitoring tasks</span>
+    tasks = []
+    <span class="keyword">for</span> asset <span class="keyword">in</span> assets:
+        task = asyncio.create_task(monitor_asset(client, asset))
+        tasks.append(task)
+    
+    <span class="comment"># Run all monitoring tasks concurrently</span>
+    <span class="keyword">try</span>:
+        <span class="keyword">await</span> asyncio.gather(*tasks)
+    <span class="keyword">except</span> KeyboardInterrupt:
+        logger.info(<span class="string">"Shutting down trading system"</span>)
+        <span class="keyword">for</span> task <span class="keyword">in</span> tasks:
+            task.cancel()
+
+<span class="keyword">def</span> <span class="function">should_trade</span>(update):
+    <span class="comment"># Implement your trading logic here</span>
+    <span class="keyword">return</span> <span class="keyword">False</span>  <span class="comment"># Placeholder</span>
+
+<span class="comment"># Run the async trading system</span>
+<span class="keyword">if</span> __name__ == <span class="string">"__main__"</span>:
+    asyncio.run(main())</pre>
+                    </div>
+                </div>
+
+                <h3>Portfolio Management</h3>
+                <div class="example">
+                    <h5>Advanced Portfolio Tracking:</h5>
+                    <div class="code-block">
+                        <pre><span class="keyword">from</span> BinaryOptionsToolsV2.pocketoption <span class="keyword">import</span> PocketOption
+<span class="keyword">from</span> BinaryOptionsToolsV2.tracing <span class="keyword">import</span> start_logs, Logger
+<span class="keyword">import</span> json
+<span class="keyword">import</span> time
+<span class="keyword">from</span> datetime <span class="keyword">import</span> datetime
+
+<span class="comment"># Initialize</span>
+start_logs(<span class="string">"portfolio_logs/"</span>)
+logger = Logger()
+client = PocketOption(<span class="string">"your-session-id"</span>)
+time.sleep(5)
+
+<span class="keyword">class</span> <span class="function">PortfolioManager</span>:
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, client):
+        self.client = client
+        self.trades = []
+        self.initial_balance = client.balance()
+        self.logger = Logger()
+        
+    <span class="keyword">def</span> <span class="function">execute_trade</span>(self, asset, direction, amount, duration):
+        <span class="string">"""Execute a trade with full tracking"""</span>
+        <span class="keyword">try</span>:
+            <span class="comment"># Place trade</span>
+            <span class="keyword">if</span> direction.lower() == <span class="string">"buy"</span>:
+                trade_id, trade_data = self.client.buy(asset, amount, duration, check_win=<span class="keyword">True</span>)
+            <span class="keyword">else</span>:
+                trade_id, trade_data = self.client.sell(asset, amount, duration, check_win=<span class="keyword">True</span>)
+            
+            <span class="comment"># Record trade</span>
+            trade_record = {
+                <span class="string">"id"</span>: trade_id,
+                <span class="string">"asset"</span>: asset,
+                <span class="string">"direction"</span>: direction,
+                <span class="string">"amount"</span>: amount,
+                <span class="string">"duration"</span>: duration,
+                <span class="string">"timestamp"</span>: datetime.now().isoformat(),
+                <span class="string">"result"</span>: trade_data[<span class="string">"result"</span>],
+                <span class="string">"profit"</span>: trade_data[<span class="string">"profit"</span>],
+                <span class="string">"balance_after"</span>: self.client.balance()
+            }
+            
+            self.trades.append(trade_record)
+            self.logger.info(<span class="string">f"Trade executed: {trade_record}"</span>)
+            
+            <span class="keyword">return</span> trade_record
+            
+        <span class="keyword">except</span> Exception <span class="keyword">as</span> e:
+            self.logger.error(<span class="string">f"Trade execution failed: {e}"</span>)
+            <span class="keyword">return</span> <span class="keyword">None</span>
+    
+    <span class="keyword">def</span> <span class="function">get_statistics</span>(self):
+        <span class="string">"""Calculate portfolio statistics"""</span>
+        <span class="keyword">if</span> <span class="keyword">not</span> self.trades:
+            <span class="keyword">return</span> {<span class="string">"message"</span>: <span class="string">"No trades executed"</span>}
+        
+        total_trades = len(self.trades)
+        wins = sum(<span class="number">1</span> <span class="keyword">for</span> t <span class="keyword">in</span> self.trades <span class="keyword">if</span> t[<span class="string">"result"</span>] == <span class="string">"win"</span>)
+        losses = sum(<span class="number">1</span> <span class="keyword">for</span> t <span class="keyword">in</span> self.trades <span class="keyword">if</span> t[<span class="string">"result"</span>] == <span class="string">"loss"</span>)
+        draws = sum(<span class="number">1</span> <span class="keyword">for</span> t <span class="keyword">in</span> self.trades <span class="keyword">if</span> t[<span class="string">"result"</span>] == <span class="string">"draw"</span>)
+        
+        total_profit = sum(t[<span class="string">"profit"</span>] <span class="keyword">for</span> t <span class="keyword">in</span> self.trades)
+        current_balance = self.client.balance()
+        
+        win_rate = (wins / total_trades) * <span class="number">100</span> <span class="keyword">if</span> total_trades > <span class="number">0</span> <span class="keyword">else</span> <span class="number">0</span>
+        
+        <span class="keyword">return</span> {
+            <span class="string">"total_trades"</span>: total_trades,
+            <span class="string">"wins"</span>: wins,
+            <span class="string">"losses"</span>: losses,
+            <span class="string">"draws"</span>: draws,
+            <span class="string">"win_rate"</span>: round(win_rate, <span class="number">2</span>),
+            <span class="string">"total_profit"</span>: round(total_profit, <span class="number">2</span>),
+            <span class="string">"initial_balance"</span>: self.initial_balance,
+            <span class="string">"current_balance"</span>: current_balance,
+            <span class="string">"roi"</span>: round(((current_balance - self.initial_balance) / self.initial_balance) * <span class="number">100</span>, <span class="number">2</span>)
+        }
+    
+    <span class="keyword">def</span> <span class="function">export_trades</span>(self, filename):
+        <span class="string">"""Export trades to JSON file"""</span>
+        <span class="keyword">with</span> open(filename, <span class="string">"w"</span>) <span class="keyword">as</span> f:
+            json.dump(self.trades, f, indent=<span class="number">2</span>)
+        self.logger.info(<span class="string">f"Trades exported to {filename}"</span>)
+
+<span class="comment"># Usage example</span>
+portfolio = PortfolioManager(client)
+
+<span class="comment"># Execute some trades</span>
+portfolio.execute_trade(<span class="string">"EURUSD"</span>, <span class="string">"buy"</span>, <span class="number">1.0</span>, <span class="number">60</span>)
+portfolio.execute_trade(<span class="string">"GBPUSD"</span>, <span class="string">"sell"</span>, <span class="number">1.5</span>, <span class="number">120</span>)
+
+<span class="comment"># Get statistics</span>
+stats = portfolio.get_statistics()
+<span class="function">print</span>(<span class="string">f"Portfolio Statistics: {stats}"</span>)
+
+<span class="comment"># Export trades</span>
+portfolio.export_trades(<span class="string">"trades_history.json"</span>)</pre>
+                    </div>
+                </div>
+
+                <h3>Risk Management System</h3>
+                <div class="example">
+                    <h5>Advanced Risk Management:</h5>
+                    <div class="code-block">
+                        <pre><span class="keyword">from</span> BinaryOptionsToolsV2.pocketoption <span class="keyword">import</span> PocketOption
+<span class="keyword">from</span> BinaryOptionsToolsV2.tracing <span class="keyword">import</span> Logger
+<span class="keyword">import</span> time
+<span class="keyword">from</span> datetime <span class="keyword">import</span> datetime, timedelta
+
+<span class="keyword">class</span> <span class="function">RiskManager</span>:
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, client, config):
+        self.client = client
+        self.config = config
+        self.logger = Logger()
+        self.daily_trades = []
+        self.daily_profit = <span class="number">0</span>
+        self.consecutive_losses = <span class="number">0</span>
+        
+    <span class="keyword">def</span> <span class="function">can_trade</span>(self, amount):
+        <span class="string">"""Check if trade is allowed based on risk parameters"""</span>
+        current_balance = self.client.balance()
+        
+        <span class="comment"># Check minimum balance</span>
+        <span class="keyword">if</span> current_balance < self.config[<span class="string">"min_balance"</span>]:
+            self.logger.warn(<span class="string">f"Balance too low: {current_balance}"</span>)
+            <span class="keyword">return</span> <span class="keyword">False</span>
+        
+        <span class="comment"># Check maximum trade size</span>
+        max_trade_size = current_balance * self.config[<span class="string">"max_trade_percent"</span>] / <span class="number">100</span>
+        <span class="keyword">if</span> amount > max_trade_size:
+            self.logger.warn(<span class="string">f"Trade size too large: {amount} > {max_trade_size}"</span>)
+            <span class="keyword">return</span> <span class="keyword">False</span>
+        
+        <span class="comment"># Check daily trade limit</span>
+        <span class="keyword">if</span> len(self.daily_trades) >= self.config[<span class="string">"max_daily_trades"</span>]:
+            self.logger.warn(<span class="string">"Daily trade limit reached"</span>)
+            <span class="keyword">return</span> <span class="keyword">False</span>
+        
+        <span class="comment"># Check daily loss limit</span>
+        <span class="keyword">if</span> self.daily_profit <= -self.config[<span class="string">"max_daily_loss"</span>]:
+            self.logger.warn(<span class="string">f"Daily loss limit reached: {self.daily_profit}"</span>)
+            <span class="keyword">return</span> <span class="keyword">False</span>
+        
+        <span class="comment"># Check consecutive losses</span>
+        <span class="keyword">if</span> self.consecutive_losses >= self.config[<span class="string">"max_consecutive_losses"</span>]:
+            self.logger.warn(<span class="string">f"Too many consecutive losses: {self.consecutive_losses}"</span>)
+            <span class="keyword">return</span> <span class="keyword">False</span>
+        
+        <span class="comment"># Check if demo account for large trades</span>
+        <span class="keyword">if</span> <span class="keyword">not</span> self.client.is_demo() <span class="keyword">and</span> amount > self.config[<span class="string">"demo_required_above"</span>]:
+            self.logger.warn(<span class="string">"Large trade requires demo account testing first"</span>)
+            <span class="keyword">return</span> <span class="keyword">False</span>
+        
+        <span class="keyword">return</span> <span class="keyword">True</span>
+    
+    <span class="keyword">def</span> <span class="function">record_trade</span>(self, trade_result):
+        <span class="string">"""Record trade result and update risk metrics"""</span>
+        self.daily_trades.append(trade_result)
+        self.daily_profit += trade_result[<span class="string">"profit"</span>]
+        
+        <span class="keyword">if</span> trade_result[<span class="string">"result"</span>] == <span class="string">"loss"</span>:
+            self.consecutive_losses += <span class="number">1</span>
+        <span class="keyword">else</span>:
+            self.consecutive_losses = <span class="number">0</span>
+        
+        self.logger.info(<span class="string">f"Trade recorded: {trade_result['result']}, Daily P&L: {self.daily_profit}"</span>)
+    
+    <span class="keyword">def</span> <span class="function">calculate_position_size</span>(self, confidence_level):
+        <span class="string">"""Calculate optimal position size based on Kelly criterion"""</span>
+        current_balance = self.client.balance()
+        
+        <span class="comment"># Simple Kelly formula: f = (bp - q) / b</span>
+        <span class="comment"># Where: b = odds, p = win probability, q = loss probability</span>
+        win_rate = confidence_level / <span class="number">100</span>
+        loss_rate = <span class="number">1</span> - win_rate
+        payout_ratio = <span class="number">0.8</span>  <span class="comment"># Typical binary options payout</span>
+        
+        kelly_fraction = (payout_ratio * win_rate - loss_rate) / payout_ratio
+        
+        <span class="comment"># Apply conservative factor</span>
+        kelly_fraction *= <span class="number">0.5</span>  <span class="comment"># Use half Kelly for safety</span>
+        
+        <span class="comment"># Ensure within risk limits</span>
+        max_fraction = self.config[<span class="string">"max_trade_percent"</span>] / <span class="number">100</span>
+        kelly_fraction = min(kelly_fraction, max_fraction)
+        kelly_fraction = max(kelly_fraction, <span class="number">0.01</span>)  <span class="comment"># Minimum 1%</span>
+        
+        position_size = current_balance * kelly_fraction
+        
+        self.logger.info(<span class="string">f"Calculated position size: {position_size} (Kelly: {kelly_fraction:.2%})"</span>)
+        <span class="keyword">return</span> position_size
+    
+    <span class="keyword">def</span> <span class="function">reset_daily_metrics</span>(self):
+        <span class="string">"""Reset daily tracking metrics"""</span>
+        self.daily_trades = []
+        self.daily_profit = <span class="number">0</span>
+        self.consecutive_losses = <span class="number">0</span>
+        self.logger.info(<span class="string">"Daily metrics reset"</span>)
+
+<span class="comment"># Risk management configuration</span>
+risk_config = {
+    <span class="string">"min_balance"</span>: <span class="number">100.0</span>,
+    <span class="string">"max_trade_percent"</span>: <span class="number">5.0</span>,  <span class="comment"># 5% of balance per trade</span>
+    <span class="string">"max_daily_trades"</span>: <span class="number">20</span>,
+    <span class="string">"max_daily_loss"</span>: <span class="number">50.0</span>,
+    <span class="string">"max_consecutive_losses"</span>: <span class="number">5</span>,
+    <span class="string">"demo_required_above"</span>: <span class="number">100.0</span>
+}
+
+<span class="comment"># Initialize risk manager</span>
+client = PocketOption(<span class="string">"your-session-id"</span>)
+time.sleep(5)
+risk_manager = RiskManager(client, risk_config)
+
+<span class="comment"># Example usage</span>
+confidence = <span class="number">75</span>  <span class="comment"># 75% confidence in trade</span>
+position_size = risk_manager.calculate_position_size(confidence)
+
+<span class="keyword">if</span> risk_manager.can_trade(position_size):
+    <span class="comment"># Execute trade</span>
+    trade_id, trade_data = client.buy(<span class="string">"EURUSD"</span>, position_size, <span class="number">60</span>, check_win=<span class="keyword">True</span>)
+    risk_manager.record_trade(trade_data)
+<span class="keyword">else</span>:
+    <span class="function">print</span>(<span class="string">"Trade blocked by risk management"</span>)</pre>
+                    </div>
+                </div>
+
+                <h3>Custom WebSocket Handler</h3>
+                <div class="example">
+                    <h5>Raw WebSocket Message Processing:</h5>
+                    <div class="code-block">
+                        <pre><span class="keyword">from</span> BinaryOptionsToolsV2.pocketoption <span class="keyword">import</span> PocketOption
+<span class="keyword">from</span> BinaryOptionsToolsV2.validator <span class="keyword">import</span> Validator
+<span class="keyword">from</span> datetime <span class="keyword">import</span> timedelta
+<span class="keyword">import</span> json
+<span class="keyword">import</span> time
+
+<span class="keyword">class</span> <span class="function">CustomWebSocketHandler</span>:
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, client):
+        self.client = client
+        self.message_handlers = {}
+        
+    <span class="keyword">def</span> <span class="function">register_handler</span>(self, message_type, handler_func):
+        <span class="string">"""Register a custom message handler"""</span>
+        self.message_handlers[message_type] = handler_func
+        
+    <span class="keyword">def</span> <span class="function">handle_trade_signals</span>(self, message):
+        <span class="string">"""Handle trading signals from WebSocket"""</span>
+        <span class="keyword">try</span>:
+            data = json.loads(message)
+            <span class="keyword">if</span> <span class="string">"signal"</span> <span class="keyword">in</span> data:
+                signal_type = data[<span class="string">"signal"</span>][<span class="string">"type"</span>]
+                asset = data[<span class="string">"signal"</span>][<span class="string">"asset"</span>]
+                direction = data[<span class="string">"signal"</span>][<span class="string">"direction"</span>]
+                
+                <span class="function">print</span>(<span class="string">f"Trading signal: {signal_type} {direction} {asset}"</span>)
+                
+                <span class="comment"># Execute trade based on signal</span>
+                <span class="keyword">if</span> signal_type == <span class="string">"strong"</span>:
+                    self.execute_signal_trade(asset, direction)
+                    
+        <span class="keyword">except</span> Exception <span class="keyword">as</span> e:
+            <span class="function">print</span>(<span class="string">f"Error handling signal: {e}"</span>)
+    
+    <span class="keyword">def</span> <span class="function">handle_market_data</span>(self, message):
+        <span class="string">"""Handle market data updates"""</span>
+        <span class="keyword">try</span>:
+            data = json.loads(message)
+            <span class="keyword">if</span> <span class="string">"market"</span> <span class="keyword">in</span> data:
+                <span class="comment"># Process market data</span>
+                <span class="function">print</span>(<span class="string">f"Market update: {data['market']}"</span>)
+        <span class="keyword">except</span> Exception <span class="keyword">as</span> e:
+            <span class="function">print</span>(<span class="string">f"Error handling market data: {e}"</span>)
+    
+    <span class="keyword">def</span> <span class="function">execute_signal_trade</span>(self, asset, direction):
+        <span class="string">"""Execute trade based on signal"""</span>
+        <span class="keyword">try</span>:
+            amount = <span class="number">1.0</span>  <span class="comment"># Fixed amount for signals</span>
+            duration = <span class="number">60</span>  <span class="comment"># 1 minute</span>
+            
+            <span class="keyword">if</span> direction.lower() == <span class="string">"call"</span>:
+                trade_id, trade_data = self.client.buy(asset, amount, duration, check_win=<span class="keyword">True</span>)
+            <span class="keyword">else</span>:
+                trade_id, trade_data = self.client.sell(asset, amount, duration, check_win=<span class="keyword">True</span>)
+            
+            <span class="function">print</span>(<span class="string">f"Signal trade result: {trade_data['result']}"</span>)
+            
+        <span class="keyword">except</span> Exception <span class="keyword">as</span> e:
+            <span class="function">print</span>(<span class="string">f"Error executing signal trade: {e}"</span>)
+    
+    <span class="keyword">def</span> <span class="function">start_custom_stream</span>(self):
+        <span class="string">"""Start processing custom WebSocket messages"""</span>
+        <span class="comment"># Create validators for different message types</span>
+        signal_validator = Validator.all([
+            Validator.contains(<span class="string">"signal"</span>),
+            Validator.contains(<span class="string">"type"</span>)
+        ])
+        
+        market_validator = Validator.contains(<span class="string">"market"</span>)
+        
+        <span class="keyword">try</span>:
+            <span class="comment"># Subscribe to trading signals</span>
+            self.client.send_raw_message(<span class="string">'42["signals/subscribe"]'</span>)
+            
+            <span class="comment"># Create signal stream</span>
+            signal_stream = self.client.create_raw_iterator(
+                <span class="string">'42["signals/get_latest"]'</span>,
+                signal_validator,
+                timeout=timedelta(minutes=<span class="number">30</span>)
+            )
+            
+            <span class="comment"># Process signals</span>
+            <span class="keyword">for</span> message <span class="keyword">in</span> signal_stream:
+                <span class="keyword">if</span> <span class="string">"signal"</span> <span class="keyword">in</span> message:
+                    self.handle_trade_signals(message)
+                <span class="keyword">elif</span> <span class="string">"market"</span> <span class="keyword">in</span> message:
+                    self.handle_market_data(message)
+                    
+        <span class="keyword">except</span> Exception <span class="keyword">as</span> e:
+            <span class="function">print</span>(<span class="string">f"Error in custom stream: {e}"</span>)
+
+<span class="comment"># Usage</span>
+client = PocketOption(<span class="string">"your-session-id"</span>)
+time.sleep(5)
+
+handler = CustomWebSocketHandler(client)
+handler.start_custom_stream()</pre>
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>Note:</strong> These examples are for educational purposes. Always test strategies thoroughly in demo accounts before using real money. Binary options trading involves significant risk.
+                </div>
+            </section>
+
+            <!-- Best Practices Section -->
+            <section class="section">
+                <h2>Best Practices</h2>
+
+                <h3>Security</h3>
+                <ul>
+                    <li>Never hardcode session IDs in your code</li>
+                    <li>Use environment variables for sensitive data</li>
+                    <li>Regularly rotate session IDs</li>
+                    <li>Always test with demo accounts first</li>
+                </ul>
+
+                <h3>Performance</h3>
+                <ul>
+                    <li>Use async API for concurrent operations</li>
+                    <li>Implement proper error handling and retries</li>
+                    <li>Monitor connection health</li>
+                    <li>Use appropriate timeouts</li>
+                </ul>
+
+                <h3>Risk Management</h3>
+                <ul>
+                    <li>Never risk more than you can afford to lose</li>
+                    <li>Implement position sizing algorithms</li>
+                    <li>Set daily loss limits</li>
+                    <li>Use stop-loss mechanisms</li>
+                </ul>
+
+                <h3>Development</h3>
+                <ul>
+                    <li>Implement comprehensive logging</li>
+                    <li>Use proper validation for all inputs</li>
+                    <li>Write unit tests for your strategies</li>
+                    <li>Monitor performance metrics</li>
+                </ul>
+            </section>
+
+            <!-- Troubleshooting Section -->
+            <section class="section">
+                <h2>Troubleshooting</h2>
+
+                <h3>Common Issues</h3>
+                
+                <h4>Connection Problems</h4>
+                <ul>
+                    <li>Verify session ID is valid and not expired</li>
+                    <li>Check network connectivity</li>
+                    <li>Try different WebSocket URLs</li>
+                    <li>Increase connection timeout</li>
+                </ul>
+
+                <h4>Trade Execution Issues</h4>
+                <ul>
+                    <li>Ensure sufficient account balance</li>
+                    <li>Check if asset is available for trading</li>
+                    <li>Verify trade parameters are valid</li>
+                    <li>Check market hours</li>
+                </ul>
+
+                <h4>Data Issues</h4>
+                <ul>
+                    <li>Verify asset names are correct</li>
+                    <li>Check if historical data is available</li>
+                    <li>Ensure proper time formatting</li>
+                    <li>Check subscription parameters</li>
+                </ul>
+
+                <h3>Error Codes</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Error</th>
+                            <th>Description</th>
+                            <th>Solution</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>ConnectionError</td>
+                            <td>Failed to connect to WebSocket</td>
+                            <td>Check network and session ID</td>
+                        </tr>
+                        <tr>
+                            <td>TimeoutError</td>
+                            <td>Operation timed out</td>
+                            <td>Increase timeout or check connection</td>
+                        </tr>
+                        <tr>
+                            <td>ValueError</td>
+                            <td>Invalid parameter values</td>
+                            <td>Verify input parameters</td>
+                        </tr>
+                        <tr>
+                            <td>NotImplementedError</td>
+                            <td>Feature not available in current version</td>
+                            <td>Use alternative method or update library</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 BinaryOptionsToolsV2 Documentation. Created by ChipaDevTeam.</p>
+            <p>⚠️ <strong>Disclaimer:</strong> Binary options trading involves substantial risk. This library is for educational purposes only.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Highlight current section in navigation
+        window.addEventListener('scroll', function() {
+            const sections = document.querySelectorAll('.section');
+            const navLinks = document.querySelectorAll('.nav a');
+            
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (pageYOffset >= sectionTop - 200) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+
+    <style>
+        .nav a.active {
+            background: var(--secondary-color);
+            color: white;
+        }
+        
+        /* Add some animations */
+        .method {
+            transition: transform 0.2s ease;
+        }
+        
+        .method:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .code-block {
+            position: relative;
+        }
+        
+        .code-block:hover {
+            background: #f0f0f0;
+        }
+        
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background-color: #1a1a1a;
+                --text-color: #e9ecef;
+                --border-color: #333;
+                --code-bg: #2d2d2d;
+            }
+            
+            body {
+                background-color: var(--background-color);
+                color: var(--text-color);
+            }
+            
+            .section {
+                background: #2d2d2d;
+                color: var(--text-color);
+            }
+            
+            .nav {
+                background: #2d2d2d;
+            }
+            
+            .method {
+                border-color: #444;
+            }
+            
+            .code-block {
+                background: #1e1e1e;
+                color: #e9ecef;
+            }
+            
+            .table th {
+                background: #333;
+            }
+            
+            .table tr:hover {
+                background: rgba(255, 255, 255, 0.1);
+            }
+        }
+        
+        /* Responsive code blocks */
+        @media (max-width: 768px) {
+            .code-block {
+                font-size: 0.8rem;
+                padding: 0.5rem;
+            }
+            
+            .method-signature {
+                font-size: 0.8rem;
+                word-break: break-all;
+            }
+        }
+        
+        /* Print styles */
+        @media print {
+            .nav, .footer {
+                display: none;
+            }
+            
+            .section {
+                box-shadow: none;
+                border: 1px solid #ddd;
+                page-break-inside: avoid;
+            }
+            
+            .code-block {
+                background: #f8f8f8 !important;
+                border: 1px solid #ddd;
+            }
+        }
+        
+        /* Accessibility improvements */
+        .method-header:focus,
+        .nav a:focus {
+            outline: 2px solid var(--secondary-color);
+            outline-offset: 2px;
+        }
+        
+        /* Loading animation for code blocks */
+        .code-block {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Tooltip styles for parameter types */
+        .param-type {
+            position: relative;
+            cursor: help;
+        }
+        
+        .param-type:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            z-index: 1000;
+        }
+        
+        /* Enhanced alert styles */
+        .alert {
+            border-radius: 8px;
+            border: 1px solid;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .alert::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: currentColor;
+        }
+        
+        .alert-info {
+            border-color: var(--secondary-color);
+            color: var(--secondary-color);
+        }
+        
+        .alert-warning {
+            border-color: var(--warning-color);
+            color: var(--warning-color);
+        }
+        
+        .alert-danger {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+        
+        /* Back to top button */
+        .back-to-top {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            display: none;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+        
+        .back-to-top:hover {
+            background: var(--primary-color);
+            transform: translateY(-2px);
+        }
+        
+        .back-to-top.show {
+            display: block;
+        }
+        
+        /* Method collapsible content */
+        .method-body {
+            max-height: none;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .method.collapsed .method-body {
+            max-height: 0;
+            padding: 0 1rem;
+        }
+        
+        .method-header {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        
+        .method-header::after {
+            content: '▼';
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: transform 0.3s ease;
+        }
+        
+        .method.collapsed .method-header::after {
+            transform: translateY(-50%) rotate(-90deg);
+        }
+        
+        /* Search functionality styles */
+        .search-container {
+            position: relative;
+            max-width: 400px;
+            margin: 0 auto 2rem;
+        }
+        
+        .search-box {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 25px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+        
+        .search-box:focus {
+            border-color: var(--secondary-color);
+        }
+        
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .search-result {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .search-result:hover {
+            background: var(--background-color);
+        }
+        
+        .search-result:last-child {
+            border-bottom: none;
+        }
+        
+        .search-highlight {
+            background: yellow;
+            font-weight: bold;
+        }
+        
+        /* Enhanced table styles */
+        .table-container {
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        
+        .table {
+            min-width: 600px;
+        }
+        
+        .table tbody tr:nth-child(even) {
+            background: rgba(52, 152, 219, 0.05);
+        }
+        
+        /* Code syntax highlighting improvements */
+        .code-block .keyword { color: #0066cc; font-weight: bold; }
+        .code-block .string { color: #008800; }
+        .code-block .comment { color: #666; font-style: italic; }
+        .code-block .number { color: #cc0000; }
+        .code-block .function { color: #9900cc; font-weight: bold; }
+        .code-block .operator { color: #333; }
+        .code-block .punctuation { color: #999; }
+        
+        /* Copy button for code blocks */
+        .code-block {
+            position: relative;
+        }
+        
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .code-block:hover .copy-btn {
+            opacity: 1;
+        }
+        
+        .copy-btn:hover {
+            background: var(--primary-color);
+        }
+        
+        /* Version indicator */
+        .version-badge {
+            display: inline-block;
+            background: var(--success-color);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 0.5rem;
+        }
+        
+        /* API status indicator */
+        .api-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(39, 174, 96, 0.1);
+            border-radius: 20px;
+            margin-bottom: 1rem;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success-color);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Mobile-specific improvements */
+        @media (max-width: 768px) {
+            .method-header {
+                font-size: 1rem;
+                padding: 0.75rem;
+            }
+            
+            .param {
+                font-size: 0.9rem;
+            }
+            
+            .search-container {
+                margin: 0 1rem 2rem;
+            }
+            
+            .table-container {
+                margin: 1rem -1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Add search functionality -->
+    <div class="search-container" style="display: none;">
+        <input type="text" class="search-box" placeholder="Search methods, parameters, examples...">
+        <div class="search-results"></div>
+    </div>
+
+    <!-- Add back to top button -->
+    <button class="back-to-top" onclick="scrollToTop()">↑</button>
+
+    <script>
+        // Back to top functionality
+        window.onscroll = function() {
+            const backToTop = document.querySelector('.back-to-top');
+            if (document.body.scrollTop > 200 || document.documentElement.scrollTop > 200) {
+                backToTop.classList.add('show');
+            } else {
+                backToTop.classList.remove('show');
+            }
+        };
+
+        function scrollToTop() {
+            document.body.scrollTop = 0;
+            document.documentElement.scrollTop = 0;
+        }
+
+        // Copy code functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const codeBlocks = document.querySelectorAll('.code-block');
+            codeBlocks.forEach(block => {
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.textContent = 'Copy';
+                copyBtn.onclick = function() {
+                    const code = block.querySelector('pre').textContent;
+                    navigator.clipboard.writeText(code).then(function() {
+                        copyBtn.textContent = 'Copied!';
+                        setTimeout(() => {
+                            copyBtn.textContent = 'Copy';
+                        }, 2000);
+                    });
+                };
+                block.appendChild(copyBtn);
+            });
+        });
+
+        // Method collapsible functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const methodHeaders = document.querySelectorAll('.method-header');
+            methodHeaders.forEach(header => {
+                header.addEventListener('click', function() {
+                    const method = this.parentElement;
+                    method.classList.toggle('collapsed');
+                });
+            });
+        });
+
+        // Enhanced smooth scrolling with offset for sticky nav
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    const navHeight = document.querySelector('.nav').offsetHeight;
+                    const targetPosition = target.offsetTop - navHeight - 20;
+                    
+                    window.scrollTo({
+                        top: targetPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+
+        // Add version info
+        document.addEventListener('DOMContentLoaded', function() {
+            const header = document.querySelector('.header h1');
+            const versionBadge = document.createElement('span');
+            versionBadge.className = 'version-badge';
+            versionBadge.textContent = 'v0.1.8';
+            header.appendChild(versionBadge);
+        });
+
+        // Add API status indicator
+        document.addEventListener('DOMContentLoaded', function() {
+            const overviewSection = document.querySelector('#overview');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'api-status';
+            statusDiv.innerHTML = `
+                <span class="status-dot"></span>
+                <span>API Status: Online</span>
+            `;
+            overviewSection.insertBefore(statusDiv, overviewSection.firstChild.nextSibling);
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'k') {
+                e.preventDefault();
+                const searchBox = document.querySelector('.search-box');
+                if (searchBox) {
+                    searchBox.focus();
+                }
+            }
+        });
+
+        // Print functionality
+        function printDocs() {
+            window.print();
+        }
+
+        // Add print button to navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            const nav = document.querySelector('.nav ul');
+            const printLi = document.createElement('li');
+            printLi.innerHTML = '<a href="#" onclick="printDocs()">Print</a>';
+            nav.appendChild(printLi);
+        });
+    </script>
+</body>
+</html>
