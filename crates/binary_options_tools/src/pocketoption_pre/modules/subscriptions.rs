@@ -682,3 +682,22 @@ async fn send_subscribe_message(ws_sender: &AsyncSender<Message>, asset: &str) -
         .map_err(CoreError::from)?;
     Ok(())
 }
+
+
+impl Drop for SubscriptionStream {
+    fn drop(&mut self) {
+        // Send Unsubscribe signal when the stream is dropped
+        // This will gracefully end the stream and notify any listeners
+        debug!(target: "SubscriptionStream", "Dropping subscription stream for asset: {}", self.asset);
+        // Send Unsubscribe signal to the main handle
+        // This will notify the main module to remove this subscription
+        // We don't need to wait for response since we're consuming self
+        // and it will be dropped anyway
+        let _ = self.sender.as_sync().send(Command::Unsubscribe {
+            asset: self.asset.clone(),
+            command_id: Uuid::new_v4(),
+        }).inspect_err(|e| {
+            warn!(target: "SubscriptionStream", "Failed to send unsubscribe command: {}", e);
+        });
+    }
+}

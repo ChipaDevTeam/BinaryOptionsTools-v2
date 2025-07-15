@@ -11,25 +11,35 @@ Don't know programming and you are looking for a bot? [click here to get our dev
 
 # Features
 Currently we only support **Pocket Option** (quick trading) with the following features (for real and demo):
-* Place trades for any asset 
-* Check trade results
+* Place trades for any asset (buy/sell)
+* Check trade results with optional timeout
 * Get account balance
+* Get server time synchronization
 * Get the payout of each asset
-* Get a list with the opened and closed trades with all of the trades data 
-* Get candle data for a specific asset
-* Subscribe to an asset to get realtime data
+* Get a list with the opened trades with all of the trades data
+* Subscribe to an asset to get realtime data with different subscription types
+* Asset validation and information retrieval
+* Automatic reconnection and connection management
+
+## TODO Features
+* Get a list with the closed trades with all of the trades data
+* Get candle data for a specific asset (historical data)
+* Add support for pending trades 
+* Add support for other trading platforms like Expert Options
 
 # Python 
 For the full python documentation check [here](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/master/BinaryOptionsToolsV2/Readme.md).
 To install it use pip:
 ```
-pip install binaryoptionstoolsv2==0.1.6a3
+pip install binaryoptionstoolsv2==0.1.8
 ```
 
 # Rust
 For the full rust documentation check [here](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/crates/core/Readme.md)
 # Todo
 * *Pocket Option*: Add support for pending trades 
+* *Pocket Option*: Add support for closed deals management
+* *Pocket Option*: Add support for historical candle data
 * *BinaryOptionsToolsV2*: Add support for **rust** (done)
 * *BinaryOptionsToolsV2*: Add support for other trading platforms like Expert Options
 

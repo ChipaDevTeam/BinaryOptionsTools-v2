@@ -1,22 +1,24 @@
 👉 [Join us on Discord](https://discord.gg/T3FGXcmd)
 # [BinaryOptionsToolsV2](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/0.1.6a4)
 
-## ⚠️ Work in Progress Notice
-
-**Current Status**: This version is undergoing major refactoring to use a new, more stable API implementation. Many features are temporarily unavailable while we transition to the new architecture.
+## Current Status
 
 **Available Features**:
-- Basic authentication and connection
-- Buy/Sell operations
+- Authentication and secure connection
+- Buy/Sell trading operations
 - Balance retrieval
-- Basic symbol subscriptions
 - Server time synchronization
+- Symbol subscriptions with different types (real-time, time-aligned, chunked)
+- Trade result checking
+- Opened deals management
+- Asset information and validation
+- Automatic reconnection handling
 
 **Temporarily Unavailable Features** (returning "work in progress" errors):
 - Historical candle data (`get_candles`, `get_candles_advanced`)
 - Trade history (`history`)
 - Closed deals management
-- Payout information
+- Payout information retrieval
 - Raw message sending
 - Advanced validators
 - Deal end time queries
@@ -101,6 +103,11 @@ Key Features of PocketOptionAsync
   - `subscribe_symbol()`: Provides an asynchronous iterator for real-time candle updates. 
   - `subscribe_symbol_timed()`: Provides an asynchronous iterator for timed real-time candle updates.
   - `subscribe_symbol_chunked()`: Provides an asynchronous iterator for chunked real-time candle updates.
+- **Server Information**:
+  - `server_time()`: Gets the current server time.
+- **Connection Management**:
+  - `reconnect()`: Manually reconnect to the server.
+  - `shutdown()`: Properly close the connection.
 
 Helper Class - `AsyncSubscription` 
 
@@ -117,6 +124,14 @@ async def main():
     await asyncio.sleep(5)
     balance = await client.balance() 
     print("Account Balance:", balance) 
+    
+    # Place a trade
+    trade_id, deal = await client.buy("EURUSD_otc", 60, 1.0)
+    print(f"Trade placed: {deal}")
+    
+    # Check result
+    result = await client.check_win(trade_id)
+    print(f"Trade result: {result}")
  
 asyncio.run(main()) 
 ``` 
@@ -143,6 +158,11 @@ Key Features of PocketOption
   - `subscribe_symbol()`: Provides a synchronous iterator for live data updates. 
   - `subscribe_symbol_timed()`: Provides a synchronous iterator for timed real-time candle updates.
   - `subscribe_symbol_chunked()`: Provides a synchronous iterator for chunked real-time candle updates.
+- **Server Information**:
+  - `server_time()`: Gets the current server time.
+- **Connection Management**:
+  - `reconnect()`: Manually reconnect to the server.
+  - `shutdown()`: Properly close the connection.
 
 Helper Class - `SyncSubscription` 
 
@@ -157,7 +177,15 @@ import time
 client = PocketOption(ssid="your-session-id") 
 time.sleep(5)
 balance = client.balance() 
-print("Account Balance:", balance) 
+print("Account Balance:", balance)
+
+# Place a trade
+trade_id, deal = client.buy("EURUSD_otc", 60, 1.0)
+print(f"Trade placed: {deal}")
+
+# Check result
+result = client.check_win(trade_id)
+print(f"Trade result: {result}")
 ```
 
 4. Differences Between PocketOption and PocketOptionAsync 
