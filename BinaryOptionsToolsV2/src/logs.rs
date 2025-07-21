@@ -298,8 +298,8 @@ mod tests {
 
             // stream.next().await;
             while let Some(Ok(value)) = stream.next().await {
-                let value: Value = serde_json::from_str(&format!("{:?}", value)).unwrap();
-                println!("{}", value);
+                let value: Value = serde_json::from_str(&value).unwrap();
+                println!("{value}");
             }
         }
 

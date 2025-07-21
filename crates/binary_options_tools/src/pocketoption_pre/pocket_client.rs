@@ -276,7 +276,7 @@ impl PocketOption {
         if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await
             && let Some(assets) = self.assets().await
         {
-            if let Some(_) = assets.get(&asset.to_string()) {
+            if assets.get(&asset.to_string()).is_some() {
                 handle.unsubscribe(asset.to_string()).await
             } else {
                 Err(PocketError::InvalidAsset(asset.to_string()))

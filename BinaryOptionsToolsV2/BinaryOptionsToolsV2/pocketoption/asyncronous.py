@@ -6,7 +6,6 @@ from datetime import timedelta
 
 import asyncio
 import json
-import time 
 import sys 
 
 
@@ -170,15 +169,15 @@ class PocketOptionAsync:
             ValueError: If trade_id is invalid
             TimeoutError: If result check times out
         """
-        end_time = await self.client.get_deal_end_time(id)
+        # end_time = await self.client.get_deal_end_time(id)
         
-        if end_time is not None:
-            duration = end_time - int(time.time())
-            if duration <= 0:
-                duration = 5 # If duration is less than 0 then the trade is closed and the function should take less than 5 seconds to run
-        else:
-            duration = 5
-        duration += self.config.extra_duration
+        # if end_time is not None:
+        #     duration = end_time - int(time.time())
+        #     if duration <= 0:
+        #         duration = 5 # If duration is less than 0 then the trade is closed and the function should take less than 5 seconds to run
+        # else:
+        #     duration = 5
+        # duration += self.config.extra_duration
         
         # self.logger.debug(f"Timeout set to: {duration} (6 extra seconds)")
         async def check(id):
@@ -260,7 +259,7 @@ class PocketOptionAsync:
         Note:
             Updates in real-time as trades are completed
         """
-        return json.loads(await self.client.balance())["balance"]
+        return await self.client.balance()
     
     async def opened_deals(self) -> list[dict]:
         "Returns a list of all the opened deals as dictionaries"

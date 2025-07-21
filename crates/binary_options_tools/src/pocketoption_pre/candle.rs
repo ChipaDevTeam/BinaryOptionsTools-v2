@@ -251,8 +251,7 @@ impl SubscriptionType {
                 duration
             );
             return Err(PocketError::General(format!(
-                "Unsupported duration for time-aligned subscription: {:?}",
-                duration
+                "Unsupported duration for time-aligned subscription: {duration:?}"
             )));
         }
         Ok(SubscriptionType::TimeAligned {

@@ -6,6 +6,7 @@ import asyncio
 async def main(ssid: str):
     # The api automatically detects if the 'ssid' is for real or demo account
     api = PocketOptionAsync(ssid)
+    await asyncio.sleep(5)
     (buy_id, _) = await api.buy(asset="EURUSD_otc", amount=1.0, time=15, check_win=False)
     (sell_id, _) = await api.sell(asset="EURUSD_otc", amount=1.0, time=300, check_win=False)
     print(buy_id, sell_id)

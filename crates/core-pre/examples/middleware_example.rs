@@ -7,6 +7,7 @@ use binary_options_tools_core_pre::traits::{ApiModule, AppState, Rule};
 use kanal::{AsyncReceiver, AsyncSender};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::info;
 
@@ -207,6 +208,7 @@ impl ApiModule<ExampleState> for ExampleModule {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct ExampleHandle {
     sender: AsyncSender<String>,
     receiver: AsyncReceiver<String>,
@@ -221,7 +223,7 @@ async fn main() -> CoreResult<()> {
     let stats_middleware = Arc::new(StatisticsMiddleware::new());
 
     // Build the client with middleware
-    let (client, mut runner) = ClientBuilder::new(MockConnector, ExampleState)
+    let (client, _) = ClientBuilder::new(MockConnector, ExampleState)
         .with_middleware(Box::new(LoggingMiddleware))
         .with_middleware(Box::new(StatisticsMiddleware::new()))
         .with_module::<ExampleModule>()
@@ -229,7 +231,8 @@ async fn main() -> CoreResult<()> {
         .await?;
 
     info!("Client built with middleware layers");
-
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    client.shutdown().await?;
     // In a real application, you would:
     // 1. Start the runner in a background task
     // 2. Use the client to send messages

@@ -6,9 +6,9 @@ use uuid::Uuid;
 #[derive(Error, Debug)]
 pub enum BinaryErrorPy {
     #[error("BinaryOptionsError, {0}")]
-    BinaryOptionsError(#[from] BinaryOptionsToolsError),
+    BinaryOptionsError(Box<BinaryOptionsToolsError>),
     #[error("PocketOptionError, {0}")]
-    PocketOptionError(#[from] PocketError),
+    PocketOptionError(Box<PocketError>),
 
     #[error("Uninitialized, {0}")]
     Uninitialized(String),
@@ -31,3 +31,15 @@ impl From<BinaryErrorPy> for PyErr {
 }
 
 pub type BinaryResultPy<T> = Result<T, BinaryErrorPy>;
+
+impl From<BinaryOptionsToolsError> for BinaryErrorPy {
+    fn from(value: BinaryOptionsToolsError) -> Self {
+        BinaryErrorPy::BinaryOptionsError(Box::new(value))
+    }
+}
+
+impl From<PocketError> for BinaryErrorPy {
+    fn from(value: PocketError) -> Self {
+        BinaryErrorPy::PocketOptionError(Box::new(value))
+    }
+}

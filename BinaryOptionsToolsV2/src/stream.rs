@@ -21,7 +21,7 @@ where
         Some(item) => match item {
             Ok(itm) => Ok(itm),
             Err(e) => {
-                println!("Error: {:?}", e);
+                println!("Error: {e:?}");
                 match sync {
                     true => Err(PyStopIteration::new_err(e.to_string())),
                     false => Err(PyStopAsyncIteration::new_err(e.to_string())),

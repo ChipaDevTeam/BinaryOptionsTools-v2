@@ -611,10 +611,10 @@ impl SubscriptionStream {
             .update(&BaseCandle::from((timestamp, price)))?
         {
             // Successfully updated candle
-            return Ok(Some(Candle::from((c, asset))));
+            Ok(Some(Candle::from((c, asset))))
         } else {
             // No complete candle yet, continue waiting
-            return Ok(None);
+            Ok(None)
         }
     }
 

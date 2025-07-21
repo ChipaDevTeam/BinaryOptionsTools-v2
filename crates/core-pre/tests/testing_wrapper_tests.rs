@@ -71,6 +71,7 @@ impl ApiModule<()> for TestModule {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct TestHandle {
     sender: AsyncSender<String>,
     receiver: AsyncReceiver<String>,

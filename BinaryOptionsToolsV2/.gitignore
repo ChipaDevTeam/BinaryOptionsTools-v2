@@ -70,3 +70,6 @@ docs/_build/
 
 # Pyenv
 .python-version
+
+BinaryOptionsToolsV2/example_usage.py
+BinaryOptionsToolsV2/test_config.py
