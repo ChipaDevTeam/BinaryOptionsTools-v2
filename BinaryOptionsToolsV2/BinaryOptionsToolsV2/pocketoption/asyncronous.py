@@ -215,11 +215,11 @@ class PocketOptionAsync:
             Available timeframes: 1, 5, 15, 30, 60, 300 seconds
             Maximum period depends on the timeframe
         """
-        # candles = await self.client.get_candles(asset, period, offset)
-        # return json.loads(candles)
-        raise NotImplementedError(
-            "The get_candles method is not implemented in the PocketOptionAsync class. "
-        )
+        candles = await self.client.get_candles(asset, period, offset)
+        return json.loads(candles)
+        # raise NotImplementedError(
+        #     "The get_candles method is not implemented in the PocketOptionAsync class. "
+        # )
     
     async def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> list[dict]:  
         """
@@ -243,11 +243,11 @@ class PocketOptionAsync:
             Available timeframes: 1, 5, 15, 30, 60, 300 seconds
             Maximum period depends on the timeframe
         """
-        # candles = await self.client.get_candles_advanced(asset, period, offset, time)
-        # return json.loads(candles)
-        raise NotImplementedError(
-            "The get_candles_advanced method is not implemented in the PocketOptionAsync class. "
-        )
+        candles = await self.client.get_candles_advanced(asset, period, offset, time)
+        return json.loads(candles)
+        # raise NotImplementedError(
+        #     "The get_candles_advanced method is not implemented in the PocketOptionAsync class. "
+        # )
         
     async def balance(self) -> float:
         """
@@ -263,17 +263,17 @@ class PocketOptionAsync:
     
     async def opened_deals(self) -> list[dict]:
         "Returns a list of all the opened deals as dictionaries"
-        # return json.loads(await self.client.opened_deals())
-        raise NotImplementedError(
-            "The opened_deals method is not implemented in the PocketOptionAsync class. "
-        )
+        return json.loads(await self.client.opened_deals())
+        # raise NotImplementedError(
+        #     "The opened_deals method is not implemented in the PocketOptionAsync class. "
+        # )
     
     async def closed_deals(self) -> list[dict]:
         "Returns a list of all the closed deals as dictionaries"
-        # return json.loads(await self.client.closed_deals())
-        raise NotImplementedError(
-            "The closed_deals method is not implemented in the PocketOptionAsync class. "
-        )
+        return json.loads(await self.client.closed_deals())
+        # raise NotImplementedError(
+        #     "The closed_deals method is not implemented in the PocketOptionAsync class. "
+        # )
     
     async def clear_closed_deals(self) -> None:
         "Removes all the closed deals from memory, this function doesn't return anything"

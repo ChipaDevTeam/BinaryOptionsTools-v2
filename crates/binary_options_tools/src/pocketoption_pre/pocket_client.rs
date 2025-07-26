@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::pocketoption_pre::{
+    candle::Candle,
     candle::SubscriptionType,
     connect::PocketConnect,
     error::{PocketError, PocketResult},
@@ -18,6 +19,7 @@ use crate::pocketoption_pre::{
         assets::AssetsModule,
         balance::BalanceModule,
         deals::DealsApiModule,
+        get_candles::GetCandlesApiModule,
         keep_alive::{InitModule, KeepAliveModule},
         print_handler,
         server_time::ServerTimeModule,
@@ -70,13 +72,12 @@ impl PocketOption {
             .with_module::<TradesApiModule>()
             .with_module::<DealsApiModule>()
             .with_module::<SubscriptionsApiModule>()
+            .with_module::<GetCandlesApiModule>()
             .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state))))
     }
 
     pub async fn new(ssid: impl ToString) -> PocketResult<Self> {
-        let state = StateBuilder::default()
-            .ssid(Ssid::parse(ssid)?)
-            .build()?;
+        let state = StateBuilder::default().ssid(Ssid::parse(ssid)?).build()?;
         let builder = ClientBuilder::new(PocketConnect, state)
             .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)))
             .with_lightweight_module::<KeepAliveModule>()
@@ -87,6 +88,7 @@ impl PocketOption {
             .with_module::<TradesApiModule>()
             .with_module::<DealsApiModule>()
             .with_module::<SubscriptionsApiModule>()
+            .with_module::<GetCandlesApiModule>()
             .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)));
         let (client, mut runner) = builder.build().await?;
 
@@ -104,7 +106,19 @@ impl PocketOption {
             .ssid(Ssid::parse(ssid)?)
             .default_connection_url(url)
             .build()?;
-        let (client, mut runner) = ClientBuilder::new(PocketConnect, state).build().await?;
+        let builder = ClientBuilder::new(PocketConnect, state)
+            .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)))
+            .with_lightweight_module::<KeepAliveModule>()
+            .with_lightweight_module::<InitModule>()
+            .with_lightweight_module::<BalanceModule>()
+            .with_lightweight_module::<ServerTimeModule>()
+            .with_lightweight_module::<AssetsModule>()
+            .with_module::<TradesApiModule>()
+            .with_module::<DealsApiModule>()
+            .with_module::<SubscriptionsApiModule>()
+            .with_module::<GetCandlesApiModule>()
+            .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)));
+        let (client, mut runner) = builder.build().await?;
 
         let _runner = tokio::spawn(async move { runner.run().await });
 
@@ -254,6 +268,16 @@ impl PocketOption {
         self.client.state.trade_state.get_opened_deals().await
     }
 
+    /// Gets the currently closed deals.
+    pub async fn get_closed_deals(&self) -> HashMap<Uuid, Deal> {
+        self.client.state.trade_state.get_closed_deals().await
+    }
+    /// Clears the currently closed deals.
+    pub async fn clear_closed_deals(&self) {
+        self.client.state.trade_state.clear_closed_deals().await
+    }
+
+    /// Subscribes to a specific asset's updates.
     pub async fn subscribe(
         &self,
         asset: impl ToString,
@@ -283,6 +307,80 @@ impl PocketOption {
             }
         } else {
             Err(CoreError::ModuleNotFound("SubscriptionsApiModuel".into()).into())
+        }
+    }
+
+    /// Gets historical candle data for a specific asset.
+    ///
+    /// # Arguments
+    /// * `asset` - Trading symbol (e.g., "EURUSD_otc")
+    /// * `period` - Time period for each candle in seconds
+    /// * `time` - Current time timestamp
+    /// * `offset` - Number of periods to offset from current time
+    ///
+    /// # Returns
+    /// A vector of Candle objects containing historical price data
+    ///
+    /// # Errors
+    /// * Returns InvalidAsset if the asset is not found
+    /// * Returns ModuleNotFound if GetCandlesApiModule is not available
+    /// * Returns General error for other failures
+    pub async fn get_candles_advanced(
+        &self,
+        asset: impl ToString,
+        period: i64,
+        time: i64,
+        offset: i64,
+    ) -> PocketResult<Vec<Candle>> {
+        if let Some(handle) = self.client.get_handle::<GetCandlesApiModule>().await {
+            if let Some(assets) = self.assets().await {
+                if assets.get(&asset.to_string()).is_some() {
+                    handle.get_candles_advanced(asset, period, time, offset).await
+                } else {
+                    Err(PocketError::InvalidAsset(asset.to_string()))
+                }
+            } else {
+                // If assets are not loaded yet, still try to get candles
+                handle.get_candles_advanced(asset, period, time, offset).await
+            }
+        } else {
+            Err(CoreError::ModuleNotFound("GetCandlesApiModule".into()).into())
+        }
+    }
+
+    /// Gets historical candle data with advanced parameters.
+    ///
+    /// # Arguments
+    /// * `asset` - Trading symbol (e.g., "EURUSD_otc")
+    /// * `period` - Time period for each candle in seconds
+    /// * `offset` - Number of periods to offset from current time
+    ///
+    /// # Returns
+    /// A vector of Candle objects containing historical price data
+    ///
+    /// # Errors
+    /// * Returns InvalidAsset if the asset is not found
+    /// * Returns ModuleNotFound if GetCandlesApiModule is not available
+    /// * Returns General error for other failures
+    pub async fn get_candles(
+        &self,
+        asset: impl ToString,
+        period: i64,
+        offset: i64,
+    ) -> PocketResult<Vec<Candle>> {
+        if let Some(handle) = self.client.get_handle::<GetCandlesApiModule>().await {
+            if let Some(assets) = self.assets().await {
+                if assets.get(&asset.to_string()).is_some() {
+                    handle.get_candles(asset, period, offset).await
+                } else {
+                    Err(PocketError::InvalidAsset(asset.to_string()))
+                }
+            } else {
+                // If assets are not loaded yet, still try to get candles
+                handle.get_candles(asset, period, offset).await
+            }
+        } else {
+            Err(CoreError::ModuleNotFound("GetCandlesApiModule".into()).into())
         }
     }
 
@@ -414,6 +512,32 @@ mod tests {
         }
         api.unsubscribe("AUDUSD_otc").await.unwrap();
         println!("Unsubscribed from AUDUSD_otc");
+
+        api.shutdown().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_pocket_option_get_candles() {
+        tracing_subscriber::fmt::init();
+        let ssid = r#"42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#;
+        let api = PocketOption::new(ssid).await.unwrap();
+        tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
+
+        let current_time = chrono::Utc::now().timestamp();
+        let candles = api
+            .get_candles_advanced("EURUSD_otc", 5, current_time, 1000)
+            .await
+            .unwrap();
+        println!("Received {} candles", candles.len());
+        for (i, candle) in candles.iter().take(5).enumerate() {
+            println!("Candle {i}: {candle:?}");
+        }
+
+        let candles_advanced = api
+            .get_candles("EURUSD_otc", 5, 1000)
+            .await
+            .unwrap();
+        println!("Received {} candles (advanced)", candles_advanced.len());
 
         api.shutdown().await.unwrap();
     }

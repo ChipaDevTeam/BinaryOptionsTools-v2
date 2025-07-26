@@ -251,6 +251,7 @@ impl MultiPatternRule {
 
 impl Rule for MultiPatternRule {
     fn call(&self, msg: &Message) -> bool {
+        // tracing::info!("Called with message: {:?}", msg);
         match msg {
             Message::Text(text) => {
                 for pattern in &self.patterns {

@@ -1,3 +1,19 @@
+use chrono::{Duration, Utc};
+use rand::{rng, Rng};
+
+use crate::pocketoption_pre::error::{PocketError, PocketResult};
+
+pub fn get_index() -> PocketResult<u64> {
+    let mut rng = rng();
+
+    let rand = rng.random_range(10..99);
+    let time = (Utc::now() + Duration::hours(2)).timestamp();
+    format!("{time}{rand}")
+        .parse::<u64>()
+        .map_err(|e| PocketError::General(e.to_string()))
+}
+
+
 pub mod float_time {
     use chrono::{DateTime, Utc};
     use serde::{Deserialize, Deserializer, Serializer};

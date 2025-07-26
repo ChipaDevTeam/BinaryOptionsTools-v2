@@ -51,7 +51,7 @@ pub mod keep_alive;
 pub mod server_time;
 pub mod subscriptions;
 pub mod trades;
-
+pub mod get_candles;
 // pub use subscriptions::{
 //     CandleConfig, MAX_SUBSCRIPTIONS, SubscriptionCommand, SubscriptionHandle, SubscriptionModule,
 //     SubscriptionResponse,

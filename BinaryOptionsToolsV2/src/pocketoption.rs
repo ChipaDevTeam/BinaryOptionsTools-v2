@@ -129,32 +129,41 @@ impl RawPocketOption {
 
     pub fn get_candles<'py>(
         &self,
-        _py: Python<'py>,
-        _asset: String,
-        _period: i64,
-        _offset: i64,
+        py: Python<'py>,
+        asset: String,
+        period: i64,
+        offset: i64,
     ) -> PyResult<Bound<'py, PyAny>> {
         // Work in progress - this feature is not yet implemented in the new API
 
-        Err(BinaryErrorPy::NotAllowed(
-            "get_candles is work in progress and not yet available".into(),
-        )
-        .into())
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let res = client.get_candles(asset, period, offset).await.map_err(BinaryErrorPy::from)?;
+            Python::with_gil(|py| {
+                serde_json::to_string(&res)
+                    .map_err(BinaryErrorPy::from)?
+                    .into_py_any(py)
+            })
+        })
     }
 
     pub fn get_candles_advanced<'py>(
         &self,
-        _py: Python<'py>,
-        _asset: String,
-        _period: i64,
-        _offset: i64,
-        _time: i64,
+        py: Python<'py>,
+        asset: String,
+        period: i64,
+        offset: i64,
+        time: i64,
     ) -> PyResult<Bound<'py, PyAny>> {
-        // Work in progress - this feature is not yet implemented in the new API
-        Err(BinaryErrorPy::NotAllowed(
-            "get_candles_advanced is work in progress and not yet available".into(),
-        )
-        .into())
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let res = client.get_candles_advanced(asset, period, time, offset).await.map_err(BinaryErrorPy::from)?;
+            Python::with_gil(|py| {
+                serde_json::to_string(&res)
+                    .map_err(BinaryErrorPy::from)?
+                    .into_py_any(py)
+            })
+        })    
     }
 
     pub async fn balance(&self) -> f64 {
@@ -172,6 +181,7 @@ impl RawPocketOption {
     pub async fn clear_closed_deals(&self) {
         // Work in progress - this feature is not yet implemented in the new API
         // No-op for now
+        self.client.clear_closed_deals().await;
     }
 
     pub async fn opened_deals(&self) -> PyResult<String> {
