@@ -4,14 +4,40 @@ build-backend = "maturin"
 
 [project]
 name = "BinaryOptionsToolsV2"
-# requires-python = ">=3.8"
+description = "A library to connect to PocketOption using python with async and sync support."
+authors = [
+    {name = "ChipaDevTeam", email = "your-email@example.com"}
+]
+license = {text = "BSD"}
+readme = "Readme.md"
+homepage = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+documentation = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+requires-python = ">=3.8"
+keywords = ["binary options", "trading", "pocketoption", "finance", "async"]
 classifiers = [
-    "Programming Language :: Rust",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Rust",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dynamic = ["version"]
 
+[project.urls]
+"Bug Reports" = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues"
+"Source" = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
