@@ -1,14 +1,14 @@
-name: Build and Publish to PyPI
+name: Release
 
 on:
-  push:
-    branches:
-      - main
-      - master
-    tags:
-      - "v*"
-  pull_request:
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -153,10 +153,9 @@ jobs:
           name: wheels-sdist
           path: BinaryOptionsToolsV2/dist
 
-  release:
-    name: Release
+  publish:
+    name: Publish to PyPI
     runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'"
     needs: [linux, musllinux, windows, macos, sdist]
     environment:
       name: pypi
