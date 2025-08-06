@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 #[derive(thiserror::Error, Debug)]
 pub enum CoreError {
     #[error("WebSocket error: {0}")]
@@ -33,6 +35,16 @@ pub enum CoreError {
 
     #[error("Serialization error: {0}")]
     Serde(#[from] serde_json::Error),
+
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    
+    #[error("Tracing error: {0}")]
+    Tracing(String),
+
+    #[error("Failed to execute '{task}' task before the maximum allowed time of '{duration:?}'")]
+    TimeoutError { task: String, duration: Duration },
+
 }
 
 pub type CoreResult<T> = std::result::Result<T, CoreError>;

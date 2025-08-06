@@ -303,10 +303,7 @@ class PocketOptionAsync:
     
     async def history(self, asset: str, period: int) -> list[dict]:
         "Returns a list of dictionaries containing the latest data available for the specified asset starting from 'period', the data is in the same format as the returned data of the 'get_candles' function."
-        # return json.loads(await self.client.history(asset, period))
-        raise NotImplementedError(
-            "The history method is not implemented in the PocketOptionAsync class. "
-        )
+        return json.loads(await self.client.history(asset, period))
     
     
     async def _subscribe_symbol_inner(self, asset: str) :

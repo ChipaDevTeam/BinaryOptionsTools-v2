@@ -3,9 +3,9 @@ use std::str;
 use std::sync::Arc;
 use std::time::Duration;
 
-use binary_options_tools::pocketoption_pre::candle::{Candle, SubscriptionType};
-use binary_options_tools::pocketoption_pre::error::PocketResult;
-use binary_options_tools::pocketoption_pre::pocket_client::PocketOption;
+use binary_options_tools::pocketoption::candle::{Candle, SubscriptionType};
+use binary_options_tools::pocketoption::error::PocketResult;
+use binary_options_tools::pocketoption::pocket_client::PocketOption;
 // use binary_options_tools::pocketoption::types::base::RawWebsocketMessage;
 // use binary_options_tools::pocketoption::types::update::DataCandle;
 // use binary_options_tools::pocketoption::ws::stream::StreamAsset;
@@ -172,10 +172,7 @@ impl RawPocketOption {
 
     pub async fn closed_deals(&self) -> PyResult<String> {
         // Work in progress - this feature is not yet implemented in the new API
-        Err(BinaryErrorPy::NotAllowed(
-            "closed_deals is work in progress and not yet available".into(),
-        )
-        .into())
+        Ok(serde_json::to_string(&self.client.get_closed_deals().await).map_err(BinaryErrorPy::from)?)
     }
 
     pub async fn clear_closed_deals(&self) {
@@ -206,15 +203,21 @@ impl RawPocketOption {
 
     pub fn history<'py>(
         &self,
-        _py: Python<'py>,
-        _asset: String,
-        _period: i64,
+        py: Python<'py>,
+        asset: String,
+        period: u32,
     ) -> PyResult<Bound<'py, PyAny>> {
         // Work in progress - this feature is not yet implemented in the new API
-        Err(
-            BinaryErrorPy::NotAllowed("history is work in progress and not yet available".into())
-                .into(),
-        )
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let res = client.history(asset, period).await.map_err(BinaryErrorPy::from)?;
+            Python::with_gil(|py| {
+                serde_json::to_string(&res)
+                    .map_err(BinaryErrorPy::from)?
+                    .into_py_any(py)
+            })
+        })    
+
     }
 
     pub fn subscribe_symbol<'py>(

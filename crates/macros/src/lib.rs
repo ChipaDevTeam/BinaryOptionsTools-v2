@@ -1,3 +1,4 @@
+mod action;
 mod config;
 mod deserialize;
 mod impls;
@@ -5,6 +6,7 @@ mod region;
 mod serialize;
 mod timeout;
 
+use action::ActionImpl;
 use config::Config;
 use deserialize::Deserializer;
 use region::RegionImpl;
@@ -57,4 +59,16 @@ pub fn region(input: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(input as DeriveInput);
     let region = RegionImpl::from_derive_input(&parsed).unwrap();
     quote! { #region }.into()
+}
+
+#[proc_macro_derive(ActionImpl, attributes(action))]
+pub fn action_impl(input: TokenStream) -> TokenStream {
+    let parsed = parse_macro_input!(input as DeriveInput);
+    let action = match ActionImpl::from_derive_input(&parsed) {
+        Ok(action) => action,
+        Err(e) => return e.write_errors().into(),
+    };
+    quote! {
+        #action
+    }.into()
 }

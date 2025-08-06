@@ -1,9 +1,6 @@
 use std::{fs::OpenOptions, io::Write, sync::Arc};
 
-use binary_options_tools::{
-    error::BinaryOptionsResult,
-    stream::{stream_logs_layer, RecieverStream},
-};
+use binary_options_tools::stream::{stream_logs_layer, Message, RecieverStream};
 use chrono::Duration;
 use futures_util::{
     stream::{BoxStream, Fuse},
@@ -101,7 +98,7 @@ impl<'a> MakeWriter<'a> for NoneWriter {
     }
 }
 
-type LogStream = Fuse<BoxStream<'static, BinaryOptionsResult<String>>>;
+type LogStream = Fuse<BoxStream<'static, Result<Message, BinaryErrorPy>>>;
 
 #[pyclass]
 pub struct StreamLogsIterator {
@@ -120,13 +117,25 @@ impl StreamLogsIterator {
 
     fn __anext__<'py>(&'py mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let stream = self.stream.clone();
-        future_into_py(py, next_stream(stream, false))
+        future_into_py(py, async move {
+            let result = next_stream(stream, false).await?;
+            match result {
+                Message::Text(text) => Ok(text.to_string()),
+                Message::Binary(data) => Ok(String::from_utf8_lossy(&data).to_string()),
+                _ => Ok("".to_string()),
+            }
+        })
     }
 
     fn __next__<'py>(&'py self, py: Python<'py>) -> PyResult<String> {
         let runtime = get_runtime(py)?;
         let stream = self.stream.clone();
-        runtime.block_on(next_stream(stream, true))
+        let result = runtime.block_on(next_stream(stream, true))?;
+        match result {
+            Message::Text(text) => Ok(text.to_string()),
+            Message::Binary(data) => Ok(String::from_utf8_lossy(&data).to_string()),
+            _ => Ok("".to_string()),
+        }
     }
 }
 
@@ -163,6 +172,7 @@ impl LogBuilder {
         let (layer, inner_iter) =
             stream_logs_layer(level.parse().unwrap_or(Level::DEBUG.into()), timeout);
         let stream = RecieverStream::to_stream_static(Arc::new(inner_iter))
+            .map(|result| result.map_err(|e| BinaryErrorPy::Uninitialized(e.to_string())))
             .boxed()
             .fuse();
         let iter = StreamLogsIterator {
@@ -267,6 +277,7 @@ mod tests {
             layer: Arc::new(inner_layer),
         };
         let stream = RecieverStream::to_stream_static(Arc::new(inner_iter))
+            .map(|result| result.map_err(|e| BinaryErrorPy::Uninitialized(e.to_string())))
             .boxed()
             .fuse();
         let iter = StreamLogsIterator {
@@ -296,9 +307,13 @@ mod tests {
         async fn reciever_fn(reciever: StreamLogsIterator) {
             let mut stream = reciever.stream.lock().await;
 
-            // stream.next().await;
-            while let Some(Ok(value)) = stream.next().await {
-                let value: Value = serde_json::from_str(&value).unwrap();
+            while let Some(Ok(message)) = stream.next().await {
+                let text = match message {
+                    Message::Text(text) => text.to_string(),
+                    Message::Binary(data) => String::from_utf8_lossy(&data).to_string(),
+                    _ => continue,
+                };
+                let value: Value = serde_json::from_str(&text).unwrap();
                 println!("{value}");
             }
         }

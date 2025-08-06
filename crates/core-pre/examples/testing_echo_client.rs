@@ -222,6 +222,13 @@ impl TestingEchoPlatform {
     }
 }
 
+// fn test(msg: Message) -> bool {
+//     if let Message::Binary(bin) = msg {
+//         return bin.as_ref().starts_with(b"needle")
+//     }
+//     false
+// }
+
 // Demonstration of usage
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() -> CoreResult<()> {

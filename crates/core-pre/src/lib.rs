@@ -27,5 +27,6 @@ pub mod signals;
 pub mod statistics;
 pub mod testing;
 pub mod traits;
+pub mod utils;
 
 pub mod reimports;

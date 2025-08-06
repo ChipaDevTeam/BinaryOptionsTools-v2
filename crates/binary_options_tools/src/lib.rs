@@ -1,15 +1,43 @@
+//! # Binary Options Tools
+//! 
+//! A comprehensive library for binary options trading tools and utilities.
+//! 
+//! This crate provides modules for interacting with various binary options platforms,
+//! error handling utilities, and streaming capabilities for real-time data processing.
+//! 
+//! ## Modules
+//! 
+//! - `pocketoption` - Integration with PocketOption platform
+//! - `expertoptions` - Integration with ExpertOption platform  
+//! - `reimports` - Common re-exports for convenience
+//! - `error` - Error handling types and utilities
+//! - `stream` - Streaming utilities including receiver streams and logging layers
+//! 
+//! ## Features
+//! 
+//! - Asynchronous operations with tokio support
+//! - Serialization/deserialization with serde
+//! - Structured logging with tracing
+//! - Timeout handling with custom macros
+//! - Stream processing capabilities
+//! 
+//! // Use the streaming utilities for real-time data processing
+//! // Serialize and deserialize data with the provided macros
+//! // Apply timeouts to async operations
+//! ```
 pub mod pocketoption;
-pub mod pocketoption_pre;
+pub mod expertoptions;
+
+pub mod utils;
 pub mod reimports;
 
+pub mod error;
 pub mod stream {
-    pub use binary_options_tools_core::general::stream::RecieverStream;
-    pub use binary_options_tools_core::utils::tracing::stream_logs_layer;
+    pub use binary_options_tools_core_pre::utils::stream::RecieverStream;
+    pub use binary_options_tools_core_pre::utils::tracing::stream_logs_layer;
+    pub use binary_options_tools_core_pre::reimports::*;
 }
 
-pub mod error {
-    pub use binary_options_tools_core::error::{BinaryOptionsResult, BinaryOptionsToolsError};
-}
 
 #[cfg(test)]
 mod tests {
@@ -19,7 +47,7 @@ mod tests {
     use tokio::time::sleep;
     use tracing::debug;
 
-    use binary_options_tools_core::utils::tracing::start_tracing;
+    use binary_options_tools_core_pre::utils::tracing::start_tracing;
     use binary_options_tools_macros::{deserialize, serialize, timeout};
     #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
     struct Test {

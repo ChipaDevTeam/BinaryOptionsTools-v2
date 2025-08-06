@@ -1,4 +1,4 @@
-use binary_options_tools::{error::BinaryOptionsToolsError, pocketoption_pre::error::PocketError};
+use binary_options_tools::{error::BinaryOptionsError, pocketoption::error::PocketError};
 use pyo3::{exceptions::PyValueError, PyErr};
 use thiserror::Error;
 use uuid::Uuid;
@@ -6,7 +6,7 @@ use uuid::Uuid;
 #[derive(Error, Debug)]
 pub enum BinaryErrorPy {
     #[error("BinaryOptionsError, {0}")]
-    BinaryOptionsError(Box<BinaryOptionsToolsError>),
+    BinaryOptionsError(Box<BinaryOptionsError>),
     #[error("PocketOptionError, {0}")]
     PocketOptionError(Box<PocketError>),
 
@@ -32,8 +32,8 @@ impl From<BinaryErrorPy> for PyErr {
 
 pub type BinaryResultPy<T> = Result<T, BinaryErrorPy>;
 
-impl From<BinaryOptionsToolsError> for BinaryErrorPy {
-    fn from(value: BinaryOptionsToolsError) -> Self {
+impl From<BinaryOptionsError> for BinaryErrorPy {
+    fn from(value: BinaryOptionsError) -> Self {
         BinaryErrorPy::BinaryOptionsError(Box::new(value))
     }
 }

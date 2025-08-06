@@ -19,7 +19,7 @@ enum FieldConfig {
     // `dtype`: Specifies the type of elements in the collection.
     // `add_fn`: Optionally specifies the method name to add elements (e.g., "push", "insert"). Defaults to "push".
     #[darling(rename = "iterator")]
-    Iterator { dtype: Type, add_fn: Option<String> },
+    Iterator { dtype: Box<Type>, add_fn: Option<String> },
 }
 
 // `ConfigField` represents a single field from the input struct.
@@ -64,14 +64,14 @@ impl ToTokens for Config {
         // `new_name`: The identifier for the generated config struct.
         // If the original struct name starts with `_`, it's removed. Otherwise, "Config" is appended.
         // e.g., `MyStruct` -> `MyStructConfig`, `_Internal` -> `InternalConfig`.
-        let new_name = match format!("{}", name) {
+        let new_name = match format!("{name}") {
             n if n.starts_with("_") => Ident::new(&n[1..], name.span()),
-            n => Ident::new(&format!("{}Config", n), name.span()),
+            n => Ident::new(&format!("{n}Config"), name.span()),
         };
 
         // `builder_name`: The identifier for the generated builder struct.
         // e.g., `MyStructConfig` -> `MyStructConfigBuilder`.
-        let builder_name = Ident::new(&format!("{}Builder", new_name), new_name.span());
+        let builder_name = Ident::new(&format!("{new_name}Builder"), new_name.span());
 
         // --- Preparing iterators for code generation ---
         // `fields_builders`: Generates the builder methods for each field (e.g., `fn field_name(self, value: Type) -> Self`).
@@ -231,9 +231,9 @@ impl ToTokens for ConfigField {
         let dtype = &self.ty; // The type of the field, e.g., `String`, `Vec<u32>`, `Option<i32>`.
 
         // Generate `set_field_name` method.
-        let set_name = Ident::new(&format!("set_{}", name), name.span());
+        let set_name = Ident::new(&format!("set_{name}"), name.span());
         // Generate `get_field_name` method.
-        let get_name = Ident::new(&format!("get_{}", name), name.span());
+        let get_name = Ident::new(&format!("get_{name}"), name.span());
 
         // `extra`: Handles special code generation for `Iterator` fields.
         let extra = if let Some(FieldConfig::Iterator {
@@ -244,7 +244,7 @@ impl ToTokens for ConfigField {
             // If the field is configured as an iterator `#[config(iterator(dtype = ...))]`
 
             // `add_name`: Name of the method to add items, e.g., `add_my_vec`.
-            let add_name = Ident::new(&format!("add_{}", name), name.span());
+            let add_name = Ident::new(&format!("add_{name}"), name.span());
             // `add_fn_ident`: The actual function to call on the collection, e.g., `push`, `insert`.
             // Defaults to `push` if not specified in `#[config(iterator(add_fn = "..."))]`.
             let add_fn_ident = if let Some(add) = add_fn {
@@ -319,7 +319,7 @@ impl ConfigField {
     // different field configurations (`extra: Option<FieldConfig>`).
     fn ok_panic_default(&self) -> TokenStream2 {
         let name = self.ident.as_ref().expect("should have a name");
-        let name_str = format!("{}", name); // Field name as a string for error messages.
+        let name_str = format!("{name}"); // Field name as a string for error messages.
 
         if let Some(extra_config) = &self.extra {
             match extra_config {
