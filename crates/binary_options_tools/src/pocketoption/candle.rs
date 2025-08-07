@@ -35,9 +35,9 @@ pub struct Candle {
 pub struct BaseCandle {
     pub timestamp: f64,
     pub open: f64,
-    pub high: f64,
-    pub low: f64,
     pub close: f64,
+    pub low: f64,
+    pub high: f64,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub volume: Option<f64>,
 }
