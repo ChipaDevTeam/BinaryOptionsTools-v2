@@ -6,20 +6,27 @@ use binary_options_tools_core_pre::{
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, Rule},
 };
+use rust_decimal::{Decimal, prelude::FromPrimitive};
 use serde::{Deserialize, Serialize};
 use tokio::select;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::pocketoption::{
-    candle::Candle,
-    error::{PocketError, PocketResult},
-    state::State,
-    types::MultiPatternRule,
-    utils::get_index,
+use crate::{
+    error::BinaryOptionsError,
+    pocketoption::{
+        candle::Candle,
+        error::{PocketError, PocketResult},
+        state::State,
+        types::MultiPatternRule,
+        utils::get_index,
+    },
 };
 
-const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = [r#"451-["loadHistoryPeriodFast","#, r#"451-["loadHistoryPeriod","#];
+const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = [
+    r#"451-["loadHistoryPeriodFast","#,
+    r#"451-["loadHistoryPeriod","#,
+];
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoadHistoryPeriod {
@@ -67,17 +74,27 @@ pub struct LoadHistoryPeriodResult {
     pub period: i64,
 }
 
-impl From<CandleData> for Candle {
-    fn from(candle_data: CandleData) -> Self {
-        Candle {
+impl TryFrom<CandleData> for Candle {
+    type Error = BinaryOptionsError;
+
+    fn try_from(candle_data: CandleData) -> Result<Self, Self::Error> {
+        Ok(Candle {
             symbol: String::new(), // Will be filled by the caller
             timestamp: candle_data.time as f64,
-            open: candle_data.open,
-            high: candle_data.high,
-            low: candle_data.low,
-            close: candle_data.close,
+            open: Decimal::from_f64(candle_data.open).ok_or(BinaryOptionsError::ParseFloat(
+                "Couldn't parse f64 to Decimal".to_string(),
+            ))?,
+            high: Decimal::from_f64(candle_data.high).ok_or(BinaryOptionsError::ParseFloat(
+                "Couldn't parse f64 to Decimal".to_string(),
+            ))?,
+            low: Decimal::from_f64(candle_data.low).ok_or(BinaryOptionsError::ParseFloat(
+                "Couldn't parse f64 to Decimal".to_string(),
+            ))?,
+            close: Decimal::from_f64(candle_data.close).ok_or(BinaryOptionsError::ParseFloat(
+                "Couldn't parse f64 to Decimal".to_string(),
+            ))?,
             volume: None,
-        }
+        })
     }
 }
 
@@ -97,7 +114,6 @@ pub enum CommandResponse {
     CandlesResult { req_id: Uuid, candles: Vec<Candle> },
     Error { req_id: Uuid, error: String },
 }
-
 
 #[derive(Clone)]
 pub struct GetCandlesHandle {
@@ -122,7 +138,8 @@ impl GetCandlesHandle {
         offset: i64,
     ) -> PocketResult<Vec<Candle>> {
         let current_time = chrono::Utc::now().timestamp();
-        self.get_candles_advanced(asset, period, current_time, offset).await
+        self.get_candles_advanced(asset, period, current_time, offset)
+            .await
     }
 
     /// Gets historical candle data with advanced parameters.
@@ -235,11 +252,10 @@ impl ApiModule<State> for GetCandlesApiModule {
                                     let candles: Vec<Candle> = result.data
                                         .into_iter()
                                         .map(|candle_data| {
-                                            let mut candle = Candle::from(candle_data);
-                                            candle.symbol = asset.clone();
-                                            candle
+                                            Candle::try_from(candle_data).map_err(|e| CoreError::Other(e.to_string())).map(|mut c| {c.symbol = asset.clone();
+                                            c})
                                         })
-                                        .collect();
+                                        .collect::<Result<Vec<Candle>, _>>()?;
 
                                     // Send the response
                                     if let Err(e) = self.command_responder.send(CommandResponse::CandlesResult {
@@ -296,7 +312,9 @@ impl ApiModule<State> for GetCandlesApiModule {
         }
     }
 
-    fn rule() -> Box<dyn Rule + Send + Sync> {
-        Box::new(MultiPatternRule::new(Vec::from(LOAD_HISTORY_PERIOD_PATTERNS)))
+    fn rule(_: Arc<State>) -> Box<dyn Rule + Send + Sync> {
+        Box::new(MultiPatternRule::new(Vec::from(
+            LOAD_HISTORY_PERIOD_PATTERNS,
+        )))
     }
 }

@@ -5,17 +5,14 @@ use serde_json::Value;
 use crate::expertoptions::error::{ExpertOptionsError, ExpertOptionsResult};
 
 /// This struct will be the base of the messages sent to the ExpertOptions API. Almost all the messages will have this structure.
-/// 
+///
 #[derive(Serialize, Deserialize)]
 pub struct Action {
-    pub action: String, 
+    pub action: String,
     pub token: Option<String>,
     pub ns: Option<u64>,
-    pub message: Value
+    pub message: Value,
 }
-
-
-
 
 impl Action {
     pub fn new(action: String, token: String, ns: u64, message: Value) -> Self {
@@ -53,14 +50,19 @@ pub trait ActionName: Serialize {
     }
 
     fn action(&self, token: String) -> ExpertOptionsResult<Action> {
-        Ok(Action::new(self.name().to_string(), token, 2, self.to_value()?))
+        Ok(Action::new(
+            self.name().to_string(),
+            token,
+            2,
+            self.to_value()?,
+        ))
     }
 }
 
 // Example usage of the ActionImpl derive macro:
-// 
+//
 // use binary_options_tools_macros::ActionImpl;
-// 
+//
 // #[derive(ActionImpl)]
 // #[action = "login"]
 // struct LoginAction {
@@ -89,5 +91,5 @@ pub trait ActionName: Serialize {
 // //         "login"
 // //     }
 // // }
-// // 
+// //
 // // Similar implementations for TradeAction and BalanceAction

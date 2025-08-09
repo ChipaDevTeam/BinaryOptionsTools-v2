@@ -10,25 +10,29 @@ use binary_options_tools_core_pre::{
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::pocketoption::{
-    candle::Candle,
-    candle::SubscriptionType,
-    connect::PocketConnect,
-    error::{PocketError, PocketResult},
-    modules::{
-        assets::AssetsModule,
-        balance::BalanceModule,
-        deals::DealsApiModule,
-        get_candles::GetCandlesApiModule,
-        keep_alive::{InitModule, KeepAliveModule},
-        print_handler,
-        server_time::ServerTimeModule,
-        subscriptions::{SubscriptionStream, SubscriptionsApiModule},
-        trades::TradesApiModule,
+use crate::{
+    pocketoption::{
+        candle::{Candle, SubscriptionType},
+        connect::PocketConnect,
+        error::{PocketError, PocketResult},
+        modules::{
+            assets::AssetsModule,
+            balance::BalanceModule,
+            deals::DealsApiModule,
+            get_candles::GetCandlesApiModule,
+            keep_alive::{InitModule, KeepAliveModule},
+            raw::{
+                Outgoing, RawApiModule, RawHandle as InnerRawHandle, RawHandler as InnerRawHandler,
+            },
+            server_time::ServerTimeModule,
+            subscriptions::{SubscriptionStream, SubscriptionsApiModule},
+            trades::TradesApiModule,
+        },
+        ssid::Ssid,
+        state::{State, StateBuilder},
+        types::{Action, Assets, Deal},
     },
-    ssid::Ssid,
-    state::{State, StateBuilder},
-    types::{Action, Assets, Deal},
+    utils::print_handler,
 };
 
 const MINIMUM_TRADE_AMOUNT: f64 = 1.0;
@@ -63,7 +67,6 @@ impl PocketOption {
         let state = StateBuilder::default().ssid(Ssid::parse(ssid)?).build()?;
 
         Ok(ClientBuilder::new(PocketConnect, state)
-            .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)))
             .with_lightweight_module::<KeepAliveModule>()
             .with_lightweight_module::<InitModule>()
             .with_lightweight_module::<BalanceModule>()
@@ -73,23 +76,12 @@ impl PocketOption {
             .with_module::<DealsApiModule>()
             .with_module::<SubscriptionsApiModule>()
             .with_module::<GetCandlesApiModule>()
-            .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state))))
+            .with_module::<RawApiModule>()
+            .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg))))
     }
 
     pub async fn new(ssid: impl ToString) -> PocketResult<Self> {
-        let state = StateBuilder::default().ssid(Ssid::parse(ssid)?).build()?;
-        let builder = ClientBuilder::new(PocketConnect, state)
-            .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)))
-            .with_lightweight_module::<KeepAliveModule>()
-            .with_lightweight_module::<InitModule>()
-            .with_lightweight_module::<BalanceModule>()
-            .with_lightweight_module::<ServerTimeModule>()
-            .with_lightweight_module::<AssetsModule>()
-            .with_module::<TradesApiModule>()
-            .with_module::<DealsApiModule>()
-            .with_module::<SubscriptionsApiModule>()
-            .with_module::<GetCandlesApiModule>()
-            .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)));
+        let builder = Self::builder(ssid)?;
         let (client, mut runner) = builder.build().await?;
 
         let _runner = tokio::spawn(async move { runner.run().await });
@@ -107,7 +99,7 @@ impl PocketOption {
             .default_connection_url(url)
             .build()?;
         let builder = ClientBuilder::new(PocketConnect, state)
-            .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)))
+            .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)))
             .with_lightweight_module::<KeepAliveModule>()
             .with_lightweight_module::<InitModule>()
             .with_lightweight_module::<BalanceModule>()
@@ -117,7 +109,8 @@ impl PocketOption {
             .with_module::<DealsApiModule>()
             .with_module::<SubscriptionsApiModule>()
             .with_module::<GetCandlesApiModule>()
-            .with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)));
+            .with_module::<RawApiModule>()
+            .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)));
         let (client, mut runner) = builder.build().await?;
 
         let _runner = tokio::spawn(async move { runner.run().await });
@@ -126,6 +119,28 @@ impl PocketOption {
             client,
             _runner: Arc::new(_runner),
         })
+    }
+
+    /// Get a handle to the Raw module for ad-hoc validators and custom message processing.
+    pub async fn raw_handle(&self) -> PocketResult<InnerRawHandle> {
+        self.client
+            .get_handle::<RawApiModule>()
+            .await
+            .ok_or(CoreError::ModuleNotFound("RawApiModule".into()).into())
+    }
+
+    /// Convenience: create a RawHandler bound to a validator, optionally sending a keep-alive message on reconnect.
+    pub async fn create_raw_handler(
+        &self,
+        validator: crate::validator::Validator,
+        keep_alive: Option<Outgoing>,
+    ) -> PocketResult<InnerRawHandler> {
+        let handle = self
+            .client
+            .get_handle::<RawApiModule>()
+            .await
+            .ok_or(CoreError::ModuleNotFound("RawApiModule".into()))?;
+        handle.create(validator, keep_alive).await
     }
 
     /// Gets the current balance of the user.
@@ -335,13 +350,17 @@ impl PocketOption {
         if let Some(handle) = self.client.get_handle::<GetCandlesApiModule>().await {
             if let Some(assets) = self.assets().await {
                 if assets.get(&asset.to_string()).is_some() {
-                    handle.get_candles_advanced(asset, period, time, offset).await
+                    handle
+                        .get_candles_advanced(asset, period, time, offset)
+                        .await
                 } else {
                     Err(PocketError::InvalidAsset(asset.to_string()))
                 }
             } else {
                 // If assets are not loaded yet, still try to get candles
-                handle.get_candles_advanced(asset, period, time, offset).await
+                handle
+                    .get_candles_advanced(asset, period, time, offset)
+                    .await
             }
         } else {
             Err(CoreError::ModuleNotFound("GetCandlesApiModule".into()).into())
@@ -390,11 +409,7 @@ impl PocketOption {
     /// * `period` - The time period for each candle in seconds.
     /// # Returns
     /// A `PocketResult` containing a vector of `Candle` if successful, or an error if the request fails.
-    pub async fn history(
-        &self,
-        asset: impl ToString,
-        period: u32,
-    ) -> PocketResult<Vec<Candle>> {
+    pub async fn history(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<Candle>> {
         if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await {
             if let Some(assets) = self.assets().await {
                 if assets.get(&asset.to_string()).is_some() {
@@ -560,10 +575,7 @@ mod tests {
             println!("Candle {i}: {candle:?}");
         }
 
-        let candles_advanced = api
-            .get_candles("EURCHF_otc", 5, 1000)
-            .await
-            .unwrap();
+        let candles_advanced = api.get_candles("EURCHF_otc", 5, 1000).await.unwrap();
         println!("Received {} candles (advanced)", candles_advanced.len());
 
         api.shutdown().await.unwrap();

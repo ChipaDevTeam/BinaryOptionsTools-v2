@@ -1,7 +1,13 @@
 use std::sync::Arc;
 
-use binary_options_tools_core_pre::{connector::{Connector as ConnectorTrait, ConnectorError, ConnectorResult}, reimports::{connect_async_tls_with_config, generate_key, Connector, MaybeTlsStream, Request, WebSocketStream}};
-use futures_util::{stream::FuturesUnordered, StreamExt};
+use binary_options_tools_core_pre::{
+    connector::{Connector as ConnectorTrait, ConnectorError, ConnectorResult},
+    reimports::{
+        Connector, MaybeTlsStream, Request, WebSocketStream, connect_async_tls_with_config,
+        generate_key,
+    },
+};
+use futures_util::{StreamExt, stream::FuturesUnordered};
 use tokio::net::TcpStream;
 use tracing::{info, warn};
 use url::Url;
@@ -65,7 +71,7 @@ pub async fn try_connect(
         .ok_or(ConnectorError::UrlParsing("Host not found".into()))?;
     let request = Request::builder()
         .uri(t_url.to_string())
-        .header("Origin", "https://pocketoption.com")
+        .header("Origin", "https://app.expertoption.com")
         .header("Cache-Control", "no-cache")
         .header("User-Agent", agent)
         .header("Upgrade", "websocket")

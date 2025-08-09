@@ -1,14 +1,13 @@
 use uuid::Uuid;
 
-pub mod profile;
 pub mod keep_alive;
+pub mod profile;
 
 #[derive(Debug)]
 pub struct Command<T> {
     id: Uuid,
-    data: T
+    data: T,
 }
-
 
 impl<T> Command<T> {
     pub fn new(data: T) -> (Uuid, Self) {

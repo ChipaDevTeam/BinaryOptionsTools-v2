@@ -196,10 +196,10 @@ impl<S: AppState> ClientBuilder<S> {
                         error!(target: "ApiModule", "Failed to get callback for module {}: {:?}", type_name::<M>(), e);
                     }
                 }
+                let state_clone = state.clone();
                 router.spawn_module(async move {
                 let mut failures = 0;
                 let mut last_fail = Instant::now().checked_sub(Duration::from_secs(3600)).unwrap_or(Instant::now());
-
                 loop {
                     let mut module = M::new(
                         state.clone(),
@@ -235,7 +235,7 @@ impl<S: AppState> ClientBuilder<S> {
                 }
             });
 
-                router.add_module_rule(M::rule(), msg_tx);
+                router.add_module_rule(M::rule(state_clone), msg_tx);
             };
 
         self.module_factories.push(Box::new(factory));

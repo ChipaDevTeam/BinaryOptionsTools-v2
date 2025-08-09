@@ -1,12 +1,7 @@
-use std::sync::Arc;
-
-use binary_options_tools_core_pre::{error::CoreResult, reimports::Message};
-
-use crate::pocketoption::state::State;
-
 pub mod assets;
 pub mod balance;
 pub mod deals;
+pub mod get_candles;
 /// Module implementations for PocketOption client
 ///
 /// This module provides specialized handlers for different aspects of the
@@ -48,41 +43,11 @@ pub mod deals;
 ///
 /// Both patterns allow for clean separation of concerns and easy testing.
 pub mod keep_alive;
+pub mod raw;
 pub mod server_time;
 pub mod subscriptions;
 pub mod trades;
-pub mod get_candles;
 // pub use subscriptions::{
 //     CandleConfig, MAX_SUBSCRIPTIONS, SubscriptionCommand, SubscriptionHandle, SubscriptionModule,
 //     SubscriptionResponse,
 // };
-
-/// Lightweight message printer for debugging purposes
-///
-/// This handler logs all incoming WebSocket messages for debugging
-/// and development purposes. It can be useful for understanding
-/// the message flow and troubleshooting connection issues.
-///
-/// # Usage
-///
-/// This is typically used during development to monitor all WebSocket
-/// traffic. It should be disabled in production due to performance
-/// and log volume concerns.
-///
-/// # Arguments
-/// * `msg` - WebSocket message to log
-/// * `_state` - Shared application state (unused)
-///
-/// # Returns
-/// Always returns Ok(())
-///
-/// # Examples
-///
-/// ```rust
-/// // Add as a lightweight handler to the client
-/// client.with_lightweight_handler(|msg, state, _| Box::pin(print_handler(msg, state)));
-/// ```
-pub async fn print_handler(msg: Arc<Message>, _state: Arc<State>) -> CoreResult<()> {
-    tracing::debug!(target: "Lightweight", "Received: {msg:?}");
-    Ok(())
-}

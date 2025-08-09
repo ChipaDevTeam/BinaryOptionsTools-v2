@@ -1,43 +1,44 @@
 //! # Binary Options Tools
-//! 
+//!
 //! A comprehensive library for binary options trading tools and utilities.
-//! 
+//!
 //! This crate provides modules for interacting with various binary options platforms,
 //! error handling utilities, and streaming capabilities for real-time data processing.
-//! 
+//!
 //! ## Modules
-//! 
+//!
 //! - `pocketoption` - Integration with PocketOption platform
 //! - `expertoptions` - Integration with ExpertOption platform  
 //! - `reimports` - Common re-exports for convenience
 //! - `error` - Error handling types and utilities
 //! - `stream` - Streaming utilities including receiver streams and logging layers
-//! 
+//!
 //! ## Features
-//! 
+//!
 //! - Asynchronous operations with tokio support
 //! - Serialization/deserialization with serde
 //! - Structured logging with tracing
 //! - Timeout handling with custom macros
 //! - Stream processing capabilities
-//! 
+//!
 //! // Use the streaming utilities for real-time data processing
 //! // Serialize and deserialize data with the provided macros
 //! // Apply timeouts to async operations
 //! ```
-pub mod pocketoption;
 pub mod expertoptions;
+pub mod pocketoption;
 
-pub mod utils;
 pub mod reimports;
+pub mod traits;
+pub mod utils;
+pub mod validator;
 
 pub mod error;
 pub mod stream {
+    pub use binary_options_tools_core_pre::reimports::*;
     pub use binary_options_tools_core_pre::utils::stream::RecieverStream;
     pub use binary_options_tools_core_pre::utils::tracing::stream_logs_layer;
-    pub use binary_options_tools_core_pre::reimports::*;
 }
-
 
 #[cfg(test)]
 mod tests {

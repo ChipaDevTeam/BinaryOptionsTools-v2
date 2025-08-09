@@ -1,12 +1,18 @@
-use binary_options_tools_core_pre::reimports::{connect_async_tls_with_config, generate_key, Connector, MaybeTlsStream, Request, WebSocketStream};
 use binary_options_tools_core_pre::connector::{ConnectorError, ConnectorResult};
+use binary_options_tools_core_pre::reimports::{
+    Connector, MaybeTlsStream, Request, WebSocketStream, connect_async_tls_with_config,
+    generate_key,
+};
 use chrono::{Duration, Utc};
 use rand::{Rng, rng};
 
+use crate::pocketoption::{
+    error::{PocketError, PocketResult},
+    ssid::Ssid,
+};
 use serde_json::Value;
 use tokio::net::TcpStream;
 use url::Url;
-use crate::pocketoption::{error::{PocketError, PocketResult}, ssid::Ssid};
 
 pub fn get_index() -> PocketResult<u64> {
     let mut rng = rng();
@@ -17,7 +23,6 @@ pub fn get_index() -> PocketResult<u64> {
         .parse::<u64>()
         .map_err(|e| PocketError::General(e.to_string()))
 }
-
 
 pub async fn get_user_location(ip_address: &str) -> PocketResult<(f64, f64)> {
     let response = reqwest::get(format!("http://ip-api.com/json/{ip_address}")).await?;

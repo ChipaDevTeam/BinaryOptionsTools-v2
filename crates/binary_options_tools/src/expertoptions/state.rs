@@ -1,4 +1,5 @@
 use binary_options_tools_core_pre::traits::AppState;
+use chrono::Local;
 use rust_decimal::Decimal;
 use tokio::sync::RwLock;
 
@@ -17,6 +18,8 @@ pub struct State {
     pub demo: RwLock<Demo>,
     /// Configuration for the ExpertOptions client
     pub config: RwLock<Config>,
+    /// Current timezone (UTC offset)
+    pub timezone: RwLock<i32>
 }
 
 impl Config {
@@ -37,20 +40,24 @@ impl Default for Config {
 impl AppState for State {
     async fn clear_temporal_data(&self) {
         // Clear any temporary data associated with the state
-
     }
 }
 
 impl State {
     pub fn new(token: String, demo: bool) -> Self {
+        let timezone = Local::now()
+            .offset()
+            .local_minus_utc().div_euclid(60);
+        dbg!(timezone);
         State {
             token,
             balance: RwLock::new(None),
             demo: RwLock::new(Demo::new(demo)),
             config: RwLock::new(Config::default()),
+            timezone: RwLock::new(timezone), // Default to UTC
         }
     }
-    
+
     pub async fn set_demo(&self, demo: Demo) {
         *self.demo.write().await = demo;
     }

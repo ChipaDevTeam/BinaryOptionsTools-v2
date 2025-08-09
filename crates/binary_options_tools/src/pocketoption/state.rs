@@ -12,6 +12,7 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     ssid::Ssid,
 };
+use crate::validator::Validator;
 
 /// Application state for PocketOption client
 ///
@@ -39,6 +40,8 @@ pub struct State {
     pub assets: RwLock<Option<Assets>>,
     /// Holds the state for all trading-related data.
     pub trade_state: Arc<TradeState>,
+    /// Holds the current validators for the raw module keyed by ID
+    pub raw_validators: RwLock<HashMap<Uuid, Validator>>,
 }
 
 /// Builder pattern for creating State instances
@@ -97,6 +100,7 @@ impl StateBuilder {
             server_time: ServerTimeState::default(),
             assets: RwLock::new(None),
             trade_state: Arc::new(TradeState::default()),
+            raw_validators: RwLock::new(HashMap::new()),
         })
     }
 }
@@ -210,6 +214,22 @@ impl State {
     pub async fn set_assets(&self, assets: Assets) {
         let mut state = self.assets.write().await;
         *state = Some(assets);
+    }
+
+    /// Adds or replaces a validator in the list of raw validators.
+    pub async fn add_raw_validator(&self, id: Uuid, validator: Validator) {
+        let mut validators = self.raw_validators.write().await;
+        validators.insert(id, validator);
+    }
+
+    /// Removes a validator by ID. Returns whether it existed.
+    pub async fn remove_raw_validator(&self, id: &Uuid) -> bool {
+        self.raw_validators.write().await.remove(id).is_some()
+    }
+
+    /// Removes all the validators
+    pub async fn clear_raw_validators(&self) {
+        self.raw_validators.write().await.clear();
     }
 }
 

@@ -117,7 +117,6 @@ impl fmt::Display for ServerTime {
     }
 }
 
-
 /// Stream data from WebSocket messages
 ///
 /// This represents the raw price data received from PocketOption's WebSocket API
@@ -336,10 +335,10 @@ pub enum AssetType {
 
 impl Asset {
     const DEFAULT_CANDLE_LENGTHS: [CandleLength; 9] = [
-        CandleLength::new(5),   
-        CandleLength::new(15),  
-        CandleLength::new(30),  
-        CandleLength::new(60), 
+        CandleLength::new(5),
+        CandleLength::new(15),
+        CandleLength::new(30),
+        CandleLength::new(60),
         CandleLength::new(60 * 3),
         CandleLength::new(60 * 5),
         CandleLength::new(60 * 30),
@@ -367,7 +366,9 @@ impl Asset {
         if !self.is_active {
             return Err(PocketError::InvalidAsset("Asset is not active".into()));
         }
-        if !self.allowed_candles.contains(&CandleLength::from(time)) && !Self::DEFAULT_CANDLE_LENGTHS.contains(&CandleLength::from(time)) {
+        if !self.allowed_candles.contains(&CandleLength::from(time))
+            && !Self::DEFAULT_CANDLE_LENGTHS.contains(&CandleLength::from(time))
+        {
             return Err(PocketError::InvalidAsset(format!(
                 "Time is not in allowed candle durations, available {:?}",
                 self.allowed_candles()

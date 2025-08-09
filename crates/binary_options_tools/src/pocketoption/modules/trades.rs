@@ -201,7 +201,7 @@ impl ApiModule<State> for TradesApiModule {
         }
     }
 
-    fn rule() -> Box<dyn Rule + Send + Sync> {
+    fn rule(_: Arc<State>) -> Box<dyn Rule + Send + Sync> {
         // This rule will match messages like:
         // 451-["successopenOrder",...]
         // 451-["failopenOrder",...]

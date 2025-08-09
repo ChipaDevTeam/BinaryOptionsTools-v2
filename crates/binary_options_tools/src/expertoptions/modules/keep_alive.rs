@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
-use binary_options_tools_core_pre::{error::{CoreError, CoreResult}, reimports::{AsyncReceiver, AsyncSender, Message}, traits::{LightweightModule, Rule}};
+use binary_options_tools_core_pre::{
+    error::{CoreError, CoreResult},
+    reimports::{AsyncReceiver, AsyncSender, Message},
+    traits::{LightweightModule, Rule},
+};
 use serde_json::Value;
 use tracing::warn;
 
-use crate::expertoptions::{state::State, Action};
-
-
+use crate::expertoptions::{Action, state::State};
 
 pub struct PongModule {
     ws_sender: AsyncSender<Message>,
@@ -16,11 +18,18 @@ pub struct PongModule {
 
 #[async_trait::async_trait]
 impl LightweightModule<State> for PongModule {
-    fn new(state: Arc<State>, ws_sender: AsyncSender<Message>, ws_receiver: AsyncReceiver<Arc<Message>>) -> Self where Self: Sized {
+    fn new(
+        state: Arc<State>,
+        ws_sender: AsyncSender<Message>,
+        ws_receiver: AsyncReceiver<Arc<Message>>,
+    ) -> Self
+    where
+        Self: Sized,
+    {
         Self {
             ws_sender,
             ws_receiver,
-            state
+            state,
         }
     }
 
@@ -29,9 +38,16 @@ impl LightweightModule<State> for PongModule {
             if let Message::Binary(text) = &*msg {
                 match Action::from_json::<Value>(text) {
                     Ok(action) => {
-                        self.ws_sender.send(Action::new("pong".into(), self.state.token.clone(), 2, action).to_message()?).await?;
-                    },
-                    Err(e) => warn!(target: "PongModule", "Failed to parse message into a `PongResponse` variant, {e}"),
+                        self.ws_sender
+                            .send(
+                                Action::new("pong".into(), self.state.token.clone(), 2, action)
+                                    .to_message()?,
+                            )
+                            .await?;
+                    }
+                    Err(e) => {
+                        warn!(target: "PongModule", "Failed to parse message into a `PongResponse` variant, {e}")
+                    }
                 }
             }
         }

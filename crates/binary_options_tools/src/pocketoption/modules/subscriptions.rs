@@ -78,7 +78,11 @@ pub enum Command {
     /// Unsubscribe from an asset's stream
     Unsubscribe { asset: String, command_id: Uuid },
     /// History
-    History { asset: String, period: u32, command_id: Uuid },
+    History {
+        asset: String,
+        period: u32,
+        command_id: Uuid,
+    },
     /// Requests the number of active subscriptions
     SubscriptionCount,
 }
@@ -97,10 +101,7 @@ pub enum CommandResponse {
         error: Box<PocketError>,
     },
     /// History Response
-    History {
-        command_id: Uuid,
-        data: Vec<Candle>
-    },
+    History { command_id: Uuid, data: Vec<Candle> },
     /// Unsubscription successful
     UnsubscriptionSuccess { command_id: Uuid },
     /// Unsubscription failed
@@ -448,7 +449,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                         },
                         Command::History { asset, period, command_id } => {
                             self.send_subscribe_message(&asset, period).await?;
-                            self.histories.write().await.push((asset, period, command_id)); 
+                            self.histories.write().await.push((asset, period, command_id));
                         }
                     }
                 },
@@ -479,7 +480,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                         }
                                     });
                                     if let Some(command_id) = id {
-                                        let candles = data.candles.into_iter().map(|c| Candle::from((c, data.asset.clone()))).collect();
+                                        let candles = data.candles.into_iter().map(|c| Candle::try_from((c, data.asset.clone()))).collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Other(e.to_string()))?;
                                         if let Err(e) = self.command_responder.send(CommandResponse::History {
                                             command_id,
                                             data: candles
@@ -513,7 +514,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
         })))
     }
 
-    fn rule() -> Box<dyn Rule + Send + Sync> {
+    fn rule(_: Arc<State>) -> Box<dyn Rule + Send + Sync> {
         // TODO: Implement rule for subscription-related messages
         // This should match messages like:
         // - Asset data updates
@@ -696,7 +697,10 @@ impl SubscriptionStream {
             .update(&BaseCandle::from((timestamp, price)))?
         {
             // Successfully updated candle
-            Ok(Some(Candle::from((c, asset))))
+            Ok(Some(Candle::try_from((c, asset)).map_err(|e| {
+                warn!(target: "SubscriptionStream", "Failed to convert candle: {}", e);
+                PocketError::General(format!("Failed to convert candle: {e}"))
+            })?))
         } else {
             // No complete candle yet, continue waiting
             Ok(None)
@@ -744,7 +748,11 @@ impl Clone for SubscriptionStream {
     }
 }
 
-async fn send_subscribe_message(ws_sender: &AsyncSender<Message>, asset: &str, period: u32) -> CoreResult<()> {
+async fn send_subscribe_message(
+    ws_sender: &AsyncSender<Message>,
+    asset: &str,
+    period: u32,
+) -> CoreResult<()> {
     // TODO: Implement WebSocket subscription message
     // Create and send appropriate subscription message format
     ws_sender
@@ -768,7 +776,6 @@ async fn send_subscribe_message(ws_sender: &AsyncSender<Message>, asset: &str, p
     Ok(())
 }
 
-
 impl Drop for SubscriptionStream {
     fn drop(&mut self) {
         // Send Unsubscribe signal when the stream is dropped
@@ -778,11 +785,15 @@ impl Drop for SubscriptionStream {
         // This will notify the main module to remove this subscription
         // We don't need to wait for response since we're consuming self
         // and it will be dropped anyway
-        let _ = self.sender.as_sync().send(Command::Unsubscribe {
-            asset: self.asset.clone(),
-            command_id: Uuid::new_v4(),
-        }).inspect_err(|e| {
-            warn!(target: "SubscriptionStream", "Failed to send unsubscribe command: {}", e);
-        });
+        let _ = self
+            .sender
+            .as_sync()
+            .send(Command::Unsubscribe {
+                asset: self.asset.clone(),
+                command_id: Uuid::new_v4(),
+            })
+            .inspect_err(|e| {
+                warn!(target: "SubscriptionStream", "Failed to send unsubscribe command: {}", e);
+            });
     }
 }

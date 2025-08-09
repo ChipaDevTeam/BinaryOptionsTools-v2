@@ -1,10 +1,17 @@
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use rust_decimal::{
+    Decimal, dec,
+    prelude::{FromPrimitive, ToPrimitive},
+};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
-use crate::pocketoption::error::{PocketError, PocketResult};
+use crate::{
+    error::{BinaryOptionsError, BinaryOptionsResult},
+    pocketoption::error::{PocketError, PocketResult},
+};
 
 /// Candle data structure for PocketOption price data
 ///
@@ -17,16 +24,16 @@ pub struct Candle {
     /// Unix timestamp of the candle start time
     pub timestamp: f64,
     /// Opening price
-    pub open: f64,
+    pub open: Decimal,
     /// Highest price in the candle period
-    pub high: f64,
+    pub high: Decimal,
     /// Lowest price in the candle period
-    pub low: f64,
+    pub low: Decimal,
     /// Closing price
-    pub close: f64,
+    pub close: Decimal,
     /// Volume is not provided by PocketOption
     // #[serde(skip_serializing_if = "Option::is_none")]
-    pub volume: Option<f64>,
+    pub volume: Option<Decimal>,
     // /// Whether this candle is closed/finalized
     // pub is_closed: bool,
 }
@@ -52,8 +59,11 @@ impl Candle {
     ///
     /// # Returns
     /// New Candle instance with all OHLC values set to the initial price
-    pub fn new(symbol: String, timestamp: f64, price: f64) -> Self {
-        Self {
+    pub fn new(symbol: String, timestamp: f64, price: f64) -> BinaryOptionsResult<Self> {
+        let price = Decimal::from_f64(price).ok_or(BinaryOptionsError::ParseFloat(
+            "Couldn't parse f64 to Decimal".to_string(),
+        ))?;
+        Ok(Self {
             symbol,
             timestamp,
             open: price,
@@ -62,7 +72,7 @@ impl Candle {
             close: price,
             volume: None, // PocketOption doesn't provide volume
                           // is_closed: false,
-        }
+        })
     }
 
     /// Update the candle with a new price
@@ -72,10 +82,14 @@ impl Candle {
     ///
     /// # Arguments
     /// * `price` - New price to incorporate into the candle
-    pub fn update_price(&mut self, price: f64) {
+    pub fn update_price(&mut self, price: f64) -> BinaryOptionsResult<()> {
+        let price = Decimal::from_f64(price).ok_or(BinaryOptionsError::ParseFloat(
+            "Couldn't parse f64 to Decimal".to_string(),
+        ))?;
         self.high = self.high.max(price);
         self.low = self.low.min(price);
         self.close = price;
+        Ok(())
     }
 
     /// Update the candle with a new timestamp and price
@@ -86,11 +100,16 @@ impl Candle {
     /// # Arguments
     /// * `timestamp` - New timestamp for the candle
     /// * `price` - New price to incorporate into the candle
-    pub fn update(&mut self, timestamp: f64, price: f64) {
+    pub fn update(&mut self, timestamp: f64, price: f64) -> BinaryOptionsResult<()> {
+        let price = Decimal::from_f64(price).ok_or(BinaryOptionsError::ParseFloat(
+            "Couldn't parse f64 to Decimal".to_string(),
+        ))?;
+
         self.high = self.high.max(price);
         self.low = self.low.min(price);
         self.close = price;
         self.timestamp = timestamp;
+        Ok(())
     }
 
     // /// Mark the candle as closed/finalized
@@ -104,11 +123,18 @@ impl Candle {
     /// Get the price range (high - low) of the candle
     ///
     /// # Returns
-    /// Price range as f64
-    pub fn price_range(&self) -> f64 {
+    /// Price range as Decimal
+    pub fn price_range(&self) -> Decimal {
         self.high - self.low
     }
 
+    pub fn price_range_f64(&self) -> BinaryOptionsResult<f64> {
+        self.price_range()
+            .to_f64()
+            .ok_or(BinaryOptionsError::ParseDecimal(
+                "Couldn't parse Decimal to f64".to_string(),
+            ))
+    }
     /// Check if the candle is bullish (close > open)
     ///
     /// # Returns
@@ -134,8 +160,8 @@ impl Candle {
         let range = self.price_range();
 
         // Consider it a doji if the body is less than 10% of the range
-        if range > 0.0 {
-            body_size / range < 0.1
+        if range > dec!(0.0) {
+            body_size / range < dec!(0.1)
         } else {
             true // No price movement at all
         }
@@ -144,25 +170,61 @@ impl Candle {
     /// Get the body size of the candle (absolute difference between open and close)
     ///
     /// # Returns
-    /// Body size as f64
-    pub fn body_size(&self) -> f64 {
+    /// Body size as Decimal
+    pub fn body_size(&self) -> Decimal {
         (self.close - self.open).abs()
+    }
+
+    /// Get the body size of the candle (absolute difference between open and close)
+    ///
+    /// # Returns
+    /// Body size as f64
+    pub fn body_size_f64(&self) -> BinaryOptionsResult<f64> {
+        self.body_size()
+            .to_f64()
+            .ok_or(BinaryOptionsError::ParseDecimal(
+                "Couldn't parse Decimal to f64".to_string(),
+            ))
+    }
+
+    /// Get the upper shadow length
+    ///
+    /// # Returns
+    /// Upper shadow length as Decimal
+    pub fn upper_shadow(&self) -> Decimal {
+        self.high - self.open.max(self.close)
     }
 
     /// Get the upper shadow length
     ///
     /// # Returns
     /// Upper shadow length as f64
-    pub fn upper_shadow(&self) -> f64 {
-        self.high - self.open.max(self.close)
+    pub fn upper_shadow_f64(&self) -> BinaryOptionsResult<f64> {
+        self.upper_shadow()
+            .to_f64()
+            .ok_or(BinaryOptionsError::ParseDecimal(
+                "Couldn't parse Decimal to f64".to_string(),
+            ))
+    }
+
+    /// Get the lower shadow length
+    ///
+    /// # Returns
+    /// Lower shadow length as Decimal
+    pub fn lower_shadow(&self) -> Decimal {
+        self.open.min(self.close) - self.low
     }
 
     /// Get the lower shadow length
     ///
     /// # Returns
     /// Lower shadow length as f64
-    pub fn lower_shadow(&self) -> f64 {
-        self.open.min(self.close) - self.low
+    pub fn lower_shadow_f64(&self) -> BinaryOptionsResult<f64> {
+        self.lower_shadow()
+            .to_f64()
+            .ok_or(BinaryOptionsError::ParseDecimal(
+                "Couldn't parse Decimal to f64".to_string(),
+            ))
     }
 
     /// Convert timestamp to DateTime<Utc>
@@ -391,17 +453,31 @@ impl From<(f64, f64)> for BaseCandle {
     }
 }
 
-impl From<(BaseCandle, String)> for Candle {
-    fn from((base_candle, symbol): (BaseCandle, String)) -> Self {
-        Candle {
+impl TryFrom<(BaseCandle, String)> for Candle {
+    type Error = BinaryOptionsError;
+
+    fn try_from(value: (BaseCandle, String)) -> Result<Self, Self::Error> {
+        let (base_candle, symbol) = value;
+        let volume = match base_candle.volume {
+            Some(v) => Some(Decimal::from_f64(v).ok_or(BinaryOptionsError::ParseFloat(
+                "Couldn't parse volume".into(),
+            ))?),
+            None => None,
+        };
+        Ok(Candle {
             symbol,
             timestamp: base_candle.timestamp,
-            open: base_candle.open,
-            high: base_candle.high,
-            low: base_candle.low,
-            close: base_candle.close,
-            volume: base_candle.volume,
-        }
+            open: Decimal::from_f64(base_candle.open)
+                .ok_or(BinaryOptionsError::ParseFloat("Couldn't parse open".into()))?,
+            high: Decimal::from_f64(base_candle.high)
+                .ok_or(BinaryOptionsError::ParseFloat("Couldn't parse high".into()))?,
+            low: Decimal::from_f64(base_candle.low)
+                .ok_or(BinaryOptionsError::ParseFloat("Couldn't parse low".into()))?,
+            close: Decimal::from_f64(base_candle.close).ok_or(BinaryOptionsError::ParseFloat(
+                "Couldn't parse close".into(),
+            ))?,
+            volume,
+        })
     }
 }
 

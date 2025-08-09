@@ -202,7 +202,7 @@ impl ApiModule<ExampleState> for ExampleModule {
         Ok(())
     }
 
-    fn rule() -> Box<dyn Rule + Send + Sync> {
+    fn rule(_ : Arc<ExampleState>) -> Box<dyn Rule + Send + Sync> {
         Box::new(move |_msg: &Message| true)
     }
 }

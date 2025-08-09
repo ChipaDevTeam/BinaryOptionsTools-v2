@@ -264,7 +264,7 @@ impl ApiModule<State> for DealsApiModule {
         }
     }
 
-    fn rule() -> Box<dyn Rule + Send + Sync> {
+    fn rule(_: Arc<State>) -> Box<dyn Rule + Send + Sync> {
         // This rule will match messages like:
         // 451-["updateOpenedDeals",...]
         // 451-["updateClosedDeals",...]

@@ -101,7 +101,7 @@ impl ApiModule<()> for EchoModule {
         }
     }
 
-    fn rule() -> Box<dyn Rule + Send + Sync> {
+    fn rule(_: Arc<()>) -> Box<dyn Rule + Send + Sync> {
         Box::new(move |msg: &Message| msg.is_text())
     }
 }
@@ -179,7 +179,7 @@ impl ApiModule<()> for StreamModule {
         }
     }
 
-    fn rule() -> Box<dyn Rule + Send + Sync> {
+    fn rule(_: Arc<()>) -> Box<dyn Rule + Send + Sync> {
         Box::new(move |_msg: &Message| {
             // Accept all messages
             true
@@ -255,7 +255,7 @@ impl ApiModule<()> for PeriodicSenderModule {
         }
     }
 
-    fn rule() -> Box<dyn Rule + Send + Sync> {
+    fn rule(_ : Arc<()>) -> Box<dyn Rule + Send + Sync> {
         Box::new(move |_msg: &Message| {
             // This module does not process incoming messages
             false

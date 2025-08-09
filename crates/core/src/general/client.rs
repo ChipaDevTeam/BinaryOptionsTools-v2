@@ -195,7 +195,7 @@ where
                     }
                     Err(e) => {
                         if let BinaryOptionsToolsError::MaxReconnectAttemptsReached(_) = e {
-                            panic!("Error: {}", e);
+                            panic!("Error: {e}");
                         }
                     }
                 }

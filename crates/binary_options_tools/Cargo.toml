@@ -35,7 +35,8 @@ tracing = "0.1.41"
 uuid = { version = "1.16.0", features = ["serde", "v4"] }
 url = "2.5.4"
 serde-enum-str = "0.4.0"
-rust_decimal = "1.37.2"
+rust_decimal = { version = "1.37.2", features = ["macros", "serde-float"] }
+regex = "1.11.1"
 
 [dev-dependencies]
 tracing-subscriber = "0.3.19"
