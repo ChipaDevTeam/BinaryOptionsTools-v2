@@ -1,0 +1,109 @@
+namespace binaryoptionstoolsuni {
+
+  enum Action {
+    "Call",
+    "Put"
+  };
+
+  enum AssetType {
+    "Stock",
+    "Currency",
+    "Commodity",
+    "Cryptocurrency",
+    "Index"
+  };
+
+  record CandleLength {
+    u32 time;
+  };
+
+  record Asset {
+    i32 id;
+    string name;
+    string symbol;
+    boolean is_otc;
+    boolean is_active;
+    i32 payout;
+    sequence<CandleLength> allowed_candles;
+    AssetType asset_type;
+  };
+
+  record Deal {
+    string id; // Uuid will be a string
+    string open_time;
+    string close_time;
+    i64 open_timestamp;
+    i64 close_timestamp;
+    u64 uid;
+    optional<string> request_id;
+    f64 amount;
+    f64 profit;
+    i32 percent_profit;
+    i32 percent_loss;
+    f64 open_price;
+    f64 close_price;
+    i32 command;
+    string asset;
+    u32 is_demo;
+    string copy_ticket;
+    i32 open_ms;
+    optional<i32> close_ms;
+    i32 option_type;
+    optional<boolean> is_rollover;
+    optional<boolean> is_copy_signal;
+    optional<boolean> is_ai;
+    string currency;
+    optional<f64> amount_usd;
+    optional<f64> amount_usd2;
+  };
+
+  record Candle {
+    string symbol;
+    i64 timestamp; // f64 in original, but i64 is safer for FFI
+    f64 open;
+    f64 high;
+    f64 low;
+    f64 close;
+    optional<f64> volume;
+  };
+
+  interface SubscriptionStream {
+    async optional<Candle> next();
+  };
+
+  interface PocketOption {
+    [constructor]
+    async PocketOption new(string ssid);
+
+    [constructor]
+    async PocketOption new_with_url(string ssid, string url);
+
+    async f64 balance();
+    boolean is_demo();
+
+    async Deal trade(string asset, Action action, u32 time, f64 amount);
+    async Deal buy(string asset, u32 time, f64 amount);
+    async Deal sell(string asset, u32 time, f64 amount);
+
+    async i64 server_time();
+    async optional<sequence<Asset>> assets();
+
+    async Deal result(string id);
+    async Deal result_with_timeout(string id, u64 timeout_secs);
+
+    async sequence<Deal> get_opened_deals();
+    async sequence<Deal> get_closed_deals();
+    async void clear_closed_deals();
+
+    async SubscriptionStream subscribe(string asset, u64 duration_secs);
+    async void unsubscribe(string asset);
+
+    async sequence<Candle> get_candles_advanced(string asset, i64 period, i64 time, i64 offset);
+    async sequence<Candle> get_candles(string asset, i64 period, i64 offset);
+    async sequence<Candle> history(string asset, u32 period);
+
+    async void reconnect();
+    [destructor]
+    async void shutdown();
+  };
+};
