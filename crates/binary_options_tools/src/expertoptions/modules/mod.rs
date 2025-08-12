@@ -15,6 +15,10 @@ impl<T> Command<T> {
         (id, Command { id, data })
     }
 
+    pub fn from_id(id: Uuid, data: T) -> Self {
+        Command { id, data }
+    }
+
     pub fn id(&self) -> Uuid {
         self.id
     }

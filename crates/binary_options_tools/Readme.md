@@ -1,5 +1,5 @@
 # Binary Options Tools (Rust)
-
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ChipaDevTeam/BinaryOptionsTools-v2)
 [![Crates.io](https://img.shields.io/crates/v/binary_options_tools.svg)](https://crates.io/crates/binary_options_tools)
 [![Docs.rs](https://docs.rs/binary_options_tools/badge.svg)](https://docs.rs/binary_options_tools)
 <!-- Add other badges as appropriate, e.g., license, build status -->

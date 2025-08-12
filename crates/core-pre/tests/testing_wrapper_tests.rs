@@ -65,7 +65,7 @@ impl ApiModule<()> for TestModule {
         Ok(())
     }
 
-    fn rule(_ : Arc<()>) -> Box<dyn Rule + Send + Sync> {
+    fn rule(_: Arc<()>) -> Box<dyn Rule + Send + Sync> {
         Box::new(move |_msg: &Message| false) // This rule never matches
     }
 }

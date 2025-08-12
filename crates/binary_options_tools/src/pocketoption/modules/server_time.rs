@@ -37,13 +37,12 @@ impl LightweightModule<State> for ServerTimeModule {
     /// The module's asynchronous run loop.
     async fn run(&mut self) -> CoreResult<()> {
         while let Ok(msg) = self.receiver.recv().await {
-            if let Message::Binary(data) = &*msg {
-                if let Ok(candle) = serde_json::from_slice::<StreamData>(data) {
+            if let Message::Binary(data) = &*msg
+                && let Ok(candle) = serde_json::from_slice::<StreamData>(data) {
                     // Process the candle data
                     debug!("Received candle data: {:?}", candle);
                     self.state.update_server_time(candle.timestamp).await;
                 }
-            }
         }
         Err(CoreError::LightweightModuleLoop(
             "ServerTimeModule".to_string(),

@@ -1,13 +1,14 @@
 use std::{sync::Arc, time::Duration};
 
-use kanal::{AsyncReceiver, ReceiveError};
 use futures_util::{Stream, stream::unfold};
+use kanal::{AsyncReceiver, ReceiveError};
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
-    error::{CoreError, CoreResult}, traits::Rule, utils::time::timeout
+    error::{CoreError, CoreResult},
+    traits::Rule,
+    utils::time::timeout,
 };
-
 
 pub struct RecieverStream {
     inner: AsyncReceiver<Message>,
@@ -46,8 +47,7 @@ impl RecieverStream {
         }))
     }
 
-    pub fn to_stream_static(self: Arc<Self>) -> impl Stream<Item = CoreResult<Message>> + 'static
-    {
+    pub fn to_stream_static(self: Arc<Self>) -> impl Stream<Item = CoreResult<Message>> + 'static {
         Box::pin(unfold(self, async |state| {
             let item = state.receive().await;
             Some((item, state))
@@ -102,8 +102,7 @@ impl FilteredRecieverStream {
         }))
     }
 
-    pub fn to_stream_static(self: Arc<Self>) -> impl Stream<Item = CoreResult<Message>> + 'static
-    {
+    pub fn to_stream_static(self: Arc<Self>) -> impl Stream<Item = CoreResult<Message>> + 'static {
         Box::pin(unfold(self, async |state| {
             let item = state.receive().await;
             Some((item, state))

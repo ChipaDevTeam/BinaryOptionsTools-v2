@@ -11,8 +11,10 @@ use tracing_subscriber::{
     util::SubscriberInitExt,
 };
 
-use crate::{error::{CoreError, CoreResult}, utils::stream::RecieverStream};
-
+use crate::{
+    error::{CoreError, CoreResult},
+    utils::stream::RecieverStream,
+};
 
 pub fn start_tracing(terminal: bool) -> CoreResult<()> {
     let error_logs = OpenOptions::new()
@@ -31,9 +33,11 @@ pub fn start_tracing(terminal: bool) -> CoreResult<()> {
         );
     if terminal {
         sub.with(fmt::Layer::default().with_filter(LevelFilter::DEBUG))
-            .try_init().map_err(|e| CoreError::Tracing(e.to_string()))?;
+            .try_init()
+            .map_err(|e| CoreError::Tracing(e.to_string()))?;
     } else {
-        sub.try_init().map_err(|e| CoreError::Tracing(e.to_string()))?;
+        sub.try_init()
+            .map_err(|e| CoreError::Tracing(e.to_string()))?;
     }
 
     Ok(())
@@ -56,9 +60,11 @@ pub fn start_tracing_leveled(terminal: bool, level: LevelFilter) -> CoreResult<(
         );
     if terminal {
         sub.with(fmt::Layer::default().with_filter(level))
-            .try_init().map_err(|e| CoreError::Tracing(e.to_string()))?;
+            .try_init()
+            .map_err(|e| CoreError::Tracing(e.to_string()))?;
     } else {
-        sub.try_init().map_err(|e| CoreError::Tracing(e.to_string()))?;
+        sub.try_init()
+            .map_err(|e| CoreError::Tracing(e.to_string()))?;
     }
 
     Ok(())
@@ -94,13 +100,12 @@ impl<'a> MakeWriter<'a> for StreamWriter {
 pub fn stream_logs_layer(
     level: LevelFilter,
     timout: Option<Duration>,
-) -> (
-    Box<dyn Layer<Registry> + Send + Sync>,
-    RecieverStream,
-) {
+) -> (Box<dyn Layer<Registry> + Send + Sync>, RecieverStream) {
     let (sender, receiver) = bounded_async(128);
     let receiver = RecieverStream::new_timed(receiver, timout);
-    let writer = StreamWriter { sender: sender.to_sync() };
+    let writer = StreamWriter {
+        sender: sender.to_sync(),
+    };
     let layer = tracing_subscriber::fmt::layer::<Registry>()
         .json()
         .flatten_event(true)

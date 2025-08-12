@@ -561,7 +561,7 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_get_candles() {
         tracing_subscriber::fmt::init();
-        let ssid = r#"42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#;
+        let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"a1b0c4986eb221b5530428dbbdb6b796\";s:10:\"ip_address\";s:14:\"191.113.147.46\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 OPR/120.\";s:13:\"last_activity\";i:1754424804;}e3c483184de3f99e5f806db7d92c1cac","isDemo":0,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#;
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
 

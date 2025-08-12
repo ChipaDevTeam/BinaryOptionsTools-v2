@@ -45,7 +45,7 @@ impl<S: AppState> WebSocketMiddleware<S> for PrintMiddleware {
     async fn on_send(&self, message: &Message, _context: &MiddlewareContext<S>) -> CoreResult<()> {
         // Default implementation does nothing
 
-        tracing::info!(target: "Middleware", "Sending: {message:?}");
+        tracing::debug!(target: "Middleware", "Sending: {message:?}");
         Ok(())
     }
 
@@ -55,7 +55,7 @@ impl<S: AppState> WebSocketMiddleware<S> for PrintMiddleware {
         _context: &MiddlewareContext<S>,
     ) -> CoreResult<()> {
         // Default implementation does nothing
-        tracing::info!(target: "Middleware", "Receiving: {message:?}");
+        tracing::debug!(target: "Middleware", "Receiving: {message:?}");
         Ok(())
     }
 }

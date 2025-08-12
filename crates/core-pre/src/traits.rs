@@ -93,7 +93,7 @@ pub trait ApiModule<S: AppState>: Send + 'static {
     /// Route only messages for which this returns true.
     /// This function is used to determine whether a message should be processed by this module.
     /// It allows for flexible and reusable rules that can be applied to different modules.
-    /// The main difference between this and the `LightweightModule` rule is that 
+    /// The main difference between this and the `LightweightModule` rule is that
     /// this rule also takes the shared state as an argument, allowing for more complex
     /// routing logic that can depend on the current state of the application.
     fn rule(state: Arc<S>) -> Box<dyn Rule + Send + Sync>;

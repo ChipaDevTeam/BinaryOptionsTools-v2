@@ -38,13 +38,12 @@ pub enum CoreError {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("Tracing error: {0}")]
     Tracing(String),
 
     #[error("Failed to execute '{task}' task before the maximum allowed time of '{duration:?}'")]
     TimeoutError { task: String, duration: Duration },
-
 }
 
 pub type CoreResult<T> = std::result::Result<T, CoreError>;

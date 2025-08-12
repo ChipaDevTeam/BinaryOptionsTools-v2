@@ -91,7 +91,7 @@ impl ApiModule<()> for EchoModule {
         }
     }
 
-    fn rule(_ : Arc<()>) -> Box<dyn Rule + Send + Sync> {
+    fn rule(_: Arc<()>) -> Box<dyn Rule + Send + Sync> {
         Box::new(move |msg: &Message| {
             println!("Routing rule for EchoModule: {msg:?}");
             msg.is_text()

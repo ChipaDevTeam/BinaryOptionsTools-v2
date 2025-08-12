@@ -286,11 +286,10 @@ impl ApiModule<State> for RawApiModule {
                     let validators = self.state.raw_validators.read().await.clone();
                     let sinks = self.sinks.read().await.clone();
                     for (id, validator) in validators.into_iter() {
-                        if validator.call(content.as_str()) {
-                            if let Some(tx) = sinks.get(&id) {
+                        if validator.call(content.as_str())
+                            && let Some(tx) = sinks.get(&id) {
                                 let _ = tx.send(msg.clone()).await; // best effort
                             }
-                        }
                     }
                 }
             }

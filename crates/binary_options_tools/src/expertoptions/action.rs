@@ -6,7 +6,7 @@ use crate::expertoptions::error::{ExpertOptionsError, ExpertOptionsResult};
 
 /// This struct will be the base of the messages sent to the ExpertOptions API. Almost all the messages will have this structure.
 ///
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Action {
     pub action: String,
     pub token: Option<String>,
@@ -23,18 +23,21 @@ impl Action {
             message,
         }
     }
-
+    pub fn id(&self) -> &str {
+        &self.action
+    }
+    
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).unwrap_or_else(|_| "{}".to_string())
     }
 
-    pub fn take<T: for<'a> Deserialize<'a>>(self) -> ExpertOptionsResult<T> {
+    pub fn take<T: for<'a> Deserialize<'a>>(self) -> CoreResult<T> {
         Ok(serde_json::from_value(self.message)?)
     }
 
     pub fn from_json<T: for<'a> Deserialize<'a>>(json: &[u8]) -> ExpertOptionsResult<T> {
         let action: Action = serde_json::from_slice(json)?;
-        action.take()
+        action.take().map_err(ExpertOptionsError::from)
     }
 
     pub fn to_message(&self) -> CoreResult<Message> {

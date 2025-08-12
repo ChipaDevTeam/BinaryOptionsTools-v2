@@ -164,13 +164,12 @@ impl ApiModule<()> for StreamModule {
                     self.send.store(cmd, Ordering::SeqCst);
                 }
                 Ok(msg) = self.msg_rx.recv() => {
-                    if let Message::Text(txt) = &*msg {
-                        if self.send.load(Ordering::SeqCst) {
+                    if let Message::Text(txt) = &*msg
+                        && self.send.load(Ordering::SeqCst) {
                             // Process the message if send is true
                             println!("[StreamModule] Received: {txt}");
                             let _ = self.cmd_tx.send(txt.to_string()).await;
                         }
-                    }
                 }
                 else => {
                     println!("[Error] StreamModule: Channel closed");
@@ -255,7 +254,7 @@ impl ApiModule<()> for PeriodicSenderModule {
         }
     }
 
-    fn rule(_ : Arc<()>) -> Box<dyn Rule + Send + Sync> {
+    fn rule(_: Arc<()>) -> Box<dyn Rule + Send + Sync> {
         Box::new(move |_msg: &Message| {
             // This module does not process incoming messages
             false
