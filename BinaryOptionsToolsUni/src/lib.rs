@@ -3,4 +3,5 @@ pub mod platforms;
 pub mod tracing;
 pub mod utils;
 
-uniffi::include_scaffolding!("binaryoptionstoolsuni");
+uniffi::setup_scaffolding!();
+// uniffi::include_scaffolding!("binary_options_tools_uni");

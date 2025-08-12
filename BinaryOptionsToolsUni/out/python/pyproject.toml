@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "binary-options-tools-uni"
+version = "0.1.0"
+description = "UniFFI bindings for BinaryOptionsTools (PocketOption)"
+requires-python = ">=3.8"
+authors = [{ name = "Rick-29", email = "ayfmportner@gmail.com" }]
+readme = "README.md"
+license = { text = "MIT" }
+classifiers = ["Programming Language :: Python :: 3"]
+
+[tool.setuptools]
+packages = ["binary_options_tools_uni"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+binary_options_tools_uni = ["_native/*"]

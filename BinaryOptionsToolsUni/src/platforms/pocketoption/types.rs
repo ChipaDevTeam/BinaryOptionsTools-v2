@@ -5,6 +5,7 @@ use binary_options_tools::pocketoption::{
         CandleLength as OriginalCandleLength, Deal as OriginalDeal,
     },
 };
+use rust_decimal::prelude::ToPrimitive;
 
 /// Represents the action to take in a trade.
 ///
@@ -286,11 +287,11 @@ impl From<OriginalCandle> for Candle {
         Self {
             symbol: candle.symbol,
             timestamp: candle.timestamp as i64,
-            open: candle.open,
-            high: candle.high,
-            low: candle.low,
-            close: candle.close,
-            volume: candle.volume,
+            open: candle.open.to_f64().unwrap_or_default(),
+            high: candle.high.to_f64().unwrap_or_default(),
+            low: candle.low.to_f64().unwrap_or_default(),
+            close: candle.close.to_f64().unwrap_or_default(),
+            volume: candle.volume.map(|v| v.to_f64()).flatten(),
         }
     }
 }

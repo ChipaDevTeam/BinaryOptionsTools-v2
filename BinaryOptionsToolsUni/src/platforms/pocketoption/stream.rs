@@ -1,4 +1,3 @@
-use futures_util::StreamExt;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -22,14 +21,17 @@ pub struct SubscriptionStream {
     inner: Arc<Mutex<OriginalSubscriptionStream>>,
 }
 
-#[uniffi::export(async_runtime = "tokio")]
 impl SubscriptionStream {
-    pub fn new(stream: OriginalSubscriptionStream) -> Arc<Self> {
+    // Internal helper to construct from the original stream (not exported to UniFFI)
+    pub(crate) fn from_original(stream: OriginalSubscriptionStream) -> Arc<Self> {
         Arc::new(Self {
             inner: Arc::new(Mutex::new(stream)),
         })
     }
+}
 
+#[uniffi::export]
+impl SubscriptionStream {
     /// Retrieves the next item from the stream.
     ///
     /// This method should be called in a loop to consume the data from the stream.
@@ -67,14 +69,13 @@ impl SubscriptionStream {
     ///     }
     /// }
     /// ```
-    pub async fn next(&self) -> Result<Option<Candle>, UniError> {
+    pub async fn next(&self) -> Result<Candle, UniError> {
         let mut stream = self.inner.lock().await;
-        match stream.next().await {
-            Some(Ok(candle)) => Ok(Some(Candle::from(candle))),
-            Some(Err(e)) => Err(UniError::from(
+        match stream.receive().await {
+            Ok(candle) => Ok(candle.into()),
+            Err(e) => Err(UniError::from(
                 binary_options_tools::error::BinaryOptionsError::from(e),
             )),
-            None => Ok(None),
         }
     }
 }

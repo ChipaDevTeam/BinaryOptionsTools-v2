@@ -1,10 +1,10 @@
 use std::sync::Arc;
+use std::time::Duration as StdDuration;
 
 use binary_options_tools::pocketoption::{
-    modules::subscriptions::SubscriptionType,
-    types::Action as OriginalAction,
-    PocketOption as OriginalPocketOption,
+    PocketOption as OriginalPocketOption, candle::SubscriptionType, types::Action as OriginalAction,
 };
+use uuid::Uuid;
 
 use crate::error::UniError;
 
@@ -30,7 +30,7 @@ pub struct PocketOption {
     inner: OriginalPocketOption,
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl PocketOption {
     /// Creates a new instance of the PocketOption client.
     ///
@@ -58,7 +58,10 @@ impl PocketOption {
     /// ```
     #[uniffi::constructor]
     pub async fn new(ssid: String) -> Result<Arc<Self>, UniError> {
-        todo!()
+        let inner = OriginalPocketOption::new(ssid)
+            .await
+            .map_err(UniError::from)?;
+        Ok(Arc::new(Self { inner }))
     }
 
     /// Creates a new instance of the PocketOption client with a custom WebSocket URL.
@@ -72,7 +75,10 @@ impl PocketOption {
     /// * `url` - The custom WebSocket URL to connect to.
     #[uniffi::constructor]
     pub async fn new_with_url(ssid: String, url: String) -> Result<Arc<Self>, UniError> {
-        todo!()
+        let inner = OriginalPocketOption::new_with_url(ssid, url)
+            .await
+            .map_err(UniError::from)?;
+        Ok(Arc::new(Self { inner }))
     }
 
     /// Gets the current balance of the account.
@@ -82,8 +88,9 @@ impl PocketOption {
     /// # Returns
     ///
     /// The current balance as a floating-point number.
+    #[uniffi::method]
     pub async fn balance(&self) -> f64 {
-        todo!()
+        self.inner.balance().await
     }
 
     /// Checks if the current session is a demo account.
@@ -91,8 +98,9 @@ impl PocketOption {
     /// # Returns
     ///
     /// `true` if the account is a demo account, `false` otherwise.
+    #[uniffi::method]
     pub fn is_demo(&self) -> bool {
-        todo!()
+        self.inner.is_demo()
     }
 
     /// Places a trade.
@@ -109,6 +117,8 @@ impl PocketOption {
     /// # Returns
     ///
     /// A `Deal` object representing the completed trade.
+    #[uniffi::method]
+
     pub async fn trade(
         &self,
         asset: String,
@@ -116,26 +126,38 @@ impl PocketOption {
         time: u32,
         amount: f64,
     ) -> Result<Deal, UniError> {
-        todo!()
+        let original_action = match action {
+            Action::Call => OriginalAction::Call,
+            Action::Put => OriginalAction::Put,
+        };
+        let (_id, deal) = self
+            .inner
+            .trade(asset, original_action, time, amount)
+            .await
+            .map_err(UniError::from)?;
+        Ok(Deal::from(deal))
     }
 
     /// Places a "Call" (buy) trade.
     ///
     /// This is a convenience method that calls `trade` with `Action.Call`.
+    #[uniffi::method]
     pub async fn buy(&self, asset: String, time: u32, amount: f64) -> Result<Deal, UniError> {
-        todo!()
+        self.trade(asset, Action::Call, time, amount).await
     }
 
     /// Places a "Put" (sell) trade.
     ///
     /// This is a convenience method that calls `trade` with `Action.Put`.
+    #[uniffi::method]
     pub async fn sell(&self, asset: String, time: u32, amount: f64) -> Result<Deal, UniError> {
-        todo!()
+        self.trade(asset, Action::Put, time, amount).await
     }
 
     /// Gets the current server time as a Unix timestamp.
+    #[uniffi::method]
     pub async fn server_time(&self) -> i64 {
-        todo!()
+        self.inner.server_time().await.timestamp()
     }
 
     /// Gets the list of available assets for trading.
@@ -143,8 +165,12 @@ impl PocketOption {
     /// # Returns
     ///
     /// A list of `Asset` objects, or `None` if the assets have not been loaded yet.
+    #[uniffi::method]
     pub async fn assets(&self) -> Option<Vec<Asset>> {
-        todo!()
+        self.inner
+            .assets()
+            .await
+            .map(|assets_map| assets_map.0.values().cloned().map(Asset::from).collect())
     }
 
     /// Checks the result of a trade by its ID.
@@ -156,8 +182,12 @@ impl PocketOption {
     /// # Returns
     ///
     /// A `Deal` object representing the completed trade.
+    #[uniffi::method]
     pub async fn result(&self, id: String) -> Result<Deal, UniError> {
-        todo!()
+        let uuid = Uuid::parse_str(&id)
+            .map_err(|e| UniError::Uuid(format!("Invalid UUID: {e}")))?;
+        let deal = self.inner.result(uuid).await.map_err(UniError::from)?;
+        Ok(Deal::from(deal))
     }
 
     /// Checks the result of a trade by its ID with a timeout.
@@ -170,27 +200,48 @@ impl PocketOption {
     /// # Returns
     ///
     /// A `Deal` object representing the completed trade.
+    #[uniffi::method]
     pub async fn result_with_timeout(
         &self,
         id: String,
         timeout_secs: u64,
     ) -> Result<Deal, UniError> {
-        todo!()
+        let uuid = Uuid::parse_str(&id)
+            .map_err(|e| UniError::Uuid(format!("Invalid UUID: {e}")))?;
+        let deal = self
+            .inner
+            .result_with_timeout(uuid, StdDuration::from_secs(timeout_secs))
+            .await
+            .map_err(UniError::from)?;
+        Ok(Deal::from(deal))
     }
 
     /// Gets the list of currently opened deals.
+    #[uniffi::method]
     pub async fn get_opened_deals(&self) -> Vec<Deal> {
-        todo!()
+        self.inner
+            .get_opened_deals()
+            .await
+            .into_values()
+            .map(Deal::from)
+            .collect()
     }
 
     /// Gets the list of currently closed deals.
+    #[uniffi::method]
     pub async fn get_closed_deals(&self) -> Vec<Deal> {
-        todo!()
+        self.inner
+            .get_closed_deals()
+            .await
+            .into_values()
+            .map(Deal::from)
+            .collect()
     }
 
     /// Clears the list of closed deals from the client's state.
+    #[uniffi::method]
     pub async fn clear_closed_deals(&self) {
-        todo!()
+        self.inner.clear_closed_deals().await
     }
 
     /// Subscribes to real-time candle data for a specific asset.
@@ -203,20 +254,30 @@ impl PocketOption {
     /// # Returns
     ///
     /// A `SubscriptionStream` object that can be used to receive candle data.
+    #[uniffi::method]
     pub async fn subscribe(
         &self,
         asset: String,
         duration_secs: u64,
     ) -> Result<Arc<SubscriptionStream>, UniError> {
-        todo!()
+        let sub_type = SubscriptionType::time_aligned(StdDuration::from_secs(duration_secs))
+            .map_err(UniError::from)?;
+        let original_stream = self
+            .inner
+            .subscribe(asset, sub_type)
+            .await
+            .map_err(UniError::from)?;
+        Ok(SubscriptionStream::from_original(original_stream))
     }
 
     /// Unsubscribes from real-time candle data for a specific asset.
+    #[uniffi::method]
     pub async fn unsubscribe(&self, asset: String) -> Result<(), UniError> {
-        todo!()
+        self.inner.unsubscribe(asset).await.map_err(UniError::from)
     }
 
     /// Gets historical candle data for a specific asset with advanced parameters.
+    #[uniffi::method]
     pub async fn get_candles_advanced(
         &self,
         asset: String,
@@ -224,34 +285,63 @@ impl PocketOption {
         time: i64,
         offset: i64,
     ) -> Result<Vec<Candle>, UniError> {
-        todo!()
+        let candles = self
+            .inner
+            .get_candles_advanced(asset, period, time, offset)
+            .await
+            .map_err(UniError::from)?
+            .into_iter()
+            .map(Candle::from)
+            .collect();
+        Ok(candles)
     }
 
     /// Gets historical candle data for a specific asset.
+    #[uniffi::method]
     pub async fn get_candles(
         &self,
         asset: String,
         period: i64,
         offset: i64,
     ) -> Result<Vec<Candle>, UniError> {
-        todo!()
+        let candles = self
+            .inner
+            .get_candles(asset, period, offset)
+            .await
+            .map_err(UniError::from)?
+            .into_iter()
+            .map(Candle::from)
+            .collect();
+        Ok(candles)
     }
 
     /// Gets historical candle data for a specific asset and period.
+    #[uniffi::method]
     pub async fn history(&self, asset: String, period: u32) -> Result<Vec<Candle>, UniError> {
-        todo!()
+        let candles = self
+            .inner
+            .history(asset, period)
+            .await
+            .map_err(UniError::from)?
+            .into_iter()
+            .map(Candle::from)
+            .collect();
+        Ok(candles)
     }
 
     /// Disconnects and reconnects the client.
+    #[uniffi::method]
     pub async fn reconnect(&self) -> Result<(), UniError> {
-        todo!()
+        self.inner.reconnect().await.map_err(UniError::from)
     }
 
     /// Shuts down the client and stops all background tasks.
     ///
     /// This method should be called when you are finished with the client
     /// to ensure a graceful shutdown.
+    #[uniffi::method]
     pub async fn shutdown(self: Arc<Self>) -> Result<(), UniError> {
-        todo!()
+        // Call shutdown on a clone of the inner client to consume it
+        self.inner.clone().shutdown().await.map_err(UniError::from)
     }
 }
