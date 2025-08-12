@@ -1,0 +1,17 @@
+[package]
+name = "binaryoptionstoolsuni"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "binaryoptionstoolsuni"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+uniffi = { version = "0.25.2", features = ["cli", "uuid"] }
+binary_options_tools = { path = "../crates/binary_options_tools" }
+tokio = { version = "1", features = ["full"] }
+thiserror = "1.0"
+
+[build-dependencies]
+uniffi = { version = "0.25.2", features = ["build", "uuid"] }
