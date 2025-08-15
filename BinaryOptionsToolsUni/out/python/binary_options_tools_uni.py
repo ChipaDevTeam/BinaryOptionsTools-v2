@@ -1857,6 +1857,36 @@ class UniError:  # type: ignore
         def __repr__(self):
             return "UniError.BinaryOptions({})".format(str(self))
     _UniffiTempUniError.BinaryOptions = BinaryOptions # type: ignore
+    class PocketOption(_UniffiTempUniError):
+        def __init__(self, *values):
+            if len(values) != 1:
+                raise TypeError(f"Expected 1 arguments, found {len(values)}")
+            if not isinstance(values[0], str):
+                raise TypeError(f"unexpected type for tuple element 0 - expected 'str', got '{type(values[0])}'")
+            super().__init__(", ".join(map(repr, values)))
+            self._values = values
+
+        def __getitem__(self, index):
+            return self._values[index]
+
+        def __repr__(self):
+            return "UniError.PocketOption({})".format(str(self))
+    _UniffiTempUniError.PocketOption = PocketOption # type: ignore
+    class Uuid(_UniffiTempUniError):
+        def __init__(self, *values):
+            if len(values) != 1:
+                raise TypeError(f"Expected 1 arguments, found {len(values)}")
+            if not isinstance(values[0], str):
+                raise TypeError(f"unexpected type for tuple element 0 - expected 'str', got '{type(values[0])}'")
+            super().__init__(", ".join(map(repr, values)))
+            self._values = values
+
+        def __getitem__(self, index):
+            return self._values[index]
+
+        def __repr__(self):
+            return "UniError.Uuid({})".format(str(self))
+    _UniffiTempUniError.Uuid = Uuid # type: ignore
 
 UniError = _UniffiTempUniError # type: ignore
 del _UniffiTempUniError
@@ -1870,6 +1900,14 @@ class _UniffiConverterTypeUniError(_UniffiConverterRustBuffer):
             return UniError.BinaryOptions(
                 _UniffiConverterString.read(buf),
             )
+        if variant == 2:
+            return UniError.PocketOption(
+                _UniffiConverterString.read(buf),
+            )
+        if variant == 3:
+            return UniError.Uuid(
+                _UniffiConverterString.read(buf),
+            )
         raise InternalError("Raw enum value doesn't match any cases")
 
     @staticmethod
@@ -1877,11 +1915,23 @@ class _UniffiConverterTypeUniError(_UniffiConverterRustBuffer):
         if isinstance(value, UniError.BinaryOptions):
             _UniffiConverterString.check_lower(value._values[0])
             return
+        if isinstance(value, UniError.PocketOption):
+            _UniffiConverterString.check_lower(value._values[0])
+            return
+        if isinstance(value, UniError.Uuid):
+            _UniffiConverterString.check_lower(value._values[0])
+            return
 
     @staticmethod
     def write(value, buf):
         if isinstance(value, UniError.BinaryOptions):
             buf.write_i32(1)
+            _UniffiConverterString.write(value._values[0], buf)
+        if isinstance(value, UniError.PocketOption):
+            buf.write_i32(2)
+            _UniffiConverterString.write(value._values[0], buf)
+        if isinstance(value, UniError.Uuid):
+            buf.write_i32(3)
             _UniffiConverterString.write(value._values[0], buf)
 
 

@@ -291,7 +291,7 @@ impl From<OriginalCandle> for Candle {
             high: candle.high.to_f64().unwrap_or_default(),
             low: candle.low.to_f64().unwrap_or_default(),
             close: candle.close.to_f64().unwrap_or_default(),
-            volume: candle.volume.map(|v| v.to_f64()).flatten(),
+            volume: candle.volume.and_then(|v| v.to_f64()),
         }
     }
 }

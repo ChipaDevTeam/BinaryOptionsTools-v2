@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: binary-options-tools-uni
+Version: 0.1.0
+Summary: Python bindings for the Binary Options Tools (Rust), packaged with a platform DLL.
+License: MIT

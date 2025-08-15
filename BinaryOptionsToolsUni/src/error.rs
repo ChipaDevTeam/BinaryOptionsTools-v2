@@ -1,4 +1,4 @@
-use binary_options_tools::error::{self, BinaryOptionsError};
+use binary_options_tools::error::BinaryOptionsError;
 use binary_options_tools::pocketoption::error::PocketError;
 use thiserror::Error;
 

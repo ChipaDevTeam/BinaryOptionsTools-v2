@@ -50,6 +50,38 @@ impl PocketOption {
     ///
     /// async def main():
     ///     ssid = "YOUR_SESSION_ID"
+    ///     api = await PocketOption.init(ssid)
+    ///     balance = await api.balance()
+    ///     print(f"Balance: {balance}")
+    ///
+    /// asyncio.run(main())
+    /// ```
+    #[uniffi::constructor]
+    pub async fn init(ssid: String) -> Result<Arc<Self>, UniError> {
+        let inner = OriginalPocketOption::new(ssid)
+            .await
+            .map_err(UniError::from)?;
+        Ok(Arc::new(Self { inner }))
+    }
+
+        /// Creates a new instance of the PocketOption client.
+    ///
+    /// This is the primary constructor for the client. It requires a session ID (ssid)
+    /// to authenticate with the PocketOption servers.
+    ///
+    /// # Arguments
+    ///
+    /// * `ssid` - The session ID for your PocketOption account.
+    ///
+    /// # Examples
+    ///
+    /// ## Python
+    /// ```python
+    /// import asyncio
+    /// from binaryoptionstoolsuni import PocketOption
+    ///
+    /// async def main():
+    ///     ssid = "YOUR_SESSION_ID"
     ///     api = await PocketOption.new(ssid)
     ///     balance = await api.balance()
     ///     print(f"Balance: {balance}")

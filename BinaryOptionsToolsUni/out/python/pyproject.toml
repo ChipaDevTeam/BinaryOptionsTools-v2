@@ -1,20 +1,20 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "binary-options-tools-uni"
 version = "0.1.0"
-description = "UniFFI bindings for BinaryOptionsTools (PocketOption)"
-requires-python = ">=3.8"
-authors = [{ name = "Rick-29", email = "ayfmportner@gmail.com" }]
-readme = "README.md"
+description = "Python bindings for the Binary Options Tools (Rust), packaged with a platform DLL."
 license = { text = "MIT" }
-classifiers = ["Programming Language :: Python :: 3"]
+dependencies = []
 
 [tool.setuptools]
-packages = ["binary_options_tools_uni"]
-include-package-data = true
+package-dir = { "" = "." }
+
+[tool.setuptools.packages.find]
+where = [""]
+include = ["binary_options_tools_uni*"]
 
 [tool.setuptools.package-data]
-binary_options_tools_uni = ["_native/*"]
+"binary_options_tools_uni" = ["*.dll", "*.so", "*.dylib"]
