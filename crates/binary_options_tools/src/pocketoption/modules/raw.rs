@@ -201,7 +201,7 @@ impl Rule for RawRule {
             Message::Text(text) => text.to_string(),
             _ => return false,
         };
-        let validators = self.state.raw_validators.blocking_read();
+        let validators = self.state.raw_validators.read().expect("Failed to acquire read lock");
         for (_id, v) in validators.iter() {
             if v.call(msg_str.as_str()) {
                 return true;
@@ -253,7 +253,7 @@ impl ApiModule<State> for RawApiModule {
                     match cmd {
                         Command::Create { validator, keep_alive, command_id } => {
                             let id = Uuid::new_v4();
-                            self.state.add_raw_validator(id, validator).await;
+                            self.state.add_raw_validator(id, validator);
                             if let Some(msg) = keep_alive.clone() {
                                 self.keep_alive_msgs.write().await.insert(id, msg);
                             }
@@ -262,7 +262,7 @@ impl ApiModule<State> for RawApiModule {
                             self.command_responder.send(CommandResponse::Created { command_id, id, stream_receiver: rx }).await?;
                         }
                         Command::Remove { id, command_id } => {
-                            let existed_state = self.state.remove_raw_validator(&id).await;
+                            let existed_state = self.state.remove_raw_validator(&id);
                             let existed_sink = self.sinks.write().await.remove(&id).is_some();
                             self.keep_alive_msgs.write().await.remove(&id);
                             self.command_responder.send(CommandResponse::Removed { command_id, id, existed: existed_state || existed_sink }).await?;
@@ -283,7 +283,7 @@ impl ApiModule<State> for RawApiModule {
                         _ => String::new(),
                     };
                     if content.is_empty() { continue; }
-                    let validators = self.state.raw_validators.read().await.clone();
+                    let validators = self.state.raw_validators.read().expect("Failed to acquire read lock").clone();
                     let sinks = self.sinks.read().await.clone();
                     for (id, validator) in validators.into_iter() {
                         if validator.call(content.as_str())
