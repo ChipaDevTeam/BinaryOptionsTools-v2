@@ -1273,9 +1273,6 @@ module UniFFILib
   attach_function :uniffi_binary_options_tools_uni_fn_free_pocketoption,
     [:pointer, RustCallStatus.by_ref],
     :void
-  attach_function :uniffi_binary_options_tools_uni_fn_constructor_pocketoption_init,
-    [RustBuffer.by_value, RustCallStatus.by_ref],
-    :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new,
     [RustBuffer.by_value, RustCallStatus.by_ref],
     :uint64
@@ -1418,9 +1415,6 @@ module UniFFILib
     [RustCallStatus.by_ref],
     :uint16
   attach_function :uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next,
-    [RustCallStatus.by_ref],
-    :uint16
-  attach_function :uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_init,
     [RustCallStatus.by_ref],
     :uint16
   attach_function :uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new,
@@ -1739,14 +1733,6 @@ end
     ObjectSpace.define_finalizer(self, self.class.uniffi_define_finalizer_by_pointer(pointer, self.object_id))
   end
 
-  def self.init(ssid)
-        ssid = BinaryOptionsToolsUni::uniffi_utf8(ssid)
-        
-    # Call the (fallible) function before creating any half-baked object instances.
-    # Lightly yucky way to bypass the usual "initialize" logic
-    # and just create a new instance with the required pointer.
-    return uniffi_allocate(BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_constructor_pocketoption_init,RustBuffer.allocFromString(ssid)))
-  end
   def self.new_with_url(ssid, url)
         ssid = BinaryOptionsToolsUni::uniffi_utf8(ssid)
         

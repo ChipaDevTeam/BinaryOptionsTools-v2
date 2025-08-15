@@ -2426,6 +2426,8 @@ func (err UniError) Unwrap() error {
 
 // Err* are used for checking error type with `errors.Is`
 var ErrUniErrorBinaryOptions = fmt.Errorf("UniErrorBinaryOptions")
+var ErrUniErrorPocketOption = fmt.Errorf("UniErrorPocketOption")
+var ErrUniErrorUuid = fmt.Errorf("UniErrorUuid")
 
 // Variant structs
 type UniErrorBinaryOptions struct {
@@ -2455,6 +2457,60 @@ func (err UniErrorBinaryOptions) Error() string {
 func (self UniErrorBinaryOptions) Is(target error) bool {
 	return target == ErrUniErrorBinaryOptions
 }
+type UniErrorPocketOption struct {
+	Field0 string
+}
+func NewUniErrorPocketOption(
+	var0 string,
+) *UniError {
+	return &UniError { err: &UniErrorPocketOption {
+			Field0: var0,} }
+}
+
+func (e UniErrorPocketOption) destroy() {
+		FfiDestroyerString{}.Destroy(e.Field0)
+}
+
+
+func (err UniErrorPocketOption) Error() string {
+	return fmt.Sprint("PocketOption",
+		": ",
+		
+		"Field0=",
+		err.Field0,
+	)
+}
+
+func (self UniErrorPocketOption) Is(target error) bool {
+	return target == ErrUniErrorPocketOption
+}
+type UniErrorUuid struct {
+	Field0 string
+}
+func NewUniErrorUuid(
+	var0 string,
+) *UniError {
+	return &UniError { err: &UniErrorUuid {
+			Field0: var0,} }
+}
+
+func (e UniErrorUuid) destroy() {
+		FfiDestroyerString{}.Destroy(e.Field0)
+}
+
+
+func (err UniErrorUuid) Error() string {
+	return fmt.Sprint("Uuid",
+		": ",
+		
+		"Field0=",
+		err.Field0,
+	)
+}
+
+func (self UniErrorUuid) Is(target error) bool {
+	return target == ErrUniErrorUuid
+}
 
 type FfiConverterUniError struct{}
 
@@ -2476,6 +2532,14 @@ func (c FfiConverterUniError) Read(reader io.Reader) *UniError {
 		return &UniError{ &UniErrorBinaryOptions{
 			Field0: FfiConverterStringINSTANCE.Read(reader),
 		}}
+	case 2:
+		return &UniError{ &UniErrorPocketOption{
+			Field0: FfiConverterStringINSTANCE.Read(reader),
+		}}
+	case 3:
+		return &UniError{ &UniErrorUuid{
+			Field0: FfiConverterStringINSTANCE.Read(reader),
+		}}
 	default:
 		panic(fmt.Sprintf("Unknown error code %d in FfiConverterUniError.Read()", errorID))
 	}
@@ -2485,6 +2549,12 @@ func (c FfiConverterUniError) Write(writer io.Writer, value *UniError) {
 	switch variantValue := value.err.(type) {
 		case *UniErrorBinaryOptions:
 			writeInt32(writer, 1)
+			FfiConverterStringINSTANCE.Write(writer, variantValue.Field0)
+		case *UniErrorPocketOption:
+			writeInt32(writer, 2)
+			FfiConverterStringINSTANCE.Write(writer, variantValue.Field0)
+		case *UniErrorUuid:
+			writeInt32(writer, 3)
 			FfiConverterStringINSTANCE.Write(writer, variantValue.Field0)
 		default:
 			_ = variantValue
@@ -2497,6 +2567,10 @@ type FfiDestroyerUniError struct {}
 func (_ FfiDestroyerUniError) Destroy(value *UniError) {
 	switch variantValue := value.err.(type) {
 		case UniErrorBinaryOptions:
+			variantValue.destroy()
+		case UniErrorPocketOption:
+			variantValue.destroy()
+		case UniErrorUuid:
 			variantValue.destroy()
 		default:
 			_ = variantValue

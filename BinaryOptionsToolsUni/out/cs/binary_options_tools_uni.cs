@@ -3113,6 +3113,34 @@ internal class UniException: UniffiException {
         }
     }
     
+    
+    public class PocketOption : UniException {
+        // Members
+        public string @v1;
+
+        // Constructor
+        public PocketOption(
+                string @v1) : base(
+                "@v1" + "=" + @v1) {
+
+            this.@v1 = @v1;
+        }
+    }
+    
+    
+    public class Uuid : UniException {
+        // Members
+        public string @v1;
+
+        // Constructor
+        public Uuid(
+                string @v1) : base(
+                "@v1" + "=" + @v1) {
+
+            this.@v1 = @v1;
+        }
+    }
+    
 
     
 }
@@ -3126,6 +3154,12 @@ class FfiConverterTypeUniError : FfiConverterRustBuffer<UniException>, CallStatu
             case 1:
                 return new UniException.BinaryOptions(
                     FfiConverterString.INSTANCE.Read(stream));
+            case 2:
+                return new UniException.PocketOption(
+                    FfiConverterString.INSTANCE.Read(stream));
+            case 3:
+                return new UniException.Uuid(
+                    FfiConverterString.INSTANCE.Read(stream));
             default:
                 throw new InternalException(String.Format("invalid error value '{0}' in FfiConverterTypeUniError.Read()", value));
         }
@@ -3137,6 +3171,14 @@ class FfiConverterTypeUniError : FfiConverterRustBuffer<UniException>, CallStatu
             case UniException.BinaryOptions variant_value:
                 return 4
                     + FfiConverterString.INSTANCE.AllocationSize(variant_value.@v1);
+
+            case UniException.PocketOption variant_value:
+                return 4
+                    + FfiConverterString.INSTANCE.AllocationSize(variant_value.@v1);
+
+            case UniException.Uuid variant_value:
+                return 4
+                    + FfiConverterString.INSTANCE.AllocationSize(variant_value.@v1);
             default:
                 throw new InternalException(String.Format("invalid error value '{0}' in FfiConverterTypeUniError.AllocationSize()", value));
         }
@@ -3146,6 +3188,14 @@ class FfiConverterTypeUniError : FfiConverterRustBuffer<UniException>, CallStatu
         switch (value) {
             case UniException.BinaryOptions variant_value:
                 stream.WriteInt(1);
+                FfiConverterString.INSTANCE.Write(variant_value.@v1, stream);
+                break;
+            case UniException.PocketOption variant_value:
+                stream.WriteInt(2);
+                FfiConverterString.INSTANCE.Write(variant_value.@v1, stream);
+                break;
+            case UniException.Uuid variant_value:
+                stream.WriteInt(3);
                 FfiConverterString.INSTANCE.Write(variant_value.@v1, stream);
                 break;
             default:

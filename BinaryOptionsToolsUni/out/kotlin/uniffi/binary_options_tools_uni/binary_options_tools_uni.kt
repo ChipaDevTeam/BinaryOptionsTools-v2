@@ -3255,6 +3255,22 @@ sealed class UniException: kotlin.Exception() {
             get() = "v1=${ v1 }"
     }
     
+    class PocketOption(
+        
+        val v1: kotlin.String
+        ) : UniException() {
+        override val message
+            get() = "v1=${ v1 }"
+    }
+    
+    class Uuid(
+        
+        val v1: kotlin.String
+        ) : UniException() {
+        override val message
+            get() = "v1=${ v1 }"
+    }
+    
 
     companion object ErrorHandler : UniffiRustCallStatusErrorHandler<UniException> {
         override fun lift(error_buf: RustBuffer.ByValue): UniException = FfiConverterTypeUniError.lift(error_buf)
@@ -3274,6 +3290,12 @@ public object FfiConverterTypeUniError : FfiConverterRustBuffer<UniException> {
             1 -> UniException.BinaryOptions(
                 FfiConverterString.read(buf),
                 )
+            2 -> UniException.PocketOption(
+                FfiConverterString.read(buf),
+                )
+            3 -> UniException.Uuid(
+                FfiConverterString.read(buf),
+                )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
         }
     }
@@ -3285,6 +3307,16 @@ public object FfiConverterTypeUniError : FfiConverterRustBuffer<UniException> {
                 4UL
                 + FfiConverterString.allocationSize(value.v1)
             )
+            is UniException.PocketOption -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.v1)
+            )
+            is UniException.Uuid -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.v1)
+            )
         }
     }
 
@@ -3292,6 +3324,16 @@ public object FfiConverterTypeUniError : FfiConverterRustBuffer<UniException> {
         when(value) {
             is UniException.BinaryOptions -> {
                 buf.putInt(1)
+                FfiConverterString.write(value.v1, buf)
+                Unit
+            }
+            is UniException.PocketOption -> {
+                buf.putInt(2)
+                FfiConverterString.write(value.v1, buf)
+                Unit
+            }
+            is UniException.Uuid -> {
+                buf.putInt(3)
                 FfiConverterString.write(value.v1, buf)
                 Unit
             }

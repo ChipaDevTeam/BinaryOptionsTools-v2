@@ -824,47 +824,6 @@ public convenience init(ssid: String)async throws  {
 
     
     /**
-     * Creates a new instance of the PocketOption client.
-     *
-     * This is the primary constructor for the client. It requires a session ID (ssid)
-     * to authenticate with the PocketOption servers.
-     *
-     * # Arguments
-     *
-     * * `ssid` - The session ID for your PocketOption account.
-     *
-     * # Examples
-     *
-     * ## Python
-     * ```python
-     * import asyncio
-     * from binaryoptionstoolsuni import PocketOption
-     *
-     * async def main():
-     * ssid = "YOUR_SESSION_ID"
-     * api = await PocketOption.init(ssid)
-     * balance = await api.balance()
-     * print(f"Balance: {balance}")
-     *
-     * asyncio.run(main())
-     * ```
-     */
-public static func `init`(ssid: String)async throws  -> PocketOption  {
-    return
-        try  await uniffiRustCallAsync(
-            rustFutureFunc: {
-                uniffi_binary_options_tools_uni_fn_constructor_pocketoption_init(FfiConverterString.lower(ssid)
-                )
-            },
-            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_pointer,
-            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_pointer,
-            freeFunc: ffi_binary_options_tools_uni_rust_future_free_pointer,
-            liftFunc: FfiConverterTypePocketOption_lift,
-            errorHandler: FfiConverterTypeUniError_lift
-        )
-}
-    
-    /**
      * Creates a new instance of the PocketOption client with a custom WebSocket URL.
      *
      * This constructor is useful for connecting to different PocketOption servers,
@@ -2896,9 +2855,6 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next() != 13448) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_init() != 50054) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new() != 31315) {
