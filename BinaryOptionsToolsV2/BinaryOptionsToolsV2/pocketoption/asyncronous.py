@@ -1,6 +1,6 @@
-from BinaryOptionsToolsV2.validator import Validator
-from BinaryOptionsToolsV2.config import Config
-from BinaryOptionsToolsV2 import RawPocketOption, Logger
+from ..validator import Validator
+from ..config import Config
+from .. import RawPocketOption, Logger
 from datetime import timedelta
 
 
