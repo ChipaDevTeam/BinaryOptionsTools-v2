@@ -334,16 +334,22 @@ pub enum AssetType {
 }
 
 impl Asset {
-    const DEFAULT_CANDLE_LENGTHS: [CandleLength; 9] = [
+    const DEFAULT_CANDLE_LENGTHS: [CandleLength; 15] = [
         CandleLength::new(5),
         CandleLength::new(15),
         CandleLength::new(30),
         CandleLength::new(60),
-        CandleLength::new(60 * 3),
-        CandleLength::new(60 * 5),
-        CandleLength::new(60 * 30),
-        CandleLength::new(60 * 60),
-        CandleLength::new(60 * 60 * 4),
+        CandleLength::new(120),
+        CandleLength::new(180),
+        CandleLength::new(300),
+        CandleLength::new(600),
+        CandleLength::new(900),
+        CandleLength::new(1800),
+        CandleLength::new(2700),
+        CandleLength::new(3600),
+        CandleLength::new(7200),
+        CandleLength::new(10800),
+        CandleLength::new(14400),
     ];
 
     pub fn is_otc(&self) -> bool {
@@ -369,12 +375,17 @@ impl Asset {
         if !self.allowed_candles.contains(&CandleLength::from(time))
             && !Self::DEFAULT_CANDLE_LENGTHS.contains(&CandleLength::from(time))
         {
+            let mut all_available: Vec<u32> = self.allowed_candles()
+                .iter()
+                .map(|c| c.duration())
+                .collect();
+            all_available.extend(Self::DEFAULT_CANDLE_LENGTHS.iter().map(|c| c.duration()));
+            all_available.sort();
+            all_available.dedup();
+            
             return Err(PocketError::InvalidAsset(format!(
                 "Time is not in allowed candle durations, available {:?}",
-                self.allowed_candles()
-                    .iter()
-                    .map(|c| c.duration())
-                    .collect::<Vec<_>>()
+                all_available
             )));
         }
         Ok(())
