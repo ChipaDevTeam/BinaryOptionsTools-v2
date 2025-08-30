@@ -1,10 +1,12 @@
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-
+import time
 import asyncio
 # Main part of the code
 async def main(ssid: str):
     # The api automatically detects if the 'ssid' is for real or demo account
     api = PocketOptionAsync(ssid)
+
+    time.sleep(5)
     
     (buy_id, buy) = await api.buy(asset="EURUSD_otc", amount=1.0, time=60, check_win=False)
     print(f"Buy trade id: {buy_id}\nBuy trade data: {buy}")
