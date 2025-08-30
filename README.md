@@ -28,7 +28,7 @@ Currently we only support **Pocket Option** (quick trading) with the following f
 * Add support for other trading platforms like Expert Options
 
 # Python 
-For the full python documentation check [here](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/master/BinaryOptionsToolsV2/Readme.md).
+For the full python documentation check [here](https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html).
 To install it use pip:
 ```
 pip install binaryoptionstoolsv2==0.1.8
