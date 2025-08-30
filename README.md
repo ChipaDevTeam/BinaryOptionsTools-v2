@@ -5,7 +5,7 @@ donate in paypal: [Paypal.me](https://paypal.me/ChipaCL?country.x=CL&locale.x=en
 help us in patreon: [Patreon](https://patreon.com/VigoDEV?utm_medium=unknown&utm_source=join_link&utm_campaign=creatorshare_creator&utm_content=copyLink) <br>
 👉 [Join us on Discord](https://discord.gg/p7YyFqSmAz)
 # BinaryOptionsTools
-Don't know programming and you are looking for a bot? [click here to get our development services!](https://chipa.tech/shop/)
+Don't know programming and you are looking for a bot? [click here to get our development services!](https://shop.chipatrade.com/)
 **Check [here](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/5ef8aa83bcf3f9b8a55f0d9d5e69a1a48397ed7f) to check the repo at the time of the release**
 **BinaryOptionsTools** is a powerful suite of tools designed to enhance your binary options trading experience. Whether you're looking for analysis, strategy optimization, or execution tools, this project provides a variety of solutions to help you make informed trading decisions.
 
