@@ -5,24 +5,27 @@ from BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
 
 from datetime import timedelta
 
+
 class LogSubscription:
     def __init__(self, subscription):
         self.subscription = subscription
-        
+
     def __aiter__(self):
         return self
-        
+
     async def __anext__(self):
         return json.loads(await anext(self.subscription))
-    
+
     def __iter__(self):
         return self
-        
+
     def __next__(self):
-        return json.loads(next(self.subscription))        
+        return json.loads(next(self.subscription))
 
 
-def start_logs(path: str, level: str = "DEBUG", terminal: bool = True, layers: list = None):
+def start_logs(
+    path: str, level: str = "DEBUG", terminal: bool = True, layers: list = None
+):
     """
     Initialize logging system for the application.
 
@@ -43,8 +46,8 @@ def start_logs(path: str, level: str = "DEBUG", terminal: bool = True, layers: l
         start_tracing(path, level, terminal, layers)
     except Exception as e:
         print(f"Error starting logs, {e}")
-        
-        
+
+
 class Logger:
     """
     A logger class wrapping the RustLogger functionality.
@@ -52,6 +55,7 @@ class Logger:
     Attributes:
         logger (RustLogger): The underlying RustLogger instance.
     """
+
     def __init__(self):
         self.logger = RustLogger()
 
@@ -99,10 +103,13 @@ class LogBuilder:
     Attributes:
         builder (RustLogBuilder): The underlying RustLogBuilder instance.
     """
+
     def __init__(self):
         self.builder = RustLogBuilder()
 
-    def create_logs_iterator(self, level: str = "DEBUG", timeout: None | timedelta = None) -> LogSubscription:
+    def create_logs_iterator(
+        self, level: str = "DEBUG", timeout: None | timedelta = None
+    ) -> LogSubscription:
         """
         Create a new logs iterator with the specified level and timeout.
 
@@ -139,4 +146,3 @@ class LogBuilder:
         Build and initialize the logging configuration. This function should be called only once per execution.
         """
         self.builder.build()
-        

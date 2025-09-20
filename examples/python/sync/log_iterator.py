@@ -6,19 +6,22 @@ from multiprocessing import Process
 
 import time
 
+
 def main():
     """
     Main synchronous function demonstrating the usage of logging system.
     """
-    
+
     # Create a Logger instance
     logger = Logger()
-    
+
     # Create a LogBuilder instance
     log_builder = LogBuilder()
-    
+
     # Create a new logs iterator with INFO level and 10-second timeout
-    log_iterator = log_builder.create_logs_iterator(level="INFO", timeout=timedelta(seconds=10))
+    log_iterator = log_builder.create_logs_iterator(
+        level="INFO", timeout=timedelta(seconds=10)
+    )
 
     # Configure logging to write to a file
     # This will create or append to 'logs.log' file with INFO level logs
@@ -56,12 +59,13 @@ def main():
     # Run the sync function
     task1 = Process(target=log_sync())
     task1.start()
+
     # Example of using LogBuilder for creating iterators
     def process_logs(log_iterator):
         """
         Function demonstrating the use of LogSubscription.
         """
-        
+
         try:
             for log in log_iterator:
                 print(f"Received log: {log}")
@@ -77,7 +81,6 @@ def main():
     task1.join()
     task2.join()
 
-    
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,3 @@
-
 from .BinaryOptionsToolsV2 import *  # noqa: F403
 
 # optional: include the documentation from the Rust module
@@ -8,4 +7,4 @@ from .pocketoption import __all__ as __pocket_all__
 from . import tracing
 from . import validator
 
-__all__ = __pocket_all__ + ['tracing', 'validator']
+__all__ = __pocket_all__ + ["tracing", "validator"]
