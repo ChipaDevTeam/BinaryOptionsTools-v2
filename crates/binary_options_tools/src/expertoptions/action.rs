@@ -26,7 +26,7 @@ impl Action {
     pub fn id(&self) -> &str {
         &self.action
     }
-    
+
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).unwrap_or_else(|_| "{}".to_string())
     }

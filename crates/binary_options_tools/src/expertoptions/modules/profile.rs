@@ -11,7 +11,7 @@ use binary_options_tools_core_pre::traits::{ApiModule, ReconnectCallback, Rule};
 use binary_options_tools_macros::ActionImpl;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::select;
 use tracing::debug;
 
@@ -31,7 +31,7 @@ pub enum Response {
 
 #[derive(Deserialize, Debug)]
 struct ProfileAction {
-    actions: Vec<Action>
+    actions: Vec<Action>,
 }
 
 // List of ids for Action responses
@@ -39,7 +39,7 @@ const ASSETS: &str = "assets";
 const PROFILE: &str = "profile";
 const GET_CANDLES_TIMEFRAMES: &str = "getCandlesTimeFrames";
 
-// List of structs to get important data 
+// List of structs to get important data
 #[derive(Deserialize)]
 struct Profile {
     demo_balance: Decimal,
@@ -47,14 +47,14 @@ struct Profile {
     #[serde(with = "bool2int")]
     is_demo: bool,
     #[serde(flatten)]
-    _extra: HashMap<String, Value>
+    _extra: HashMap<String, Value>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CandlesTimeFrames {
     candles_time_frames: Vec<u32>,
-    points_timeframe: Decimal
+    points_timeframe: Decimal,
 }
 
 #[derive(Clone)]
@@ -68,7 +68,7 @@ impl ProfileHandle {
     pub async fn set_context(&self, is_demo: bool) -> CoreResult<()> {
         let (id, cmd) = Command::new(Request::SetContext(Demo::new(is_demo)));
         self.sender.send(cmd).await?;
-                loop {
+        loop {
             match self.receiver.recv().await {
                 Ok(cmd) => {
                     if id == cmd.id() {
@@ -82,7 +82,6 @@ impl ProfileHandle {
                 Err(e) => return Err(CoreError::from(e)),
             }
         }
- 
     }
 }
 /// Profile module for maintaining session activity
@@ -112,7 +111,7 @@ struct Res {
 #[serde(untagged)]
 enum ProfileResponse {
     Change(Res),
-    Profile(ProfileAction)
+    Profile(ProfileAction),
 }
 
 impl Demo {
@@ -140,26 +139,40 @@ impl ProfileModule {
                 ASSETS => {
                     // Handle assets response
                     let assets: HashMap<String, Vec<Asset>> = action.take()?;
-                    let assets = Assets::new(assets.into_iter().next().ok_or_else(|| CoreError::Other("No assets found".to_string()))?.1);
+                    let assets = Assets::new(
+                        assets
+                            .into_iter()
+                            .next()
+                            .ok_or_else(|| CoreError::Other("No assets found".to_string()))?
+                            .1,
+                    );
                     self.state.set_assets(assets).await;
                     // Process assets as needed
                 }
                 PROFILE => {
                     // Handle profile response
                     let profile_action: HashMap<String, Profile> = action.take()?;
-                    let balance_profile = profile_action.into_iter().next().ok_or_else(|| CoreError::Other("No profile found".to_string()))?.1;
+                    let balance_profile = profile_action
+                        .into_iter()
+                        .next()
+                        .ok_or_else(|| CoreError::Other("No profile found".to_string()))?
+                        .1;
                     let balance = Balance {
                         demo: balance_profile.demo_balance,
                         real: balance_profile.real_balance,
                     };
                     self.state.set_balance(balance).await;
-                    self.state.set_demo(Demo::new(balance_profile.is_demo)).await;
+                    self.state
+                        .set_demo(Demo::new(balance_profile.is_demo))
+                        .await;
                     // Process profile data
-                },
+                }
                 GET_CANDLES_TIMEFRAMES => {
                     // Handle get candles timeframes response
                     let timeframes: CandlesTimeFrames = action.take()?;
-                    self.state.set_timeframes(timeframes.candles_time_frames, timeframes.points_timeframe).await;
+                    self.state
+                        .set_timeframes(timeframes.candles_time_frames, timeframes.points_timeframe)
+                        .await;
                 }
                 _ => {
                     debug!("Unhandled action response: {}", action.id());
@@ -301,9 +314,9 @@ impl ProfileModule {
             dbg!("Sent demo message");
             let demo = Demo::new(true);
             let msg = demo
-            .action(token.clone())
-            .map_err(|e| CoreError::Other(e.to_string()))?
-            .to_message()?;
+                .action(token.clone())
+                .map_err(|e| CoreError::Other(e.to_string()))?
+                .to_message()?;
             self.ws_sender.send(msg).await?;
         }
         // Send multipleAction with basic actions placeholder (can be extended)

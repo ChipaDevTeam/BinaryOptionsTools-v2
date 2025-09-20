@@ -23,4 +23,3 @@ impl From<PocketError> for UniError {
         UniError::PocketOption(e.to_string())
     }
 }
-

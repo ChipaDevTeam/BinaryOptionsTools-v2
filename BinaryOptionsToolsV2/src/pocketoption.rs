@@ -138,7 +138,10 @@ impl RawPocketOption {
 
         let client = self.client.clone();
         future_into_py(py, async move {
-            let res = client.get_candles(asset, period, offset).await.map_err(BinaryErrorPy::from)?;
+            let res = client
+                .get_candles(asset, period, offset)
+                .await
+                .map_err(BinaryErrorPy::from)?;
             Python::with_gil(|py| {
                 serde_json::to_string(&res)
                     .map_err(BinaryErrorPy::from)?
@@ -157,13 +160,16 @@ impl RawPocketOption {
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
-            let res = client.get_candles_advanced(asset, period, time, offset).await.map_err(BinaryErrorPy::from)?;
+            let res = client
+                .get_candles_advanced(asset, period, time, offset)
+                .await
+                .map_err(BinaryErrorPy::from)?;
             Python::with_gil(|py| {
                 serde_json::to_string(&res)
                     .map_err(BinaryErrorPy::from)?
                     .into_py_any(py)
             })
-        })    
+        })
     }
 
     pub async fn balance(&self) -> f64 {
@@ -172,7 +178,8 @@ impl RawPocketOption {
 
     pub async fn closed_deals(&self) -> PyResult<String> {
         // Work in progress - this feature is not yet implemented in the new API
-        Ok(serde_json::to_string(&self.client.get_closed_deals().await).map_err(BinaryErrorPy::from)?)
+        Ok(serde_json::to_string(&self.client.get_closed_deals().await)
+            .map_err(BinaryErrorPy::from)?)
     }
 
     pub async fn clear_closed_deals(&self) {
@@ -210,14 +217,16 @@ impl RawPocketOption {
         // Work in progress - this feature is not yet implemented in the new API
         let client = self.client.clone();
         future_into_py(py, async move {
-            let res = client.history(asset, period).await.map_err(BinaryErrorPy::from)?;
+            let res = client
+                .history(asset, period)
+                .await
+                .map_err(BinaryErrorPy::from)?;
             Python::with_gil(|py| {
                 serde_json::to_string(&res)
                     .map_err(BinaryErrorPy::from)?
                     .into_py_any(py)
             })
-        })    
-
+        })
     }
 
     pub fn subscribe_symbol<'py>(

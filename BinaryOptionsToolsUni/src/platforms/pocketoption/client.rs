@@ -64,7 +64,7 @@ impl PocketOption {
         Ok(Arc::new(Self { inner }))
     }
 
-        /// Creates a new instance of the PocketOption client.
+    /// Creates a new instance of the PocketOption client.
     ///
     /// This is the primary constructor for the client. It requires a session ID (ssid)
     /// to authenticate with the PocketOption servers.
@@ -216,8 +216,8 @@ impl PocketOption {
     /// A `Deal` object representing the completed trade.
     #[uniffi::method]
     pub async fn result(&self, id: String) -> Result<Deal, UniError> {
-        let uuid = Uuid::parse_str(&id)
-            .map_err(|e| UniError::Uuid(format!("Invalid UUID: {e}")))?;
+        let uuid =
+            Uuid::parse_str(&id).map_err(|e| UniError::Uuid(format!("Invalid UUID: {e}")))?;
         let deal = self.inner.result(uuid).await.map_err(UniError::from)?;
         Ok(Deal::from(deal))
     }
@@ -238,8 +238,8 @@ impl PocketOption {
         id: String,
         timeout_secs: u64,
     ) -> Result<Deal, UniError> {
-        let uuid = Uuid::parse_str(&id)
-            .map_err(|e| UniError::Uuid(format!("Invalid UUID: {e}")))?;
+        let uuid =
+            Uuid::parse_str(&id).map_err(|e| UniError::Uuid(format!("Invalid UUID: {e}")))?;
         let deal = self
             .inner
             .result_with_timeout(uuid, StdDuration::from_secs(timeout_secs))

@@ -19,7 +19,10 @@ enum FieldConfig {
     // `dtype`: Specifies the type of elements in the collection.
     // `add_fn`: Optionally specifies the method name to add elements (e.g., "push", "insert"). Defaults to "push".
     #[darling(rename = "iterator")]
-    Iterator { dtype: Box<Type>, add_fn: Option<String> },
+    Iterator {
+        dtype: Box<Type>,
+        add_fn: Option<String>,
+    },
 }
 
 // `ConfigField` represents a single field from the input struct.

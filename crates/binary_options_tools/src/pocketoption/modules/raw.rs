@@ -201,7 +201,11 @@ impl Rule for RawRule {
             Message::Text(text) => text.to_string(),
             _ => return false,
         };
-        let validators = self.state.raw_validators.read().expect("Failed to acquire read lock");
+        let validators = self
+            .state
+            .raw_validators
+            .read()
+            .expect("Failed to acquire read lock");
         for (_id, v) in validators.iter() {
             if v.call(msg_str.as_str()) {
                 return true;

@@ -13,7 +13,7 @@ pub struct Asset {
     #[serde(with = "bool2int")]
     pub is_active: bool,
     #[serde(flatten)]
-    _extra: HashMap<String, Value>
+    _extra: HashMap<String, Value>,
 }
 
 pub struct Assets(pub HashMap<String, Asset>);
@@ -53,7 +53,12 @@ impl Asset {
 
 impl Assets {
     pub fn new(assets: Vec<Asset>) -> Self {
-        Assets(HashMap::from_iter(assets.into_iter().filter(|asset| asset.is_valid()).map(|a| (a.symbol.clone(), a))))
+        Assets(HashMap::from_iter(
+            assets
+                .into_iter()
+                .filter(|asset| asset.is_valid())
+                .map(|a| (a.symbol.clone(), a)),
+        ))
     }
 
     pub fn id(&self, asset: &str) -> Option<u32> {

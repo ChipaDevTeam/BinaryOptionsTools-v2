@@ -9,10 +9,9 @@ pub struct Config {
     pub user_agent: String,
 }
 
-
 pub struct Balance {
     pub real: Decimal,
-    pub demo: Decimal
+    pub demo: Decimal,
 }
 
 pub struct State {
@@ -30,9 +29,8 @@ pub struct State {
     pub get_candles_timeframes: RwLock<Vec<u32>>,
     /// Maps how often point data is returned by server
     pub points_timeframe: RwLock<Decimal>,
-    /// Assets 
+    /// Assets
     pub assets: RwLock<Option<Assets>>,
-
 }
 
 impl Config {
@@ -58,9 +56,7 @@ impl AppState for State {
 
 impl State {
     pub fn new(token: String, demo: bool) -> Self {
-        let timezone = Local::now()
-            .offset()
-            .local_minus_utc().div_euclid(60);
+        let timezone = Local::now().offset().local_minus_utc().div_euclid(60);
         dbg!(timezone);
         State {
             token,
@@ -108,8 +104,8 @@ impl State {
                 } else {
                     balance.real
                 }
-            },
-            None => dec!(-1)
+            }
+            None => dec!(-1),
         }
     }
 
@@ -118,6 +114,9 @@ impl State {
     }
 
     pub async fn validate_candle_timeframe(&self, timeframe: u32) -> bool {
-        self.get_candles_timeframes.read().await.contains(&timeframe)
+        self.get_candles_timeframes
+            .read()
+            .await
+            .contains(&timeframe)
     }
 }
