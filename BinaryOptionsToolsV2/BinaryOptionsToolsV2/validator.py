@@ -265,11 +265,7 @@ class Validator:
         Returns:
             True if message matches the validator's conditions, False otherwise
         """
-        # return self._validator.check(message)
-        raise NotImplementedError(
-            "The check method is not implemented in the Validator class. "
-            "Please use a RawValidator instance directly or implement this method."
-        )
+        return self._validator.check(message)
 
     @property
     def raw_validator(self):

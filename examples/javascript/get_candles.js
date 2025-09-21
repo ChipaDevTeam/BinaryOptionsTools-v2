@@ -14,7 +14,7 @@ async function main(ssid) {
     // Get candles for each combination
     for (const time of times) {
         for (const frame of timeFrames) {
-            const candles = await api.getCandles("EURUSD_otc", 60, time);
+            const candles = await api.get_candles("EURUSD_otc", 60, time);
             console.log(`Candles for time ${time} and frame ${frame}:`, candles);
         }
     }

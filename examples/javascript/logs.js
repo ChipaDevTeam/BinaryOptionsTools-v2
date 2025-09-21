@@ -29,8 +29,8 @@ async function main(ssid) {
     console.log(buyId, sellId);
     
     // Check wins (same as setting checkWin to true in the buy/sell calls)
-    const buyResult = await api.checkWin(buyId);
-    const sellResult = await api.checkWin(sellId);
+    const buyResult = await api.result(buyId);
+    const sellResult = await api.result(sellId);
     
     console.log("Buy trade result:", buyResult.result);
     console.log("Buy trade data:", buyResult);

@@ -2,6 +2,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use regex::Regex;
+use serde_json::Value;
 
 use crate::traits::ValidatorTrait;
 
@@ -95,5 +96,22 @@ impl ValidatorTrait for Validator {
             Validator::Any(validators) => validators.iter().any(|v| v.call(data)),
             Validator::Custom(validator) => validator.call(data),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RawValidator;
+
+impl RawValidator {
+    /// Creates a new instance of RawValidator
+    pub fn new() -> Self {
+        RawValidator
+    }
+
+    /// Validates a raw JSON message and returns a boolean indicating validity
+    pub fn check(&self, message: &Value) -> bool {
+        // For now, we'll consider any valid JSON as valid
+        // In a more complex implementation, we might check for specific fields or structure
+        !message.is_null()
     }
 }

@@ -7,9 +7,9 @@ use crate::pocketoption::modules::subscriptions::SubscriptionError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum PocketError {
-    #[error("Failed to join task: {0}")]
-    Core(#[from] Box<CoreError>),
-    #[error("State builder error, {0}")]
+    #[error("Core error: {0}")]
+    Core(#[from] CoreError),
+    #[error("State builder error: {0}")]
     StateBuilder(String),
     #[error("Invalid asset: {0}")]
     InvalidAsset(String),
@@ -45,9 +45,3 @@ pub enum PocketError {
 }
 
 pub type PocketResult<T> = Result<T, PocketError>;
-
-impl From<CoreError> for PocketError {
-    fn from(err: CoreError) -> Self {
-        PocketError::Core(Box::new(err))
-    }
-}

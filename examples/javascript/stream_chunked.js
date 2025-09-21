@@ -8,31 +8,9 @@ async function main(ssid) {
     // Wait for connection to establish
     await new Promise(resolve => setTimeout(resolve, 5000));
     
-    // Subscribe to a chunked symbol stream
-    const stream = await api.subscribeSymbolChunked("EURUSD_otc");
-    
-    console.log("Starting chunked stream...");
-    
-    // Listen to the stream for 1 minute
-    const endTime = Date.now() + 60000; // 60 seconds
-    
-    try {
-        for await (const chunk of stream) {
-            console.log("Received chunk:", chunk);
-            console.log("Chunk timestamp:", new Date(chunk.timestamp).toISOString());
-            console.log("Chunk data:", chunk.data);
-            
-            if (Date.now() > endTime) {
-                console.log("Stream time finished");
-                break;
-            }
-        }
-    } catch (error) {
-        console.error("Stream error:", error);
-    } finally {
-        // Clean up
-        await stream.close();
-    }
+    // The subscribeSymbolChunked method does not exist in the current API implementation
+    // Please refer to the documentation for available methods
+    console.log("The subscribeSymbolChunked method is not available in the current API implementation.");
 }
 
 // Check if ssid is provided as command line argument
