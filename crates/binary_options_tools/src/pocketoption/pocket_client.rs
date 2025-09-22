@@ -3,7 +3,6 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use binary_options_tools_core_pre::{
     builder::ClientBuilder,
     client::Client,
-    error::CoreError,
     testing::{TestingWrapper, TestingWrapperBuilder},
     traits::ApiModule,
 };

@@ -19,6 +19,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "tungstenite",
  "url",
  "uuid",
 ]

@@ -60,7 +60,7 @@ impl Candle {
     /// # Returns
     /// New Candle instance with all OHLC values set to the initial price
     pub fn new(symbol: String, timestamp: f64, price: f64) -> BinaryOptionsResult<Self> {
-        let price = Decimal::from_f64(price).ok_or(BinaryOptionsError::ParseFloat(
+        let price = Decimal::from_f64(price).ok_or(BinaryOptionsError::General(
             "Couldn't parse f64 to Decimal".to_string(),
         ))?;
         Ok(Self {
@@ -83,7 +83,7 @@ impl Candle {
     /// # Arguments
     /// * `price` - New price to incorporate into the candle
     pub fn update_price(&mut self, price: f64) -> BinaryOptionsResult<()> {
-        let price = Decimal::from_f64(price).ok_or(BinaryOptionsError::ParseFloat(
+        let price = Decimal::from_f64(price).ok_or(BinaryOptionsError::General(
             "Couldn't parse f64 to Decimal".to_string(),
         ))?;
         self.high = self.high.max(price);
@@ -101,7 +101,7 @@ impl Candle {
     /// * `timestamp` - New timestamp for the candle
     /// * `price` - New price to incorporate into the candle
     pub fn update(&mut self, timestamp: f64, price: f64) -> BinaryOptionsResult<()> {
-        let price = Decimal::from_f64(price).ok_or(BinaryOptionsError::ParseFloat(
+        let price = Decimal::from_f64(price).ok_or(BinaryOptionsError::General(
             "Couldn't parse f64 to Decimal".to_string(),
         ))?;
 
@@ -459,7 +459,7 @@ impl TryFrom<(BaseCandle, String)> for Candle {
     fn try_from(value: (BaseCandle, String)) -> Result<Self, Self::Error> {
         let (base_candle, symbol) = value;
         let volume = match base_candle.volume {
-            Some(v) => Some(Decimal::from_f64(v).ok_or(BinaryOptionsError::ParseFloat(
+            Some(v) => Some(Decimal::from_f64(v).ok_or(BinaryOptionsError::General(
                 "Couldn't parse volume".into(),
             ))?),
             None => None,
@@ -468,12 +468,12 @@ impl TryFrom<(BaseCandle, String)> for Candle {
             symbol,
             timestamp: base_candle.timestamp,
             open: Decimal::from_f64(base_candle.open)
-                .ok_or(BinaryOptionsError::ParseFloat("Couldn't parse open".into()))?,
+                .ok_or(BinaryOptionsError::General("Couldn't parse open".into()))?,
             high: Decimal::from_f64(base_candle.high)
-                .ok_or(BinaryOptionsError::ParseFloat("Couldn't parse high".into()))?,
+                .ok_or(BinaryOptionsError::General("Couldn't parse high".into()))?,
             low: Decimal::from_f64(base_candle.low)
-                .ok_or(BinaryOptionsError::ParseFloat("Couldn't parse low".into()))?,
-            close: Decimal::from_f64(base_candle.close).ok_or(BinaryOptionsError::ParseFloat(
+                .ok_or(BinaryOptionsError::General("Couldn't parse low".into()))?,
+            close: Decimal::from_f64(base_candle.close).ok_or(BinaryOptionsError::General(
                 "Couldn't parse close".into(),
             ))?,
             volume,

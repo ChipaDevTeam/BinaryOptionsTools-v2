@@ -3,6 +3,7 @@ use std::time::Duration;
 use binary_options_tools_core_pre::error::CoreError;
 use uuid::Uuid;
 
+use crate::error::BinaryOptionsError;
 use crate::pocketoption::modules::subscriptions::SubscriptionError;
 
 #[derive(thiserror::Error, Debug)]
@@ -45,3 +46,12 @@ pub enum PocketError {
 }
 
 pub type PocketResult<T> = Result<T, PocketError>;
+
+impl From<BinaryOptionsError> for PocketError {
+    fn from(error: BinaryOptionsError) -> Self {
+        match error {
+            BinaryOptionsError::PocketOptions(pocket_error) => pocket_error,
+            _ => PocketError::General(format!("BinaryOptionsError: {:?}", error)),
+        }
+    }
+}

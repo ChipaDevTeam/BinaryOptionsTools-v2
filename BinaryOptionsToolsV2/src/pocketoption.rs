@@ -16,6 +16,7 @@ use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, Py, PyAny, PyResult, Pyth
 use pyo3_async_runtimes::tokio::future_into_py;
 use uuid::Uuid;
 use binary_options_tools::validator::Validator as CrateValidator;
+use binary_options_tools::validator::Validator;
 use tungstenite;
 use async_stream;
 
@@ -28,10 +29,15 @@ use tokio::sync::Mutex;
 /// Convert a tungstenite message to a string
 fn message_to_string(msg: &tungstenite::Message) -> String {
     match msg {
-        tungstenite::Message::Text(text) => text.clone(),
+        tungstenite::Message::Text(text) => text.to_string(),
         tungstenite::Message::Binary(data) => String::from_utf8_lossy(data).into_owned(),
         _ => String::new(),
     }
+}
+
+/// Convert an Arc<Message> to a string
+fn arc_message_to_string(msg: &std::sync::Arc<tungstenite::Message>) -> String {
+    message_to_string(msg.as_ref())
 }
 
 /// Send a raw message and wait for the response
@@ -50,7 +56,7 @@ async fn send_raw_message_and_wait(
     let response = handler.send_and_wait(binary_options_tools::pocketoption::modules::raw::Outgoing::Text(message)).await.map_err(BinaryErrorPy::from)?;
     
     // Convert the response to a string
-    Ok(message_to_string(&response))
+    Ok(arc_message_to_string(&response))
 }
 
 #[pyclass]
@@ -369,9 +375,10 @@ impl RawPocketOption {
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
-            let handle = client.raw_handle().await.map_err(BinaryErrorPy::from)?;
-            // Send text message
-            handle.send_text(message).await.map_err(BinaryErrorPy::from)?;
+            // Create a raw handler with a simple validator that matches everything
+            let handler = client.create_raw_handler(Validator::None, None).await.map_err(BinaryErrorPy::from)?;
+            // Send the raw message without waiting for a response
+            handler.send_text(message).await.map_err(BinaryErrorPy::from)?;
             Ok(())
         })
     }
@@ -402,7 +409,7 @@ impl RawPocketOption {
         future_into_py(py, async move {
             let send_future = send_raw_message_and_wait(&client, validator, message);
             let response = tokio::time::timeout(timeout, send_future).await.map_err(|_| {
-                BinaryErrorPy::NotAllowed("Operation timed out".into())
+                Into::<pyo3::PyErr>::into(BinaryErrorPy::NotAllowed("Operation timed out".into()))
             })?;
             Python::with_gil(|py| response?.into_py_any(py))
         })
@@ -443,7 +450,7 @@ impl RawPocketOption {
                             delay *= 2; // Exponential backoff
                             continue;
                         } else {
-                            return Err(BinaryErrorPy::NotAllowed("Operation timed out".into()));
+                            return Err(Into::<pyo3::PyErr>::into(BinaryErrorPy::NotAllowed("Operation timed out".into())));
                         }
                     }
                 }
@@ -472,7 +479,7 @@ impl RawPocketOption {
             handler.send_text(message).await.map_err(BinaryErrorPy::from)?;
             
             // Create a stream from the handler's subscription
-            let mut receiver = handler.subscribe();
+            let receiver = handler.subscribe();
             
             // Create a boxed stream that yields String values
             let boxed_stream = async_stream::stream! {
@@ -492,7 +499,7 @@ impl RawPocketOption {
                         match tokio::time::timeout(remaining_time, receiver.recv()).await {
                             Ok(Ok(msg)) => {
                                 // Convert the message to a string
-                                let msg_str = message_to_string(msg.as_ref());
+                                let msg_str = arc_message_to_string(&msg);
                                 yield Ok(msg_str);
                             }
                             Ok(Err(_)) => break, // Channel closed
@@ -503,7 +510,7 @@ impl RawPocketOption {
                     // No timeout, just receive messages indefinitely
                     while let Ok(msg) = receiver.recv().await {
                         // Convert the message to a string
-                        let msg_str = message_to_string(msg.as_ref());
+                        let msg_str = arc_message_to_string(&msg);
                         yield Ok(msg_str);
                     }
                 }
@@ -565,7 +572,7 @@ impl RawStreamIterator {
         let stream = self.stream.clone();
         future_into_py(py, async move {
             let res = next_stream(stream, false).await;
-            res.map(message_to_string)
+            res.map(|s| s)
         })
     }
 
@@ -574,7 +581,7 @@ impl RawStreamIterator {
         let stream = self.stream.clone();
         runtime.block_on(async move {
             let res = next_stream(stream, true).await;
-            res.map(message_to_string)
+            res.map(|s| s)
         })
     }
 }
