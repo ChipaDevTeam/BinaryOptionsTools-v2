@@ -58,7 +58,7 @@ docs/
 
 3. **Access**: Your documentation will be available at:
    ```
-   https://your-username.github.io/BinaryOptionsTools-v2-1/
+   https://your-username.github.io/BinaryOptionsTools-v2/
    ```
 
 ### Local Development
@@ -170,7 +170,7 @@ This documentation is part of BinaryOptionsToolsV2 and follows the same license 
 
 - **Live Documentation**: [GitHub Pages URL]
 - **Bot Services**: [chipa.tech](https://chipa.tech)
-- **Main Repository**: [BinaryOptionsTools-v2-1](https://github.com/your-username/BinaryOptionsTools-v2-1)
+- **Main Repository**: [BinaryOptionsTools-v2](https://github.com/your-username/BinaryOptionsTools-v2)
 - **Discord Community**: [Join our Discord](https://discord.gg/T3FGXcmd)
 
 ---

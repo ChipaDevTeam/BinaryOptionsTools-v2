@@ -2,7 +2,7 @@
 title: "BinaryOptionsToolsV2 Documentation"
 description: "High-performance binary options trading tools with multi-language support (Python, JavaScript, Rust)"
 url: "https://yourusername.github.io"
-baseurl: "/BinaryOptionsTools-v2-1"
+baseurl: "/BinaryOptionsTools-v2"
 
 # Build settings
 markdown: kramdown
@@ -20,7 +20,7 @@ twitter:
 social:
   name: BinaryOptionsToolsV2
   links:
-    - https://github.com/yourusername/BinaryOptionsTools-v2-1
+    - https://github.com/yourusername/BinaryOptionsTools-v2
 
 # SEO settings
 google_site_verification: "your-google-site-verification-code"
