@@ -10,15 +10,15 @@ use binary_options_tools::pocketoption::pocket_client::PocketOption;
 // use binary_options_tools::pocketoption::types::update::DataCandle;
 // use binary_options_tools::pocketoption::ws::stream::StreamAsset;
 // use binary_options_tools::reimports::FilteredRecieverStream;
-use futures_util::stream::{BoxStream, Fuse};
-use futures_util::StreamExt;
-use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python};
-use pyo3_async_runtimes::tokio::future_into_py;
-use uuid::Uuid;
+use async_stream;
 use binary_options_tools::validator::Validator as CrateValidator;
 use binary_options_tools::validator::Validator;
+use futures_util::StreamExt;
+use futures_util::stream::{BoxStream, Fuse};
+use pyo3::{Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python, pyclass, pymethods};
+use pyo3_async_runtimes::tokio::future_into_py;
 use tungstenite;
-use async_stream;
+use uuid::Uuid;
 
 use crate::error::BinaryErrorPy;
 use crate::runtime::get_runtime;
@@ -48,13 +48,19 @@ async fn send_raw_message_and_wait(
 ) -> PyResult<String> {
     // Convert RawValidator to CrateValidator
     let crate_validator: CrateValidator = validator.into();
-    
+
     // Create a raw handler with the validator
-    let handler = client.create_raw_handler(crate_validator, None).await.map_err(BinaryErrorPy::from)?;
-    
+    let handler = client
+        .create_raw_handler(crate_validator, None)
+        .await
+        .map_err(BinaryErrorPy::from)?;
+
     // Send the message and wait for the next matching response
-    let response = handler.send_and_wait(binary_options_tools::pocketoption::modules::raw::Outgoing::Text(message)).await.map_err(BinaryErrorPy::from)?;
-    
+    let response = handler
+        .send_and_wait(binary_options_tools::pocketoption::modules::raw::Outgoing::Text(message))
+        .await
+        .map_err(BinaryErrorPy::from)?;
+
     // Convert the response to a string
     Ok(arc_message_to_string(&response))
 }
@@ -156,21 +162,25 @@ impl RawPocketOption {
         })
     }
 
-    pub fn get_deal_end_time<'py>(&self, py: Python<'py>, trade_id: String) -> PyResult<Bound<'py, PyAny>> {
+    pub fn get_deal_end_time<'py>(
+        &self,
+        py: Python<'py>,
+        trade_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
             let uuid = Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?;
-            
+
             // Check if the deal is in closed deals first
             if let Some(deal) = client.get_closed_deal(uuid).await {
                 return Ok(Some(deal.close_timestamp.timestamp()));
             }
-            
+
             // If not found in closed deals, check opened deals
             if let Some(deal) = client.get_opened_deal(uuid).await {
                 return Ok(Some(deal.close_timestamp.timestamp()));
             }
-            
+
             // If not found in either, return None
             Ok(None) as PyResult<Option<i64>>
         })
@@ -376,9 +386,15 @@ impl RawPocketOption {
         let client = self.client.clone();
         future_into_py(py, async move {
             // Create a raw handler with a simple validator that matches everything
-            let handler = client.create_raw_handler(Validator::None, None).await.map_err(BinaryErrorPy::from)?;
+            let handler = client
+                .create_raw_handler(Validator::None, None)
+                .await
+                .map_err(BinaryErrorPy::from)?;
             // Send the raw message without waiting for a response
-            handler.send_text(message).await.map_err(BinaryErrorPy::from)?;
+            handler
+                .send_text(message)
+                .await
+                .map_err(BinaryErrorPy::from)?;
             Ok(())
         })
     }
@@ -408,9 +424,13 @@ impl RawPocketOption {
         let validator = validator.get().clone();
         future_into_py(py, async move {
             let send_future = send_raw_message_and_wait(&client, validator, message);
-            let response = tokio::time::timeout(timeout, send_future).await.map_err(|_| {
-                Into::<pyo3::PyErr>::into(BinaryErrorPy::NotAllowed("Operation timed out".into()))
-            })?;
+            let response = tokio::time::timeout(timeout, send_future)
+                .await
+                .map_err(|_| {
+                    Into::<pyo3::PyErr>::into(BinaryErrorPy::NotAllowed(
+                        "Operation timed out".into(),
+                    ))
+                })?;
             Python::with_gil(|py| response?.into_py_any(py))
         })
     }
@@ -428,9 +448,10 @@ impl RawPocketOption {
             // Retry logic with exponential backoff
             let max_retries = 3;
             let mut delay = Duration::from_millis(100);
-            
+
             for retries in 0..=max_retries {
-                let send_future = send_raw_message_and_wait(&client, validator.clone(), message.clone());
+                let send_future =
+                    send_raw_message_and_wait(&client, validator.clone(), message.clone());
                 match tokio::time::timeout(timeout, send_future).await {
                     Ok(Ok(response)) => {
                         return Python::with_gil(|py| response.into_py_any(py));
@@ -450,7 +471,9 @@ impl RawPocketOption {
                             delay *= 2; // Exponential backoff
                             continue;
                         } else {
-                            return Err(Into::<pyo3::PyErr>::into(BinaryErrorPy::NotAllowed("Operation timed out".into())));
+                            return Err(Into::<pyo3::PyErr>::into(BinaryErrorPy::NotAllowed(
+                                "Operation timed out".into(),
+                            )));
                         }
                     }
                 }
@@ -471,16 +494,22 @@ impl RawPocketOption {
         future_into_py(py, async move {
             // Convert RawValidator to CrateValidator
             let crate_validator: CrateValidator = validator.into();
-            
+
             // Create a raw handler with the validator
-            let handler = client.create_raw_handler(crate_validator, None).await.map_err(BinaryErrorPy::from)?;
-            
+            let handler = client
+                .create_raw_handler(crate_validator, None)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+
             // Send the initial message
-            handler.send_text(message).await.map_err(BinaryErrorPy::from)?;
-            
+            handler
+                .send_text(message)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+
             // Create a stream from the handler's subscription
             let receiver = handler.subscribe();
-            
+
             // Create a boxed stream that yields String values
             let boxed_stream = async_stream::stream! {
                 // If a timeout is specified, apply it to the stream
@@ -491,10 +520,10 @@ impl RawPocketOption {
                         if start_time.elapsed() >= timeout_duration {
                             break;
                         }
-                        
+
                         // Calculate remaining time for this iteration
                         let remaining_time = timeout_duration - start_time.elapsed();
-                        
+
                         // Try to receive a message with timeout
                         match tokio::time::timeout(remaining_time, receiver.recv()).await {
                             Ok(Ok(msg)) => {
@@ -514,8 +543,10 @@ impl RawPocketOption {
                         yield Ok(msg_str);
                     }
                 }
-            }.boxed().fuse();
-            
+            }
+            .boxed()
+            .fuse();
+
             let stream = Arc::new(Mutex::new(boxed_stream));
             Python::with_gil(|py| RawStreamIterator { stream }.into_py_any(py))
         })

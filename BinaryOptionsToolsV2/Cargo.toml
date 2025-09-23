@@ -1,7 +1,7 @@
 [package]
 name = "BinaryOptionsToolsV2"
-version = "0.1.8"
-edition = "2021"
+version = "0.2.0"
+edition = "2024"
 description = "A library to connect to PocketOption using python with async and sync support."
 license = "BSD License (BSD)"
 homepage = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"

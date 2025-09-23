@@ -1,13 +1,13 @@
 if you are looking to build a bot, let us build it for you! check [Our shop](https://shop.chipatrade.com/collections/all)
 ## Support us
-join PocketOption with our affiliate link: [PocketOption Affiliate link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) <br>
-donate in paypal: [Paypal.me](https://paypal.me/ChipaCL?country.x=CL&locale.x=en_US) <br> 
-help us in patreon: [Patreon](https://patreon.com/VigoDEV?utm_medium=unknown&utm_source=join_link&utm_campaign=creatorshare_creator&utm_content=copyLink) <br>
-👉 [Join us on Discord](https://discord.gg/p7YyFqSmAz)
+Join PocketOption with Six's affiliate link: [Six's PocketOption Affiliate link](https://u3.shortink.io/main?utm_campaign=821725&utm_source=affiliate&utm_medium=sr&a=IqeAmBtFTrEWbh&ac=api&code=DLN960)
+<br>
+Join PocketOption with Chipas affiliate link: [Chipas PocketOption Affiliate link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) 
+Donate at paypal: [Paypal.me](https://paypal.me/ChipaCL) <br> 
+Join us in patreon: [Patreon](https://patreon.com/VigoDEV?utm_medium=unknown&utm_source=join_link&utm_campaign=creatorshare_creator&utm_content=copyLink) <br>
+[Join us on Discord](https://discord.gg/p7YyFqSmAz)
 # BinaryOptionsTools
-Don't know programming and you are looking for a bot? [click here to get our development services!](https://shop.chipatrade.com/)
-**Check [here](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/5ef8aa83bcf3f9b8a55f0d9d5e69a1a48397ed7f) to check the repo at the time of the release** <br>
-**BinaryOptionsTools** is a powerful suite of tools designed to enhance your binary options trading experience. Whether you're looking for analysis, strategy optimization, or execution tools, this project provides a variety of solutions to help you make informed trading decisions.
+Don't know programming and you are looking for a bot to automate YOUR strategy? [click here to get our development services!](https://shop.chipatrade.com/)
 
 # Features
 Currently we only support **Pocket Option** (quick trading) with the following features (for real and demo):
@@ -31,23 +31,19 @@ Currently we only support **Pocket Option** (quick trading) with the following f
 For the full python documentation check [here](https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html).
 To install it use pip:
 ```
-pip install binaryoptionstoolsv2==0.1.8
+pip install binaryoptionstoolsv2
 ```
 
-# Rust
-For the full rust documentation check [here](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/crates/core/Readme.md)
 # Todo
 * *Pocket Option*: Add support for pending trades 
 * *Pocket Option*: Add support for closed deals management
 * *Pocket Option*: Add support for historical candle data
-* *BinaryOptionsToolsV2*: Add support for **rust** (done)
 * *BinaryOptionsToolsV2*: Add support for other trading platforms like Expert Options
 
 # Examples
 You can find the examples for all the features available of the library in the [examples](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/examples) directory.
 
 # Info
-Our goal is to provide access to connect to important **Binary Options Trading** platforms programatically in multiple programming languages. 
 Currently we support the following languages:
 * Python
 * Rust
