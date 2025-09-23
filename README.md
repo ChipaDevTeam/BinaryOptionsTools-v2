@@ -24,7 +24,7 @@ Currently we only support **Pocket Option** (quick trading) with the following f
 ## TODO Features
 * Get a list with the closed trades with all of the trades data
 * Get candle data for a specific asset (historical data)
-* Add support for pending trades 
+* Add support for pending trades
 * Add support for other trading platforms like Expert Options
 
 # Python 
@@ -35,10 +35,10 @@ pip install binaryoptionstoolsv2
 ```
 
 # Todo
-* *Pocket Option*: Add support for pending trades 
+* *Pocket Option*: Add support for pending trades
 * *Pocket Option*: Add support for closed deals management
 * *Pocket Option*: Add support for historical candle data
-* *BinaryOptionsToolsV2*: Add support for other trading platforms like Expert Options
+* *BinaryOptionsToolsV2*: Add support for other trading platforms like Expert Options, Close Option, and more.
 
 # Examples
 You can find the examples for all the features available of the library in the [examples](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/examples) directory.
@@ -49,6 +49,6 @@ Currently we support the following languages:
 * Rust
 
 And the following trading platforms:
-* Pocket Options
+* PocketOption
 
 We plan on supporting other programming languages and trading platforms in the future.
