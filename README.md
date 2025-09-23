@@ -2,10 +2,10 @@ If you are looking to build a bot, let us build it for you! Check [Chipa's shop]
 ## Support us
 Join PocketOption with Six's affiliate link: [Six's PocketOption Affiliate link](https://u3.shortink.io/main?utm_campaign=821725&utm_source=affiliate&utm_medium=sr&a=IqeAmBtFTrEWbh&ac=api&code=DLN960)
 <br>
-Join PocketOption with Chipas affiliate link: [Chipas PocketOption Affiliate link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) 
+Join PocketOption with Chipas affiliate link: [Chipas PocketOption Affiliate link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) <br> 
 Donate at paypal: [Paypal.me](https://paypal.me/ChipaCL) <br> 
 Join us in patreon: [Patreon](https://patreon.com/VigoDEV?utm_medium=unknown&utm_source=join_link&utm_campaign=creatorshare_creator&utm_content=copyLink) <br>
-[Join us on Discord](https://discord.gg/p7YyFqSmAz)
+Join us on [Discord](https://discord.gg/p7YyFqSmAz)
 # BinaryOptionsTools
 Don't know programming and you are looking for a bot to automate YOUR strategy? [click here to get our development services!](https://shop.chipatrade.com/)
 
