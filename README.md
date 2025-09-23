@@ -1,4 +1,4 @@
-if you are looking to build a bot, let us build it for you! check [Our shop](https://shop.chipatrade.com/collections/all)
+If you are looking to build a bot, let us build it for you! Check [Chipa's shop](https://shop.chipatrade.com/collections/all)
 ## Support us
 Join PocketOption with Six's affiliate link: [Six's PocketOption Affiliate link](https://u3.shortink.io/main?utm_campaign=821725&utm_source=affiliate&utm_medium=sr&a=IqeAmBtFTrEWbh&ac=api&code=DLN960)
 <br>
