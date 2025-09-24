@@ -40,12 +40,6 @@ To install it manually:
 `pip wheel .` **OR** `maturin build`
 ```
 
-# Todo
-* *Pocket Option*: Add support for pending trades
-* *Pocket Option*: Add support for closed deals management
-* *Pocket Option*: Add support for historical candle data
-* *BinaryOptionsToolsV2*: Add support for other trading platforms like Expert Options, Close Option, and more.
-
 # Examples
 You can find the examples for all the features available of the library in the [examples](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/examples) directory.
 
