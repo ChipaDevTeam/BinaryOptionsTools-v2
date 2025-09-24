@@ -34,9 +34,8 @@ To install it using pip:
 pip install binaryoptionstoolsv2
 ```
 To install it manually:
+# Clone the repo and cd into ./BinartOptionsToolsV2
 ```
-# Clone the repo
-`cd` into ./BinartOptionsToolsV2
 `pip wheel .` **OR** `maturin build`
 ```
 
