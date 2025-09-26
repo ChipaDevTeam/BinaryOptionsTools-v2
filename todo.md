@@ -1,6 +1,6 @@
 ### Priority List
 ## Mission Critical (Preventing Functioning of App/Site/Bot)
-- n/a at this moment
+- n/a
 
 ## Priority (Currently being developed)
 - *Pocket Option*: Add support for pending trades
@@ -11,4 +11,4 @@
 - Add support for other trading platforms like Expert Options, Close Option, and more.
 
 ## Deferred Tasks
-- 
+- n/a
