@@ -54,16 +54,20 @@ pub enum Ssid {
 impl Ssid {
     pub fn parse(data: impl ToString) -> CoreResult<Self> {
         let data = data.to_string();
-        let parsed = data
-            .trim()
-            .strip_prefix(r#"42["auth","#)
-            .ok_or(CoreError::SsidParsing(
-                "Error parsing ssid string into object".into(),
-            ))?
-            .strip_suffix("]")
-            .ok_or(CoreError::SsidParsing(
-                "Error parsing ssid string into object".into(),
-            ))?;
+        let parsed = if data.trim().starts_with(r#"42["auth","#) {
+            data
+                .trim()
+                .strip_prefix(r#"42["auth","#)
+                .ok_or(CoreError::SsidParsing(
+                    "Error parsing ssid string into object".into(),
+                ))?
+                .strip_suffix("]")
+                .ok_or(CoreError::SsidParsing(
+                    "Error parsing ssid string into object".into(),
+                ))?
+        } else {
+            data.trim()
+        };
         let ssid: Demo =
             serde_json::from_str(parsed).map_err(|e| CoreError::SsidParsing(e.to_string()))?;
         if ssid.is_demo == 1 {
