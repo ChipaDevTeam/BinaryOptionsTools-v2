@@ -81,16 +81,16 @@ impl TryFrom<CandleData> for Candle {
         Ok(Candle {
             symbol: String::new(), // Will be filled by the caller
             timestamp: candle_data.time as f64,
-            open: Decimal::from_f64(candle_data.open).ok_or(BinaryOptionsError::ParseFloat(
+            open: Decimal::from_f64(candle_data.open).ok_or(BinaryOptionsError::General(
                 "Couldn't parse f64 to Decimal".to_string(),
             ))?,
-            high: Decimal::from_f64(candle_data.high).ok_or(BinaryOptionsError::ParseFloat(
+            high: Decimal::from_f64(candle_data.high).ok_or(BinaryOptionsError::General(
                 "Couldn't parse f64 to Decimal".to_string(),
             ))?,
-            low: Decimal::from_f64(candle_data.low).ok_or(BinaryOptionsError::ParseFloat(
+            low: Decimal::from_f64(candle_data.low).ok_or(BinaryOptionsError::General(
                 "Couldn't parse f64 to Decimal".to_string(),
             ))?,
-            close: Decimal::from_f64(candle_data.close).ok_or(BinaryOptionsError::ParseFloat(
+            close: Decimal::from_f64(candle_data.close).ok_or(BinaryOptionsError::General(
                 "Couldn't parse f64 to Decimal".to_string(),
             ))?,
             volume: None,

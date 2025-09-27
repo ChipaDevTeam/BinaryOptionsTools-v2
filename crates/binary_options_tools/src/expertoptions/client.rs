@@ -1,6 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
-use binary_options_tools_core_pre::{builder::ClientBuilder, client::Client, error::CoreError, testing::{TestingWrapper, TestingWrapperBuilder}};
+use binary_options_tools_core_pre::{
+    builder::ClientBuilder,
+    client::Client,
+    error::CoreError,
+    testing::{TestingWrapper, TestingWrapperBuilder},
+};
 use tokio::task::JoinHandle;
 
 use crate::{
@@ -61,15 +66,24 @@ impl ExpertOptions {
 
     /// Disconnects and reconnects the client.
     pub async fn reconnect(&self) -> ExpertOptionsResult<()> {
-        self.client.reconnect().await.map_err(ExpertOptionsError::from)
+        self.client
+            .reconnect()
+            .await
+            .map_err(ExpertOptionsError::from)
     }
 
     /// Shuts down the client and stops the runner.
     pub async fn shutdown(self) -> ExpertOptionsResult<()> {
-        self.client.shutdown().await.map_err(ExpertOptionsError::from)
+        self.client
+            .shutdown()
+            .await
+            .map_err(ExpertOptionsError::from)
     }
 
-    pub async fn new_testing_wrapper(token: impl ToString, demo: bool) -> ExpertOptionsResult<TestingWrapper<State>> {
+    pub async fn new_testing_wrapper(
+        token: impl ToString,
+        demo: bool,
+    ) -> ExpertOptionsResult<TestingWrapper<State>> {
         let pocket_builder = Self::builder(token, demo)?;
         let builder = TestingWrapperBuilder::new()
             .with_stats_interval(Duration::from_secs(10))

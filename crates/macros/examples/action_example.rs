@@ -28,7 +28,6 @@
 //     Demo,
 // }
 
-
 fn main() {
     // let login = LoginAction {
     //     username: "user".to_string(),

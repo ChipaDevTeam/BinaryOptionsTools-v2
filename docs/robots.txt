@@ -2,7 +2,7 @@ User-agent: *
 Allow: /
 
 # Sitemap location
-Sitemap: https://yourusername.github.io/BinaryOptionsTools-v2-1/sitemap.xml
+Sitemap: https://yourusername.github.io/BinaryOptionsTools-v2/sitemap.xml
 
 # Allow indexing of all documentation pages
 Allow: /index.html

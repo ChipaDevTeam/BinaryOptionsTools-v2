@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use futures_util::{
-    stream::{BoxStream, Fuse},
     StreamExt,
+    stream::{BoxStream, Fuse},
 };
 use pyo3::{
-    exceptions::{PyStopAsyncIteration, PyStopIteration},
     PyResult,
+    exceptions::{PyStopAsyncIteration, PyStopIteration},
 };
 use tokio::sync::Mutex;
 

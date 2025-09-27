@@ -14,7 +14,12 @@ pub enum UniError {
 
 impl From<BinaryOptionsError> for UniError {
     fn from(e: BinaryOptionsError) -> Self {
-        UniError::BinaryOptions(e.to_string())
+        match e {
+            BinaryOptionsError::PocketOptions(pocket_error) => {
+                UniError::PocketOption(pocket_error.to_string())
+            }
+            _ => UniError::BinaryOptions(e.to_string()),
+        }
     }
 }
 
@@ -23,4 +28,3 @@ impl From<PocketError> for UniError {
         UniError::PocketOption(e.to_string())
     }
 }
-

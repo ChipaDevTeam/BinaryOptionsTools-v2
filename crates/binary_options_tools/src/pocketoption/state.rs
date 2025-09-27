@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use std::{collections::HashMap, sync::{Arc,  RwLock as SyncRwLock}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock as SyncRwLock},
+};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -218,17 +221,27 @@ impl State {
 
     /// Adds or replaces a validator in the list of raw validators.
     pub fn add_raw_validator(&self, id: Uuid, validator: Validator) {
-        self.raw_validators.write().expect("Failed to acquire write lock").insert(id, validator);
+        self.raw_validators
+            .write()
+            .expect("Failed to acquire write lock")
+            .insert(id, validator);
     }
 
     /// Removes a validator by ID. Returns whether it existed.
     pub fn remove_raw_validator(&self, id: &Uuid) -> bool {
-        self.raw_validators.write().expect("Failed to acquire write lock").remove(id).is_some()
+        self.raw_validators
+            .write()
+            .expect("Failed to acquire write lock")
+            .remove(id)
+            .is_some()
     }
 
     /// Removes all the validators
     pub fn clear_raw_validators(&self) {
-        self.raw_validators.write().expect("Failed to acquire write lock").clear();
+        self.raw_validators
+            .write()
+            .expect("Failed to acquire write lock")
+            .clear();
     }
 }
 

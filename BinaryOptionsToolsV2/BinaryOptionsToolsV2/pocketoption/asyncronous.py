@@ -6,23 +6,26 @@ from datetime import timedelta
 
 import asyncio
 import json
-import sys 
+import sys
 
 
 class AsyncSubscription:
     def __init__(self, subscription):
         """Asyncronous Iterator over json objects"""
         self.subscription = subscription
-        
+
     def __aiter__(self):
         return self
-        
+
     async def __anext__(self):
         return json.loads(await anext(self.subscription))
-    
+
+
 # This file contains all the async code for the PocketOption Module
 class PocketOptionAsync:
-    def __init__(self, ssid: str, url: str | None = None, config: Config | dict | str = None, **_):
+    def __init__(
+        self, ssid: str, url: str | None = None, config: Config | dict | str = None, **_
+    ):
         """
         Initializes a new PocketOptionAsync instance.
 
@@ -72,22 +75,25 @@ class PocketOptionAsync:
             elif isinstance(config, Config):
                 self.config = config
             else:
-                raise ValueError("Config must be either a Config object, dictionary, or JSON string")
+                raise ValueError(
+                    "Config must be either a Config object, dictionary, or JSON string"
+                )
 
             if url is not None:
                 self.client = RawPocketOption.new_with_url(ssid, url)
             else:
                 self.client = RawPocketOption(ssid, config)
-        else: 
+        else:
             self.config = Config()
             if url is not None:
                 self.client = RawPocketOption.new_with_url(ssid, url)
             else:
                 self.client = RawPocketOption(ssid)
         self.logger = Logger()
-    
-    
-    async def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> tuple[str, dict]:
+
+    async def buy(
+        self, asset: str, amount: float, time: int, check_win: bool = False
+    ) -> tuple[str, dict]:
         """
         Places a buy (call) order for the specified asset.
 
@@ -114,12 +120,14 @@ class PocketOptionAsync:
         """
         (trade_id, trade) = await self.client.buy(asset, amount, time)
         if check_win:
-            return trade_id, await self.check_win(trade_id) 
+            return trade_id, await self.check_win(trade_id)
         else:
             trade = json.loads(trade)
-            return trade_id, trade 
-       
-    async def sell(self, asset: str, amount: float, time: int, check_win: bool = False) -> tuple[str, dict]:
+            return trade_id, trade
+
+    async def sell(
+        self, asset: str, amount: float, time: int, check_win: bool = False
+    ) -> tuple[str, dict]:
         """
         Places a sell (put) order for the specified asset.
 
@@ -146,11 +154,11 @@ class PocketOptionAsync:
         """
         (trade_id, trade) = await self.client.sell(asset, amount, time)
         if check_win:
-            return trade_id, await self.check_win(trade_id)   
+            return trade_id, await self.check_win(trade_id)
         else:
             trade = json.loads(trade)
-            return trade_id, trade 
- 
+            return trade_id, trade
+
     async def check_win(self, id: str) -> dict:
         """
         Checks the result of a specific trade.
@@ -170,7 +178,7 @@ class PocketOptionAsync:
             TimeoutError: If result check times out
         """
         # end_time = await self.client.get_deal_end_time(id)
-        
+
         # if end_time is not None:
         #     duration = end_time - int(time.time())
         #     if duration <= 0:
@@ -178,7 +186,7 @@ class PocketOptionAsync:
         # else:
         #     duration = 5
         # duration += self.config.extra_duration
-        
+
         # self.logger.debug(f"Timeout set to: {duration} (6 extra seconds)")
         async def check(id):
             trade = await self.client.check_win(id)
@@ -191,10 +199,10 @@ class PocketOptionAsync:
             else:
                 trade["result"] = "loss"
             return trade
+
         return await check(id)
-        
-        
-    async def get_candles(self, asset: str, period: int, offset: int) -> list[dict]:  
+
+    async def get_candles(self, asset: str, period: int, offset: int) -> list[dict]:
         """
         Retrieves historical candle data for an asset.
 
@@ -220,8 +228,10 @@ class PocketOptionAsync:
         # raise NotImplementedError(
         #     "The get_candles method is not implemented in the PocketOptionAsync class. "
         # )
-    
-    async def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> list[dict]:  
+
+    async def get_candles_advanced(
+        self, asset: str, period: int, offset: int, time: int
+    ) -> list[dict]:
         """
         Retrieves historical candle data for an asset.
 
@@ -248,7 +258,7 @@ class PocketOptionAsync:
         # raise NotImplementedError(
         #     "The get_candles_advanced method is not implemented in the PocketOptionAsync class. "
         # )
-        
+
     async def balance(self) -> float:
         """
         Retrieves current account balance.
@@ -260,26 +270,28 @@ class PocketOptionAsync:
             Updates in real-time as trades are completed
         """
         return await self.client.balance()
-    
+
     async def opened_deals(self) -> list[dict]:
         "Returns a list of all the opened deals as dictionaries"
         return json.loads(await self.client.opened_deals())
         # raise NotImplementedError(
         #     "The opened_deals method is not implemented in the PocketOptionAsync class. "
         # )
-    
+
     async def closed_deals(self) -> list[dict]:
         "Returns a list of all the closed deals as dictionaries"
         return json.loads(await self.client.closed_deals())
         # raise NotImplementedError(
         #     "The closed_deals method is not implemented in the PocketOptionAsync class. "
         # )
-    
+
     async def clear_closed_deals(self) -> None:
         "Removes all the closed deals from memory, this function doesn't return anything"
         await self.client.clear_closed_deals()
 
-    async def payout(self, asset: None | str | list[str] = None) -> dict | list[int] | int:
+    async def payout(
+        self, asset: None | str | list[str] = None
+    ) -> dict | list[int] | int:
         """
         Retrieves current payout percentages for all assets.
 
@@ -293,28 +305,27 @@ class PocketOptionAsync:
             list: If asset is a list, returns a list of payouts for each asset in the same order
             int: If asset is a string, returns the payout for that specific asset
             none: If asset didn't match and valid asset none will be returned
-        """        
+        """
         payout = json.loads(await self.client.payout())
         if isinstance(asset, str):
             return payout.get(asset)
         elif isinstance(asset, list):
             return [payout.get(ast) for ast in asset]
         return payout
-    
+
     async def history(self, asset: str, period: int) -> list[dict]:
         "Returns a list of dictionaries containing the latest data available for the specified asset starting from 'period', the data is in the same format as the returned data of the 'get_candles' function."
         return json.loads(await self.client.history(asset, period))
-    
-    
-    async def _subscribe_symbol_inner(self, asset: str) :
+
+    async def _subscribe_symbol_inner(self, asset: str):
         return await self.client.subscribe_symbol(asset)
-    
+
     async def _subscribe_symbol_chuncked_inner(self, asset: str, chunck_size: int):
         return await self.client.subscribe_symbol_chuncked(asset, chunck_size)
-    
+
     async def _subscribe_symbol_timed_inner(self, asset: str, time: timedelta):
         return await self.client.subscribe_symbol_timed(asset, time)
-    
+
     async def _subscribe_symbol_time_aligned_inner(self, asset: str, time: timedelta):
         return await self.client.subscribe_symbol_time_aligned(asset, time)
 
@@ -336,12 +347,18 @@ class PocketOptionAsync:
             ```
         """
         return AsyncSubscription(await self._subscribe_symbol_inner(asset))
-    
-    async def subscribe_symbol_chuncked(self, asset: str, chunck_size: int) -> AsyncSubscription:
+
+    async def subscribe_symbol_chuncked(
+        self, asset: str, chunck_size: int
+    ) -> AsyncSubscription:
         """Returns an async iterator over the associated asset, it will return real time candles formed with the specified amount of raw candles and will return new candles while the 'PocketOptionAsync' class is loaded if the class is droped then the iterator will fail"""
-        return AsyncSubscription(await self._subscribe_symbol_chuncked_inner(asset, chunck_size))
-    
-    async def subscribe_symbol_timed(self, asset: str, time: timedelta) -> AsyncSubscription:
+        return AsyncSubscription(
+            await self._subscribe_symbol_chuncked_inner(asset, chunck_size)
+        )
+
+    async def subscribe_symbol_timed(
+        self, asset: str, time: timedelta
+    ) -> AsyncSubscription:
         """
         Creates a timed real-time data subscription for an asset.
 
@@ -361,8 +378,10 @@ class PocketOptionAsync:
             ```
         """
         return AsyncSubscription(await self._subscribe_symbol_timed_inner(asset, time))
-    
-    async def subscribe_symbol_time_aligned(self, asset: str, time: timedelta) -> AsyncSubscription:
+
+    async def subscribe_symbol_time_aligned(
+        self, asset: str, time: timedelta
+    ) -> AsyncSubscription:
         """
         Creates a time-aligned real-time data subscription for an asset.
 
@@ -381,12 +400,14 @@ class PocketOptionAsync:
                     print(f"Time-aligned update: {update}")
             ```
         """
-        return AsyncSubscription(await self._subscribe_symbol_time_aligned_inner(asset, time))
-    
+        return AsyncSubscription(
+            await self._subscribe_symbol_time_aligned_inner(asset, time)
+        )
+
     async def send_raw_message(self, message: str) -> None:
         """
         Sends a raw WebSocket message without waiting for a response.
-        
+
         Args:
             message: Raw WebSocket message to send (e.g., '42["ping"]')
         """
@@ -394,18 +415,18 @@ class PocketOptionAsync:
         raise NotImplementedError(
             "The send_raw_message method is not implemented in the PocketOptionAsync class. "
         )
-        
+
     async def create_raw_order(self, message: str, validator: Validator) -> str:
         """
         Sends a raw WebSocket message and waits for a validated response.
-        
+
         Args:
             message: Raw WebSocket message to send
             validator: Validator instance to validate the response
-            
+
         Returns:
             str: The first message that matches the validator's conditions
-            
+
         Example:
             ```python
             validator = Validator.starts_with('451-["signals/load"')
@@ -419,19 +440,21 @@ class PocketOptionAsync:
         raise NotImplementedError(
             "The create_raw_order method is not implemented in the PocketOptionAsync class. "
         )
-        
-    async def create_raw_order_with_timeout(self, message: str, validator: Validator, timeout: timedelta) -> str:
+
+    async def create_raw_order_with_timeout(
+        self, message: str, validator: Validator, timeout: timedelta
+    ) -> str:
         """
         Similar to create_raw_order but with a timeout.
-        
+
         Args:
             message: Raw WebSocket message to send
             validator: Validator instance to validate the response
             timeout: Maximum time to wait for a valid response
-            
+
         Returns:
             str: The first message that matches the validator's conditions
-            
+
         Raises:
             TimeoutError: If no valid response is received within the timeout period
         """
@@ -440,16 +463,18 @@ class PocketOptionAsync:
         raise NotImplementedError(
             "The create_raw_order_with_timout method is not implemented in the PocketOptionAsync class. "
         )
-    
-    async def create_raw_order_with_timeout_and_retry(self, message: str, validator: Validator, timeout: timedelta) -> str:
+
+    async def create_raw_order_with_timeout_and_retry(
+        self, message: str, validator: Validator, timeout: timedelta
+    ) -> str:
         """
         Similar to create_raw_order_with_timout but with automatic retry on failure.
-        
+
         Args:
             message: Raw WebSocket message to send
             validator: Validator instance to validate the response
             timeout: Maximum time to wait for each attempt
-            
+
         Returns:
             str: The first message that matches the validator's conditions
         """
@@ -458,19 +483,21 @@ class PocketOptionAsync:
         raise NotImplementedError(
             "The create_raw_order_with_timeout_and_retry method is not implemented in the PocketOptionAsync class. "
         )
- 
-    async def create_raw_iterator(self, message: str, validator: Validator, timeout: timedelta | None = None):
+
+    async def create_raw_iterator(
+        self, message: str, validator: Validator, timeout: timedelta | None = None
+    ):
         """
         Creates an async iterator that yields validated WebSocket messages.
-        
+
         Args:
             message: Initial WebSocket message to send
             validator: Validator instance to filter incoming messages
             timeout: Optional timeout for the entire stream
-            
+
         Returns:
             AsyncIterator yielding validated messages
-            
+
         Example:
             ```python
             validator = Validator.starts_with('{"signals":')
@@ -486,11 +513,11 @@ class PocketOptionAsync:
         raise NotImplementedError(
             "The create_raw_iterator method is not implemented in the PocketOptionAsync class. "
         )
-    
+
     async def get_server_time(self) -> int:
         """Returns the current server time as a UNIX timestamp"""
         return await self.client.get_server_time()
-    
+
     def is_demo(self) -> bool:
         """
         Checks if the current account is a demo account.
@@ -521,8 +548,9 @@ class PocketOptionAsync:
         """
         return self.client.is_demo()
 
+
 async def _timeout(future, timeout: int):
-    if sys.version_info[:3] >= (3,11): 
+    if sys.version_info[:3] >= (3, 11):
         async with asyncio.timeout(timeout):
             return await future
     else:

@@ -3,13 +3,15 @@
 use std::sync::Arc;
 
 use pyo3::{
-    pyclass, pymethods,
+    Bound, PyObject, PyResult, pyclass, pymethods,
     types::{PyAnyMethods, PyList},
-    Bound, PyObject, PyResult,
 };
 use regex::Regex;
 
 use crate::error::BinaryResultPy;
+use binary_options_tools::traits::ValidatorTrait;
+use binary_options_tools::validator::Validator as CrateValidator;
+use pyo3::Python;
 
 #[pyclass]
 #[derive(Clone)]
@@ -165,5 +167,59 @@ impl RawValidator {
         true
         // let raw = RawWebsocketMessage::from(msg);
         // self.validate(&raw)
+    }
+}
+
+impl From<RawValidator> for CrateValidator {
+    fn from(validator: RawValidator) -> Self {
+        match validator {
+            RawValidator::None() => CrateValidator::None,
+            RawValidator::Regex(regex_validator) => CrateValidator::Regex(regex_validator.regex),
+            RawValidator::StartsWith(prefix) => CrateValidator::StartsWith(prefix),
+            RawValidator::EndsWith(suffix) => CrateValidator::EndsWith(suffix),
+            RawValidator::Contains(substring) => CrateValidator::Contains(substring),
+            RawValidator::All(array_validator) => {
+                let validators: Vec<CrateValidator> =
+                    array_validator.0.into_iter().map(|v| v.into()).collect();
+                CrateValidator::All(Box::new(validators))
+            }
+            RawValidator::Any(array_validator) => {
+                let validators: Vec<CrateValidator> =
+                    array_validator.0.into_iter().map(|v| v.into()).collect();
+                CrateValidator::Any(Box::new(validators))
+            }
+            RawValidator::Not(boxed_validator) => {
+                let validator: CrateValidator = (*boxed_validator.0).into();
+                CrateValidator::Not(Box::new(validator))
+            }
+            RawValidator::Custom(py_custom) => {
+                // Create a custom validator that calls the Python function
+                let custom_validator = Arc::new(PyCustomValidator {
+                    func: py_custom.custom.clone(),
+                });
+                CrateValidator::Custom(custom_validator)
+            }
+        }
+    }
+}
+
+struct PyCustomValidator {
+    func: Arc<PyObject>,
+}
+
+impl ValidatorTrait for PyCustomValidator {
+    fn call(&self, data: &str) -> bool {
+        Python::with_gil(|py| {
+            let func = self.func.as_ref();
+            match func.call1(py, (data,)) {
+                Ok(result) => {
+                    match result.extract::<bool>(py) {
+                        Ok(b) => b,
+                        Err(_) => false, // If we can't extract a bool, return false
+                    }
+                }
+                Err(_) => false, // If the function call fails, return false
+            }
+        })
     }
 }

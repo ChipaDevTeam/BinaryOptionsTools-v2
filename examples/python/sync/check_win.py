@@ -1,6 +1,7 @@
 import time
 from BinaryOptionsToolsV2.pocketoption import PocketOption
 
+
 # Main part of the code
 def main(ssid: str):
     # The api automatically detects if the 'ssid' is for real or demo account
@@ -17,8 +18,6 @@ def main(ssid: str):
     print(f"Sell trade result: {sell_data['result']}\nSell trade data: {sell_data}")
 
 
-    
-if __name__ == '__main__':
-    ssid = input('Please enter your ssid: ')
+if __name__ == "__main__":
+    ssid = input("Please enter your ssid: ")
     main(ssid)
-    

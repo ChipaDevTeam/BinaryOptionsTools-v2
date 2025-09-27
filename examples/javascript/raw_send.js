@@ -9,17 +9,20 @@ async function main(ssid) {
     await new Promise(resolve => setTimeout(resolve, 5000));
     
     try {
+        // Get raw handle
+        const rawHandle = await api.raw_handle();
+        
         // Subscribe to signals
-        await api.sendRawMessage('42["signals/subscribe"]');
+        await rawHandle.send('42["signals/subscribe"]');
         console.log("Sent signals subscription message");
         
         // Subscribe to price updates
-        await api.sendRawMessage('42["price/subscribe"]');
+        await rawHandle.send('42["price/subscribe"]');
         console.log("Sent price subscription message");
         
         // Custom message example
         const customMessage = '42["custom/event",{"param":"value"}]';
-        await api.sendRawMessage(customMessage);
+        await rawHandle.send(customMessage);
         console.log(`Sent custom message: ${customMessage}`);
         
         // Multiple messages in sequence
@@ -30,7 +33,7 @@ async function main(ssid) {
         ];
         
         for (const msg of messages) {
-            await api.sendRawMessage(msg);
+            await rawHandle.send(msg);
             console.log(`Sent message: ${msg}`);
             await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
         }

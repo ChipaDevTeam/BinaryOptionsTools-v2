@@ -9,7 +9,7 @@ async function main(ssid) {
     await new Promise(resolve => setTimeout(resolve, 5000));
     
     // Subscribe to a symbol stream
-    const stream = await api.subscribeSymbol("EURUSD_otc");
+    const stream = await api.subscribe("EURUSD_otc");
     
     console.log("Starting stream...");
     

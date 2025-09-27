@@ -6,7 +6,10 @@ import asyncio
 # from BinaryOptionsToolsV2 import connect
 
 # print(BinaryOptionsToolsV2)
-from BinaryOptionsToolsV2.BinaryOptionsToolsV2.pocketoption.asyncronous import PocketOptionAsync
+from BinaryOptionsToolsV2.BinaryOptionsToolsV2.pocketoption.asyncronous import (
+    PocketOptionAsync,
+)
+
 
 # async def main(ssid):
 #     api = await async_connect(ssid)
@@ -18,7 +21,7 @@ from BinaryOptionsToolsV2.BinaryOptionsToolsV2.pocketoption.asyncronous import P
 #     print(f"Candles: {candles}")
 #     print(f"Trade: {trade}")
 #     df = pd.DataFrame.from_dict(candles)
-#     df.to_csv("candles_eurusd_otc.csv")    
+#     df.to_csv("candles_eurusd_otc.csv")
 async def main(ssid):
     # Testing the new iterator
     api = PocketOptionAsync(ssid)
@@ -27,8 +30,7 @@ async def main(ssid):
     async for item in stream:
         print(item["time"], item["open"])
 
-    
+
 if __name__ == "__main__":
     ssid = input("Write your ssid: ")
     asyncio.run(main(ssid))
-

@@ -10,7 +10,9 @@ if __name__ == "__main__":
     custom = Validator.custom(lambda x: x.startswith("Hello") and x.endswith("World"))
 
     # Modified for better testing - smaller groups with predictable outcomes
-    rall = Validator.all([regex, start])  # Will need both capital letter and "Hello" at start
+    rall = Validator.all(
+        [regex, start]
+    )  # Will need both capital letter and "Hello" at start
     rany = Validator.any([contains, end])  # Will need either "World" or end with "Bye"
 
     print(f"None validator: {none.check('hello')} (Expected: True)")
@@ -28,13 +30,25 @@ if __name__ == "__main__":
         print(f"Custom validator: {custom.check('Hello World')}, (Expected: True)")
         print(f"Custom validator: {custom.check('Hello there')}, (Expected: False)")
     except Exception as e:
-        print(f"Error: {e}")        
+        print(f"Error: {e}")
     # Testing the all validator
-    print(f"All validator: {rall.check('Hello World')} (Expected: True)")  # Starts with "Hello" and has capital
-    print(f"All validator: {rall.check('hello World')} (Expected: False)")  # No capital at start
-    print(f"All validator: {rall.check('Hey there')} (Expected: False)")  # Has capital but doesn't start with "Hello"
+    print(
+        f"All validator: {rall.check('Hello World')} (Expected: True)"
+    )  # Starts with "Hello" and has capital
+    print(
+        f"All validator: {rall.check('hello World')} (Expected: False)"
+    )  # No capital at start
+    print(
+        f"All validator: {rall.check('Hey there')} (Expected: False)"
+    )  # Has capital but doesn't start with "Hello"
 
     # Testing the any validator
-    print(f"Any validator: {rany.check('Hello World')} (Expected: True)")  # Contains "World"
-    print(f"Any validator: {rany.check('Hello Bye')} (Expected: True)")  # Ends with "Bye"
-    print(f"Any validator: {rany.check('Hello there')} (Expected: False)")  # Neither contains "World" nor ends with "Bye"
+    print(
+        f"Any validator: {rany.check('Hello World')} (Expected: True)"
+    )  # Contains "World"
+    print(
+        f"Any validator: {rany.check('Hello Bye')} (Expected: True)"
+    )  # Ends with "Bye"
+    print(
+        f"Any validator: {rany.check('Hello there')} (Expected: False)"
+    )  # Neither contains "World" nor ends with "Bye"

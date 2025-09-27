@@ -8,7 +8,7 @@ async function main(ssid) {
     await new Promise(resolve => setTimeout(resolve, 5000));
     
     const [orderId, details] = await api.buy("EURUSD_otc", 10, 60);
-    const results = await api.checkWin(orderId);
+    const results = await api.result(orderId);
     // Get balance
     console.log(`Balance: ${results.profit}`);
 }

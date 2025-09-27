@@ -3,7 +3,6 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use binary_options_tools_core_pre::{
     builder::ClientBuilder,
     client::Client,
-    error::CoreError,
     testing::{TestingWrapper, TestingWrapperBuilder},
     traits::ApiModule,
 };
@@ -11,6 +10,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::{
+    error::BinaryOptionsError,
     pocketoption::{
         candle::{Candle, SubscriptionType},
         connect::PocketConnect,
@@ -126,7 +126,7 @@ impl PocketOption {
         self.client
             .get_handle::<RawApiModule>()
             .await
-            .ok_or(CoreError::ModuleNotFound("RawApiModule".into()).into())
+            .ok_or(BinaryOptionsError::General("RawApiModule not found".into()).into())
     }
 
     /// Convenience: create a RawHandler bound to a validator, optionally sending a keep-alive message on reconnect.
@@ -139,8 +139,11 @@ impl PocketOption {
             .client
             .get_handle::<RawApiModule>()
             .await
-            .ok_or(CoreError::ModuleNotFound("RawApiModule".into()))?;
-        handle.create(validator, keep_alive).await
+            .ok_or(BinaryOptionsError::General("RawApiModule not found".into()))?;
+        handle
+            .create(validator, keep_alive)
+            .await
+            .map_err(|e| e.into())
     }
 
     /// Gets the current balance of the user.
@@ -194,7 +197,7 @@ impl PocketOption {
                     .await
                     .map(|d| (d.id, d))
             } else {
-                Err(CoreError::ModuleNotFound("TradesApiModule".into()).into())
+                Err(BinaryOptionsError::General("TradesApiModule not found".into()).into())
             }
         } else {
             Err(PocketError::General("Assets not loaded".to_string()))
@@ -260,7 +263,7 @@ impl PocketOption {
         if let Some(handle) = self.client.get_handle::<DealsApiModule>().await {
             handle.check_result(id).await
         } else {
-            Err(CoreError::ModuleNotFound("DealsApiModule".into()).into())
+            Err(BinaryOptionsError::General("DealsApiModule not found".into()).into())
         }
     }
 
@@ -274,7 +277,7 @@ impl PocketOption {
         if let Some(handle) = self.client.get_handle::<DealsApiModule>().await {
             handle.check_result_with_timeout(id, timeout).await
         } else {
-            Err(CoreError::ModuleNotFound("DealsApiModule".into()).into())
+            Err(BinaryOptionsError::General("DealsApiModule not found".into()).into())
         }
     }
 
@@ -292,6 +295,16 @@ impl PocketOption {
         self.client.state.trade_state.clear_closed_deals().await
     }
 
+    /// Gets a specific opened deal by its ID.
+    pub async fn get_opened_deal(&self, deal_id: Uuid) -> Option<Deal> {
+        self.client.state.trade_state.get_opened_deal(deal_id).await
+    }
+
+    /// Gets a specific closed deal by its ID.
+    pub async fn get_closed_deal(&self, deal_id: Uuid) -> Option<Deal> {
+        self.client.state.trade_state.get_closed_deal(deal_id).await
+    }
+
     /// Subscribes to a specific asset's updates.
     pub async fn subscribe(
         &self,
@@ -307,7 +320,7 @@ impl PocketOption {
                 Err(PocketError::InvalidAsset(asset.to_string()))
             }
         } else {
-            Err(CoreError::ModuleNotFound("SubscriptionsApiModule".into()).into())
+            Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
         }
     }
 
@@ -321,7 +334,7 @@ impl PocketOption {
                 Err(PocketError::InvalidAsset(asset.to_string()))
             }
         } else {
-            Err(CoreError::ModuleNotFound("SubscriptionsApiModuel".into()).into())
+            Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
         }
     }
 
@@ -363,7 +376,7 @@ impl PocketOption {
                     .await
             }
         } else {
-            Err(CoreError::ModuleNotFound("GetCandlesApiModule".into()).into())
+            Err(BinaryOptionsError::General("GetCandlesApiModule not found".into()).into())
         }
     }
 
@@ -399,7 +412,7 @@ impl PocketOption {
                 handle.get_candles(asset, period, offset).await
             }
         } else {
-            Err(CoreError::ModuleNotFound("GetCandlesApiModule".into()).into())
+            Err(BinaryOptionsError::General("GetCandlesApiModule not found".into()).into())
         }
     }
 
@@ -422,7 +435,7 @@ impl PocketOption {
                 handle.history(asset.to_string(), period).await
             }
         } else {
-            Err(CoreError::ModuleNotFound("SubscriptionsApiModule".into()).into())
+            Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
         }
     }
 

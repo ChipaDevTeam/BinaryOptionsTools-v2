@@ -70,5 +70,6 @@ pub fn action_impl(input: TokenStream) -> TokenStream {
     };
     quote! {
         #action
-    }.into()
+    }
+    .into()
 }

@@ -3,13 +3,14 @@ use std::time::Duration;
 use binary_options_tools_core_pre::error::CoreError;
 use uuid::Uuid;
 
+use crate::error::BinaryOptionsError;
 use crate::pocketoption::modules::subscriptions::SubscriptionError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum PocketError {
-    #[error("Failed to join task: {0}")]
-    Core(#[from] Box<CoreError>),
-    #[error("State builder error, {0}")]
+    #[error("Core error: {0}")]
+    Core(#[from] CoreError),
+    #[error("State builder error: {0}")]
     StateBuilder(String),
     #[error("Invalid asset: {0}")]
     InvalidAsset(String),
@@ -46,8 +47,11 @@ pub enum PocketError {
 
 pub type PocketResult<T> = Result<T, PocketError>;
 
-impl From<CoreError> for PocketError {
-    fn from(err: CoreError) -> Self {
-        PocketError::Core(Box::new(err))
+impl From<BinaryOptionsError> for PocketError {
+    fn from(error: BinaryOptionsError) -> Self {
+        match error {
+            BinaryOptionsError::PocketOptions(pocket_error) => pocket_error,
+            _ => PocketError::General(format!("BinaryOptionsError: {:?}", error)),
+        }
     }
 }

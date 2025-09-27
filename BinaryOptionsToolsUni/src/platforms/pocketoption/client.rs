@@ -7,6 +7,7 @@ use binary_options_tools::pocketoption::{
 use uuid::Uuid;
 
 use crate::error::UniError;
+use binary_options_tools::error::BinaryOptionsError;
 
 use super::{
     stream::SubscriptionStream,
@@ -60,11 +61,11 @@ impl PocketOption {
     pub async fn init(ssid: String) -> Result<Arc<Self>, UniError> {
         let inner = OriginalPocketOption::new(ssid)
             .await
-            .map_err(UniError::from)?;
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
         Ok(Arc::new(Self { inner }))
     }
 
-        /// Creates a new instance of the PocketOption client.
+    /// Creates a new instance of the PocketOption client.
     ///
     /// This is the primary constructor for the client. It requires a session ID (ssid)
     /// to authenticate with the PocketOption servers.
@@ -92,7 +93,7 @@ impl PocketOption {
     pub async fn new(ssid: String) -> Result<Arc<Self>, UniError> {
         let inner = OriginalPocketOption::new(ssid)
             .await
-            .map_err(UniError::from)?;
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
         Ok(Arc::new(Self { inner }))
     }
 
@@ -109,7 +110,7 @@ impl PocketOption {
     pub async fn new_with_url(ssid: String, url: String) -> Result<Arc<Self>, UniError> {
         let inner = OriginalPocketOption::new_with_url(ssid, url)
             .await
-            .map_err(UniError::from)?;
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
         Ok(Arc::new(Self { inner }))
     }
 
@@ -166,7 +167,7 @@ impl PocketOption {
             .inner
             .trade(asset, original_action, time, amount)
             .await
-            .map_err(UniError::from)?;
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
         Ok(Deal::from(deal))
     }
 
@@ -216,9 +217,13 @@ impl PocketOption {
     /// A `Deal` object representing the completed trade.
     #[uniffi::method]
     pub async fn result(&self, id: String) -> Result<Deal, UniError> {
-        let uuid = Uuid::parse_str(&id)
-            .map_err(|e| UniError::Uuid(format!("Invalid UUID: {e}")))?;
-        let deal = self.inner.result(uuid).await.map_err(UniError::from)?;
+        let uuid =
+            Uuid::parse_str(&id).map_err(|e| UniError::Uuid(format!("Invalid UUID: {e}")))?;
+        let deal = self
+            .inner
+            .result(uuid)
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
         Ok(Deal::from(deal))
     }
 
@@ -238,13 +243,13 @@ impl PocketOption {
         id: String,
         timeout_secs: u64,
     ) -> Result<Deal, UniError> {
-        let uuid = Uuid::parse_str(&id)
-            .map_err(|e| UniError::Uuid(format!("Invalid UUID: {e}")))?;
+        let uuid =
+            Uuid::parse_str(&id).map_err(|e| UniError::Uuid(format!("Invalid UUID: {e}")))?;
         let deal = self
             .inner
             .result_with_timeout(uuid, StdDuration::from_secs(timeout_secs))
             .await
-            .map_err(UniError::from)?;
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
         Ok(Deal::from(deal))
     }
 
@@ -293,19 +298,22 @@ impl PocketOption {
         duration_secs: u64,
     ) -> Result<Arc<SubscriptionStream>, UniError> {
         let sub_type = SubscriptionType::time_aligned(StdDuration::from_secs(duration_secs))
-            .map_err(UniError::from)?;
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
         let original_stream = self
             .inner
             .subscribe(asset, sub_type)
             .await
-            .map_err(UniError::from)?;
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
         Ok(SubscriptionStream::from_original(original_stream))
     }
 
     /// Unsubscribes from real-time candle data for a specific asset.
     #[uniffi::method]
     pub async fn unsubscribe(&self, asset: String) -> Result<(), UniError> {
-        self.inner.unsubscribe(asset).await.map_err(UniError::from)
+        self.inner
+            .unsubscribe(asset)
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))
     }
 
     /// Gets historical candle data for a specific asset with advanced parameters.
@@ -321,7 +329,7 @@ impl PocketOption {
             .inner
             .get_candles_advanced(asset, period, time, offset)
             .await
-            .map_err(UniError::from)?
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?
             .into_iter()
             .map(Candle::from)
             .collect();
@@ -340,7 +348,7 @@ impl PocketOption {
             .inner
             .get_candles(asset, period, offset)
             .await
-            .map_err(UniError::from)?
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?
             .into_iter()
             .map(Candle::from)
             .collect();
@@ -354,7 +362,7 @@ impl PocketOption {
             .inner
             .history(asset, period)
             .await
-            .map_err(UniError::from)?
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?
             .into_iter()
             .map(Candle::from)
             .collect();
@@ -364,7 +372,10 @@ impl PocketOption {
     /// Disconnects and reconnects the client.
     #[uniffi::method]
     pub async fn reconnect(&self) -> Result<(), UniError> {
-        self.inner.reconnect().await.map_err(UniError::from)
+        self.inner
+            .reconnect()
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))
     }
 
     /// Shuts down the client and stops all background tasks.
@@ -374,6 +385,10 @@ impl PocketOption {
     #[uniffi::method]
     pub async fn shutdown(self: Arc<Self>) -> Result<(), UniError> {
         // Call shutdown on a clone of the inner client to consume it
-        self.inner.clone().shutdown().await.map_err(UniError::from)
+        self.inner
+            .clone()
+            .shutdown()
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))
     }
 }

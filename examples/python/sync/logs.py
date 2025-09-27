@@ -1,10 +1,13 @@
 from BinaryOptionsToolsV2.tracing import start_logs
 from BinaryOptionsToolsV2.pocketoption import PocketOption
 
+
 # Main part of the code
 def main(ssid: str):
     # Start logs, it works perfectly on sync code
-    start_logs(path=".", level="DEBUG", terminal=True) # If false then the logs will only be written to the log files
+    start_logs(
+        path=".", level="DEBUG", terminal=True
+    )  # If false then the logs will only be written to the log files
     # The api automatically detects if the 'ssid' is for real or demo account
     api = PocketOption(ssid)
     (buy_id, _) = api.buy(asset="EURUSD_otc", amount=1.0, time=300, check_win=False)
@@ -17,8 +20,6 @@ def main(ssid: str):
     print(f"Sell trade result: {sell_data['result']}\nSell trade data: {sell_data}")
 
 
-    
-if __name__ == '__main__':
-    ssid = input('Please enter your ssid: ')
+if __name__ == "__main__":
+    ssid = input("Please enter your ssid: ")
     main(ssid)
-    

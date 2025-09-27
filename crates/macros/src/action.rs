@@ -33,34 +33,33 @@ impl ActionImpl {
                 }
             }
         }
-    //         fn call(&self, msg: &Message) -> bool {
-    //     // tracing::info!("Called with message: {:?}", msg);
-    //     match msg {
-    //         Message::Text(text) => {
-    //             for pattern in &self.patterns {
-    //                 if text.starts_with(pattern) {
-    //                     self.valid.store(true, Ordering::SeqCst);
-    //                     return false;
-    //                 }
-    //             }
-    //             false
-    //         }
-    //         Message::Binary(_) => {
-    //             if self.valid.load(Ordering::SeqCst) {
-    //                 self.valid.store(false, Ordering::SeqCst);
-    //                 true
-    //             } else {
-    //                 false
-    //             }
-    //         }
-    //         _ => false,
-    //     }
-    // }
+        //         fn call(&self, msg: &Message) -> bool {
+        //     // tracing::info!("Called with message: {:?}", msg);
+        //     match msg {
+        //         Message::Text(text) => {
+        //             for pattern in &self.patterns {
+        //                 if text.starts_with(pattern) {
+        //                     self.valid.store(true, Ordering::SeqCst);
+        //                     return false;
+        //                 }
+        //             }
+        //             false
+        //         }
+        //         Message::Binary(_) => {
+        //             if self.valid.load(Ordering::SeqCst) {
+        //                 self.valid.store(false, Ordering::SeqCst);
+        //                 true
+        //             } else {
+        //                 false
+        //             }
+        //         }
+        //         _ => false,
+        //     }
+        // }
 
-    // fn reset(&self) {
-    //     self.valid.store(false, Ordering::SeqCst)
-    // }
-
+        // fn reset(&self) {
+        //     self.valid.store(false, Ordering::SeqCst)
+        // }
     }
     /// Generate the implementation tokens for the ActionName trait
     pub fn generate_impl(&self) -> proc_macro2::TokenStream {

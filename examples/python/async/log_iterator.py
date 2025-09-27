@@ -3,19 +3,22 @@ from BinaryOptionsToolsV2.tracing import Logger, LogBuilder
 from datetime import timedelta
 import asyncio
 
+
 async def main():
     """
     Main asynchronous function demonstrating the usage of logging system.
     """
-    
+
     # Create a Logger instance
     logger = Logger()
-    
+
     # Create a LogBuilder instance
     log_builder = LogBuilder()
-    
+
     # Create a new logs iterator with INFO level and 10-second timeout
-    log_iterator = log_builder.create_logs_iterator(level="INFO", timeout=timedelta(seconds=10))
+    log_iterator = log_builder.create_logs_iterator(
+        level="INFO", timeout=timedelta(seconds=10)
+    )
 
     # Configure logging to write to a file
     # This will create or append to 'logs.log' file with INFO level logs
@@ -58,7 +61,7 @@ async def main():
         """
         Function demonstrating the use of LogSubscription.
         """
-        
+
         try:
             async for log in log_iterator:
                 print(f"Received log: {log}")
@@ -69,11 +72,10 @@ async def main():
 
     # Run the logs processing function
     task2 = asyncio.create_task(process_logs(log_iterator))
-    
+
     # Execute both tasks at the same time
     await asyncio.gather(task1, task2)
 
-    
 
 if __name__ == "__main__":
     asyncio.run(main())

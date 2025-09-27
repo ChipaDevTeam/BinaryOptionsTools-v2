@@ -10,11 +10,14 @@ async function main(ssid) {
     
     // Basic raw order example
     try {
+        // Create a validator for successful responses
         const basicValidator = Validator.contains('"status":"success"');
-        const basicResponse = await api.createRawOrder(
-            '42["signals/subscribe"]',
-            basicValidator
-        );
+        
+        // Create a raw handler with the validator
+        const rawHandler = await api.create_raw_handler(basicValidator, null);
+        
+        // Send a message using the raw handler
+        const basicResponse = await rawHandler.send_and_wait('42["signals/subscribe"]');
         console.log(`Basic raw order response: ${basicResponse}`);
     } catch (error) {
         console.log(`Basic raw order failed: ${error}`);
@@ -22,11 +25,16 @@ async function main(ssid) {
 
     // Raw order with timeout example
     try {
+        // Create a validator for signal data
         const timeoutValidator = Validator.regex(/{\"type\":\"signal\",\"data\":.*}/);
-        const timeoutResponse = await api.createRawOrderWithTimeout(
+        
+        // Create a raw handler with the validator
+        const rawHandler = await api.create_raw_handler(timeoutValidator, null);
+        
+        // Send a message with timeout
+        const timeoutResponse = await rawHandler.send_and_wait_with_timeout(
             '42["signals/load"]',
-            timeoutValidator,
-            { timeout: 5000 } // 5 seconds
+            5000 // 5 seconds
         );
         console.log(`Raw order with timeout response: ${timeoutResponse}`);
     } catch (error) {
@@ -37,21 +45,25 @@ async function main(ssid) {
         }
     }
 
-    // Raw order with timeout and retry example
+    // Raw order with keep-alive message example
     try {
-        const retryValidator = Validator.all([
+        // Create a validator for trade completion
+        const keepAliveValidator = Validator.all([
             Validator.contains('"type":"trade"'),
             Validator.contains('"status":"completed"')
         ]);
         
-        const retryResponse = await api.createRawOrderWithTimeoutAndRetry(
-            '42["trade/subscribe"]',
-            retryValidator,
-            { timeout: 10000 } // 10 seconds
-        );
-        console.log(`Raw order with retry response: ${retryResponse}`);
+        // Create a keep-alive message
+        const keepAliveMessage = '42["ping"]';
+        
+        // Create a raw handler with the validator and keep-alive message
+        const rawHandler = await api.create_raw_handler(keepAliveValidator, keepAliveMessage);
+        
+        // Send a message using the raw handler
+        const keepAliveResponse = await rawHandler.send_and_wait('42["trade/subscribe"]');
+        console.log(`Raw order with keep-alive response: ${keepAliveResponse}`);
     } catch (error) {
-        console.log(`Order with retry failed: ${error}`);
+        console.log(`Order with keep-alive failed: ${error}`);
     }
 }
 
