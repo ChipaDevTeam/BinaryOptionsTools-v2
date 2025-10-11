@@ -42,6 +42,9 @@ pip install binaryoptionstoolsv2
 # Examples
 You can find the examples for all the features available of the library in the [examples](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/examples) directory.
 
+# Supported Assets and Timeframes
+For a complete list of supported assets and timeframes, check the [Supported Assets and Timeframes](docs/SUPPORTED_ASSETS_TIMEFRAMES.md) documentation.
+
 # Info
 Currently we support the following languages:
 * Python

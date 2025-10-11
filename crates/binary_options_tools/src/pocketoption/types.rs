@@ -334,9 +334,11 @@ pub enum AssetType {
 }
 
 impl Asset {
-    const DEFAULT_CANDLE_LENGTHS: [CandleLength; 9] = [
+    const DEFAULT_CANDLE_LENGTHS: [CandleLength; 11] = [
         CandleLength::new(5),
+        CandleLength::new(10),
         CandleLength::new(15),
+        CandleLength::new(20),
         CandleLength::new(30),
         CandleLength::new(60),
         CandleLength::new(60 * 3),
