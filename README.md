@@ -31,7 +31,11 @@ Currently we only support **Pocket Option** (quick trading) with the following f
 For the full python documentation check [here](https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html).
 # To install it using pip:
 ```
-pip install binaryoptionstoolsv2
+# Windows
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/master/wheels/BinaryOptionsToolsV2-0.1.8-cp38-abi3-win_amd64.whl?raw=true"
+
+# Linux
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/master/wheels/BinaryOptionsToolsV2-0.2.0-cp38-abi3-manylinux_2_34_x86_64.whl?raw=true"
 ```
 # To install it manually:
 ## Clone the repo and cd into ./BinartOptionsToolsV2
