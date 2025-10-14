@@ -80,6 +80,26 @@ impl PocketOption {
             .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg))))
     }
 
+    /// Creates a new PocketOption client with the provided session ID.
+    ///
+    /// # Arguments
+    /// * `ssid` - The session ID (SSID cookie value) for authenticating with PocketOption.
+    ///
+    /// # Returns
+    /// A `PocketResult` containing the initialized `PocketOption` client.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use binary_options_tools::PocketOption;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let balance = client.balance().await;
+    ///     println!("Balance: {}", balance);
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn new(ssid: impl ToString) -> PocketResult<Self> {
         let builder = Self::builder(ssid)?;
         let (client, mut runner) = builder.build().await?;
@@ -93,6 +113,17 @@ impl PocketOption {
         })
     }
 
+    /// Creates a new PocketOption client with a custom WebSocket URL.
+    ///
+    /// This method allows you to specify a custom WebSocket URL for connecting to the PocketOption platform,
+    /// which can be useful for testing or connecting to alternative endpoints.
+    ///
+    /// # Arguments
+    /// * `ssid` - The session ID (SSID cookie value) for authenticating with PocketOption.
+    /// * `url` - The custom WebSocket URL to connect to.
+    ///
+    /// # Returns
+    /// A `PocketResult` containing the initialized `PocketOption` client.
     pub async fn new_with_url(ssid: impl ToString, url: String) -> PocketResult<Self> {
         let state = StateBuilder::default()
             .ssid(Ssid::parse(ssid)?)
@@ -158,6 +189,10 @@ impl PocketOption {
         -1.0
     }
 
+    /// Checks if the account is a demo account.
+    ///
+    /// # Returns
+    /// `true` if the account is a demo account, `false` if it's a real account.
     pub fn is_demo(&self) -> bool {
         let state = &self.client.state;
         state.ssid.demo()
@@ -324,6 +359,13 @@ impl PocketOption {
         }
     }
 
+    /// Unsubscribes from a specific asset's real-time updates.
+    ///
+    /// # Arguments
+    /// * `asset` - The asset symbol to unsubscribe from.
+    ///
+    /// # Returns
+    /// A `PocketResult` indicating success or an error if the unsubscribe operation fails.
     pub async fn unsubscribe(&self, asset: impl ToString) -> PocketResult<()> {
         if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await
             && let Some(assets) = self.assets().await
