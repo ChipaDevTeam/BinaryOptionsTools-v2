@@ -10,7 +10,7 @@ mod validator;
 
 // use config::PyConfig;
 use logs::{LogBuilder, Logger, StreamLogsIterator, StreamLogsLayer, start_tracing};
-use pocketoption::{RawPocketOption, RawStreamIterator, StreamIterator};
+use pocketoption::{RawPocketOption, RawStreamIterator, StreamIterator, RawHandle, RawHandler};
 use pyo3::prelude::*;
 use validator::RawValidator;
 
@@ -25,6 +25,8 @@ fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<StreamIterator>()?;
     m.add_class::<RawStreamIterator>()?;
     m.add_class::<RawValidator>()?;
+    m.add_class::<RawHandle>()?;
+    m.add_class::<RawHandler>()?;
     // m.add_class::<PyConfig>()?;
 
     m.add_function(wrap_pyfunction!(start_tracing, m)?)?;
