@@ -1,5 +1,9 @@
-👉 [Join us on Discord](https://discord.gg/T3FGXcmd)
-# [BinaryOptionsToolsV2](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/0.1.6a4)
+# BinaryOptionsToolsV2 - Python Package
+
+[![Discord](https://img.shields.io/discord/your-discord-id?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/T3FGXcmd)
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://pypi.org/project/binaryoptionstoolsv2/)
+
+Python bindings for BinaryOptionsTools - A powerful library for automated binary options trading on PocketOption platform.
 
 ## Current Status
 
@@ -120,18 +124,28 @@ from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 import asyncio 
  
 async def main(): 
-    client = PocketOptionAsync(ssid="your-session-id") 
-    await asyncio.sleep(5)
-    balance = await client.balance() 
-    print("Account Balance:", balance) 
+    # Initialize the client
+    client = PocketOptionAsync(ssid="your-session-id")
     
-    # Place a trade
+    # IMPORTANT: Wait for connection to establish
+    await asyncio.sleep(5)
+    
+    # Get account balance
+    balance = await client.balance() 
+    print(f"Account Balance: ${balance}")
+    
+    # Place a buy trade
     trade_id, deal = await client.buy("EURUSD_otc", 60, 1.0)
     print(f"Trade placed: {deal}")
     
     # Check result
     result = await client.check_win(trade_id)
     print(f"Trade result: {result}")
+    
+    # Subscribe to real-time data
+    async for candle in client.subscribe_symbol("EURUSD_otc"):
+        print(f"New candle: {candle}")
+        break  # Just print one candle for demo
  
 asyncio.run(main()) 
 ``` 
@@ -174,18 +188,29 @@ Example Usage
 from BinaryOptionsToolsV2.pocketoption import PocketOption 
 import time
 
-client = PocketOption(ssid="your-session-id") 
-time.sleep(5)
-balance = client.balance() 
-print("Account Balance:", balance)
+# Initialize the client
+client = PocketOption(ssid="your-session-id")
 
-# Place a trade
+# IMPORTANT: Wait for connection to establish
+time.sleep(5)
+
+# Get account balance
+balance = client.balance() 
+print(f"Account Balance: ${balance}")
+
+# Place a buy trade
 trade_id, deal = client.buy("EURUSD_otc", 60, 1.0)
 print(f"Trade placed: {deal}")
 
 # Check result
 result = client.check_win(trade_id)
 print(f"Trade result: {result}")
+
+# Subscribe to real-time data
+stream = client.subscribe_symbol("EURUSD_otc")
+for candle in stream:
+    print(f"New candle: {candle}")
+    break  # Just print one candle for demo
 ```
 
 4. Differences Between PocketOption and PocketOptionAsync 
@@ -219,3 +244,194 @@ from BinaryOptionsToolsV2.tracing import start_logs
 # Initialize logging
 start_logs(path="logs/", level="INFO", terminal=True)
 ```
+
+## 📖 Detailed Examples
+
+### Basic Trading Example (Synchronous)
+
+```python
+from BinaryOptionsToolsV2.pocketoption import PocketOption
+import time
+
+def main():
+    # Initialize client
+    client = PocketOption(ssid="your-session-id")
+    
+    # IMPORTANT: Wait for connection
+    time.sleep(5)
+    
+    # Get balance
+    balance = client.balance()
+    print(f"Current Balance: ${balance}")
+    
+    # Place a buy trade on EURUSD for 60 seconds with $1
+    trade_id, deal = client.buy(asset="EURUSD_otc", time=60, amount=1.0)
+    print(f"Trade ID: {trade_id}")
+    print(f"Deal Data: {deal}")
+    
+    # Wait for trade to complete (60 seconds)
+    time.sleep(65)
+    
+    # Check the result
+    result = client.check_win(trade_id)
+    print(f"Trade Result: {result['result']}")  # 'win', 'loss', or 'draw'
+    print(f"Profit: ${result.get('profit', 0)}")
+
+if __name__ == "__main__":
+    main()
+```
+
+### Basic Trading Example (Asynchronous)
+
+```python
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main():
+    # Initialize client
+    client = PocketOptionAsync(ssid="your-session-id")
+    
+    # IMPORTANT: Wait for connection
+    await asyncio.sleep(5)
+    
+    # Get balance
+    balance = await client.balance()
+    print(f"Current Balance: ${balance}")
+    
+    # Place a buy trade on EURUSD for 60 seconds with $1
+    trade_id, deal = await client.buy(asset="EURUSD_otc", time=60, amount=1.0)
+    print(f"Trade ID: {trade_id}")
+    print(f"Deal Data: {deal}")
+    
+    # Wait for trade to complete (60 seconds)
+    await asyncio.sleep(65)
+    
+    # Check the result
+    result = await client.check_win(trade_id)
+    print(f"Trade Result: {result['result']}")  # 'win', 'loss', or 'draw'
+    print(f"Profit: ${result.get('profit', 0)}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Real-Time Data Subscription (Synchronous)
+
+```python
+from BinaryOptionsToolsV2.pocketoption import PocketOption
+import time
+
+def main():
+    client = PocketOption(ssid="your-session-id")
+    time.sleep(5)  # Wait for connection
+    
+    # Subscribe to real-time candle data
+    stream = client.subscribe_symbol("EURUSD_otc")
+    
+    print("Listening for real-time candles...")
+    for candle in stream:
+        print(f"Time: {candle.get('time')}")
+        print(f"Open: {candle.get('open')}")
+        print(f"High: {candle.get('high')}")
+        print(f"Low: {candle.get('low')}")
+        print(f"Close: {candle.get('close')}")
+        print("---")
+
+if __name__ == "__main__":
+    main()
+```
+
+### Real-Time Data Subscription (Asynchronous)
+
+```python
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main():
+    client = PocketOptionAsync(ssid="your-session-id")
+    await asyncio.sleep(5)  # Wait for connection
+    
+    # Subscribe to real-time candle data
+    async for candle in client.subscribe_symbol("EURUSD_otc"):
+        print(f"Time: {candle.get('time')}")
+        print(f"Open: {candle.get('open')}")
+        print(f"High: {candle.get('high')}")
+        print(f"Low: {candle.get('low')}")
+        print(f"Close: {candle.get('close')}")
+        print("---")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Checking Opened Deals
+
+```python
+from BinaryOptionsToolsV2.pocketoption import PocketOption
+import time
+
+def main():
+    client = PocketOption(ssid="your-session-id")
+    time.sleep(5)  # Wait for connection
+    
+    # Get all opened deals
+    opened_deals = client.opened_deals()
+    
+    if opened_deals:
+        print(f"You have {len(opened_deals)} opened deals:")
+        for deal in opened_deals:
+            print(f"  - Trade ID: {deal.get('id')}")
+            print(f"    Asset: {deal.get('asset')}")
+            print(f"    Amount: ${deal.get('amount')}")
+            print(f"    Direction: {deal.get('action')}")
+    else:
+        print("No opened deals")
+
+if __name__ == "__main__":
+    main()
+```
+
+## 🔑 Important Notes
+
+### Connection Initialization
+
+**Always wait 5 seconds after creating the client** to allow the connection to establish properly. The library connects to the WebSocket in a separate thread/task, so the code continues immediately. Without the wait, API calls will fail.
+
+```python
+# Synchronous
+client = PocketOption(ssid="your-session-id")
+time.sleep(5)  # Critical!
+
+# Asynchronous
+client = PocketOptionAsync(ssid="your-session-id")
+await asyncio.sleep(5)  # Critical!
+```
+
+### Getting Your SSID
+
+1. Go to [PocketOption](https://pocketoption.com)
+2. Open Developer Tools (F12)
+3. Go to Application/Storage → Cookies
+4. Find the cookie named `ssid`
+5. Copy its value
+
+### Supported Assets
+
+Common assets include:
+- `EURUSD_otc` - Euro/US Dollar (OTC)
+- `GBPUSD_otc` - British Pound/US Dollar (OTC)
+- `USDJPY_otc` - US Dollar/Japanese Yen (OTC)
+- `AUDUSD_otc` - Australian Dollar/US Dollar (OTC)
+- And many more...
+
+Use `_otc` suffix for over-the-counter (24/7 available) assets.
+
+## 📚 Additional Resources
+
+- **Full Examples**: [examples/python](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/examples/python)
+- **API Documentation**: [https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html](https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html)
+- **Discord Community**: [Join us](https://discord.gg/T3FGXcmd)
+
+## ⚠️ Risk Warning
+
+Trading binary options involves substantial risk and may result in the loss of all invested capital. This library is provided for educational purposes only. Always trade responsibly and never invest more than you can afford to lose.
