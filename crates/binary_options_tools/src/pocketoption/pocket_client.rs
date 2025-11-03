@@ -443,6 +443,19 @@ impl PocketOption {
         self.client.get_handle::<M>().await
     }
 
+    /// Disconnects the client while keeping the configuration intact.
+    /// The connection can be re-established later using `connect()`.
+    /// This is useful for temporarily closing the connection without losing credentials or settings.
+    pub async fn disconnect(&self) -> PocketResult<()> {
+        self.client.disconnect().await.map_err(PocketError::from)
+    }
+
+    /// Establishes a connection after a manual disconnect.
+    /// This will reconnect using the same configuration and credentials.
+    pub async fn connect(&self) -> PocketResult<()> {
+        self.client.reconnect().await.map_err(PocketError::from)
+    }
+
     /// Disconnects and reconnects the client.
     pub async fn reconnect(&self) -> PocketResult<()> {
         self.client.reconnect().await.map_err(PocketError::from)

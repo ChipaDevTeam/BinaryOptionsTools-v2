@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use pyo3::{
-    Bound, PyObject, PyResult, pyclass, pymethods,
+    Bound, PyResult, pyclass, pymethods, Py, PyAny,
     types::{PyAnyMethods, PyList},
 };
 use regex::Regex;
@@ -30,7 +30,7 @@ pub struct RegexValidator {
 #[pyclass]
 #[derive(Clone)]
 pub struct PyCustom {
-    custom: Arc<PyObject>,
+    custom: Arc<Py<PyAny>>,
 }
 
 #[pyclass]
@@ -155,7 +155,7 @@ impl RawValidator {
     }
 
     #[staticmethod]
-    pub fn custom(func: PyObject) -> Self {
+    pub fn custom(func: Py<PyAny>) -> Self {
         Self::Custom(PyCustom {
             custom: Arc::new(func),
         })
@@ -204,12 +204,12 @@ impl From<RawValidator> for CrateValidator {
 }
 
 struct PyCustomValidator {
-    func: Arc<PyObject>,
+    func: Arc<Py<PyAny>>,
 }
 
 impl ValidatorTrait for PyCustomValidator {
     fn call(&self, data: &str) -> bool {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let func = self.func.as_ref();
             match func.call1(py, (data,)) {
                 Ok(result) => {

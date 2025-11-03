@@ -1,6 +1,6 @@
 [package]
 name = "BinaryOptionsToolsV2"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "A library to connect to PocketOption using python with async and sync support."
 license = "BSD License (BSD)"
@@ -13,25 +13,25 @@ name = "BinaryOptionsToolsV2"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.25.1", features = [
+pyo3 = { version = "0.27.1", features = [
     "experimental-async",
     "chrono",
     "abi3-py38",
 ] }
-pyo3-async-runtimes = { version = "0.25.0", features = ["tokio-runtime"] }
+pyo3-async-runtimes = { version = "0.27.0", features = ["tokio-runtime"] }
 
 binary-options-tools = { path = "../crates/binary_options_tools", version = "0.1.8" }
 
-thiserror = "2.0.12"
-serde = { version = "1.0.219", features = ["derive"] }
+thiserror = "2.0.17"
+serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.142"
 uuid = "1.18.0"
 tracing = "0.1.41"
-tokio = "1.47.1"
+tokio = "1.48.0"
 futures-util = "0.3.31"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-chrono = "0.4.41"
-url = "2.5.4"
-regex = "1.11.1"
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
+chrono = "0.4.42"
+url = "2.5.7"
+regex = "1.12.2"
 async-stream = "0.3.6"
-tungstenite = "0.27.0"
+tungstenite = "0.28.0"
