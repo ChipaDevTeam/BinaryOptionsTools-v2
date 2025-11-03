@@ -2,6 +2,14 @@
 name = "binary_options_tools_uni"
 version = "0.1.0"
 edition = "2024"
+authors = ["ChipaDevTeam"]
+repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+description = "UniFFI bindings for binary-options-tools. Enables multi-language support (Kotlin, Swift, Python) for cross-platform binary options trading automation."
+keywords = ["binary-options", "uniffi", "cross-platform", "trading"]
+categories = ["api-bindings"]
+license-file = "../LICENSE"
 
 [[bin]]
 # This can be whatever name makes sense for your project, but the rest of this tutorial assumes uniffi-bindgen.

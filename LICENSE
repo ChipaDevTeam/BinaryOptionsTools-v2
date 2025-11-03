@@ -1,21 +1,96 @@
-MIT License
+BinaryOptionsTools v2 - Custom License
 
-Copyright (c) 2025 Chipa
+Copyright (c) 2025 ChipaDevTeam
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. DEFINITIONS
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+"Software" refers to BinaryOptionsTools v2 and all associated documentation, 
+source code, binaries, and related materials.
+
+"Personal Use" means use by individuals for non-commercial, educational, 
+research, or personal trading purposes.
+
+"Commercial Use" means use of the Software in any manner primarily intended 
+for commercial advantage or monetary compensation, including but not limited 
+to: selling access to the Software, using the Software as part of a paid 
+service, or integrating the Software into commercial products.
+
+2. GRANT OF LICENSE
+
+2.1 Personal Use License
+Permission is hereby granted, free of charge, to any person obtaining a copy 
+of this Software, to use, copy, modify, and distribute the Software for 
+Personal Use only, subject to the following conditions:
+
+a) The above copyright notice and this permission notice shall be included in 
+   all copies or substantial portions of the Software.
+b) This Software is provided "AS IS" for Personal Use only.
+
+2.2 Commercial Use License
+Commercial Use of this Software requires explicit written permission from 
+ChipaDevTeam. To request permission for Commercial Use, contact us at:
+- Discord: https://discord.gg/p7YyFqSmAz
+- GitHub: https://github.com/ChipaDevTeam
+
+3. DISCLAIMER OF WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+
+4. LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL THE AUTHORS, COPYRIGHT HOLDERS, OR CHIPADEVTEAM BE LIABLE 
+FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR 
+THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+The authors and ChipaDevTeam are not responsible for:
+- Any financial losses incurred from using this Software
+- Any trading decisions made using this Software
+- Any bugs, errors, or issues in the Software
+- Any consequences of using this Software for trading binary options or 
+  other financial instruments
+
+5. RISK WARNING
+
+Binary options trading carries significant risk. This Software is provided 
+for educational and personal use only. Users should:
+- Never risk more than they can afford to lose
+- Understand the risks involved in binary options trading
+- Comply with all applicable laws and regulations
+- Use the Software at their own risk
+
+6. DISTRIBUTION
+
+You may distribute copies of the Software for Personal Use, provided that:
+a) You include this license file
+b) You clearly indicate this is for Personal Use only
+c) You do not charge for distribution
+d) You preserve all copyright notices
+
+7. MODIFICATIONS
+
+You may modify the Software for Personal Use. Modified versions:
+a) Must retain this license
+b) Must clearly indicate they are modified versions
+c) Cannot be used for Commercial Use without permission
+d) Cannot remove or modify copyright notices
+
+8. TERMINATION
+
+This license automatically terminates if you violate any of its terms. Upon 
+termination, you must destroy all copies of the Software in your possession.
+
+9. CONTACT
+
+For Commercial Use licensing, questions, or permissions:
+- Discord: https://discord.gg/p7YyFqSmAz
+- GitHub: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2
+
+---
+
+By using this Software, you acknowledge that you have read this license, 
+understand it, and agree to be bound by its terms and conditions.

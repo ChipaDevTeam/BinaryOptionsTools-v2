@@ -289,7 +289,18 @@ Contributions are welcome! Please ensure:
 
 ## License
 
-See [LICENSE](LICENSE) file for details.
+**Personal Use License** - Free for personal, educational, and non-commercial use.
+
+**Commercial Use** - Requires explicit written permission from ChipaDevTeam. Contact us on [Discord](https://discord.gg/p7YyFqSmAz) for commercial licensing.
+
+See the full [LICENSE](LICENSE) file for complete terms and conditions.
+
+### Key Points:
+- ✅ **Free** for personal use, learning, and private trading
+- ✅ **Open source** - modify and distribute for personal use
+- ⚠️ **Commercial use requires permission** - Contact us first
+- ⚠️ **No warranty** - Software provided "as is"
+- ⚠️ **No liability** - Use at your own risk
 
 ## Support
 
@@ -298,4 +309,16 @@ See [LICENSE](LICENSE) file for details.
 
 ## Disclaimer
 
-This library is for educational purposes. Binary options trading carries significant risk. Always trade responsibly and never risk more than you can afford to lose.
+**IMPORTANT**: This software is provided "AS IS" without any warranty. The authors and ChipaDevTeam are NOT responsible for:
+- Any financial losses incurred from using this software
+- Any trading decisions made using this software  
+- Any bugs, errors, or issues in the software
+- Any consequences of using this software for trading
+
+**Risk Warning**: Binary options trading carries significant financial risk. This software is for educational and personal use only. You should:
+- Never risk more than you can afford to lose
+- Understand the risks involved in binary options trading
+- Comply with all applicable laws and regulations in your jurisdiction
+- Use this software at your own risk
+
+By using this software, you acknowledge and accept these terms.

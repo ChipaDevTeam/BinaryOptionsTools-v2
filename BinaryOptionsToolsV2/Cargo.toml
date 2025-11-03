@@ -2,10 +2,15 @@
 name = "BinaryOptionsToolsV2"
 version = "0.2.1"
 edition = "2024"
-description = "A library to connect to PocketOption using python with async and sync support."
-license = "BSD License (BSD)"
-homepage = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+authors = ["ChipaDevTeam"]
+description = "Python bindings for binary-options-tools. High-performance library for PocketOption trading automation with async/sync support, real-time data streaming, and WebSocket API access."
+license-file = "../LICENSE"
+homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html"
 readme = "Readme.md"
+keywords = ["binary-options", "pocketoption", "trading", "python", "pyo3"]
+categories = ["api-bindings"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
