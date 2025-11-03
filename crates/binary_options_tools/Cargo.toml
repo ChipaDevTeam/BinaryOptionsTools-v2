@@ -1,5 +1,5 @@
 [package]
-name = "binary-options-tools"
+name = "binary_options_tools"
 version = "0.1.9"
 edition = "2024"
 authors = ["ChipaDevTeam"]
