@@ -13,13 +13,31 @@
 edition = "2024"
 name = "binary-options-tools-core-pre"
 version = "0.1.1"
+authors = ["ChipaDevTeam"]
 build = false
 autolib = false
 autobins = false
 autoexamples = false
 autotests = false
 autobenches = false
+description = "Low-level WebSocket client and protocol handler for binary options trading. Core foundation providing connection management, message routing, and async communication primitives."
+homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
 readme = "README.md"
+keywords = [
+    "binary-options",
+    "websocket",
+    "trading",
+    "async",
+    "tokio",
+]
+categories = [
+    "asynchronous",
+    "network-programming",
+    "api-bindings",
+]
+license-file = "LICENSE"
+repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
 
 [lib]
 name = "binary_options_tools_core_pre"

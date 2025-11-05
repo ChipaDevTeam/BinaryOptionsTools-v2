@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import sys
 import ctypes
+from dataclasses import dataclass
 import enum
 import struct
 import contextlib
@@ -28,8 +29,9 @@ import typing
 import asyncio
 import platform
 
+
 # Used for default argument values
-_DEFAULT = object()  # type: typing.Any
+_DEFAULT = object() # type: typing.Any
 
 
 class _UniffiRustBuffer(ctypes.Structure):
@@ -45,24 +47,20 @@ class _UniffiRustBuffer(ctypes.Structure):
 
     @staticmethod
     def alloc(size):
-        return _uniffi_rust_call(
-            _UniffiLib.ffi_binary_options_tools_uni_rustbuffer_alloc, size
-        )
+        return _uniffi_rust_call(_UniffiLib.ffi_binary_options_tools_uni_rustbuffer_alloc, size)
 
     @staticmethod
     def reserve(rbuf, additional):
-        return _uniffi_rust_call(
-            _UniffiLib.ffi_binary_options_tools_uni_rustbuffer_reserve, rbuf, additional
-        )
+        return _uniffi_rust_call(_UniffiLib.ffi_binary_options_tools_uni_rustbuffer_reserve, rbuf, additional)
 
     def free(self):
-        return _uniffi_rust_call(
-            _UniffiLib.ffi_binary_options_tools_uni_rustbuffer_free, self
-        )
+        return _uniffi_rust_call(_UniffiLib.ffi_binary_options_tools_uni_rustbuffer_free, self)
 
     def __str__(self):
         return "_UniffiRustBuffer(capacity={}, len={}, data={})".format(
-            self.capacity, self.len, self.data[0 : self.len]
+            self.capacity,
+            self.len,
+            self.data[0:self.len]
         )
 
     @contextlib.contextmanager
@@ -90,9 +88,7 @@ class _UniffiRustBuffer(ctypes.Structure):
             s = _UniffiRustBufferStream.from_rust_buffer(self)
             yield s
             if s.remaining() != 0:
-                raise RuntimeError(
-                    "junk data left in buffer at end of consume_with_stream"
-                )
+                raise RuntimeError(f"junk data left in buffer at end of consume_with_stream {s.remaining()}")
         finally:
             self.free()
 
@@ -106,8 +102,7 @@ class _UniffiRustBuffer(ctypes.Structure):
         s = _UniffiRustBufferStream.from_rust_buffer(self)
         yield s
         if s.remaining() != 0:
-            raise RuntimeError("junk data left in buffer at end of read_with_stream")
-
+            raise RuntimeError(f"junk data left in buffer at end of read_with_stream {s.remaining()}")
 
 class _UniffiForeignBytes(ctypes.Structure):
     _fields_ = [
@@ -116,9 +111,7 @@ class _UniffiForeignBytes(ctypes.Structure):
     ]
 
     def __str__(self):
-        return "_UniffiForeignBytes(len={}, data={})".format(
-            self.len, self.data[0 : self.len]
-        )
+        return "_UniffiForeignBytes(len={}, data={})".format(self.len, self.data[0:self.len])
 
 
 class _UniffiRustBufferStream:
@@ -141,14 +134,14 @@ class _UniffiRustBufferStream:
     def _unpack_from(self, size, format):
         if self.offset + size > self.len:
             raise InternalError("read past end of rust buffer")
-        value = struct.unpack(format, self.data[self.offset : self.offset + size])[0]
+        value = struct.unpack(format, self.data[self.offset:self.offset+size])[0]
         self.offset += size
         return value
 
     def read(self, size):
         if self.offset + size > self.len:
             raise InternalError("read past end of rust buffer")
-        data = self.data[self.offset : self.offset + size]
+        data = self.data[self.offset:self.offset+size]
         self.offset += size
         return data
 
@@ -182,7 +175,6 @@ class _UniffiRustBufferStream:
 
     def read_double(self):
         return self._unpack_from(8, ">d")
-
 
 class _UniffiRustBufferBuilder:
     """
@@ -252,22 +244,17 @@ class _UniffiRustBufferBuilder:
         self._pack_into(8, ">d", v)
 
     def write_c_size_t(self, v):
-        self._pack_into(ctypes.sizeof(ctypes.c_size_t), "@N", v)
-
-
+        self._pack_into(ctypes.sizeof(ctypes.c_size_t) , "@N", v)
 # A handful of classes and functions to support the generated data structures.
 # This would be a good candidate for isolating in its own ffi-support lib.
 
-
 class InternalError(Exception):
     pass
-
 
 class _UniffiRustCallStatus(ctypes.Structure):
     """
     Error runtime.
     """
-
     _fields_ = [
         ("code", ctypes.c_int8),
         ("error_buf", _UniffiRustBuffer),
@@ -280,10 +267,7 @@ class _UniffiRustCallStatus(ctypes.Structure):
 
     @staticmethod
     def default():
-        return _UniffiRustCallStatus(
-            code=_UniffiRustCallStatus.CALL_SUCCESS,
-            error_buf=_UniffiRustBuffer.default(),
-        )
+        return _UniffiRustCallStatus(code=_UniffiRustCallStatus.CALL_SUCCESS, error_buf=_UniffiRustBuffer.default())
 
     def __str__(self):
         if self.code == _UniffiRustCallStatus.CALL_SUCCESS:
@@ -295,11 +279,9 @@ class _UniffiRustCallStatus(ctypes.Structure):
         else:
             return "_UniffiRustCallStatus(<invalid code>)"
 
-
 def _uniffi_rust_call(fn, *args):
     # Call a rust function
     return _uniffi_rust_call_with_error(None, fn, *args)
-
 
 def _uniffi_rust_call_with_error(error_ffi_converter, fn, *args):
     # Call a rust function and handle any errors
@@ -313,16 +295,13 @@ def _uniffi_rust_call_with_error(error_ffi_converter, fn, *args):
     _uniffi_check_call_status(error_ffi_converter, call_status)
     return result
 
-
 def _uniffi_check_call_status(error_ffi_converter, call_status):
     if call_status.code == _UniffiRustCallStatus.CALL_SUCCESS:
         pass
     elif call_status.code == _UniffiRustCallStatus.CALL_ERROR:
         if error_ffi_converter is None:
             call_status.error_buf.free()
-            raise InternalError(
-                "_uniffi_rust_call_with_error: CALL_ERROR, but error_ffi_converter is None"
-            )
+            raise InternalError("_uniffi_rust_call_with_error: CALL_ERROR, but error_ffi_converter is None")
         else:
             raise error_ffi_converter.lift(call_status.error_buf)
     elif call_status.code == _UniffiRustCallStatus.CALL_UNEXPECTED_ERROR:
@@ -330,27 +309,22 @@ def _uniffi_check_call_status(error_ffi_converter, call_status):
         # with the message.  But if that code panics, then it just sends back
         # an empty buffer.
         if call_status.error_buf.len > 0:
-            msg = _UniffiConverterString.lift(call_status.error_buf)
+            msg = _UniffiFfiConverterString.lift(call_status.error_buf)
         else:
             msg = "Unknown rust panic"
         raise InternalError(msg)
     else:
-        raise InternalError(
-            "Invalid _UniffiRustCallStatus code: {}".format(call_status.code)
-        )
-
+        raise InternalError("Invalid _UniffiRustCallStatus code: {}".format(
+            call_status.code))
 
 def _uniffi_trait_interface_call(call_status, make_call, write_return_value):
     try:
         return write_return_value(make_call())
     except Exception as e:
         call_status.code = _UniffiRustCallStatus.CALL_UNEXPECTED_ERROR
-        call_status.error_buf = _UniffiConverterString.lower(repr(e))
+        call_status.error_buf = _UniffiFfiConverterString.lower(repr(e))
 
-
-def _uniffi_trait_interface_call_with_error(
-    call_status, make_call, write_return_value, error_type, lower_error
-):
+def _uniffi_trait_interface_call_with_error(call_status, make_call, write_return_value, error_type, lower_error):
     try:
         try:
             return write_return_value(make_call())
@@ -359,8 +333,11 @@ def _uniffi_trait_interface_call_with_error(
             call_status.error_buf = lower_error(e)
     except Exception as e:
         call_status.code = _UniffiRustCallStatus.CALL_UNEXPECTED_ERROR
-        call_status.error_buf = _UniffiConverterString.lower(repr(e))
-
+        call_status.error_buf = _UniffiFfiConverterString.lower(repr(e))
+# Initial value and increment amount for handles. 
+# These ensure that Python-generated handles always have the lowest bit set
+_UNIFFI_HANDLEMAP_INITIAL = 1
+_UNIFFI_HANDLEMAP_DELTA = 2
 
 class _UniffiHandleMap:
     """
@@ -371,32 +348,43 @@ class _UniffiHandleMap:
         # type Handle = int
         self._map = {}  # type: Dict[Handle, Any]
         self._lock = threading.Lock()
-        self._counter = itertools.count()
+        self._counter = _UNIFFI_HANDLEMAP_INITIAL
 
     def insert(self, obj):
         with self._lock:
-            handle = next(self._counter)
-            self._map[handle] = obj
-            return handle
+            return self._insert(obj)
+
+    """Low-level insert, this assumes `self._lock` is held."""
+    def _insert(self, obj):
+        handle = self._counter
+        self._counter += _UNIFFI_HANDLEMAP_DELTA
+        self._map[handle] = obj
+        return handle
 
     def get(self, handle):
         try:
             with self._lock:
                 return self._map[handle]
         except KeyError:
-            raise InternalError("_UniffiHandleMap.get: Invalid handle")
+            raise InternalError(f"_UniffiHandleMap.get: Invalid handle {handle}")
+
+    def clone(self, handle):
+        try:
+            with self._lock:
+                obj = self._map[handle]
+                return self._insert(obj)
+        except KeyError:
+            raise InternalError(f"_UniffiHandleMap.clone: Invalid handle {handle}")
 
     def remove(self, handle):
         try:
             with self._lock:
                 return self._map.pop(handle)
         except KeyError:
-            raise InternalError("_UniffiHandleMap.remove: Invalid handle")
+            raise InternalError(f"_UniffiHandleMap.remove: Invalid handle: {handle}")
 
     def __len__(self):
         return len(self._map)
-
-
 # Types conforming to `_UniffiConverterPrimitive` pass themselves directly over the FFI.
 class _UniffiConverterPrimitive:
     @classmethod
@@ -407,29 +395,17 @@ class _UniffiConverterPrimitive:
     def lower(cls, value):
         return value
 
-
 class _UniffiConverterPrimitiveInt(_UniffiConverterPrimitive):
     @classmethod
     def check_lower(cls, value):
         try:
             value = value.__index__()
         except Exception:
-            raise TypeError(
-                "'{}' object cannot be interpreted as an integer".format(
-                    type(value).__name__
-                )
-            )
+            raise TypeError("'{}' object cannot be interpreted as an integer".format(type(value).__name__))
         if not isinstance(value, int):
-            raise TypeError(
-                "__index__ returned non-int (type {})".format(type(value).__name__)
-            )
+            raise TypeError("__index__ returned non-int (type {})".format(type(value).__name__))
         if not cls.VALUE_MIN <= value < cls.VALUE_MAX:
-            raise ValueError(
-                "{} requires {} <= value < {}".format(
-                    cls.CLASS_NAME, cls.VALUE_MIN, cls.VALUE_MAX
-                )
-            )
-
+            raise ValueError("{} requires {} <= value < {}".format(cls.CLASS_NAME, cls.VALUE_MIN, cls.VALUE_MAX))
 
 class _UniffiConverterPrimitiveFloat(_UniffiConverterPrimitive):
     @classmethod
@@ -439,10 +415,7 @@ class _UniffiConverterPrimitiveFloat(_UniffiConverterPrimitive):
         except Exception:
             raise TypeError("must be real number, not {}".format(type(value).__name__))
         if not isinstance(value, float):
-            raise TypeError(
-                "__float__ returned non-float (type {})".format(type(value).__name__)
-            )
-
+            raise TypeError("__float__ returned non-float (type {})".format(type(value).__name__))
 
 # Helper class for wrapper types that will always go through a _UniffiRustBuffer.
 # Classes should inherit from this and implement the `read` and `write` static methods.
@@ -458,7 +431,6 @@ class _UniffiConverterRustBuffer:
             cls.write(value, builder)
             return builder.finalize()
 
-
 # Contains loading, initialization code, and the FFI Function declarations.
 # Define some ctypes FFI types that we use in the library
 
@@ -467,13 +439,11 @@ Function pointer for a Rust task, which a callback function that takes a opaque 
 """
 _UNIFFI_RUST_TASK = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_int8)
 
-
 def _uniffi_future_callback_t(return_type):
     """
     Factory function to create callback function types for async functions
     """
     return ctypes.CFUNCTYPE(None, ctypes.c_uint64, return_type, _UniffiRustCallStatus)
-
 
 def _uniffi_load_indirect():
     """
@@ -500,538 +470,96 @@ def _uniffi_load_indirect():
     lib = ctypes.cdll.LoadLibrary(path)
     return lib
 
-
 def _uniffi_check_contract_api_version(lib):
     # Get the bindings contract version from our ComponentInterface
-    bindings_contract_version = 29
+    bindings_contract_version = 30
     # Get the scaffolding contract version by calling the into the dylib
-    scaffolding_contract_version = (
-        lib.ffi_binary_options_tools_uni_uniffi_contract_version()
-    )
+    scaffolding_contract_version = lib.ffi_binary_options_tools_uni_uniffi_contract_version()
     if bindings_contract_version != scaffolding_contract_version:
-        raise InternalError(
-            "UniFFI contract version mismatch: try cleaning and rebuilding your project"
-        )
-
+        raise InternalError("UniFFI contract version mismatch: try cleaning and rebuilding your project")
 
 def _uniffi_check_api_checksums(lib):
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_assets()
-        != 48493
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_balance()
-        != 26020
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
+    if lib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_init() != 50054:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new() != 31315:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new_with_url() != 40992:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_assets() != 48493:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_balance() != 26020:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_buy() != 63032:
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_clear_closed_deals()
-        != 9178
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles()
-        != 23490
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles_advanced()
-        != 27509
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_closed_deals()
-        != 47785
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_opened_deals()
-        != 27985
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_history()
-        != 27093
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_is_demo()
-        != 19411
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_reconnect()
-        != 9220
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_clear_closed_deals() != 9178:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_create_raw_handler() != 34256:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles() != 23490:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles_advanced() != 27509:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_closed_deals() != 47785:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_opened_deals() != 27985:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_history() != 27093:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_is_demo() != 19411:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_payout() != 5344:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_reconnect() != 9220:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_result() != 594:
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_result_with_timeout()
-        != 56468
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_result_with_timeout() != 56468:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_sell() != 61157:
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_server_time()
-        != 10589
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_shutdown()
-        != 51452
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_subscribe()
-        != 23382
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_trade()
-        != 14619
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_unsubscribe()
-        != 29837
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next()
-        != 13448
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new()
-        != 31315
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-    if (
-        lib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new_with_url()
-        != 40992
-    ):
-        raise InternalError(
-            "UniFFI API checksum mismatch: try cleaning and rebuilding your project"
-        )
-
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_server_time() != 10589:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_shutdown() != 51452:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_subscribe() != 23382:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_trade() != 14619:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_unsubscribe() != 29837:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_and_wait() != 12420:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_binary() != 12514:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_text() != 41075:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_wait_next() != 65338:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next() != 13448:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_all() != 22652:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_any() != 239:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_contains() != 4008:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_ends_with() != 3462:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_ne() != 13897:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_new() != 49602:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_regex() != 42529:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_starts_with() != 32570:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_binary_options_tools_uni_checksum_method_validator_check() != 57297:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
 
 # A ctypes library to expose the extern-C FFI definitions.
 # This is an implementation detail which will be called internally by the public API.
 
 _UniffiLib = _uniffi_load_indirect()
-_UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    ctypes.c_int8,
-)
-_UNIFFI_FOREIGN_FUTURE_FREE = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-)
-_UNIFFI_CALLBACK_INTERFACE_FREE = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-)
-
-
-class _UniffiForeignFuture(ctypes.Structure):
-    _fields_ = [
-        ("handle", ctypes.c_uint64),
-        ("free", _UNIFFI_FOREIGN_FUTURE_FREE),
-    ]
-
-
-class _UniffiForeignFutureStructU8(ctypes.Structure):
-    _fields_ = [
-        ("return_value", ctypes.c_uint8),
-        ("call_status", _UniffiRustCallStatus),
-    ]
-
-
-_UNIFFI_FOREIGN_FUTURE_COMPLETE_U8 = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    _UniffiForeignFutureStructU8,
-)
-
-
-class _UniffiForeignFutureStructI8(ctypes.Structure):
-    _fields_ = [
-        ("return_value", ctypes.c_int8),
-        ("call_status", _UniffiRustCallStatus),
-    ]
-
-
-_UNIFFI_FOREIGN_FUTURE_COMPLETE_I8 = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    _UniffiForeignFutureStructI8,
-)
-
-
-class _UniffiForeignFutureStructU16(ctypes.Structure):
-    _fields_ = [
-        ("return_value", ctypes.c_uint16),
-        ("call_status", _UniffiRustCallStatus),
-    ]
-
-
-_UNIFFI_FOREIGN_FUTURE_COMPLETE_U16 = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    _UniffiForeignFutureStructU16,
-)
-
-
-class _UniffiForeignFutureStructI16(ctypes.Structure):
-    _fields_ = [
-        ("return_value", ctypes.c_int16),
-        ("call_status", _UniffiRustCallStatus),
-    ]
-
-
-_UNIFFI_FOREIGN_FUTURE_COMPLETE_I16 = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    _UniffiForeignFutureStructI16,
-)
-
-
-class _UniffiForeignFutureStructU32(ctypes.Structure):
-    _fields_ = [
-        ("return_value", ctypes.c_uint32),
-        ("call_status", _UniffiRustCallStatus),
-    ]
-
-
-_UNIFFI_FOREIGN_FUTURE_COMPLETE_U32 = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    _UniffiForeignFutureStructU32,
-)
-
-
-class _UniffiForeignFutureStructI32(ctypes.Structure):
-    _fields_ = [
-        ("return_value", ctypes.c_int32),
-        ("call_status", _UniffiRustCallStatus),
-    ]
-
-
-_UNIFFI_FOREIGN_FUTURE_COMPLETE_I32 = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    _UniffiForeignFutureStructI32,
-)
-
-
-class _UniffiForeignFutureStructU64(ctypes.Structure):
-    _fields_ = [
-        ("return_value", ctypes.c_uint64),
-        ("call_status", _UniffiRustCallStatus),
-    ]
-
-
-_UNIFFI_FOREIGN_FUTURE_COMPLETE_U64 = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    _UniffiForeignFutureStructU64,
-)
-
-
-class _UniffiForeignFutureStructI64(ctypes.Structure):
-    _fields_ = [
-        ("return_value", ctypes.c_int64),
-        ("call_status", _UniffiRustCallStatus),
-    ]
-
-
-_UNIFFI_FOREIGN_FUTURE_COMPLETE_I64 = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    _UniffiForeignFutureStructI64,
-)
-
-
-class _UniffiForeignFutureStructF32(ctypes.Structure):
-    _fields_ = [
-        ("return_value", ctypes.c_float),
-        ("call_status", _UniffiRustCallStatus),
-    ]
-
-
-_UNIFFI_FOREIGN_FUTURE_COMPLETE_F32 = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    _UniffiForeignFutureStructF32,
-)
-
-
-class _UniffiForeignFutureStructF64(ctypes.Structure):
-    _fields_ = [
-        ("return_value", ctypes.c_double),
-        ("call_status", _UniffiRustCallStatus),
-    ]
-
-
-_UNIFFI_FOREIGN_FUTURE_COMPLETE_F64 = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    _UniffiForeignFutureStructF64,
-)
-
-
-class _UniffiForeignFutureStructPointer(ctypes.Structure):
-    _fields_ = [
-        ("return_value", ctypes.c_void_p),
-        ("call_status", _UniffiRustCallStatus),
-    ]
-
-
-_UNIFFI_FOREIGN_FUTURE_COMPLETE_POINTER = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    _UniffiForeignFutureStructPointer,
-)
-
-
-class _UniffiForeignFutureStructRustBuffer(ctypes.Structure):
-    _fields_ = [
-        ("return_value", _UniffiRustBuffer),
-        ("call_status", _UniffiRustCallStatus),
-    ]
-
-
-_UNIFFI_FOREIGN_FUTURE_COMPLETE_RUST_BUFFER = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    _UniffiForeignFutureStructRustBuffer,
-)
-
-
-class _UniffiForeignFutureStructVoid(ctypes.Structure):
-    _fields_ = [
-        ("call_status", _UniffiRustCallStatus),
-    ]
-
-
-_UNIFFI_FOREIGN_FUTURE_COMPLETE_VOID = ctypes.CFUNCTYPE(
-    None,
-    ctypes.c_uint64,
-    _UniffiForeignFutureStructVoid,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_pocketoption.argtypes = (
-    ctypes.c_void_p,
-    ctypes.POINTER(_UniffiRustCallStatus),
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_pocketoption.restype = (
-    ctypes.c_void_p
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_free_pocketoption.argtypes = (
-    ctypes.c_void_p,
-    ctypes.POINTER(_UniffiRustCallStatus),
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_free_pocketoption.restype = None
-_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new.argtypes = (
-    _UniffiRustBuffer,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new.restype = (
-    ctypes.c_uint64
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new_with_url.argtypes = (
-    _UniffiRustBuffer,
-    _UniffiRustBuffer,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new_with_url.restype = ctypes.c_uint64
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_assets.argtypes = (
-    ctypes.c_void_p,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_assets.restype = (
-    ctypes.c_uint64
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_balance.argtypes = (
-    ctypes.c_void_p,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_balance.restype = (
-    ctypes.c_uint64
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_buy.argtypes = (
-    ctypes.c_void_p,
-    _UniffiRustBuffer,
-    ctypes.c_uint32,
-    ctypes.c_double,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_buy.restype = (
-    ctypes.c_uint64
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals.argtypes = (
-    ctypes.c_void_p,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals.restype = ctypes.c_uint64
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles.argtypes = (
-    ctypes.c_void_p,
-    _UniffiRustBuffer,
-    ctypes.c_int64,
-    ctypes.c_int64,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles.restype = ctypes.c_uint64
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced.argtypes = (
-    ctypes.c_void_p,
-    _UniffiRustBuffer,
-    ctypes.c_int64,
-    ctypes.c_int64,
-    ctypes.c_int64,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced.restype = ctypes.c_uint64
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals.argtypes = (
-    ctypes.c_void_p,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals.restype = ctypes.c_uint64
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals.argtypes = (
-    ctypes.c_void_p,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals.restype = ctypes.c_uint64
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_history.argtypes = (
-    ctypes.c_void_p,
-    _UniffiRustBuffer,
-    ctypes.c_uint32,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_history.restype = (
-    ctypes.c_uint64
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo.argtypes = (
-    ctypes.c_void_p,
-    ctypes.POINTER(_UniffiRustCallStatus),
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo.restype = (
-    ctypes.c_int8
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect.argtypes = (
-    ctypes.c_void_p,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect.restype = (
-    ctypes.c_uint64
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result.argtypes = (
-    ctypes.c_void_p,
-    _UniffiRustBuffer,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result.restype = (
-    ctypes.c_uint64
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout.argtypes = (
-    ctypes.c_void_p,
-    _UniffiRustBuffer,
-    ctypes.c_uint64,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout.restype = ctypes.c_uint64
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_sell.argtypes = (
-    ctypes.c_void_p,
-    _UniffiRustBuffer,
-    ctypes.c_uint32,
-    ctypes.c_double,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_sell.restype = (
-    ctypes.c_uint64
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time.argtypes = (
-    ctypes.c_void_p,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time.restype = ctypes.c_uint64
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown.argtypes = (
-    ctypes.c_void_p,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown.restype = (
-    ctypes.c_uint64
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe.argtypes = (
-    ctypes.c_void_p,
-    _UniffiRustBuffer,
-    ctypes.c_uint64,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe.restype = (
-    ctypes.c_uint64
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_trade.argtypes = (
-    ctypes.c_void_p,
-    _UniffiRustBuffer,
-    _UniffiRustBuffer,
-    ctypes.c_uint32,
-    ctypes.c_double,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_trade.restype = (
-    ctypes.c_uint64
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe.argtypes = (
-    ctypes.c_void_p,
-    _UniffiRustBuffer,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe.restype = ctypes.c_uint64
-_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_subscriptionstream.argtypes = (
-    ctypes.c_void_p,
-    ctypes.POINTER(_UniffiRustCallStatus),
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_subscriptionstream.restype = (
-    ctypes.c_void_p
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_free_subscriptionstream.argtypes = (
-    ctypes.c_void_p,
-    ctypes.POINTER(_UniffiRustCallStatus),
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_free_subscriptionstream.restype = None
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next.argtypes = (
-    ctypes.c_void_p,
-)
-_UniffiLib.uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next.restype = (
-    ctypes.c_uint64
-)
 _UniffiLib.ffi_binary_options_tools_uni_rustbuffer_alloc.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
@@ -1041,9 +569,7 @@ _UniffiLib.ffi_binary_options_tools_uni_rustbuffer_from_bytes.argtypes = (
     _UniffiForeignBytes,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
-_UniffiLib.ffi_binary_options_tools_uni_rustbuffer_from_bytes.restype = (
-    _UniffiRustBuffer
-)
+_UniffiLib.ffi_binary_options_tools_uni_rustbuffer_from_bytes.restype = _UniffiRustBuffer
 _UniffiLib.ffi_binary_options_tools_uni_rustbuffer_free.argtypes = (
     _UniffiRustBuffer,
     ctypes.POINTER(_UniffiRustCallStatus),
@@ -1055,6 +581,15 @@ _UniffiLib.ffi_binary_options_tools_uni_rustbuffer_reserve.argtypes = (
     ctypes.POINTER(_UniffiRustCallStatus),
 )
 _UniffiLib.ffi_binary_options_tools_uni_rustbuffer_reserve.restype = _UniffiRustBuffer
+_UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK = ctypes.CFUNCTYPE(None,ctypes.c_uint64,ctypes.c_int8,
+)
+_UNIFFI_FOREIGN_FUTURE_DROPPED_CALLBACK = ctypes.CFUNCTYPE(None,ctypes.c_uint64,
+)
+class _UniffiForeignFutureDroppedCallbackStruct(ctypes.Structure):
+    _fields_ = [
+        ("handle", ctypes.c_uint64),
+        ("free", _UNIFFI_FOREIGN_FUTURE_DROPPED_CALLBACK),
+    ]
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_u8.argtypes = (
     ctypes.c_uint64,
     _UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK,
@@ -1065,15 +600,15 @@ _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_u8.argtypes = (
     ctypes.c_uint64,
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_u8.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u8.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u8.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u8.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u8.restype = ctypes.c_uint8
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u8.argtypes = (
+    ctypes.c_uint64,
+)
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u8.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_i8.argtypes = (
     ctypes.c_uint64,
     _UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK,
@@ -1084,15 +619,15 @@ _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_i8.argtypes = (
     ctypes.c_uint64,
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_i8.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i8.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i8.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_i8.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_i8.restype = ctypes.c_int8
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i8.argtypes = (
+    ctypes.c_uint64,
+)
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i8.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_u16.argtypes = (
     ctypes.c_uint64,
     _UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK,
@@ -1103,17 +638,15 @@ _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_u16.argtypes = (
     ctypes.c_uint64,
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_u16.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u16.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u16.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u16.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u16.restype = (
-    ctypes.c_uint16
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u16.restype = ctypes.c_uint16
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u16.argtypes = (
+    ctypes.c_uint64,
 )
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u16.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_i16.argtypes = (
     ctypes.c_uint64,
     _UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK,
@@ -1124,17 +657,15 @@ _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_i16.argtypes = (
     ctypes.c_uint64,
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_i16.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i16.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i16.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_i16.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_i16.restype = (
-    ctypes.c_int16
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_i16.restype = ctypes.c_int16
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i16.argtypes = (
+    ctypes.c_uint64,
 )
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i16.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_u32.argtypes = (
     ctypes.c_uint64,
     _UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK,
@@ -1145,17 +676,15 @@ _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_u32.argtypes = (
     ctypes.c_uint64,
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_u32.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u32.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u32.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u32.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u32.restype = (
-    ctypes.c_uint32
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u32.restype = ctypes.c_uint32
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u32.argtypes = (
+    ctypes.c_uint64,
 )
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u32.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_i32.argtypes = (
     ctypes.c_uint64,
     _UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK,
@@ -1166,17 +695,15 @@ _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_i32.argtypes = (
     ctypes.c_uint64,
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_i32.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i32.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i32.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_i32.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_i32.restype = (
-    ctypes.c_int32
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_i32.restype = ctypes.c_int32
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i32.argtypes = (
+    ctypes.c_uint64,
 )
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i32.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_u64.argtypes = (
     ctypes.c_uint64,
     _UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK,
@@ -1187,17 +714,15 @@ _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_u64.argtypes = (
     ctypes.c_uint64,
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_u64.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u64.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u64.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u64.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u64.restype = (
-    ctypes.c_uint64
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u64.restype = ctypes.c_uint64
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u64.argtypes = (
+    ctypes.c_uint64,
 )
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u64.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_i64.argtypes = (
     ctypes.c_uint64,
     _UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK,
@@ -1208,17 +733,15 @@ _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_i64.argtypes = (
     ctypes.c_uint64,
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_i64.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i64.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i64.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_i64.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_i64.restype = (
-    ctypes.c_int64
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_i64.restype = ctypes.c_int64
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i64.argtypes = (
+    ctypes.c_uint64,
 )
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i64.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_f32.argtypes = (
     ctypes.c_uint64,
     _UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK,
@@ -1229,17 +752,15 @@ _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_f32.argtypes = (
     ctypes.c_uint64,
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_f32.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_f32.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_f32.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_f32.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_f32.restype = (
-    ctypes.c_float
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_f32.restype = ctypes.c_float
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_f32.argtypes = (
+    ctypes.c_uint64,
 )
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_f32.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_f64.argtypes = (
     ctypes.c_uint64,
     _UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK,
@@ -1250,38 +771,15 @@ _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_f64.argtypes = (
     ctypes.c_uint64,
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_f64.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_f64.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_f64.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_f64.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_f64.restype = (
-    ctypes.c_double
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_pointer.argtypes = (
-    ctypes.c_uint64,
-    _UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK,
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_f64.restype = ctypes.c_double
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_f64.argtypes = (
     ctypes.c_uint64,
 )
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_pointer.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_pointer.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_pointer.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_pointer.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_pointer.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_pointer.argtypes = (
-    ctypes.c_uint64,
-    ctypes.POINTER(_UniffiRustCallStatus),
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_pointer.restype = (
-    ctypes.c_void_p
-)
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_f64.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer.argtypes = (
     ctypes.c_uint64,
     _UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK,
@@ -1292,17 +790,15 @@ _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_rust_buffer.argtypes 
     ctypes.c_uint64,
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_rust_buffer.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer.restype = (
-    _UniffiRustBuffer
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer.restype = _UniffiRustBuffer
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer.argtypes = (
+    ctypes.c_uint64,
 )
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_void.argtypes = (
     ctypes.c_uint64,
     _UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK,
@@ -1313,91 +809,440 @@ _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_void.argtypes = (
     ctypes.c_uint64,
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_cancel_void.restype = None
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void.argtypes = (
-    ctypes.c_uint64,
-)
-_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void.restype = None
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
 )
 _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void.restype = None
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_assets.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_assets.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_balance.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_balance.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_buy.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_buy.restype = (
-    ctypes.c_uint16
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void.argtypes = (
+    ctypes.c_uint64,
 )
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_clear_closed_deals.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_clear_closed_deals.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles_advanced.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles_advanced.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_closed_deals.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_closed_deals.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_opened_deals.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_opened_deals.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_history.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_history.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_is_demo.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_is_demo.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_reconnect.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_reconnect.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_result.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_result.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_result_with_timeout.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_result_with_timeout.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_sell.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_sell.restype = (
-    ctypes.c_uint16
+_UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void.restype = None
+_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_pocketoption.argtypes = (
+    ctypes.c_uint64,
+    ctypes.POINTER(_UniffiRustCallStatus),
 )
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_server_time.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_server_time.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_shutdown.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_shutdown.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_subscribe.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_subscribe.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_trade.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_trade.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_unsubscribe.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_unsubscribe.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new.argtypes = ()
+_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_pocketoption.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_free_pocketoption.argtypes = (
+    ctypes.c_uint64,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_free_pocketoption.restype = None
+_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_rawhandler.argtypes = (
+    ctypes.c_uint64,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_rawhandler.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_free_rawhandler.argtypes = (
+    ctypes.c_uint64,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_free_rawhandler.restype = None
+_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_subscriptionstream.argtypes = (
+    ctypes.c_uint64,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_subscriptionstream.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_free_subscriptionstream.argtypes = (
+    ctypes.c_uint64,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_free_subscriptionstream.restype = None
+_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_validator.argtypes = (
+    ctypes.c_uint64,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_validator.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_free_validator.argtypes = (
+    ctypes.c_uint64,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_free_validator.restype = None
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_init.argtypes = (
+    _UniffiRustBuffer,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_init.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new.argtypes = (
+    _UniffiRustBuffer,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new_with_url.argtypes = (
+    _UniffiRustBuffer,
+    _UniffiRustBuffer,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new_with_url.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_assets.argtypes = (
+    ctypes.c_uint64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_assets.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_balance.argtypes = (
+    ctypes.c_uint64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_balance.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_buy.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+    ctypes.c_uint32,
+    ctypes.c_double,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_buy.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals.argtypes = (
+    ctypes.c_uint64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_create_raw_handler.argtypes = (
+    ctypes.c_uint64,
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_create_raw_handler.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+    ctypes.c_int64,
+    ctypes.c_int64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+    ctypes.c_int64,
+    ctypes.c_int64,
+    ctypes.c_int64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals.argtypes = (
+    ctypes.c_uint64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals.argtypes = (
+    ctypes.c_uint64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_history.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+    ctypes.c_uint32,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_history.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo.argtypes = (
+    ctypes.c_uint64,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo.restype = ctypes.c_int8
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_payout.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_payout.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect.argtypes = (
+    ctypes.c_uint64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+    ctypes.c_uint64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_sell.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+    ctypes.c_uint32,
+    ctypes.c_double,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_sell.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time.argtypes = (
+    ctypes.c_uint64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown.argtypes = (
+    ctypes.c_uint64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+    ctypes.c_uint64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_trade.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+    _UniffiRustBuffer,
+    ctypes.c_uint32,
+    ctypes.c_double,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_trade.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_and_wait.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_and_wait.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_binary.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_binary.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_text.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_text.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_wait_next.argtypes = (
+    ctypes.c_uint64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_wait_next.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next.argtypes = (
+    ctypes.c_uint64,
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_all.argtypes = (
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_all.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_any.argtypes = (
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_any.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_contains.argtypes = (
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_contains.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_ends_with.argtypes = (
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_ends_with.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_ne.argtypes = (
+    ctypes.c_uint64,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_ne.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_new.argtypes = (
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_new.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_regex.argtypes = (
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_regex.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_starts_with.argtypes = (
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_starts_with.restype = ctypes.c_uint64
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_validator_check.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_binary_options_tools_uni_fn_method_validator_check.restype = ctypes.c_int8
+_UniffiLib.ffi_binary_options_tools_uni_uniffi_contract_version.argtypes = (
+)
+_UniffiLib.ffi_binary_options_tools_uni_uniffi_contract_version.restype = ctypes.c_uint32
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_init.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_init.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new.argtypes = (
+)
 _UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new.restype = ctypes.c_uint16
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new_with_url.argtypes = ()
-_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new_with_url.restype = ctypes.c_uint16
-_UniffiLib.ffi_binary_options_tools_uni_uniffi_contract_version.argtypes = ()
-_UniffiLib.ffi_binary_options_tools_uni_uniffi_contract_version.restype = (
-    ctypes.c_uint32
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new_with_url.argtypes = (
 )
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new_with_url.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_assets.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_assets.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_balance.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_balance.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_buy.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_buy.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_clear_closed_deals.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_clear_closed_deals.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_create_raw_handler.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_create_raw_handler.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles_advanced.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles_advanced.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_closed_deals.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_closed_deals.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_opened_deals.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_opened_deals.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_history.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_history.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_is_demo.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_is_demo.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_payout.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_payout.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_reconnect.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_reconnect.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_result.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_result.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_result_with_timeout.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_result_with_timeout.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_sell.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_sell.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_server_time.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_server_time.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_shutdown.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_shutdown.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_subscribe.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_subscribe.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_trade.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_trade.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_unsubscribe.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_unsubscribe.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_and_wait.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_and_wait.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_binary.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_binary.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_text.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_text.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_wait_next.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_wait_next.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_all.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_all.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_any.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_any.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_contains.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_contains.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_ends_with.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_ends_with.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_ne.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_ne.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_new.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_new.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_regex.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_regex.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_starts_with.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_constructor_validator_starts_with.restype = ctypes.c_uint16
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_validator_check.argtypes = (
+)
+_UniffiLib.uniffi_binary_options_tools_uni_checksum_method_validator_check.restype = ctypes.c_uint16
 
 _uniffi_check_contract_api_version(_UniffiLib)
 # _uniffi_check_api_checksums(_UniffiLib)
 
+# RustFuturePoll values
+_UNIFFI_RUST_FUTURE_POLL_READY = 0
+_UNIFFI_RUST_FUTURE_POLL_WAKE = 1
+
+# Stores futures for _uniffi_continuation_callback
+_UniffiContinuationHandleMap = _UniffiHandleMap()
+
+_UNIFFI_GLOBAL_EVENT_LOOP = None
+
+"""
+Set the event loop to use for async functions
+
+This is needed if some async functions run outside of the eventloop, for example:
+    - A non-eventloop thread is spawned, maybe from `EventLoop.run_in_executor` or maybe from the
+      Rust code spawning its own thread.
+    - The Rust code calls an async callback method from a sync callback function, using something
+      like `pollster` to block on the async call.
+
+In this case, we need an event loop to run the Python async function, but there's no eventloop set
+for the thread.  Use `uniffi_set_event_loop` to force an eventloop to be used in this case.
+"""
+def uniffi_set_event_loop(eventloop: asyncio.BaseEventLoop):
+    global _UNIFFI_GLOBAL_EVENT_LOOP
+    _UNIFFI_GLOBAL_EVENT_LOOP = eventloop
+
+def _uniffi_get_event_loop():
+    if _UNIFFI_GLOBAL_EVENT_LOOP is not None:
+        return _UNIFFI_GLOBAL_EVENT_LOOP
+    else:
+        return asyncio.get_running_loop()
+
+# Continuation callback for async functions
+# lift the return value or error and resolve the future, causing the async function to resume.
+@_UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK
+def _uniffi_continuation_callback(future_ptr, poll_code):
+    (eventloop, future) = _UniffiContinuationHandleMap.remove(future_ptr)
+    eventloop.call_soon_threadsafe(_uniffi_set_future_result, future, poll_code)
+
+def _uniffi_set_future_result(future, poll_code):
+    if not future.cancelled():
+        future.set_result(poll_code)
+
+async def _uniffi_rust_call_async(rust_future, ffi_poll, ffi_complete, ffi_free, lift_func, error_ffi_converter):
+    try:
+        eventloop = _uniffi_get_event_loop()
+
+        # Loop and poll until we see a _UNIFFI_RUST_FUTURE_POLL_READY value
+        while True:
+            future = eventloop.create_future()
+            ffi_poll(
+                rust_future,
+                _uniffi_continuation_callback,
+                _UniffiContinuationHandleMap.insert((eventloop, future)),
+            )
+            poll_code = await future
+            if poll_code == _UNIFFI_RUST_FUTURE_POLL_READY:
+                break
+
+        return lift_func(
+            _uniffi_rust_call_with_error(error_ffi_converter, ffi_complete, rust_future)
+        )
+    finally:
+        ffi_free(rust_future)
+
 # Public interface members begin here.
 
 
-class _UniffiConverterUInt32(_UniffiConverterPrimitiveInt):
-    CLASS_NAME = "u32"
-    VALUE_MIN = 0
-    VALUE_MAX = 2**32
-
-    @staticmethod
-    def read(buf):
-        return buf.read_u32()
-
-    @staticmethod
-    def write(value, buf):
-        buf.write_u32(value)
-
-
-class _UniffiConverterInt32(_UniffiConverterPrimitiveInt):
+class _UniffiFfiConverterInt32(_UniffiConverterPrimitiveInt):
     CLASS_NAME = "i32"
-    VALUE_MIN = -(2**31)
+    VALUE_MIN = -2**31
     VALUE_MAX = 2**31
 
     @staticmethod
@@ -1408,68 +1253,7 @@ class _UniffiConverterInt32(_UniffiConverterPrimitiveInt):
     def write(value, buf):
         buf.write_i32(value)
 
-
-class _UniffiConverterUInt64(_UniffiConverterPrimitiveInt):
-    CLASS_NAME = "u64"
-    VALUE_MIN = 0
-    VALUE_MAX = 2**64
-
-    @staticmethod
-    def read(buf):
-        return buf.read_u64()
-
-    @staticmethod
-    def write(value, buf):
-        buf.write_u64(value)
-
-
-class _UniffiConverterInt64(_UniffiConverterPrimitiveInt):
-    CLASS_NAME = "i64"
-    VALUE_MIN = -(2**63)
-    VALUE_MAX = 2**63
-
-    @staticmethod
-    def read(buf):
-        return buf.read_i64()
-
-    @staticmethod
-    def write(value, buf):
-        buf.write_i64(value)
-
-
-class _UniffiConverterDouble(_UniffiConverterPrimitiveFloat):
-    @staticmethod
-    def read(buf):
-        return buf.read_double()
-
-    @staticmethod
-    def write(value, buf):
-        buf.write_double(value)
-
-
-class _UniffiConverterBool:
-    @classmethod
-    def check_lower(cls, value):
-        return not not value
-
-    @classmethod
-    def lower(cls, value):
-        return 1 if value else 0
-
-    @staticmethod
-    def lift(value):
-        return value != 0
-
-    @classmethod
-    def read(cls, buf):
-        return cls.lift(buf.read_u8())
-
-    @classmethod
-    def write(cls, value, buf):
-        buf.write_u8(value)
-
-
-class _UniffiConverterString:
+class _UniffiFfiConverterString:
     @staticmethod
     def check_lower(value):
         if not isinstance(value, str):
@@ -1501,7 +1285,188 @@ class _UniffiConverterString:
             builder.write(value.encode("utf-8"))
             return builder.finalize()
 
+class _UniffiFfiConverterBoolean:
+    @classmethod
+    def check_lower(cls, value):
+        return not not value
 
+    @classmethod
+    def lower(cls, value):
+        return 1 if value else 0
+
+    @staticmethod
+    def lift(value):
+        return value != 0
+
+    @classmethod
+    def read(cls, buf):
+        return cls.lift(buf.read_u8())
+
+    @classmethod
+    def write(cls, value, buf):
+        buf.write_u8(value)
+
+class _UniffiFfiConverterUInt32(_UniffiConverterPrimitiveInt):
+    CLASS_NAME = "u32"
+    VALUE_MIN = 0
+    VALUE_MAX = 2**32
+
+    @staticmethod
+    def read(buf):
+        return buf.read_u32()
+
+    @staticmethod
+    def write(value, buf):
+        buf.write_u32(value)
+
+@dataclass
+class CandleLength:
+    """
+    Represents the duration of a candle.
+
+    This struct is a simple wrapper around a `u32` that represents the candle duration in seconds.
+    It is used in the `Asset` struct to specify the allowed candle lengths for an asset.
+
+    # Examples
+
+    ## Python
+    ```python
+    from binaryoptionstoolsuni import CandleLength
+
+    five_second_candle = CandleLength(time=5)
+    ```
+"""
+    def __init__(self, *, time:int):
+        self.time = time
+        
+        
+
+    
+    def __str__(self):
+        return "CandleLength(time={})".format(self.time)
+    def __eq__(self, other):
+        if self.time != other.time:
+            return False
+        return True
+
+class _UniffiFfiConverterTypeCandleLength(_UniffiConverterRustBuffer):
+    @staticmethod
+    def read(buf):
+        return CandleLength(
+            time=_UniffiFfiConverterUInt32.read(buf),
+        )
+
+    @staticmethod
+    def check_lower(value):
+        _UniffiFfiConverterUInt32.check_lower(value.time)
+
+    @staticmethod
+    def write(value, buf):
+        _UniffiFfiConverterUInt32.write(value.time, buf)
+
+class _UniffiFfiConverterSequenceTypeCandleLength(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        for item in value:
+            _UniffiFfiConverterTypeCandleLength.check_lower(item)
+
+    @classmethod
+    def write(cls, value, buf):
+        items = len(value)
+        buf.write_i32(items)
+        for item in value:
+            _UniffiFfiConverterTypeCandleLength.write(item, buf)
+
+    @classmethod
+    def read(cls, buf):
+        count = buf.read_i32()
+        if count < 0:
+            raise InternalError("Unexpected negative sequence length")
+
+        return [
+            _UniffiFfiConverterTypeCandleLength.read(buf) for i in range(count)
+        ]
+
+
+
+
+
+
+class AssetType(enum.Enum):
+    """
+    Represents the type of an asset.
+
+    This enum is used to categorize assets into different types, such as stocks, currencies, etc.
+    This information can be useful for filtering and organizing assets.
+
+    # Examples
+
+    ## Python
+    ```python
+    from binaryoptionstoolsuni import AssetType
+
+    asset_type = AssetType.CURRENCY
+    ```
+"""
+    
+    STOCK = 0
+    
+    CURRENCY = 1
+    
+    COMMODITY = 2
+    
+    CRYPTOCURRENCY = 3
+    
+    INDEX = 4
+    
+
+
+class _UniffiFfiConverterTypeAssetType(_UniffiConverterRustBuffer):
+    @staticmethod
+    def read(buf):
+        variant = buf.read_i32()
+        if variant == 1:
+            return AssetType.STOCK
+        if variant == 2:
+            return AssetType.CURRENCY
+        if variant == 3:
+            return AssetType.COMMODITY
+        if variant == 4:
+            return AssetType.CRYPTOCURRENCY
+        if variant == 5:
+            return AssetType.INDEX
+        raise InternalError("Raw enum value doesn't match any cases")
+
+    @staticmethod
+    def check_lower(value):
+        if value == AssetType.STOCK:
+            return
+        if value == AssetType.CURRENCY:
+            return
+        if value == AssetType.COMMODITY:
+            return
+        if value == AssetType.CRYPTOCURRENCY:
+            return
+        if value == AssetType.INDEX:
+            return
+        raise ValueError(value)
+
+    @staticmethod
+    def write(value, buf):
+        if value == AssetType.STOCK:
+            buf.write_i32(1)
+        if value == AssetType.CURRENCY:
+            buf.write_i32(2)
+        if value == AssetType.COMMODITY:
+            buf.write_i32(3)
+        if value == AssetType.CRYPTOCURRENCY:
+            buf.write_i32(4)
+        if value == AssetType.INDEX:
+            buf.write_i32(5)
+
+
+
+@dataclass
 class Asset:
     """
     Represents a financial asset that can be traded.
@@ -1520,29 +1485,8 @@ class Asset:
     eurusd = Asset(id=1, name="EUR/USD", symbol="EURUSD_otc", is_otc=True, is_active=True, payout=85, allowed_candles=[], asset_type=AssetType.CURRENCY)
     print(eurusd.name)
     ```
-    """
-
-    id: "int"
-    name: "str"
-    symbol: "str"
-    is_otc: "bool"
-    is_active: "bool"
-    payout: "int"
-    allowed_candles: "typing.List[CandleLength]"
-    asset_type: "AssetType"
-
-    def __init__(
-        self,
-        *,
-        id: "int",
-        name: "str",
-        symbol: "str",
-        is_otc: "bool",
-        is_active: "bool",
-        payout: "int",
-        allowed_candles: "typing.List[CandleLength]",
-        asset_type: "AssetType",
-    ):
+"""
+    def __init__(self, *, id:int, name:str, symbol:str, is_otc:bool, is_active:bool, payout:int, allowed_candles:typing.List[CandleLength], asset_type:AssetType):
         self.id = id
         self.name = name
         self.symbol = symbol
@@ -1551,19 +1495,12 @@ class Asset:
         self.payout = payout
         self.allowed_candles = allowed_candles
         self.asset_type = asset_type
+        
+        
 
+    
     def __str__(self):
-        return "Asset(id={}, name={}, symbol={}, is_otc={}, is_active={}, payout={}, allowed_candles={}, asset_type={})".format(
-            self.id,
-            self.name,
-            self.symbol,
-            self.is_otc,
-            self.is_active,
-            self.payout,
-            self.allowed_candles,
-            self.asset_type,
-        )
-
+        return "Asset(id={}, name={}, symbol={}, is_otc={}, is_active={}, payout={}, allowed_candles={}, asset_type={})".format(self.id, self.name, self.symbol, self.is_otc, self.is_active, self.payout, self.allowed_candles, self.asset_type)
     def __eq__(self, other):
         if self.id != other.id:
             return False
@@ -1583,44 +1520,90 @@ class Asset:
             return False
         return True
 
-
-class _UniffiConverterTypeAsset(_UniffiConverterRustBuffer):
+class _UniffiFfiConverterTypeAsset(_UniffiConverterRustBuffer):
     @staticmethod
     def read(buf):
         return Asset(
-            id=_UniffiConverterInt32.read(buf),
-            name=_UniffiConverterString.read(buf),
-            symbol=_UniffiConverterString.read(buf),
-            is_otc=_UniffiConverterBool.read(buf),
-            is_active=_UniffiConverterBool.read(buf),
-            payout=_UniffiConverterInt32.read(buf),
-            allowed_candles=_UniffiConverterSequenceTypeCandleLength.read(buf),
-            asset_type=_UniffiConverterTypeAssetType.read(buf),
+            id=_UniffiFfiConverterInt32.read(buf),
+            name=_UniffiFfiConverterString.read(buf),
+            symbol=_UniffiFfiConverterString.read(buf),
+            is_otc=_UniffiFfiConverterBoolean.read(buf),
+            is_active=_UniffiFfiConverterBoolean.read(buf),
+            payout=_UniffiFfiConverterInt32.read(buf),
+            allowed_candles=_UniffiFfiConverterSequenceTypeCandleLength.read(buf),
+            asset_type=_UniffiFfiConverterTypeAssetType.read(buf),
         )
 
     @staticmethod
     def check_lower(value):
-        _UniffiConverterInt32.check_lower(value.id)
-        _UniffiConverterString.check_lower(value.name)
-        _UniffiConverterString.check_lower(value.symbol)
-        _UniffiConverterBool.check_lower(value.is_otc)
-        _UniffiConverterBool.check_lower(value.is_active)
-        _UniffiConverterInt32.check_lower(value.payout)
-        _UniffiConverterSequenceTypeCandleLength.check_lower(value.allowed_candles)
-        _UniffiConverterTypeAssetType.check_lower(value.asset_type)
+        _UniffiFfiConverterInt32.check_lower(value.id)
+        _UniffiFfiConverterString.check_lower(value.name)
+        _UniffiFfiConverterString.check_lower(value.symbol)
+        _UniffiFfiConverterBoolean.check_lower(value.is_otc)
+        _UniffiFfiConverterBoolean.check_lower(value.is_active)
+        _UniffiFfiConverterInt32.check_lower(value.payout)
+        _UniffiFfiConverterSequenceTypeCandleLength.check_lower(value.allowed_candles)
+        _UniffiFfiConverterTypeAssetType.check_lower(value.asset_type)
 
     @staticmethod
     def write(value, buf):
-        _UniffiConverterInt32.write(value.id, buf)
-        _UniffiConverterString.write(value.name, buf)
-        _UniffiConverterString.write(value.symbol, buf)
-        _UniffiConverterBool.write(value.is_otc, buf)
-        _UniffiConverterBool.write(value.is_active, buf)
-        _UniffiConverterInt32.write(value.payout, buf)
-        _UniffiConverterSequenceTypeCandleLength.write(value.allowed_candles, buf)
-        _UniffiConverterTypeAssetType.write(value.asset_type, buf)
+        _UniffiFfiConverterInt32.write(value.id, buf)
+        _UniffiFfiConverterString.write(value.name, buf)
+        _UniffiFfiConverterString.write(value.symbol, buf)
+        _UniffiFfiConverterBoolean.write(value.is_otc, buf)
+        _UniffiFfiConverterBoolean.write(value.is_active, buf)
+        _UniffiFfiConverterInt32.write(value.payout, buf)
+        _UniffiFfiConverterSequenceTypeCandleLength.write(value.allowed_candles, buf)
+        _UniffiFfiConverterTypeAssetType.write(value.asset_type, buf)
 
+class _UniffiFfiConverterInt64(_UniffiConverterPrimitiveInt):
+    CLASS_NAME = "i64"
+    VALUE_MIN = -2**63
+    VALUE_MAX = 2**63
 
+    @staticmethod
+    def read(buf):
+        return buf.read_i64()
+
+    @staticmethod
+    def write(value, buf):
+        buf.write_i64(value)
+
+class _UniffiFfiConverterFloat64(_UniffiConverterPrimitiveFloat):
+    @staticmethod
+    def read(buf):
+        return buf.read_double()
+
+    @staticmethod
+    def write(value, buf):
+        buf.write_double(value)
+
+class _UniffiFfiConverterOptionalFloat64(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        if value is not None:
+            _UniffiFfiConverterFloat64.check_lower(value)
+
+    @classmethod
+    def write(cls, value, buf):
+        if value is None:
+            buf.write_u8(0)
+            return
+
+        buf.write_u8(1)
+        _UniffiFfiConverterFloat64.write(value, buf)
+
+    @classmethod
+    def read(cls, buf):
+        flag = buf.read_u8()
+        if flag == 0:
+            return None
+        elif flag == 1:
+            return _UniffiFfiConverterFloat64.read(buf)
+        else:
+            raise InternalError("Unexpected flag byte for optional type")
+
+@dataclass
 class Candle:
     """
     Represents a single candle in a price chart.
@@ -1639,27 +1622,8 @@ class Candle:
     candle = ... # receive from api.get_candles() or stream.next()
     print(f"Candle for {candle.symbol} at {candle.timestamp}: O={candle.open}, H={candle.high}, L={candle.low}, C={candle.close}")
     ```
-    """
-
-    symbol: "str"
-    timestamp: "int"
-    open: "float"
-    high: "float"
-    low: "float"
-    close: "float"
-    volume: "typing.Optional[float]"
-
-    def __init__(
-        self,
-        *,
-        symbol: "str",
-        timestamp: "int",
-        open: "float",
-        high: "float",
-        low: "float",
-        close: "float",
-        volume: "typing.Optional[float]",
-    ):
+"""
+    def __init__(self, *, symbol:str, timestamp:int, open:float, high:float, low:float, close:float, volume:typing.Optional[float]):
         self.symbol = symbol
         self.timestamp = timestamp
         self.open = open
@@ -1667,18 +1631,12 @@ class Candle:
         self.low = low
         self.close = close
         self.volume = volume
+        
+        
 
+    
     def __str__(self):
-        return "Candle(symbol={}, timestamp={}, open={}, high={}, low={}, close={}, volume={})".format(
-            self.symbol,
-            self.timestamp,
-            self.open,
-            self.high,
-            self.low,
-            self.close,
-            self.volume,
-        )
-
+        return "Candle(symbol={}, timestamp={}, open={}, high={}, low={}, close={}, volume={})".format(self.symbol, self.timestamp, self.open, self.high, self.low, self.close, self.volume)
     def __eq__(self, other):
         if self.symbol != other.symbol:
             return False
@@ -1696,88 +1654,128 @@ class Candle:
             return False
         return True
 
-
-class _UniffiConverterTypeCandle(_UniffiConverterRustBuffer):
+class _UniffiFfiConverterTypeCandle(_UniffiConverterRustBuffer):
     @staticmethod
     def read(buf):
         return Candle(
-            symbol=_UniffiConverterString.read(buf),
-            timestamp=_UniffiConverterInt64.read(buf),
-            open=_UniffiConverterDouble.read(buf),
-            high=_UniffiConverterDouble.read(buf),
-            low=_UniffiConverterDouble.read(buf),
-            close=_UniffiConverterDouble.read(buf),
-            volume=_UniffiConverterOptionalDouble.read(buf),
+            symbol=_UniffiFfiConverterString.read(buf),
+            timestamp=_UniffiFfiConverterInt64.read(buf),
+            open=_UniffiFfiConverterFloat64.read(buf),
+            high=_UniffiFfiConverterFloat64.read(buf),
+            low=_UniffiFfiConverterFloat64.read(buf),
+            close=_UniffiFfiConverterFloat64.read(buf),
+            volume=_UniffiFfiConverterOptionalFloat64.read(buf),
         )
 
     @staticmethod
     def check_lower(value):
-        _UniffiConverterString.check_lower(value.symbol)
-        _UniffiConverterInt64.check_lower(value.timestamp)
-        _UniffiConverterDouble.check_lower(value.open)
-        _UniffiConverterDouble.check_lower(value.high)
-        _UniffiConverterDouble.check_lower(value.low)
-        _UniffiConverterDouble.check_lower(value.close)
-        _UniffiConverterOptionalDouble.check_lower(value.volume)
+        _UniffiFfiConverterString.check_lower(value.symbol)
+        _UniffiFfiConverterInt64.check_lower(value.timestamp)
+        _UniffiFfiConverterFloat64.check_lower(value.open)
+        _UniffiFfiConverterFloat64.check_lower(value.high)
+        _UniffiFfiConverterFloat64.check_lower(value.low)
+        _UniffiFfiConverterFloat64.check_lower(value.close)
+        _UniffiFfiConverterOptionalFloat64.check_lower(value.volume)
 
     @staticmethod
     def write(value, buf):
-        _UniffiConverterString.write(value.symbol, buf)
-        _UniffiConverterInt64.write(value.timestamp, buf)
-        _UniffiConverterDouble.write(value.open, buf)
-        _UniffiConverterDouble.write(value.high, buf)
-        _UniffiConverterDouble.write(value.low, buf)
-        _UniffiConverterDouble.write(value.close, buf)
-        _UniffiConverterOptionalDouble.write(value.volume, buf)
+        _UniffiFfiConverterString.write(value.symbol, buf)
+        _UniffiFfiConverterInt64.write(value.timestamp, buf)
+        _UniffiFfiConverterFloat64.write(value.open, buf)
+        _UniffiFfiConverterFloat64.write(value.high, buf)
+        _UniffiFfiConverterFloat64.write(value.low, buf)
+        _UniffiFfiConverterFloat64.write(value.close, buf)
+        _UniffiFfiConverterOptionalFloat64.write(value.volume, buf)
 
+class _UniffiFfiConverterUInt64(_UniffiConverterPrimitiveInt):
+    CLASS_NAME = "u64"
+    VALUE_MIN = 0
+    VALUE_MAX = 2**64
 
-class CandleLength:
-    """
-    Represents the duration of a candle.
-
-    This struct is a simple wrapper around a `u32` that represents the candle duration in seconds.
-    It is used in the `Asset` struct to specify the allowed candle lengths for an asset.
-
-    # Examples
-
-    ## Python
-    ```python
-    from binaryoptionstoolsuni import CandleLength
-
-    five_second_candle = CandleLength(time=5)
-    ```
-    """
-
-    time: "int"
-
-    def __init__(self, *, time: "int"):
-        self.time = time
-
-    def __str__(self):
-        return "CandleLength(time={})".format(self.time)
-
-    def __eq__(self, other):
-        if self.time != other.time:
-            return False
-        return True
-
-
-class _UniffiConverterTypeCandleLength(_UniffiConverterRustBuffer):
     @staticmethod
     def read(buf):
-        return CandleLength(
-            time=_UniffiConverterUInt32.read(buf),
-        )
-
-    @staticmethod
-    def check_lower(value):
-        _UniffiConverterUInt32.check_lower(value.time)
+        return buf.read_u64()
 
     @staticmethod
     def write(value, buf):
-        _UniffiConverterUInt32.write(value.time, buf)
+        buf.write_u64(value)
 
+class _UniffiFfiConverterOptionalString(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        if value is not None:
+            _UniffiFfiConverterString.check_lower(value)
 
+    @classmethod
+    def write(cls, value, buf):
+        if value is None:
+            buf.write_u8(0)
+            return
+
+        buf.write_u8(1)
+        _UniffiFfiConverterString.write(value, buf)
+
+    @classmethod
+    def read(cls, buf):
+        flag = buf.read_u8()
+        if flag == 0:
+            return None
+        elif flag == 1:
+            return _UniffiFfiConverterString.read(buf)
+        else:
+            raise InternalError("Unexpected flag byte for optional type")
+
+class _UniffiFfiConverterOptionalInt32(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        if value is not None:
+            _UniffiFfiConverterInt32.check_lower(value)
+
+    @classmethod
+    def write(cls, value, buf):
+        if value is None:
+            buf.write_u8(0)
+            return
+
+        buf.write_u8(1)
+        _UniffiFfiConverterInt32.write(value, buf)
+
+    @classmethod
+    def read(cls, buf):
+        flag = buf.read_u8()
+        if flag == 0:
+            return None
+        elif flag == 1:
+            return _UniffiFfiConverterInt32.read(buf)
+        else:
+            raise InternalError("Unexpected flag byte for optional type")
+
+class _UniffiFfiConverterOptionalBoolean(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        if value is not None:
+            _UniffiFfiConverterBoolean.check_lower(value)
+
+    @classmethod
+    def write(cls, value, buf):
+        if value is None:
+            buf.write_u8(0)
+            return
+
+        buf.write_u8(1)
+        _UniffiFfiConverterBoolean.write(value, buf)
+
+    @classmethod
+    def read(cls, buf):
+        flag = buf.read_u8()
+        if flag == 0:
+            return None
+        elif flag == 1:
+            return _UniffiFfiConverterBoolean.read(buf)
+        else:
+            raise InternalError("Unexpected flag byte for optional type")
+
+@dataclass
 class Deal:
     """
     Represents a completed trade.
@@ -1797,65 +1795,8 @@ class Deal:
     deal = ... # receive from api.result()
     print(f"Trade {deal.id} on {deal.asset} resulted in a profit of {deal.profit}")
     ```
-    """
-
-    id: "str"
-    open_time: "str"
-    close_time: "str"
-    open_timestamp: "int"
-    close_timestamp: "int"
-    uid: "int"
-    request_id: "typing.Optional[str]"
-    amount: "float"
-    profit: "float"
-    percent_profit: "int"
-    percent_loss: "int"
-    open_price: "float"
-    close_price: "float"
-    command: "int"
-    asset: "str"
-    is_demo: "int"
-    copy_ticket: "str"
-    open_ms: "int"
-    close_ms: "typing.Optional[int]"
-    option_type: "int"
-    is_rollover: "typing.Optional[bool]"
-    is_copy_signal: "typing.Optional[bool]"
-    is_ai: "typing.Optional[bool]"
-    currency: "str"
-    amount_usd: "typing.Optional[float]"
-    amount_usd2: "typing.Optional[float]"
-
-    def __init__(
-        self,
-        *,
-        id: "str",
-        open_time: "str",
-        close_time: "str",
-        open_timestamp: "int",
-        close_timestamp: "int",
-        uid: "int",
-        request_id: "typing.Optional[str]",
-        amount: "float",
-        profit: "float",
-        percent_profit: "int",
-        percent_loss: "int",
-        open_price: "float",
-        close_price: "float",
-        command: "int",
-        asset: "str",
-        is_demo: "int",
-        copy_ticket: "str",
-        open_ms: "int",
-        close_ms: "typing.Optional[int]",
-        option_type: "int",
-        is_rollover: "typing.Optional[bool]",
-        is_copy_signal: "typing.Optional[bool]",
-        is_ai: "typing.Optional[bool]",
-        currency: "str",
-        amount_usd: "typing.Optional[float]",
-        amount_usd2: "typing.Optional[float]",
-    ):
+"""
+    def __init__(self, *, id:str, open_time:str, close_time:str, open_timestamp:int, close_timestamp:int, uid:int, request_id:typing.Optional[str], amount:float, profit:float, percent_profit:int, percent_loss:int, open_price:float, close_price:float, command:int, asset:str, is_demo:int, copy_ticket:str, open_ms:int, close_ms:typing.Optional[int], option_type:int, is_rollover:typing.Optional[bool], is_copy_signal:typing.Optional[bool], is_ai:typing.Optional[bool], currency:str, amount_usd:typing.Optional[float], amount_usd2:typing.Optional[float]):
         self.id = id
         self.open_time = open_time
         self.close_time = close_time
@@ -1882,37 +1823,12 @@ class Deal:
         self.currency = currency
         self.amount_usd = amount_usd
         self.amount_usd2 = amount_usd2
+        
+        
 
+    
     def __str__(self):
-        return "Deal(id={}, open_time={}, close_time={}, open_timestamp={}, close_timestamp={}, uid={}, request_id={}, amount={}, profit={}, percent_profit={}, percent_loss={}, open_price={}, close_price={}, command={}, asset={}, is_demo={}, copy_ticket={}, open_ms={}, close_ms={}, option_type={}, is_rollover={}, is_copy_signal={}, is_ai={}, currency={}, amount_usd={}, amount_usd2={})".format(
-            self.id,
-            self.open_time,
-            self.close_time,
-            self.open_timestamp,
-            self.close_timestamp,
-            self.uid,
-            self.request_id,
-            self.amount,
-            self.profit,
-            self.percent_profit,
-            self.percent_loss,
-            self.open_price,
-            self.close_price,
-            self.command,
-            self.asset,
-            self.is_demo,
-            self.copy_ticket,
-            self.open_ms,
-            self.close_ms,
-            self.option_type,
-            self.is_rollover,
-            self.is_copy_signal,
-            self.is_ai,
-            self.currency,
-            self.amount_usd,
-            self.amount_usd2,
-        )
-
+        return "Deal(id={}, open_time={}, close_time={}, open_timestamp={}, close_timestamp={}, uid={}, request_id={}, amount={}, profit={}, percent_profit={}, percent_loss={}, open_price={}, close_price={}, command={}, asset={}, is_demo={}, copy_ticket={}, open_ms={}, close_ms={}, option_type={}, is_rollover={}, is_copy_signal={}, is_ai={}, currency={}, amount_usd={}, amount_usd2={})".format(self.id, self.open_time, self.close_time, self.open_timestamp, self.close_timestamp, self.uid, self.request_id, self.amount, self.profit, self.percent_profit, self.percent_loss, self.open_price, self.close_price, self.command, self.asset, self.is_demo, self.copy_ticket, self.open_ms, self.close_ms, self.option_type, self.is_rollover, self.is_copy_signal, self.is_ai, self.currency, self.amount_usd, self.amount_usd2)
     def __eq__(self, other):
         if self.id != other.id:
             return False
@@ -1968,96 +1884,99 @@ class Deal:
             return False
         return True
 
-
-class _UniffiConverterTypeDeal(_UniffiConverterRustBuffer):
+class _UniffiFfiConverterTypeDeal(_UniffiConverterRustBuffer):
     @staticmethod
     def read(buf):
         return Deal(
-            id=_UniffiConverterString.read(buf),
-            open_time=_UniffiConverterString.read(buf),
-            close_time=_UniffiConverterString.read(buf),
-            open_timestamp=_UniffiConverterInt64.read(buf),
-            close_timestamp=_UniffiConverterInt64.read(buf),
-            uid=_UniffiConverterUInt64.read(buf),
-            request_id=_UniffiConverterOptionalString.read(buf),
-            amount=_UniffiConverterDouble.read(buf),
-            profit=_UniffiConverterDouble.read(buf),
-            percent_profit=_UniffiConverterInt32.read(buf),
-            percent_loss=_UniffiConverterInt32.read(buf),
-            open_price=_UniffiConverterDouble.read(buf),
-            close_price=_UniffiConverterDouble.read(buf),
-            command=_UniffiConverterInt32.read(buf),
-            asset=_UniffiConverterString.read(buf),
-            is_demo=_UniffiConverterUInt32.read(buf),
-            copy_ticket=_UniffiConverterString.read(buf),
-            open_ms=_UniffiConverterInt32.read(buf),
-            close_ms=_UniffiConverterOptionalInt32.read(buf),
-            option_type=_UniffiConverterInt32.read(buf),
-            is_rollover=_UniffiConverterOptionalBool.read(buf),
-            is_copy_signal=_UniffiConverterOptionalBool.read(buf),
-            is_ai=_UniffiConverterOptionalBool.read(buf),
-            currency=_UniffiConverterString.read(buf),
-            amount_usd=_UniffiConverterOptionalDouble.read(buf),
-            amount_usd2=_UniffiConverterOptionalDouble.read(buf),
+            id=_UniffiFfiConverterString.read(buf),
+            open_time=_UniffiFfiConverterString.read(buf),
+            close_time=_UniffiFfiConverterString.read(buf),
+            open_timestamp=_UniffiFfiConverterInt64.read(buf),
+            close_timestamp=_UniffiFfiConverterInt64.read(buf),
+            uid=_UniffiFfiConverterUInt64.read(buf),
+            request_id=_UniffiFfiConverterOptionalString.read(buf),
+            amount=_UniffiFfiConverterFloat64.read(buf),
+            profit=_UniffiFfiConverterFloat64.read(buf),
+            percent_profit=_UniffiFfiConverterInt32.read(buf),
+            percent_loss=_UniffiFfiConverterInt32.read(buf),
+            open_price=_UniffiFfiConverterFloat64.read(buf),
+            close_price=_UniffiFfiConverterFloat64.read(buf),
+            command=_UniffiFfiConverterInt32.read(buf),
+            asset=_UniffiFfiConverterString.read(buf),
+            is_demo=_UniffiFfiConverterUInt32.read(buf),
+            copy_ticket=_UniffiFfiConverterString.read(buf),
+            open_ms=_UniffiFfiConverterInt32.read(buf),
+            close_ms=_UniffiFfiConverterOptionalInt32.read(buf),
+            option_type=_UniffiFfiConverterInt32.read(buf),
+            is_rollover=_UniffiFfiConverterOptionalBoolean.read(buf),
+            is_copy_signal=_UniffiFfiConverterOptionalBoolean.read(buf),
+            is_ai=_UniffiFfiConverterOptionalBoolean.read(buf),
+            currency=_UniffiFfiConverterString.read(buf),
+            amount_usd=_UniffiFfiConverterOptionalFloat64.read(buf),
+            amount_usd2=_UniffiFfiConverterOptionalFloat64.read(buf),
         )
 
     @staticmethod
     def check_lower(value):
-        _UniffiConverterString.check_lower(value.id)
-        _UniffiConverterString.check_lower(value.open_time)
-        _UniffiConverterString.check_lower(value.close_time)
-        _UniffiConverterInt64.check_lower(value.open_timestamp)
-        _UniffiConverterInt64.check_lower(value.close_timestamp)
-        _UniffiConverterUInt64.check_lower(value.uid)
-        _UniffiConverterOptionalString.check_lower(value.request_id)
-        _UniffiConverterDouble.check_lower(value.amount)
-        _UniffiConverterDouble.check_lower(value.profit)
-        _UniffiConverterInt32.check_lower(value.percent_profit)
-        _UniffiConverterInt32.check_lower(value.percent_loss)
-        _UniffiConverterDouble.check_lower(value.open_price)
-        _UniffiConverterDouble.check_lower(value.close_price)
-        _UniffiConverterInt32.check_lower(value.command)
-        _UniffiConverterString.check_lower(value.asset)
-        _UniffiConverterUInt32.check_lower(value.is_demo)
-        _UniffiConverterString.check_lower(value.copy_ticket)
-        _UniffiConverterInt32.check_lower(value.open_ms)
-        _UniffiConverterOptionalInt32.check_lower(value.close_ms)
-        _UniffiConverterInt32.check_lower(value.option_type)
-        _UniffiConverterOptionalBool.check_lower(value.is_rollover)
-        _UniffiConverterOptionalBool.check_lower(value.is_copy_signal)
-        _UniffiConverterOptionalBool.check_lower(value.is_ai)
-        _UniffiConverterString.check_lower(value.currency)
-        _UniffiConverterOptionalDouble.check_lower(value.amount_usd)
-        _UniffiConverterOptionalDouble.check_lower(value.amount_usd2)
+        _UniffiFfiConverterString.check_lower(value.id)
+        _UniffiFfiConverterString.check_lower(value.open_time)
+        _UniffiFfiConverterString.check_lower(value.close_time)
+        _UniffiFfiConverterInt64.check_lower(value.open_timestamp)
+        _UniffiFfiConverterInt64.check_lower(value.close_timestamp)
+        _UniffiFfiConverterUInt64.check_lower(value.uid)
+        _UniffiFfiConverterOptionalString.check_lower(value.request_id)
+        _UniffiFfiConverterFloat64.check_lower(value.amount)
+        _UniffiFfiConverterFloat64.check_lower(value.profit)
+        _UniffiFfiConverterInt32.check_lower(value.percent_profit)
+        _UniffiFfiConverterInt32.check_lower(value.percent_loss)
+        _UniffiFfiConverterFloat64.check_lower(value.open_price)
+        _UniffiFfiConverterFloat64.check_lower(value.close_price)
+        _UniffiFfiConverterInt32.check_lower(value.command)
+        _UniffiFfiConverterString.check_lower(value.asset)
+        _UniffiFfiConverterUInt32.check_lower(value.is_demo)
+        _UniffiFfiConverterString.check_lower(value.copy_ticket)
+        _UniffiFfiConverterInt32.check_lower(value.open_ms)
+        _UniffiFfiConverterOptionalInt32.check_lower(value.close_ms)
+        _UniffiFfiConverterInt32.check_lower(value.option_type)
+        _UniffiFfiConverterOptionalBoolean.check_lower(value.is_rollover)
+        _UniffiFfiConverterOptionalBoolean.check_lower(value.is_copy_signal)
+        _UniffiFfiConverterOptionalBoolean.check_lower(value.is_ai)
+        _UniffiFfiConverterString.check_lower(value.currency)
+        _UniffiFfiConverterOptionalFloat64.check_lower(value.amount_usd)
+        _UniffiFfiConverterOptionalFloat64.check_lower(value.amount_usd2)
 
     @staticmethod
     def write(value, buf):
-        _UniffiConverterString.write(value.id, buf)
-        _UniffiConverterString.write(value.open_time, buf)
-        _UniffiConverterString.write(value.close_time, buf)
-        _UniffiConverterInt64.write(value.open_timestamp, buf)
-        _UniffiConverterInt64.write(value.close_timestamp, buf)
-        _UniffiConverterUInt64.write(value.uid, buf)
-        _UniffiConverterOptionalString.write(value.request_id, buf)
-        _UniffiConverterDouble.write(value.amount, buf)
-        _UniffiConverterDouble.write(value.profit, buf)
-        _UniffiConverterInt32.write(value.percent_profit, buf)
-        _UniffiConverterInt32.write(value.percent_loss, buf)
-        _UniffiConverterDouble.write(value.open_price, buf)
-        _UniffiConverterDouble.write(value.close_price, buf)
-        _UniffiConverterInt32.write(value.command, buf)
-        _UniffiConverterString.write(value.asset, buf)
-        _UniffiConverterUInt32.write(value.is_demo, buf)
-        _UniffiConverterString.write(value.copy_ticket, buf)
-        _UniffiConverterInt32.write(value.open_ms, buf)
-        _UniffiConverterOptionalInt32.write(value.close_ms, buf)
-        _UniffiConverterInt32.write(value.option_type, buf)
-        _UniffiConverterOptionalBool.write(value.is_rollover, buf)
-        _UniffiConverterOptionalBool.write(value.is_copy_signal, buf)
-        _UniffiConverterOptionalBool.write(value.is_ai, buf)
-        _UniffiConverterString.write(value.currency, buf)
-        _UniffiConverterOptionalDouble.write(value.amount_usd, buf)
-        _UniffiConverterOptionalDouble.write(value.amount_usd2, buf)
+        _UniffiFfiConverterString.write(value.id, buf)
+        _UniffiFfiConverterString.write(value.open_time, buf)
+        _UniffiFfiConverterString.write(value.close_time, buf)
+        _UniffiFfiConverterInt64.write(value.open_timestamp, buf)
+        _UniffiFfiConverterInt64.write(value.close_timestamp, buf)
+        _UniffiFfiConverterUInt64.write(value.uid, buf)
+        _UniffiFfiConverterOptionalString.write(value.request_id, buf)
+        _UniffiFfiConverterFloat64.write(value.amount, buf)
+        _UniffiFfiConverterFloat64.write(value.profit, buf)
+        _UniffiFfiConverterInt32.write(value.percent_profit, buf)
+        _UniffiFfiConverterInt32.write(value.percent_loss, buf)
+        _UniffiFfiConverterFloat64.write(value.open_price, buf)
+        _UniffiFfiConverterFloat64.write(value.close_price, buf)
+        _UniffiFfiConverterInt32.write(value.command, buf)
+        _UniffiFfiConverterString.write(value.asset, buf)
+        _UniffiFfiConverterUInt32.write(value.is_demo, buf)
+        _UniffiFfiConverterString.write(value.copy_ticket, buf)
+        _UniffiFfiConverterInt32.write(value.open_ms, buf)
+        _UniffiFfiConverterOptionalInt32.write(value.close_ms, buf)
+        _UniffiFfiConverterInt32.write(value.option_type, buf)
+        _UniffiFfiConverterOptionalBoolean.write(value.is_rollover, buf)
+        _UniffiFfiConverterOptionalBoolean.write(value.is_copy_signal, buf)
+        _UniffiFfiConverterOptionalBoolean.write(value.is_ai, buf)
+        _UniffiFfiConverterString.write(value.currency, buf)
+        _UniffiFfiConverterOptionalFloat64.write(value.amount_usd, buf)
+        _UniffiFfiConverterOptionalFloat64.write(value.amount_usd2, buf)
+
+
+
+
 
 
 class Action(enum.Enum):
@@ -2108,14 +2027,15 @@ class Action(enum.Enum):
     var buyAction = binaryoptionstoolsuni.ActionCall
     var sellAction = binaryoptionstoolsuni.ActionPut
     ```
-    """
-
+"""
+    
     CALL = 0
-
+    
     PUT = 1
+    
 
 
-class _UniffiConverterTypeAction(_UniffiConverterRustBuffer):
+class _UniffiFfiConverterTypeAction(_UniffiConverterRustBuffer):
     @staticmethod
     def read(buf):
         variant = buf.read_i32()
@@ -2141,76 +2061,7 @@ class _UniffiConverterTypeAction(_UniffiConverterRustBuffer):
             buf.write_i32(2)
 
 
-class AssetType(enum.Enum):
-    """
-    Represents the type of an asset.
 
-    This enum is used to categorize assets into different types, such as stocks, currencies, etc.
-    This information can be useful for filtering and organizing assets.
-
-    # Examples
-
-    ## Python
-    ```python
-    from binaryoptionstoolsuni import AssetType
-
-    asset_type = AssetType.CURRENCY
-    ```
-    """
-
-    STOCK = 0
-
-    CURRENCY = 1
-
-    COMMODITY = 2
-
-    CRYPTOCURRENCY = 3
-
-    INDEX = 4
-
-
-class _UniffiConverterTypeAssetType(_UniffiConverterRustBuffer):
-    @staticmethod
-    def read(buf):
-        variant = buf.read_i32()
-        if variant == 1:
-            return AssetType.STOCK
-        if variant == 2:
-            return AssetType.CURRENCY
-        if variant == 3:
-            return AssetType.COMMODITY
-        if variant == 4:
-            return AssetType.CRYPTOCURRENCY
-        if variant == 5:
-            return AssetType.INDEX
-        raise InternalError("Raw enum value doesn't match any cases")
-
-    @staticmethod
-    def check_lower(value):
-        if value == AssetType.STOCK:
-            return
-        if value == AssetType.CURRENCY:
-            return
-        if value == AssetType.COMMODITY:
-            return
-        if value == AssetType.CRYPTOCURRENCY:
-            return
-        if value == AssetType.INDEX:
-            return
-        raise ValueError(value)
-
-    @staticmethod
-    def write(value, buf):
-        if value == AssetType.STOCK:
-            buf.write_i32(1)
-        if value == AssetType.CURRENCY:
-            buf.write_i32(2)
-        if value == AssetType.COMMODITY:
-            buf.write_i32(3)
-        if value == AssetType.CRYPTOCURRENCY:
-            buf.write_i32(4)
-        if value == AssetType.INDEX:
-            buf.write_i32(5)
 
 
 # UniError
@@ -2222,19 +2073,17 @@ class _UniffiConverterTypeAssetType(_UniffiConverterRustBuffer):
 class UniError(Exception):
     pass
 
-
 _UniffiTempUniError = UniError
 
-
 class UniError:  # type: ignore
+    
     class BinaryOptions(_UniffiTempUniError):
+        
         def __init__(self, *values):
             if len(values) != 1:
                 raise TypeError(f"Expected 1 arguments, found {len(values)}")
             if not isinstance(values[0], str):
-                raise TypeError(
-                    f"unexpected type for tuple element 0 - expected 'str', got '{type(values[0])}'"
-                )
+                raise TypeError(f"unexpected type for tuple element 0 - expected 'str', got '{type(values[0])}'")
             super().__init__(", ".join(map(repr, values)))
             self._values = values
 
@@ -2243,17 +2092,14 @@ class UniError:  # type: ignore
 
         def __repr__(self):
             return "UniError.BinaryOptions({})".format(str(self))
-
-    _UniffiTempUniError.BinaryOptions = BinaryOptions  # type: ignore
-
+    _UniffiTempUniError.BinaryOptions = BinaryOptions # type: ignore
     class PocketOption(_UniffiTempUniError):
+        
         def __init__(self, *values):
             if len(values) != 1:
                 raise TypeError(f"Expected 1 arguments, found {len(values)}")
             if not isinstance(values[0], str):
-                raise TypeError(
-                    f"unexpected type for tuple element 0 - expected 'str', got '{type(values[0])}'"
-                )
+                raise TypeError(f"unexpected type for tuple element 0 - expected 'str', got '{type(values[0])}'")
             super().__init__(", ".join(map(repr, values)))
             self._values = values
 
@@ -2262,17 +2108,14 @@ class UniError:  # type: ignore
 
         def __repr__(self):
             return "UniError.PocketOption({})".format(str(self))
-
-    _UniffiTempUniError.PocketOption = PocketOption  # type: ignore
-
+    _UniffiTempUniError.PocketOption = PocketOption # type: ignore
     class Uuid(_UniffiTempUniError):
+        
         def __init__(self, *values):
             if len(values) != 1:
                 raise TypeError(f"Expected 1 arguments, found {len(values)}")
             if not isinstance(values[0], str):
-                raise TypeError(
-                    f"unexpected type for tuple element 0 - expected 'str', got '{type(values[0])}'"
-                )
+                raise TypeError(f"unexpected type for tuple element 0 - expected 'str', got '{type(values[0])}'")
             super().__init__(", ".join(map(repr, values)))
             self._values = values
 
@@ -2281,199 +2124,92 @@ class UniError:  # type: ignore
 
         def __repr__(self):
             return "UniError.Uuid({})".format(str(self))
+    _UniffiTempUniError.Uuid = Uuid # type: ignore
+    class Validator(_UniffiTempUniError):
+        
+        def __init__(self, *values):
+            if len(values) != 1:
+                raise TypeError(f"Expected 1 arguments, found {len(values)}")
+            if not isinstance(values[0], str):
+                raise TypeError(f"unexpected type for tuple element 0 - expected 'str', got '{type(values[0])}'")
+            super().__init__(", ".join(map(repr, values)))
+            self._values = values
 
-    _UniffiTempUniError.Uuid = Uuid  # type: ignore
+        def __getitem__(self, index):
+            return self._values[index]
 
+        def __repr__(self):
+            return "UniError.Validator({})".format(str(self))
+    _UniffiTempUniError.Validator = Validator # type: ignore
 
-UniError = _UniffiTempUniError  # type: ignore
+UniError = _UniffiTempUniError # type: ignore
 del _UniffiTempUniError
 
 
-class _UniffiConverterTypeUniError(_UniffiConverterRustBuffer):
+class _UniffiFfiConverterTypeUniError(_UniffiConverterRustBuffer):
     @staticmethod
     def read(buf):
         variant = buf.read_i32()
         if variant == 1:
             return UniError.BinaryOptions(
-                _UniffiConverterString.read(buf),
+                _UniffiFfiConverterString.read(buf),
             )
         if variant == 2:
             return UniError.PocketOption(
-                _UniffiConverterString.read(buf),
+                _UniffiFfiConverterString.read(buf),
             )
         if variant == 3:
             return UniError.Uuid(
-                _UniffiConverterString.read(buf),
+                _UniffiFfiConverterString.read(buf),
+            )
+        if variant == 4:
+            return UniError.Validator(
+                _UniffiFfiConverterString.read(buf),
             )
         raise InternalError("Raw enum value doesn't match any cases")
 
     @staticmethod
     def check_lower(value):
         if isinstance(value, UniError.BinaryOptions):
-            _UniffiConverterString.check_lower(value._values[0])
+            _UniffiFfiConverterString.check_lower(value._values[0])
             return
         if isinstance(value, UniError.PocketOption):
-            _UniffiConverterString.check_lower(value._values[0])
+            _UniffiFfiConverterString.check_lower(value._values[0])
             return
         if isinstance(value, UniError.Uuid):
-            _UniffiConverterString.check_lower(value._values[0])
+            _UniffiFfiConverterString.check_lower(value._values[0])
+            return
+        if isinstance(value, UniError.Validator):
+            _UniffiFfiConverterString.check_lower(value._values[0])
             return
 
     @staticmethod
     def write(value, buf):
         if isinstance(value, UniError.BinaryOptions):
             buf.write_i32(1)
-            _UniffiConverterString.write(value._values[0], buf)
+            _UniffiFfiConverterString.write(value._values[0], buf)
         if isinstance(value, UniError.PocketOption):
             buf.write_i32(2)
-            _UniffiConverterString.write(value._values[0], buf)
+            _UniffiFfiConverterString.write(value._values[0], buf)
         if isinstance(value, UniError.Uuid):
             buf.write_i32(3)
-            _UniffiConverterString.write(value._values[0], buf)
+            _UniffiFfiConverterString.write(value._values[0], buf)
+        if isinstance(value, UniError.Validator):
+            buf.write_i32(4)
+            _UniffiFfiConverterString.write(value._values[0], buf)
 
-
-class _UniffiConverterOptionalInt32(_UniffiConverterRustBuffer):
-    @classmethod
-    def check_lower(cls, value):
-        if value is not None:
-            _UniffiConverterInt32.check_lower(value)
-
-    @classmethod
-    def write(cls, value, buf):
-        if value is None:
-            buf.write_u8(0)
-            return
-
-        buf.write_u8(1)
-        _UniffiConverterInt32.write(value, buf)
-
-    @classmethod
-    def read(cls, buf):
-        flag = buf.read_u8()
-        if flag == 0:
-            return None
-        elif flag == 1:
-            return _UniffiConverterInt32.read(buf)
-        else:
-            raise InternalError("Unexpected flag byte for optional type")
-
-
-class _UniffiConverterOptionalDouble(_UniffiConverterRustBuffer):
-    @classmethod
-    def check_lower(cls, value):
-        if value is not None:
-            _UniffiConverterDouble.check_lower(value)
-
-    @classmethod
-    def write(cls, value, buf):
-        if value is None:
-            buf.write_u8(0)
-            return
-
-        buf.write_u8(1)
-        _UniffiConverterDouble.write(value, buf)
-
-    @classmethod
-    def read(cls, buf):
-        flag = buf.read_u8()
-        if flag == 0:
-            return None
-        elif flag == 1:
-            return _UniffiConverterDouble.read(buf)
-        else:
-            raise InternalError("Unexpected flag byte for optional type")
-
-
-class _UniffiConverterOptionalBool(_UniffiConverterRustBuffer):
-    @classmethod
-    def check_lower(cls, value):
-        if value is not None:
-            _UniffiConverterBool.check_lower(value)
-
-    @classmethod
-    def write(cls, value, buf):
-        if value is None:
-            buf.write_u8(0)
-            return
-
-        buf.write_u8(1)
-        _UniffiConverterBool.write(value, buf)
-
-    @classmethod
-    def read(cls, buf):
-        flag = buf.read_u8()
-        if flag == 0:
-            return None
-        elif flag == 1:
-            return _UniffiConverterBool.read(buf)
-        else:
-            raise InternalError("Unexpected flag byte for optional type")
-
-
-class _UniffiConverterOptionalString(_UniffiConverterRustBuffer):
-    @classmethod
-    def check_lower(cls, value):
-        if value is not None:
-            _UniffiConverterString.check_lower(value)
-
-    @classmethod
-    def write(cls, value, buf):
-        if value is None:
-            buf.write_u8(0)
-            return
-
-        buf.write_u8(1)
-        _UniffiConverterString.write(value, buf)
-
-    @classmethod
-    def read(cls, buf):
-        flag = buf.read_u8()
-        if flag == 0:
-            return None
-        elif flag == 1:
-            return _UniffiConverterString.read(buf)
-        else:
-            raise InternalError("Unexpected flag byte for optional type")
-
-
-class _UniffiConverterOptionalSequenceTypeAsset(_UniffiConverterRustBuffer):
-    @classmethod
-    def check_lower(cls, value):
-        if value is not None:
-            _UniffiConverterSequenceTypeAsset.check_lower(value)
-
-    @classmethod
-    def write(cls, value, buf):
-        if value is None:
-            buf.write_u8(0)
-            return
-
-        buf.write_u8(1)
-        _UniffiConverterSequenceTypeAsset.write(value, buf)
-
-    @classmethod
-    def read(cls, buf):
-        flag = buf.read_u8()
-        if flag == 0:
-            return None
-        elif flag == 1:
-            return _UniffiConverterSequenceTypeAsset.read(buf)
-        else:
-            raise InternalError("Unexpected flag byte for optional type")
-
-
-class _UniffiConverterSequenceTypeAsset(_UniffiConverterRustBuffer):
+class _UniffiFfiConverterSequenceTypeAsset(_UniffiConverterRustBuffer):
     @classmethod
     def check_lower(cls, value):
         for item in value:
-            _UniffiConverterTypeAsset.check_lower(item)
+            _UniffiFfiConverterTypeAsset.check_lower(item)
 
     @classmethod
     def write(cls, value, buf):
         items = len(value)
         buf.write_i32(items)
         for item in value:
-            _UniffiConverterTypeAsset.write(item, buf)
+            _UniffiFfiConverterTypeAsset.write(item, buf)
 
     @classmethod
     def read(cls, buf):
@@ -2481,21 +2217,655 @@ class _UniffiConverterSequenceTypeAsset(_UniffiConverterRustBuffer):
         if count < 0:
             raise InternalError("Unexpected negative sequence length")
 
-        return [_UniffiConverterTypeAsset.read(buf) for i in range(count)]
+        return [
+            _UniffiFfiConverterTypeAsset.read(buf) for i in range(count)
+        ]
+
+class _UniffiFfiConverterOptionalSequenceTypeAsset(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        if value is not None:
+            _UniffiFfiConverterSequenceTypeAsset.check_lower(value)
+
+    @classmethod
+    def write(cls, value, buf):
+        if value is None:
+            buf.write_u8(0)
+            return
+
+        buf.write_u8(1)
+        _UniffiFfiConverterSequenceTypeAsset.write(value, buf)
+
+    @classmethod
+    def read(cls, buf):
+        flag = buf.read_u8()
+        if flag == 0:
+            return None
+        elif flag == 1:
+            return _UniffiFfiConverterSequenceTypeAsset.read(buf)
+        else:
+            raise InternalError("Unexpected flag byte for optional type")
 
 
-class _UniffiConverterSequenceTypeCandle(_UniffiConverterRustBuffer):
+class ValidatorProtocol(typing.Protocol):
+    """
+    Validator for filtering WebSocket messages.
+
+    Provides various methods to validate messages using different strategies
+    like regex matching, prefix/suffix checking, and logical combinations.
+"""
+    
+    def check(self, message: str) -> bool:
+        """
+        Checks if a message matches this validator's conditions.
+
+        # Arguments
+
+        * `message` - String to validate
+
+        # Returns
+
+        True if message matches the validator's conditions, False otherwise
+"""
+        raise NotImplementedError
+
+class Validator(ValidatorProtocol):
+    """
+    Validator for filtering WebSocket messages.
+
+    Provides various methods to validate messages using different strategies
+    like regex matching, prefix/suffix checking, and logical combinations.
+"""
+    
+    _handle: ctypes.c_uint64
+    @classmethod
+    def all(cls, validators: typing.List[Validator]) -> Validator:
+        """
+        Creates a validator that requires all input validators to match.
+
+        # Arguments
+
+        * `validators` - List of validators that all must match
+
+        # Examples
+
+        ## Python
+        ```python
+        # Match messages that start with "Hello" and end with "World"
+        v = Validator.all([
+        Validator.starts_with("Hello"),
+        Validator.ends_with("World")
+        ])
+        assert v.check("Hello Beautiful World") == True
+        assert v.check("Hello Beautiful") == False
+        ```
+"""
+        
+        _UniffiFfiConverterSequenceTypeValidator.check_lower(validators)
+        _uniffi_lowered_args = (
+            _UniffiFfiConverterSequenceTypeValidator.lower(validators),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeValidator.lift
+        _uniffi_error_converter = None
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_all,
+            *_uniffi_lowered_args,
+        )
+        return cls._uniffi_make_instance(_uniffi_ffi_result)
+    @classmethod
+    def any(cls, validators: typing.List[Validator]) -> Validator:
+        """
+        Creates a validator that requires at least one input validator to match.
+
+        # Arguments
+
+        * `validators` - List of validators where at least one must match
+
+        # Examples
+
+        ## Python
+        ```python
+        # Match messages containing either "success" or "completed"
+        v = Validator.any([
+        Validator.contains("success"),
+        Validator.contains("completed")
+        ])
+        assert v.check("operation successful") == True
+        assert v.check("task completed") == True
+        assert v.check("in progress") == False
+        ```
+"""
+        
+        _UniffiFfiConverterSequenceTypeValidator.check_lower(validators)
+        _uniffi_lowered_args = (
+            _UniffiFfiConverterSequenceTypeValidator.lower(validators),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeValidator.lift
+        _uniffi_error_converter = None
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_any,
+            *_uniffi_lowered_args,
+        )
+        return cls._uniffi_make_instance(_uniffi_ffi_result)
+    @classmethod
+    def contains(cls, substring: str) -> Validator:
+        """
+        Creates a validator that checks if messages contain a specific substring.
+
+        # Arguments
+
+        * `substring` - String that should be present in messages
+"""
+        
+        _UniffiFfiConverterString.check_lower(substring)
+        _uniffi_lowered_args = (
+            _UniffiFfiConverterString.lower(substring),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeValidator.lift
+        _uniffi_error_converter = None
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_contains,
+            *_uniffi_lowered_args,
+        )
+        return cls._uniffi_make_instance(_uniffi_ffi_result)
+    @classmethod
+    def ends_with(cls, suffix: str) -> Validator:
+        """
+        Creates a validator that checks if messages end with a specific suffix.
+
+        # Arguments
+
+        * `suffix` - String that messages should end with
+"""
+        
+        _UniffiFfiConverterString.check_lower(suffix)
+        _uniffi_lowered_args = (
+            _UniffiFfiConverterString.lower(suffix),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeValidator.lift
+        _uniffi_error_converter = None
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_ends_with,
+            *_uniffi_lowered_args,
+        )
+        return cls._uniffi_make_instance(_uniffi_ffi_result)
+    @classmethod
+    def ne(cls, validator: Validator) -> Validator:
+        """
+        Creates a validator that negates another validator's result.
+
+        # Arguments
+
+        * `validator` - Validator whose result should be negated
+
+        # Examples
+
+        ## Python
+        ```python
+        # Match messages that don't contain "error"
+        v = Validator.ne(Validator.contains("error"))
+        assert v.check("success message") == True
+        assert v.check("error occurred") == False
+        ```
+"""
+        
+        _UniffiFfiConverterTypeValidator.check_lower(validator)
+        _uniffi_lowered_args = (
+            _UniffiFfiConverterTypeValidator.lower(validator),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeValidator.lift
+        _uniffi_error_converter = None
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_ne,
+            *_uniffi_lowered_args,
+        )
+        return cls._uniffi_make_instance(_uniffi_ffi_result)
+    def __init__(self, ):
+        """
+        Creates a default validator that accepts all messages.
+"""
+        _uniffi_lowered_args = (
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeValidator.lift
+        _uniffi_error_converter = None
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_new,
+            *_uniffi_lowered_args,
+        )
+        self._handle = _uniffi_ffi_result
+    @classmethod
+    def regex(cls, pattern: str) -> Validator:
+        """
+        Creates a validator that uses regex pattern matching.
+
+        # Arguments
+
+        * `pattern` - Regular expression pattern
+
+        # Examples
+
+        ## Python
+        ```python
+        # Match messages starting with a number
+        validator = Validator.regex(r"^\d+")
+        assert validator.check("123 message") == True
+        assert validator.check("abc") == False
+        ```
+"""
+        
+        _UniffiFfiConverterString.check_lower(pattern)
+        _uniffi_lowered_args = (
+            _UniffiFfiConverterString.lower(pattern),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeValidator.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_regex,
+            *_uniffi_lowered_args,
+        )
+        return cls._uniffi_make_instance(_uniffi_ffi_result)
+    @classmethod
+    def starts_with(cls, prefix: str) -> Validator:
+        """
+        Creates a validator that checks if messages start with a specific prefix.
+
+        # Arguments
+
+        * `prefix` - String that messages should start with
+"""
+        
+        _UniffiFfiConverterString.check_lower(prefix)
+        _uniffi_lowered_args = (
+            _UniffiFfiConverterString.lower(prefix),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeValidator.lift
+        _uniffi_error_converter = None
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_starts_with,
+            *_uniffi_lowered_args,
+        )
+        return cls._uniffi_make_instance(_uniffi_ffi_result)
+
+    def __del__(self):
+        # In case of partial initialization of instances.
+        handle = getattr(self, "_handle", None)
+        if handle is not None:
+            _uniffi_rust_call(_UniffiLib.uniffi_binary_options_tools_uni_fn_free_validator, handle)
+
+    def _uniffi_clone_handle(self):
+        return _uniffi_rust_call(_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_validator, self._handle)
+
+    # Used by alternative constructors or any methods which return this type.
+    @classmethod
+    def _uniffi_make_instance(cls, handle):
+        # Lightly yucky way to bypass the usual __init__ logic
+        # and just create a new instance with the required handle.
+        inst = cls.__new__(cls)
+        inst._handle = handle
+        return inst
+    def check(self, message: str) -> bool:
+        """
+        Checks if a message matches this validator's conditions.
+
+        # Arguments
+
+        * `message` - String to validate
+
+        # Returns
+
+        True if message matches the validator's conditions, False otherwise
+"""
+        
+        _UniffiFfiConverterString.check_lower(message)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(message),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterBoolean.lift
+        _uniffi_error_converter = None
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_validator_check,
+            *_uniffi_lowered_args,
+        )
+        return _uniffi_lift_return(_uniffi_ffi_result)
+
+
+
+
+
+class _UniffiFfiConverterTypeValidator:
+    @staticmethod
+    def lift(value: int) -> Validator:
+        return Validator._uniffi_make_instance(value)
+
+    @staticmethod
+    def check_lower(value: Validator):
+        if not isinstance(value, Validator):
+            raise TypeError("Expected Validator instance, {} found".format(type(value).__name__))
+
+    @staticmethod
+    def lower(value: Validator) -> ctypes.c_uint64:
+        return value._uniffi_clone_handle()
+
+    @classmethod
+    def read(cls, buf: _UniffiRustBuffer) -> Validator:
+        ptr = buf.read_u64()
+        if ptr == 0:
+            raise InternalError("Raw handle value was null")
+        return cls.lift(ptr)
+
+    @classmethod
+    def write(cls, value: Validator, buf: _UniffiRustBuffer):
+        buf.write_u64(cls.lower(value))
+
+class _UniffiFfiConverterBytes(_UniffiConverterRustBuffer):
+    @staticmethod
+    def read(buf):
+        size = buf.read_i32()
+        if size < 0:
+            raise InternalError("Unexpected negative byte string length")
+        return buf.read(size)
+
+    @staticmethod
+    def check_lower(value):
+        try:
+            memoryview(value)
+        except TypeError:
+            raise TypeError("a bytes-like object is required, not {!r}".format(type(value).__name__))
+
+    @staticmethod
+    def write(value, buf):
+        buf.write_i32(len(value))
+        buf.write(value)
+
+
+class RawHandlerProtocol(typing.Protocol):
+    """
+    Handler for advanced raw WebSocket message operations.
+
+    Provides low-level access to send messages and receive filtered responses
+    based on a validator. Each handler maintains its own message stream.
+"""
+    
+    async def send_and_wait(self, message: str) -> str:
+        """
+        Send a message and wait for the next matching response.
+
+        # Arguments
+
+        * `message` - Message to send
+
+        # Returns
+
+        The first response that matches this handler's validator
+
+        # Examples
+
+        ## Python
+        ```python
+        response = await handler.send_and_wait('42["getBalance"]')
+        data = json.loads(response)
+        ```
+"""
+        raise NotImplementedError
+    async def send_binary(self, data: bytes) -> None:
+        """
+        Send a binary message through this handler.
+
+        # Arguments
+
+        * `data` - Binary data to send
+
+        # Examples
+
+        ## Python
+        ```python
+        await handler.send_binary(b'\\x00\\x01\\x02')
+        ```
+"""
+        raise NotImplementedError
+    async def send_text(self, message: str) -> None:
+        """
+        Send a text message through this handler.
+
+        # Arguments
+
+        * `message` - Text message to send
+
+        # Examples
+
+        ## Python
+        ```python
+        await handler.send_text('42["ping"]')
+        ```
+"""
+        raise NotImplementedError
+    async def wait_next(self, ) -> str:
+        """
+        Wait for the next message that matches this handler's validator.
+
+        # Returns
+
+        The next matching message
+
+        # Examples
+
+        ## Python
+        ```python
+        message = await handler.wait_next()
+        print(f"Received: {message}")
+        ```
+"""
+        raise NotImplementedError
+
+class RawHandler(RawHandlerProtocol):
+    """
+    Handler for advanced raw WebSocket message operations.
+
+    Provides low-level access to send messages and receive filtered responses
+    based on a validator. Each handler maintains its own message stream.
+"""
+    
+    _handle: ctypes.c_uint64
+    
+    def __init__(self, *args, **kwargs):
+        raise ValueError("This class has no default constructor")
+
+    def __del__(self):
+        # In case of partial initialization of instances.
+        handle = getattr(self, "_handle", None)
+        if handle is not None:
+            _uniffi_rust_call(_UniffiLib.uniffi_binary_options_tools_uni_fn_free_rawhandler, handle)
+
+    def _uniffi_clone_handle(self):
+        return _uniffi_rust_call(_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_rawhandler, self._handle)
+
+    # Used by alternative constructors or any methods which return this type.
+    @classmethod
+    def _uniffi_make_instance(cls, handle):
+        # Lightly yucky way to bypass the usual __init__ logic
+        # and just create a new instance with the required handle.
+        inst = cls.__new__(cls)
+        inst._handle = handle
+        return inst
+    async def send_and_wait(self, message: str) -> str:
+        """
+        Send a message and wait for the next matching response.
+
+        # Arguments
+
+        * `message` - Message to send
+
+        # Returns
+
+        The first response that matches this handler's validator
+
+        # Examples
+
+        ## Python
+        ```python
+        response = await handler.send_and_wait('42["getBalance"]')
+        data = json.loads(response)
+        ```
+"""
+        
+        _UniffiFfiConverterString.check_lower(message)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(message),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterString.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
+        return await _uniffi_rust_call_async(
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_and_wait(*_uniffi_lowered_args),
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
+        )
+    async def send_binary(self, data: bytes) -> None:
+        """
+        Send a binary message through this handler.
+
+        # Arguments
+
+        * `data` - Binary data to send
+
+        # Examples
+
+        ## Python
+        ```python
+        await handler.send_binary(b'\\x00\\x01\\x02')
+        ```
+"""
+        
+        _UniffiFfiConverterBytes.check_lower(data)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterBytes.lower(data),
+        )
+        _uniffi_lift_return = lambda val: None
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
+        return await _uniffi_rust_call_async(
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_binary(*_uniffi_lowered_args),
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_void,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
+        )
+    async def send_text(self, message: str) -> None:
+        """
+        Send a text message through this handler.
+
+        # Arguments
+
+        * `message` - Text message to send
+
+        # Examples
+
+        ## Python
+        ```python
+        await handler.send_text('42["ping"]')
+        ```
+"""
+        
+        _UniffiFfiConverterString.check_lower(message)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(message),
+        )
+        _uniffi_lift_return = lambda val: None
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
+        return await _uniffi_rust_call_async(
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_text(*_uniffi_lowered_args),
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_void,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
+        )
+    async def wait_next(self, ) -> str:
+        """
+        Wait for the next message that matches this handler's validator.
+
+        # Returns
+
+        The next matching message
+
+        # Examples
+
+        ## Python
+        ```python
+        message = await handler.wait_next()
+        print(f"Received: {message}")
+        ```
+"""
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterString.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
+        return await _uniffi_rust_call_async(
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_wait_next(*_uniffi_lowered_args),
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
+        )
+
+
+
+
+
+class _UniffiFfiConverterTypeRawHandler:
+    @staticmethod
+    def lift(value: int) -> RawHandler:
+        return RawHandler._uniffi_make_instance(value)
+
+    @staticmethod
+    def check_lower(value: RawHandler):
+        if not isinstance(value, RawHandler):
+            raise TypeError("Expected RawHandler instance, {} found".format(type(value).__name__))
+
+    @staticmethod
+    def lower(value: RawHandler) -> ctypes.c_uint64:
+        return value._uniffi_clone_handle()
+
+    @classmethod
+    def read(cls, buf: _UniffiRustBuffer) -> RawHandler:
+        ptr = buf.read_u64()
+        if ptr == 0:
+            raise InternalError("Raw handle value was null")
+        return cls.lift(ptr)
+
+    @classmethod
+    def write(cls, value: RawHandler, buf: _UniffiRustBuffer):
+        buf.write_u64(cls.lower(value))
+
+class _UniffiFfiConverterSequenceTypeCandle(_UniffiConverterRustBuffer):
     @classmethod
     def check_lower(cls, value):
         for item in value:
-            _UniffiConverterTypeCandle.check_lower(item)
+            _UniffiFfiConverterTypeCandle.check_lower(item)
 
     @classmethod
     def write(cls, value, buf):
         items = len(value)
         buf.write_i32(items)
         for item in value:
-            _UniffiConverterTypeCandle.write(item, buf)
+            _UniffiFfiConverterTypeCandle.write(item, buf)
 
     @classmethod
     def read(cls, buf):
@@ -2503,21 +2873,22 @@ class _UniffiConverterSequenceTypeCandle(_UniffiConverterRustBuffer):
         if count < 0:
             raise InternalError("Unexpected negative sequence length")
 
-        return [_UniffiConverterTypeCandle.read(buf) for i in range(count)]
+        return [
+            _UniffiFfiConverterTypeCandle.read(buf) for i in range(count)
+        ]
 
-
-class _UniffiConverterSequenceTypeCandleLength(_UniffiConverterRustBuffer):
+class _UniffiFfiConverterSequenceTypeDeal(_UniffiConverterRustBuffer):
     @classmethod
     def check_lower(cls, value):
         for item in value:
-            _UniffiConverterTypeCandleLength.check_lower(item)
+            _UniffiFfiConverterTypeDeal.check_lower(item)
 
     @classmethod
     def write(cls, value, buf):
         items = len(value)
         buf.write_i32(items)
         for item in value:
-            _UniffiConverterTypeCandleLength.write(item, buf)
+            _UniffiFfiConverterTypeDeal.write(item, buf)
 
     @classmethod
     def read(cls, buf):
@@ -2525,32 +2896,185 @@ class _UniffiConverterSequenceTypeCandleLength(_UniffiConverterRustBuffer):
         if count < 0:
             raise InternalError("Unexpected negative sequence length")
 
-        return [_UniffiConverterTypeCandleLength.read(buf) for i in range(count)]
+        return [
+            _UniffiFfiConverterTypeDeal.read(buf) for i in range(count)
+        ]
 
 
-class _UniffiConverterSequenceTypeDeal(_UniffiConverterRustBuffer):
+class SubscriptionStreamProtocol(typing.Protocol):
+    """
+    Represents a stream of subscription data.
+
+    This object is returned by the `subscribe` method on the `PocketOption` client.
+    It allows you to receive real-time data, such as candles, for a specific asset.
+
+    # Rationale
+
+    Since UniFFI does not support streams directly, this wrapper provides a way to
+    consume the stream by repeatedly calling the `next` method.
+"""
+    
+    async def next(self, ) -> Candle:
+        """
+        Retrieves the next item from the stream.
+
+        This method should be called in a loop to consume the data from the stream.
+        It will return `None` when the stream is closed.
+
+        # Returns
+
+        An optional `Candle` object. It will be `None` if the stream has finished.
+
+        # Examples
+
+        ## Python
+        ```python
+        import asyncio
+
+        async def main():
+        # ... (get api object)
+        stream = await api.subscribe("EURUSD_otc", 5)
+        while True:
+        candle = await stream.next()
+        if candle is None:
+        break
+        print(f"New candle: {candle}")
+
+        asyncio.run(main())
+        ```
+
+        ## Swift
+        ```swift
+        func subscribe() async {
+        // ... (get api object)
+        let stream = try! await api.subscribe(asset: "EURUSD_otc", durationSecs: 5)
+        while let candle = try! await stream.next() {
+        print("New candle: \(candle)")
+        }
+        }
+        ```
+"""
+        raise NotImplementedError
+
+class SubscriptionStream(SubscriptionStreamProtocol):
+    """
+    Represents a stream of subscription data.
+
+    This object is returned by the `subscribe` method on the `PocketOption` client.
+    It allows you to receive real-time data, such as candles, for a specific asset.
+
+    # Rationale
+
+    Since UniFFI does not support streams directly, this wrapper provides a way to
+    consume the stream by repeatedly calling the `next` method.
+"""
+    
+    _handle: ctypes.c_uint64
+    
+    def __init__(self, *args, **kwargs):
+        raise ValueError("This class has no default constructor")
+
+    def __del__(self):
+        # In case of partial initialization of instances.
+        handle = getattr(self, "_handle", None)
+        if handle is not None:
+            _uniffi_rust_call(_UniffiLib.uniffi_binary_options_tools_uni_fn_free_subscriptionstream, handle)
+
+    def _uniffi_clone_handle(self):
+        return _uniffi_rust_call(_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_subscriptionstream, self._handle)
+
+    # Used by alternative constructors or any methods which return this type.
     @classmethod
-    def check_lower(cls, value):
-        for item in value:
-            _UniffiConverterTypeDeal.check_lower(item)
+    def _uniffi_make_instance(cls, handle):
+        # Lightly yucky way to bypass the usual __init__ logic
+        # and just create a new instance with the required handle.
+        inst = cls.__new__(cls)
+        inst._handle = handle
+        return inst
+    async def next(self, ) -> Candle:
+        """
+        Retrieves the next item from the stream.
+
+        This method should be called in a loop to consume the data from the stream.
+        It will return `None` when the stream is closed.
+
+        # Returns
+
+        An optional `Candle` object. It will be `None` if the stream has finished.
+
+        # Examples
+
+        ## Python
+        ```python
+        import asyncio
+
+        async def main():
+        # ... (get api object)
+        stream = await api.subscribe("EURUSD_otc", 5)
+        while True:
+        candle = await stream.next()
+        if candle is None:
+        break
+        print(f"New candle: {candle}")
+
+        asyncio.run(main())
+        ```
+
+        ## Swift
+        ```swift
+        func subscribe() async {
+        // ... (get api object)
+        let stream = try! await api.subscribe(asset: "EURUSD_otc", durationSecs: 5)
+        while let candle = try! await stream.next() {
+        print("New candle: \(candle)")
+        }
+        }
+        ```
+"""
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeCandle.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
+        return await _uniffi_rust_call_async(
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next(*_uniffi_lowered_args),
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
+        )
+
+
+
+
+
+class _UniffiFfiConverterTypeSubscriptionStream:
+    @staticmethod
+    def lift(value: int) -> SubscriptionStream:
+        return SubscriptionStream._uniffi_make_instance(value)
+
+    @staticmethod
+    def check_lower(value: SubscriptionStream):
+        if not isinstance(value, SubscriptionStream):
+            raise TypeError("Expected SubscriptionStream instance, {} found".format(type(value).__name__))
+
+    @staticmethod
+    def lower(value: SubscriptionStream) -> ctypes.c_uint64:
+        return value._uniffi_clone_handle()
 
     @classmethod
-    def write(cls, value, buf):
-        items = len(value)
-        buf.write_i32(items)
-        for item in value:
-            _UniffiConverterTypeDeal.write(item, buf)
+    def read(cls, buf: _UniffiRustBuffer) -> SubscriptionStream:
+        ptr = buf.read_u64()
+        if ptr == 0:
+            raise InternalError("Raw handle value was null")
+        return cls.lift(ptr)
 
     @classmethod
-    def read(cls, buf):
-        count = buf.read_i32()
-        if count < 0:
-            raise InternalError("Unexpected negative sequence length")
-
-        return [_UniffiConverterTypeDeal.read(buf) for i in range(count)]
+    def write(cls, value: SubscriptionStream, buf: _UniffiRustBuffer):
+        buf.write_u64(cls.lower(value))
 
 
-# objects.
 class PocketOptionProtocol(typing.Protocol):
     """
     The main client for interacting with the PocketOption platform.
@@ -2565,24 +3089,18 @@ class PocketOptionProtocol(typing.Protocol):
     This struct wraps the underlying `binary_options_tools::pocketoption::PocketOption` client,
     exposing its functionality in a way that is compatible with UniFFI for creating
     multi-language bindings.
-    """
-
-    def assets(
-        self,
-    ):
+"""
+    
+    async def assets(self, ) -> typing.Optional[typing.List[Asset]]:
         """
         Gets the list of available assets for trading.
 
         # Returns
 
         A list of `Asset` objects, or `None` if the assets have not been loaded yet.
-        """
-
+"""
         raise NotImplementedError
-
-    def balance(
-        self,
-    ):
+    async def balance(self, ) -> float:
         """
         Gets the current balance of the account.
 
@@ -2591,92 +3109,122 @@ class PocketOptionProtocol(typing.Protocol):
         # Returns
 
         The current balance as a floating-point number.
-        """
-
+"""
         raise NotImplementedError
-
-    def buy(self, asset: "str", time: "int", amount: "float"):
+    async def buy(self, asset: str,time: int,amount: float) -> Deal:
         """
         Places a "Call" (buy) trade.
 
         This is a convenience method that calls `trade` with `Action.Call`.
-        """
-
+"""
         raise NotImplementedError
-
-    def clear_closed_deals(
-        self,
-    ):
+    async def clear_closed_deals(self, ) -> None:
         """
         Clears the list of closed deals from the client's state.
-        """
-
+"""
         raise NotImplementedError
+    async def create_raw_handler(self, validator: Validator,keep_alive: typing.Optional[str]) -> RawHandler:
+        """
+        Creates a raw handler for advanced WebSocket message operations.
 
-    def get_candles(self, asset: "str", period: "int", offset: "int"):
+        This allows you to send custom messages and receive filtered responses
+        based on a validator. Useful for implementing custom protocols or
+        accessing features not directly exposed by the API.
+
+        # Arguments
+
+        * `validator` - Validator to filter incoming messages
+        * `keep_alive` - Optional message to send on reconnect (e.g., for re-subscribing)
+
+        # Returns
+
+        A `RawHandler` object for sending and receiving messages
+
+        # Examples
+
+        ## Python
+        ```python
+        # Create a validator for balance updates
+        validator = Validator.contains('"balance"')
+        handler = await client.create_raw_handler(validator, None)
+
+        # Send a custom message
+        await handler.send_text('42["getBalance"]')
+
+        # Wait for response
+        response = await handler.wait_next()
+        print(f"Received: {response}")
+        ```
+"""
+        raise NotImplementedError
+    async def get_candles(self, asset: str,period: int,offset: int) -> typing.List[Candle]:
         """
         Gets historical candle data for a specific asset.
-        """
-
+"""
         raise NotImplementedError
-
-    def get_candles_advanced(
-        self, asset: "str", period: "int", time: "int", offset: "int"
-    ):
+    async def get_candles_advanced(self, asset: str,period: int,time: int,offset: int) -> typing.List[Candle]:
         """
         Gets historical candle data for a specific asset with advanced parameters.
-        """
-
+"""
         raise NotImplementedError
-
-    def get_closed_deals(
-        self,
-    ):
+    async def get_closed_deals(self, ) -> typing.List[Deal]:
         """
         Gets the list of currently closed deals.
-        """
-
+"""
         raise NotImplementedError
-
-    def get_opened_deals(
-        self,
-    ):
+    async def get_opened_deals(self, ) -> typing.List[Deal]:
         """
         Gets the list of currently opened deals.
-        """
-
+"""
         raise NotImplementedError
-
-    def history(self, asset: "str", period: "int"):
+    async def history(self, asset: str,period: int) -> typing.List[Candle]:
         """
         Gets historical candle data for a specific asset and period.
-        """
-
+"""
         raise NotImplementedError
-
-    def is_demo(
-        self,
-    ):
+    def is_demo(self, ) -> bool:
         """
         Checks if the current session is a demo account.
 
         # Returns
 
         `true` if the account is a demo account, `false` otherwise.
-        """
-
+"""
         raise NotImplementedError
+    async def payout(self, asset: str) -> typing.Optional[float]:
+        """
+        Gets the payout percentage for a specific asset.
 
-    def reconnect(
-        self,
-    ):
+        Returns the profit percentage you'll receive if a trade on this asset wins.
+        For example, 0.8 means 80% profit (if you bet $1, you get $1.80 back).
+
+        # Arguments
+
+        * `asset` - The symbol of the asset (e.g., "EURUSD_otc")
+
+        # Returns
+
+        The payout percentage as a float, or None if the asset is not available
+
+        # Examples
+
+        ## Python
+        ```python
+        payout = await client.payout("EURUSD_otc")
+        if payout:
+        print(f"Payout: {payout * 100}%")
+        # Example output: "Payout: 80.0%"
+        else:
+        print("Asset not available")
+        ```
+"""
+        raise NotImplementedError
+    async def reconnect(self, ) -> None:
         """
         Disconnects and reconnects the client.
-        """
-
+"""
         raise NotImplementedError
-
-    def result(self, id: "str"):
+    async def result(self, id: str) -> Deal:
         """
         Checks the result of a trade by its ID.
 
@@ -2687,11 +3235,9 @@ class PocketOptionProtocol(typing.Protocol):
         # Returns
 
         A `Deal` object representing the completed trade.
-        """
-
+"""
         raise NotImplementedError
-
-    def result_with_timeout(self, id: "str", timeout_secs: "int"):
+    async def result_with_timeout(self, id: str,timeout_secs: int) -> Deal:
         """
         Checks the result of a trade by its ID with a timeout.
 
@@ -2703,41 +3249,29 @@ class PocketOptionProtocol(typing.Protocol):
         # Returns
 
         A `Deal` object representing the completed trade.
-        """
-
+"""
         raise NotImplementedError
-
-    def sell(self, asset: "str", time: "int", amount: "float"):
+    async def sell(self, asset: str,time: int,amount: float) -> Deal:
         """
         Places a "Put" (sell) trade.
 
         This is a convenience method that calls `trade` with `Action.Put`.
-        """
-
+"""
         raise NotImplementedError
-
-    def server_time(
-        self,
-    ):
+    async def server_time(self, ) -> int:
         """
         Gets the current server time as a Unix timestamp.
-        """
-
+"""
         raise NotImplementedError
-
-    def shutdown(
-        self,
-    ):
+    async def shutdown(self, ) -> None:
         """
         Shuts down the client and stops all background tasks.
 
         This method should be called when you are finished with the client
         to ensure a graceful shutdown.
-        """
-
+"""
         raise NotImplementedError
-
-    def subscribe(self, asset: "str", duration_secs: "int"):
+    async def subscribe(self, asset: str,duration_secs: int) -> SubscriptionStream:
         """
         Subscribes to real-time candle data for a specific asset.
 
@@ -2749,11 +3283,9 @@ class PocketOptionProtocol(typing.Protocol):
         # Returns
 
         A `SubscriptionStream` object that can be used to receive candle data.
-        """
-
+"""
         raise NotImplementedError
-
-    def trade(self, asset: "str", action: "Action", time: "int", amount: "float"):
+    async def trade(self, asset: str,action: Action,time: int,amount: float) -> Deal:
         """
         Places a trade.
 
@@ -2769,20 +3301,15 @@ class PocketOptionProtocol(typing.Protocol):
         # Returns
 
         A `Deal` object representing the completed trade.
-        """
-
+"""
         raise NotImplementedError
-
-    def unsubscribe(self, asset: "str"):
+    async def unsubscribe(self, asset: str) -> None:
         """
         Unsubscribes from real-time candle data for a specific asset.
-        """
-
+"""
         raise NotImplementedError
 
-
-# PocketOption is a Rust-only trait - it's a wrapper around a Rust implementation.
-class PocketOption:
+class PocketOption(PocketOptionProtocol):
     """
     The main client for interacting with the PocketOption platform.
 
@@ -2796,38 +3323,56 @@ class PocketOption:
     This struct wraps the underlying `binary_options_tools::pocketoption::PocketOption` client,
     exposing its functionality in a way that is compatible with UniFFI for creating
     multi-language bindings.
-    """
+"""
+    
+    _handle: ctypes.c_uint64
+    @classmethod
+    async def init(cls, ssid: str) -> PocketOption:
+        """
+        Creates a new instance of the PocketOption client.
 
-    _pointer: ctypes.c_void_p
+        This is the primary constructor for the client. It requires a session ID (ssid)
+        to authenticate with the PocketOption servers.
 
+        # Arguments
+
+        * `ssid` - The session ID for your PocketOption account.
+
+        # Examples
+
+        ## Python
+        ```python
+        import asyncio
+        from binaryoptionstoolsuni import PocketOption
+
+        async def main():
+        ssid = "YOUR_SESSION_ID"
+        api = await PocketOption.init(ssid)
+        balance = await api.balance()
+        print(f"Balance: {balance}")
+
+        asyncio.run(main())
+        ```
+"""
+        
+        _UniffiFfiConverterString.check_lower(ssid)
+        _uniffi_lowered_args = (
+            _UniffiFfiConverterString.lower(ssid),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypePocketOption.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
+        return await _uniffi_rust_call_async(
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_init(*_uniffi_lowered_args),
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_u64,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u64,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u64,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
+        )
     def __init__(self, *args, **kw):
         raise ValueError("async constructors not supported.")
-
-    def __del__(self):
-        # In case of partial initialization of instances.
-        pointer = getattr(self, "_pointer", None)
-        if pointer is not None:
-            _uniffi_rust_call(
-                _UniffiLib.uniffi_binary_options_tools_uni_fn_free_pocketoption, pointer
-            )
-
-    def _uniffi_clone_pointer(self):
-        return _uniffi_rust_call(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_clone_pocketoption,
-            self._pointer,
-        )
-
-    # Used by alternative constructors or any methods which return this type.
     @classmethod
-    def _make_instance_(cls, pointer):
-        # Lightly yucky way to bypass the usual __init__ logic
-        # and just create a new instance with the required pointer.
-        inst = cls.__new__(cls)
-        inst._pointer = pointer
-        return inst
-
-    @classmethod
-    async def new_with_url(cls, ssid: "str", url: "str"):
+    async def new_with_url(cls, ssid: str,url: str) -> PocketOption:
         """
         Creates a new instance of the PocketOption client with a custom WebSocket URL.
 
@@ -2838,51 +3383,65 @@ class PocketOption:
 
         * `ssid` - The session ID for your PocketOption account.
         * `url` - The custom WebSocket URL to connect to.
-        """
-
-        _UniffiConverterString.check_lower(ssid)
-
-        _UniffiConverterString.check_lower(url)
-
+"""
+        
+        _UniffiFfiConverterString.check_lower(ssid)
+        
+        _UniffiFfiConverterString.check_lower(url)
+        _uniffi_lowered_args = (
+            _UniffiFfiConverterString.lower(ssid),
+            _UniffiFfiConverterString.lower(url),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypePocketOption.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new_with_url(
-                _UniffiConverterString.lower(ssid), _UniffiConverterString.lower(url)
-            ),
-            _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_pointer,
-            _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_pointer,
-            _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_pointer,
-            _UniffiConverterTypePocketOption.lift,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new_with_url(*_uniffi_lowered_args),
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_u64,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u64,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u64,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
 
-    async def assets(
-        self,
-    ) -> "typing.Optional[typing.List[Asset]]":
+    def __del__(self):
+        # In case of partial initialization of instances.
+        handle = getattr(self, "_handle", None)
+        if handle is not None:
+            _uniffi_rust_call(_UniffiLib.uniffi_binary_options_tools_uni_fn_free_pocketoption, handle)
+
+    def _uniffi_clone_handle(self):
+        return _uniffi_rust_call(_UniffiLib.uniffi_binary_options_tools_uni_fn_clone_pocketoption, self._handle)
+
+    # Used by alternative constructors or any methods which return this type.
+    @classmethod
+    def _uniffi_make_instance(cls, handle):
+        # Lightly yucky way to bypass the usual __init__ logic
+        # and just create a new instance with the required handle.
+        inst = cls.__new__(cls)
+        inst._handle = handle
+        return inst
+    async def assets(self, ) -> typing.Optional[typing.List[Asset]]:
         """
         Gets the list of available assets for trading.
 
         # Returns
 
         A list of `Asset` objects, or `None` if the assets have not been loaded yet.
-        """
-
+"""
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterOptionalSequenceTypeAsset.lift
+        _uniffi_error_converter = None
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_assets(
-                self._uniffi_clone_pointer(),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_assets(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
-            # lift function
-            _UniffiConverterOptionalSequenceTypeAsset.lift,
-            # Error FFI converter
-            None,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def balance(
-        self,
-    ) -> "float":
+    async def balance(self, ) -> float:
         """
         Gets the current balance of the account.
 
@@ -2891,234 +3450,309 @@ class PocketOption:
         # Returns
 
         The current balance as a floating-point number.
-        """
-
+"""
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterFloat64.lift
+        _uniffi_error_converter = None
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_balance(
-                self._uniffi_clone_pointer(),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_balance(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_f64,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_f64,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_f64,
-            # lift function
-            _UniffiConverterDouble.lift,
-            # Error FFI converter
-            None,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def buy(self, asset: "str", time: "int", amount: "float") -> "Deal":
+    async def buy(self, asset: str,time: int,amount: float) -> Deal:
         """
         Places a "Call" (buy) trade.
 
         This is a convenience method that calls `trade` with `Action.Call`.
-        """
-
-        _UniffiConverterString.check_lower(asset)
-
-        _UniffiConverterUInt32.check_lower(time)
-
-        _UniffiConverterDouble.check_lower(amount)
-
+"""
+        
+        _UniffiFfiConverterString.check_lower(asset)
+        
+        _UniffiFfiConverterUInt32.check_lower(time)
+        
+        _UniffiFfiConverterFloat64.check_lower(amount)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(asset),
+            _UniffiFfiConverterUInt32.lower(time),
+            _UniffiFfiConverterFloat64.lower(amount),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeDeal.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_buy(
-                self._uniffi_clone_pointer(),
-                _UniffiConverterString.lower(asset),
-                _UniffiConverterUInt32.lower(time),
-                _UniffiConverterDouble.lower(amount),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_buy(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
-            # lift function
-            _UniffiConverterTypeDeal.lift,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def clear_closed_deals(
-        self,
-    ) -> None:
+    async def clear_closed_deals(self, ) -> None:
         """
         Clears the list of closed deals from the client's state.
-        """
-
+"""
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+        )
+        _uniffi_lift_return = lambda val: None
+        _uniffi_error_converter = None
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals(
-                self._uniffi_clone_pointer(),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_void,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void,
-            # lift function
-            lambda val: None,
-            # Error FFI converter
-            None,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
+    async def create_raw_handler(self, validator: Validator,keep_alive: typing.Optional[str]) -> RawHandler:
+        """
+        Creates a raw handler for advanced WebSocket message operations.
 
-    async def get_candles(
-        self, asset: "str", period: "int", offset: "int"
-    ) -> "typing.List[Candle]":
+        This allows you to send custom messages and receive filtered responses
+        based on a validator. Useful for implementing custom protocols or
+        accessing features not directly exposed by the API.
+
+        # Arguments
+
+        * `validator` - Validator to filter incoming messages
+        * `keep_alive` - Optional message to send on reconnect (e.g., for re-subscribing)
+
+        # Returns
+
+        A `RawHandler` object for sending and receiving messages
+
+        # Examples
+
+        ## Python
+        ```python
+        # Create a validator for balance updates
+        validator = Validator.contains('"balance"')
+        handler = await client.create_raw_handler(validator, None)
+
+        # Send a custom message
+        await handler.send_text('42["getBalance"]')
+
+        # Wait for response
+        response = await handler.wait_next()
+        print(f"Received: {response}")
+        ```
+"""
+        
+        _UniffiFfiConverterTypeValidator.check_lower(validator)
+        
+        _UniffiFfiConverterOptionalString.check_lower(keep_alive)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterTypeValidator.lower(validator),
+            _UniffiFfiConverterOptionalString.lower(keep_alive),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeRawHandler.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
+        return await _uniffi_rust_call_async(
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_create_raw_handler(*_uniffi_lowered_args),
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_u64,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u64,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u64,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
+        )
+    async def get_candles(self, asset: str,period: int,offset: int) -> typing.List[Candle]:
         """
         Gets historical candle data for a specific asset.
-        """
-
-        _UniffiConverterString.check_lower(asset)
-
-        _UniffiConverterInt64.check_lower(period)
-
-        _UniffiConverterInt64.check_lower(offset)
-
+"""
+        
+        _UniffiFfiConverterString.check_lower(asset)
+        
+        _UniffiFfiConverterInt64.check_lower(period)
+        
+        _UniffiFfiConverterInt64.check_lower(offset)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(asset),
+            _UniffiFfiConverterInt64.lower(period),
+            _UniffiFfiConverterInt64.lower(offset),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterSequenceTypeCandle.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles(
-                self._uniffi_clone_pointer(),
-                _UniffiConverterString.lower(asset),
-                _UniffiConverterInt64.lower(period),
-                _UniffiConverterInt64.lower(offset),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
-            # lift function
-            _UniffiConverterSequenceTypeCandle.lift,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def get_candles_advanced(
-        self, asset: "str", period: "int", time: "int", offset: "int"
-    ) -> "typing.List[Candle]":
+    async def get_candles_advanced(self, asset: str,period: int,time: int,offset: int) -> typing.List[Candle]:
         """
         Gets historical candle data for a specific asset with advanced parameters.
-        """
-
-        _UniffiConverterString.check_lower(asset)
-
-        _UniffiConverterInt64.check_lower(period)
-
-        _UniffiConverterInt64.check_lower(time)
-
-        _UniffiConverterInt64.check_lower(offset)
-
+"""
+        
+        _UniffiFfiConverterString.check_lower(asset)
+        
+        _UniffiFfiConverterInt64.check_lower(period)
+        
+        _UniffiFfiConverterInt64.check_lower(time)
+        
+        _UniffiFfiConverterInt64.check_lower(offset)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(asset),
+            _UniffiFfiConverterInt64.lower(period),
+            _UniffiFfiConverterInt64.lower(time),
+            _UniffiFfiConverterInt64.lower(offset),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterSequenceTypeCandle.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced(
-                self._uniffi_clone_pointer(),
-                _UniffiConverterString.lower(asset),
-                _UniffiConverterInt64.lower(period),
-                _UniffiConverterInt64.lower(time),
-                _UniffiConverterInt64.lower(offset),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
-            # lift function
-            _UniffiConverterSequenceTypeCandle.lift,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def get_closed_deals(
-        self,
-    ) -> "typing.List[Deal]":
+    async def get_closed_deals(self, ) -> typing.List[Deal]:
         """
         Gets the list of currently closed deals.
-        """
-
+"""
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterSequenceTypeDeal.lift
+        _uniffi_error_converter = None
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals(
-                self._uniffi_clone_pointer(),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
-            # lift function
-            _UniffiConverterSequenceTypeDeal.lift,
-            # Error FFI converter
-            None,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def get_opened_deals(
-        self,
-    ) -> "typing.List[Deal]":
+    async def get_opened_deals(self, ) -> typing.List[Deal]:
         """
         Gets the list of currently opened deals.
-        """
-
+"""
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterSequenceTypeDeal.lift
+        _uniffi_error_converter = None
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals(
-                self._uniffi_clone_pointer(),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
-            # lift function
-            _UniffiConverterSequenceTypeDeal.lift,
-            # Error FFI converter
-            None,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def history(self, asset: "str", period: "int") -> "typing.List[Candle]":
+    async def history(self, asset: str,period: int) -> typing.List[Candle]:
         """
         Gets historical candle data for a specific asset and period.
-        """
-
-        _UniffiConverterString.check_lower(asset)
-
-        _UniffiConverterUInt32.check_lower(period)
-
+"""
+        
+        _UniffiFfiConverterString.check_lower(asset)
+        
+        _UniffiFfiConverterUInt32.check_lower(period)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(asset),
+            _UniffiFfiConverterUInt32.lower(period),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterSequenceTypeCandle.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_history(
-                self._uniffi_clone_pointer(),
-                _UniffiConverterString.lower(asset),
-                _UniffiConverterUInt32.lower(period),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_history(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
-            # lift function
-            _UniffiConverterSequenceTypeCandle.lift,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    def is_demo(
-        self,
-    ) -> "bool":
+    def is_demo(self, ) -> bool:
         """
         Checks if the current session is a demo account.
 
         # Returns
 
         `true` if the account is a demo account, `false` otherwise.
-        """
-
-        return _UniffiConverterBool.lift(
-            _uniffi_rust_call(
-                _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo,
-                self._uniffi_clone_pointer(),
-            )
+"""
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
         )
+        _uniffi_lift_return = _UniffiFfiConverterBoolean.lift
+        _uniffi_error_converter = None
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo,
+            *_uniffi_lowered_args,
+        )
+        return _uniffi_lift_return(_uniffi_ffi_result)
+    async def payout(self, asset: str) -> typing.Optional[float]:
+        """
+        Gets the payout percentage for a specific asset.
 
-    async def reconnect(
-        self,
-    ) -> None:
+        Returns the profit percentage you'll receive if a trade on this asset wins.
+        For example, 0.8 means 80% profit (if you bet $1, you get $1.80 back).
+
+        # Arguments
+
+        * `asset` - The symbol of the asset (e.g., "EURUSD_otc")
+
+        # Returns
+
+        The payout percentage as a float, or None if the asset is not available
+
+        # Examples
+
+        ## Python
+        ```python
+        payout = await client.payout("EURUSD_otc")
+        if payout:
+        print(f"Payout: {payout * 100}%")
+        # Example output: "Payout: 80.0%"
+        else:
+        print("Asset not available")
+        ```
+"""
+        
+        _UniffiFfiConverterString.check_lower(asset)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(asset),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterOptionalFloat64.lift
+        _uniffi_error_converter = None
+        return await _uniffi_rust_call_async(
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_payout(*_uniffi_lowered_args),
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
+        )
+    async def reconnect(self, ) -> None:
         """
         Disconnects and reconnects the client.
-        """
-
+"""
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+        )
+        _uniffi_lift_return = lambda val: None
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect(
-                self._uniffi_clone_pointer(),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_void,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void,
-            # lift function
-            lambda val: None,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def result(self, id: "str") -> "Deal":
+    async def result(self, id: str) -> Deal:
         """
         Checks the result of a trade by its ID.
 
@@ -3129,24 +3763,24 @@ class PocketOption:
         # Returns
 
         A `Deal` object representing the completed trade.
-        """
-
-        _UniffiConverterString.check_lower(id)
-
+"""
+        
+        _UniffiFfiConverterString.check_lower(id)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(id),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeDeal.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result(
-                self._uniffi_clone_pointer(), _UniffiConverterString.lower(id)
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
-            # lift function
-            _UniffiConverterTypeDeal.lift,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def result_with_timeout(self, id: "str", timeout_secs: "int") -> "Deal":
+    async def result_with_timeout(self, id: str,timeout_secs: int) -> Deal:
         """
         Checks the result of a trade by its ID with a timeout.
 
@@ -3158,102 +3792,92 @@ class PocketOption:
         # Returns
 
         A `Deal` object representing the completed trade.
-        """
-
-        _UniffiConverterString.check_lower(id)
-
-        _UniffiConverterUInt64.check_lower(timeout_secs)
-
+"""
+        
+        _UniffiFfiConverterString.check_lower(id)
+        
+        _UniffiFfiConverterUInt64.check_lower(timeout_secs)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(id),
+            _UniffiFfiConverterUInt64.lower(timeout_secs),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeDeal.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout(
-                self._uniffi_clone_pointer(),
-                _UniffiConverterString.lower(id),
-                _UniffiConverterUInt64.lower(timeout_secs),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
-            # lift function
-            _UniffiConverterTypeDeal.lift,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def sell(self, asset: "str", time: "int", amount: "float") -> "Deal":
+    async def sell(self, asset: str,time: int,amount: float) -> Deal:
         """
         Places a "Put" (sell) trade.
 
         This is a convenience method that calls `trade` with `Action.Put`.
-        """
-
-        _UniffiConverterString.check_lower(asset)
-
-        _UniffiConverterUInt32.check_lower(time)
-
-        _UniffiConverterDouble.check_lower(amount)
-
+"""
+        
+        _UniffiFfiConverterString.check_lower(asset)
+        
+        _UniffiFfiConverterUInt32.check_lower(time)
+        
+        _UniffiFfiConverterFloat64.check_lower(amount)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(asset),
+            _UniffiFfiConverterUInt32.lower(time),
+            _UniffiFfiConverterFloat64.lower(amount),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeDeal.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_sell(
-                self._uniffi_clone_pointer(),
-                _UniffiConverterString.lower(asset),
-                _UniffiConverterUInt32.lower(time),
-                _UniffiConverterDouble.lower(amount),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_sell(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
-            # lift function
-            _UniffiConverterTypeDeal.lift,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def server_time(
-        self,
-    ) -> "int":
+    async def server_time(self, ) -> int:
         """
         Gets the current server time as a Unix timestamp.
-        """
-
+"""
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterInt64.lift
+        _uniffi_error_converter = None
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time(
-                self._uniffi_clone_pointer(),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_i64,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_i64,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i64,
-            # lift function
-            _UniffiConverterInt64.lift,
-            # Error FFI converter
-            None,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def shutdown(
-        self,
-    ) -> None:
+    async def shutdown(self, ) -> None:
         """
         Shuts down the client and stops all background tasks.
 
         This method should be called when you are finished with the client
         to ensure a graceful shutdown.
-        """
-
+"""
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+        )
+        _uniffi_lift_return = lambda val: None
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown(
-                self._uniffi_clone_pointer(),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_void,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void,
-            # lift function
-            lambda val: None,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def subscribe(
-        self, asset: "str", duration_secs: "int"
-    ) -> "SubscriptionStream":
+    async def subscribe(self, asset: str,duration_secs: int) -> SubscriptionStream:
         """
         Subscribes to real-time candle data for a specific asset.
 
@@ -3265,30 +3889,27 @@ class PocketOption:
         # Returns
 
         A `SubscriptionStream` object that can be used to receive candle data.
-        """
-
-        _UniffiConverterString.check_lower(asset)
-
-        _UniffiConverterUInt64.check_lower(duration_secs)
-
-        return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe(
-                self._uniffi_clone_pointer(),
-                _UniffiConverterString.lower(asset),
-                _UniffiConverterUInt64.lower(duration_secs),
-            ),
-            _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_pointer,
-            _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_pointer,
-            _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_pointer,
-            # lift function
-            _UniffiConverterTypeSubscriptionStream.lift,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
+"""
+        
+        _UniffiFfiConverterString.check_lower(asset)
+        
+        _UniffiFfiConverterUInt64.check_lower(duration_secs)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(asset),
+            _UniffiFfiConverterUInt64.lower(duration_secs),
         )
-
-    async def trade(
-        self, asset: "str", action: "Action", time: "int", amount: "float"
-    ) -> "Deal":
+        _uniffi_lift_return = _UniffiFfiConverterTypeSubscriptionStream.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
+        return await _uniffi_rust_call_async(
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe(*_uniffi_lowered_args),
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_u64,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u64,
+            _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u64,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
+        )
+    async def trade(self, asset: str,action: Action,time: int,amount: float) -> Deal:
         """
         Places a trade.
 
@@ -3304,363 +3925,133 @@ class PocketOption:
         # Returns
 
         A `Deal` object representing the completed trade.
-        """
-
-        _UniffiConverterString.check_lower(asset)
-
-        _UniffiConverterTypeAction.check_lower(action)
-
-        _UniffiConverterUInt32.check_lower(time)
-
-        _UniffiConverterDouble.check_lower(amount)
-
+"""
+        
+        _UniffiFfiConverterString.check_lower(asset)
+        
+        _UniffiFfiConverterTypeAction.check_lower(action)
+        
+        _UniffiFfiConverterUInt32.check_lower(time)
+        
+        _UniffiFfiConverterFloat64.check_lower(amount)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(asset),
+            _UniffiFfiConverterTypeAction.lower(action),
+            _UniffiFfiConverterUInt32.lower(time),
+            _UniffiFfiConverterFloat64.lower(amount),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeDeal.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_trade(
-                self._uniffi_clone_pointer(),
-                _UniffiConverterString.lower(asset),
-                _UniffiConverterTypeAction.lower(action),
-                _UniffiConverterUInt32.lower(time),
-                _UniffiConverterDouble.lower(amount),
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_trade(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
-            # lift function
-            _UniffiConverterTypeDeal.lift,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
-
-    async def unsubscribe(self, asset: "str") -> None:
+    async def unsubscribe(self, asset: str) -> None:
         """
         Unsubscribes from real-time candle data for a specific asset.
-        """
-
-        _UniffiConverterString.check_lower(asset)
-
+"""
+        
+        _UniffiFfiConverterString.check_lower(asset)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterString.lower(asset),
+        )
+        _uniffi_lift_return = lambda val: None
+        _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe(
-                self._uniffi_clone_pointer(), _UniffiConverterString.lower(asset)
-            ),
+            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe(*_uniffi_lowered_args),
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_void,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void,
             _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void,
-            # lift function
-            lambda val: None,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
+            _uniffi_lift_return,
+            _uniffi_error_converter,
         )
 
 
-class _UniffiConverterTypePocketOption:
+
+
+
+class _UniffiFfiConverterTypePocketOption:
     @staticmethod
-    def lift(value: int):
-        return PocketOption._make_instance_(value)
+    def lift(value: int) -> PocketOption:
+        return PocketOption._uniffi_make_instance(value)
 
     @staticmethod
     def check_lower(value: PocketOption):
         if not isinstance(value, PocketOption):
-            raise TypeError(
-                "Expected PocketOption instance, {} found".format(type(value).__name__)
-            )
+            raise TypeError("Expected PocketOption instance, {} found".format(type(value).__name__))
 
     @staticmethod
-    def lower(value: PocketOptionProtocol):
-        if not isinstance(value, PocketOption):
-            raise TypeError(
-                "Expected PocketOption instance, {} found".format(type(value).__name__)
-            )
-        return value._uniffi_clone_pointer()
+    def lower(value: PocketOption) -> ctypes.c_uint64:
+        return value._uniffi_clone_handle()
 
     @classmethod
-    def read(cls, buf: _UniffiRustBuffer):
+    def read(cls, buf: _UniffiRustBuffer) -> PocketOption:
         ptr = buf.read_u64()
         if ptr == 0:
-            raise InternalError("Raw pointer value was null")
+            raise InternalError("Raw handle value was null")
         return cls.lift(ptr)
 
     @classmethod
-    def write(cls, value: PocketOptionProtocol, buf: _UniffiRustBuffer):
+    def write(cls, value: PocketOption, buf: _UniffiRustBuffer):
         buf.write_u64(cls.lower(value))
 
-
-class SubscriptionStreamProtocol(typing.Protocol):
-    """
-    Represents a stream of subscription data.
-
-    This object is returned by the `subscribe` method on the `PocketOption` client.
-    It allows you to receive real-time data, such as candles, for a specific asset.
-
-    # Rationale
-
-    Since UniFFI does not support streams directly, this wrapper provides a way to
-    consume the stream by repeatedly calling the `next` method.
-    """
-
-    def next(
-        self,
-    ):
-        """
-        Retrieves the next item from the stream.
-
-        This method should be called in a loop to consume the data from the stream.
-        It will return `None` when the stream is closed.
-
-        # Returns
-
-        An optional `Candle` object. It will be `None` if the stream has finished.
-
-        # Examples
-
-        ## Python
-        ```python
-        import asyncio
-
-        async def main():
-        # ... (get api object)
-        stream = await api.subscribe("EURUSD_otc", 5)
-        while True:
-        candle = await stream.next()
-        if candle is None:
-        break
-        print(f"New candle: {candle}")
-
-        asyncio.run(main())
-        ```
-
-        ## Swift
-        ```swift
-        func subscribe() async {
-        // ... (get api object)
-        let stream = try! await api.subscribe(asset: "EURUSD_otc", durationSecs: 5)
-        while let candle = try! await stream.next() {
-        print("New candle: \(candle)")
-        }
-        }
-        ```
-        """
-
-        raise NotImplementedError
-
-
-# SubscriptionStream is a Rust-only trait - it's a wrapper around a Rust implementation.
-class SubscriptionStream:
-    """
-    Represents a stream of subscription data.
-
-    This object is returned by the `subscribe` method on the `PocketOption` client.
-    It allows you to receive real-time data, such as candles, for a specific asset.
-
-    # Rationale
-
-    Since UniFFI does not support streams directly, this wrapper provides a way to
-    consume the stream by repeatedly calling the `next` method.
-    """
-
-    _pointer: ctypes.c_void_p
-
-    def __init__(self, *args, **kwargs):
-        raise ValueError("This class has no default constructor")
-
-    def __del__(self):
-        # In case of partial initialization of instances.
-        pointer = getattr(self, "_pointer", None)
-        if pointer is not None:
-            _uniffi_rust_call(
-                _UniffiLib.uniffi_binary_options_tools_uni_fn_free_subscriptionstream,
-                pointer,
-            )
-
-    def _uniffi_clone_pointer(self):
-        return _uniffi_rust_call(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_clone_subscriptionstream,
-            self._pointer,
-        )
-
-    # Used by alternative constructors or any methods which return this type.
-    @classmethod
-    def _make_instance_(cls, pointer):
-        # Lightly yucky way to bypass the usual __init__ logic
-        # and just create a new instance with the required pointer.
-        inst = cls.__new__(cls)
-        inst._pointer = pointer
-        return inst
-
-    async def next(
-        self,
-    ) -> "Candle":
-        """
-        Retrieves the next item from the stream.
-
-        This method should be called in a loop to consume the data from the stream.
-        It will return `None` when the stream is closed.
-
-        # Returns
-
-        An optional `Candle` object. It will be `None` if the stream has finished.
-
-        # Examples
-
-        ## Python
-        ```python
-        import asyncio
-
-        async def main():
-        # ... (get api object)
-        stream = await api.subscribe("EURUSD_otc", 5)
-        while True:
-        candle = await stream.next()
-        if candle is None:
-        break
-        print(f"New candle: {candle}")
-
-        asyncio.run(main())
-        ```
-
-        ## Swift
-        ```swift
-        func subscribe() async {
-        // ... (get api object)
-        let stream = try! await api.subscribe(asset: "EURUSD_otc", durationSecs: 5)
-        while let candle = try! await stream.next() {
-        print("New candle: \(candle)")
-        }
-        }
-        ```
-        """
-
-        return await _uniffi_rust_call_async(
-            _UniffiLib.uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next(
-                self._uniffi_clone_pointer(),
-            ),
-            _UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
-            _UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
-            _UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
-            # lift function
-            _UniffiConverterTypeCandle.lift,
-            # Error FFI converter
-            _UniffiConverterTypeUniError,
-        )
-
-
-class _UniffiConverterTypeSubscriptionStream:
-    @staticmethod
-    def lift(value: int):
-        return SubscriptionStream._make_instance_(value)
+class _UniffiFfiConverterUInt8(_UniffiConverterPrimitiveInt):
+    CLASS_NAME = "u8"
+    VALUE_MIN = 0
+    VALUE_MAX = 2**8
 
     @staticmethod
-    def check_lower(value: SubscriptionStream):
-        if not isinstance(value, SubscriptionStream):
-            raise TypeError(
-                "Expected SubscriptionStream instance, {} found".format(
-                    type(value).__name__
-                )
-            )
+    def read(buf):
+        return buf.read_u8()
 
     @staticmethod
-    def lower(value: SubscriptionStreamProtocol):
-        if not isinstance(value, SubscriptionStream):
-            raise TypeError(
-                "Expected SubscriptionStream instance, {} found".format(
-                    type(value).__name__
-                )
-            )
-        return value._uniffi_clone_pointer()
+    def write(value, buf):
+        buf.write_u8(value)
+
+class _UniffiFfiConverterSequenceTypeValidator(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        for item in value:
+            _UniffiFfiConverterTypeValidator.check_lower(item)
 
     @classmethod
-    def read(cls, buf: _UniffiRustBuffer):
-        ptr = buf.read_u64()
-        if ptr == 0:
-            raise InternalError("Raw pointer value was null")
-        return cls.lift(ptr)
+    def write(cls, value, buf):
+        items = len(value)
+        buf.write_i32(items)
+        for item in value:
+            _UniffiFfiConverterTypeValidator.write(item, buf)
 
     @classmethod
-    def write(cls, value: SubscriptionStreamProtocol, buf: _UniffiRustBuffer):
-        buf.write_u64(cls.lower(value))
+    def read(cls, buf):
+        count = buf.read_i32()
+        if count < 0:
+            raise InternalError("Unexpected negative sequence length")
 
-
-# Async support# RustFuturePoll values
-_UNIFFI_RUST_FUTURE_POLL_READY = 0
-_UNIFFI_RUST_FUTURE_POLL_MAYBE_READY = 1
-
-# Stores futures for _uniffi_continuation_callback
-_UniffiContinuationHandleMap = _UniffiHandleMap()
-
-_UNIFFI_GLOBAL_EVENT_LOOP = None
-
-"""
-Set the event loop to use for async functions
-
-This is needed if some async functions run outside of the eventloop, for example:
-    - A non-eventloop thread is spawned, maybe from `EventLoop.run_in_executor` or maybe from the
-      Rust code spawning its own thread.
-    - The Rust code calls an async callback method from a sync callback function, using something
-      like `pollster` to block on the async call.
-
-In this case, we need an event loop to run the Python async function, but there's no eventloop set
-for the thread.  Use `uniffi_set_event_loop` to force an eventloop to be used in this case.
-"""
-
-
-def uniffi_set_event_loop(eventloop: asyncio.BaseEventLoop):
-    global _UNIFFI_GLOBAL_EVENT_LOOP
-    _UNIFFI_GLOBAL_EVENT_LOOP = eventloop
-
-
-def _uniffi_get_event_loop():
-    if _UNIFFI_GLOBAL_EVENT_LOOP is not None:
-        return _UNIFFI_GLOBAL_EVENT_LOOP
-    else:
-        return asyncio.get_running_loop()
-
-
-# Continuation callback for async functions
-# lift the return value or error and resolve the future, causing the async function to resume.
-@_UNIFFI_RUST_FUTURE_CONTINUATION_CALLBACK
-def _uniffi_continuation_callback(future_ptr, poll_code):
-    (eventloop, future) = _UniffiContinuationHandleMap.remove(future_ptr)
-    eventloop.call_soon_threadsafe(_uniffi_set_future_result, future, poll_code)
-
-
-def _uniffi_set_future_result(future, poll_code):
-    if not future.cancelled():
-        future.set_result(poll_code)
-
-
-async def _uniffi_rust_call_async(
-    rust_future, ffi_poll, ffi_complete, ffi_free, lift_func, error_ffi_converter
-):
-    try:
-        eventloop = _uniffi_get_event_loop()
-
-        # Loop and poll until we see a _UNIFFI_RUST_FUTURE_POLL_READY value
-        while True:
-            future = eventloop.create_future()
-            ffi_poll(
-                rust_future,
-                _uniffi_continuation_callback,
-                _UniffiContinuationHandleMap.insert((eventloop, future)),
-            )
-            poll_code = await future
-            if poll_code == _UNIFFI_RUST_FUTURE_POLL_READY:
-                break
-
-        return lift_func(
-            _uniffi_rust_call_with_error(error_ffi_converter, ffi_complete, rust_future)
-        )
-    finally:
-        ffi_free(rust_future)
-
+        return [
+            _UniffiFfiConverterTypeValidator.read(buf) for i in range(count)
+        ]
 
 __all__ = [
     "InternalError",
-    "Action",
     "AssetType",
+    "Action",
     "UniError",
+    "CandleLength",
     "Asset",
     "Candle",
-    "CandleLength",
     "Deal",
-    "PocketOption",
+    "Validator",
+    "ValidatorProtocol",
+    "RawHandler",
+    "RawHandlerProtocol",
     "SubscriptionStream",
+    "SubscriptionStreamProtocol",
+    "PocketOption",
+    "PocketOptionProtocol",
 ]

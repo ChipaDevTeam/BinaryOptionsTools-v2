@@ -66,7 +66,7 @@ open class RustBuffer : Structure() {
     companion object {
         internal fun alloc(size: ULong = 0UL) = uniffiRustCall() { status ->
             // Note: need to convert the size to a `Long` value to make this work with JVM.
-            UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rustbuffer_alloc(size.toLong(), status)
+            UniffiLib.ffi_binary_options_tools_uni_rustbuffer_alloc(size.toLong(), status)
         }.also {
             if(it.data == null) {
                throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
@@ -82,7 +82,7 @@ open class RustBuffer : Structure() {
         }
 
         internal fun free(buf: RustBuffer.ByValue) = uniffiRustCall() { status ->
-            UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rustbuffer_free(buf, status)
+            UniffiLib.ffi_binary_options_tools_uni_rustbuffer_free(buf, status)
         }
     }
 
@@ -91,40 +91,6 @@ open class RustBuffer : Structure() {
         this.data?.getByteBuffer(0, this.len.toLong())?.also {
             it.order(ByteOrder.BIG_ENDIAN)
         }
-}
-
-/**
- * The equivalent of the `*mut RustBuffer` type.
- * Required for callbacks taking in an out pointer.
- *
- * Size is the sum of all values in the struct.
- *
- * @suppress
- */
-class RustBufferByReference : ByReference(16) {
-    /**
-     * Set the pointed-to `RustBuffer` to the given value.
-     */
-    fun setValue(value: RustBuffer.ByValue) {
-        // NOTE: The offsets are as they are in the C-like struct.
-        val pointer = getPointer()
-        pointer.setLong(0, value.capacity)
-        pointer.setLong(8, value.len)
-        pointer.setPointer(16, value.data)
-    }
-
-    /**
-     * Get a `RustBuffer.ByValue` from this reference.
-     */
-    fun getValue(): RustBuffer.ByValue {
-        val pointer = getPointer()
-        val value = RustBuffer.ByValue()
-        value.writeField("capacity", pointer.getLong(0))
-        value.writeField("len", pointer.getLong(8))
-        value.writeField("data", pointer.getLong(16))
-
-        return value
-    }
 }
 
 // This is a helper for safely passing byte references into the rust code.
@@ -346,21 +312,33 @@ internal inline fun<T, reified E: Throwable> uniffiTraitInterfaceCallWithError(
         }
     }
 }
+// Initial value and increment amount for handles. 
+// These ensure that Kotlin-generated handles always have the lowest bit set
+private const val UNIFFI_HANDLEMAP_INITIAL = 1.toLong()
+private const val UNIFFI_HANDLEMAP_DELTA = 2.toLong()
+
 // Map handles to objects
 //
 // This is used pass an opaque 64-bit handle representing a foreign object to the Rust code.
 internal class UniffiHandleMap<T: Any> {
     private val map = ConcurrentHashMap<Long, T>()
-    private val counter = java.util.concurrent.atomic.AtomicLong(0)
+    // Start 
+    private val counter = java.util.concurrent.atomic.AtomicLong(UNIFFI_HANDLEMAP_INITIAL)
 
     val size: Int
         get() = map.size
 
     // Insert a new object into the handle map and get a handle for it
     fun insert(obj: T): Long {
-        val handle = counter.getAndAdd(1)
+        val handle = counter.getAndAdd(UNIFFI_HANDLEMAP_DELTA)
         map.put(handle, obj)
         return handle
+    }
+
+    // Clone a handle, creating a new one
+    fun clone(handle: Long): Long {
+        val obj = map.get(handle) ?: throw InternalException("UniffiHandleMap.clone: Invalid handle")
+        return insert(obj)
     }
 
     // Get an object from the handle map
@@ -385,666 +363,581 @@ private fun findLibraryName(componentName: String): String {
     return "binary_options_tools_uni"
 }
 
-private inline fun <reified Lib : Library> loadIndirect(
-    componentName: String
-): Lib {
-    return Native.load<Lib>(findLibraryName(componentName), Lib::class.java)
-}
-
 // Define FFI callback types
 internal interface UniffiRustFutureContinuationCallback : com.sun.jna.Callback {
     fun callback(`data`: Long,`pollResult`: Byte,)
 }
-internal interface UniffiForeignFutureFree : com.sun.jna.Callback {
+internal interface UniffiForeignFutureDroppedCallback : com.sun.jna.Callback {
     fun callback(`handle`: Long,)
 }
 internal interface UniffiCallbackInterfaceFree : com.sun.jna.Callback {
     fun callback(`handle`: Long,)
 }
+internal interface UniffiCallbackInterfaceClone : com.sun.jna.Callback {
+    fun callback(`handle`: Long,)
+    : Long
+}
 @Structure.FieldOrder("handle", "free")
-internal open class UniffiForeignFuture(
+internal open class UniffiForeignFutureDroppedCallbackStruct(
     @JvmField internal var `handle`: Long = 0.toLong(),
-    @JvmField internal var `free`: UniffiForeignFutureFree? = null,
+    @JvmField internal var `free`: UniffiForeignFutureDroppedCallback? = null,
 ) : Structure() {
     class UniffiByValue(
         `handle`: Long = 0.toLong(),
-        `free`: UniffiForeignFutureFree? = null,
-    ): UniffiForeignFuture(`handle`,`free`,), Structure.ByValue
+        `free`: UniffiForeignFutureDroppedCallback? = null,
+    ): UniffiForeignFutureDroppedCallbackStruct(`handle`,`free`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFuture) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureDroppedCallbackStruct) {
         `handle` = other.`handle`
         `free` = other.`free`
     }
 
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructU8(
+internal open class UniffiForeignFutureResultU8(
     @JvmField internal var `returnValue`: Byte = 0.toByte(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Byte = 0.toByte(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructU8(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultU8(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructU8) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultU8) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteU8 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructU8.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultU8.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructI8(
+internal open class UniffiForeignFutureResultI8(
     @JvmField internal var `returnValue`: Byte = 0.toByte(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Byte = 0.toByte(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructI8(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultI8(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructI8) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultI8) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteI8 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructI8.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultI8.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructU16(
+internal open class UniffiForeignFutureResultU16(
     @JvmField internal var `returnValue`: Short = 0.toShort(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Short = 0.toShort(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructU16(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultU16(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructU16) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultU16) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteU16 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructU16.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultU16.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructI16(
+internal open class UniffiForeignFutureResultI16(
     @JvmField internal var `returnValue`: Short = 0.toShort(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Short = 0.toShort(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructI16(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultI16(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructI16) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultI16) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteI16 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructI16.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultI16.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructU32(
+internal open class UniffiForeignFutureResultU32(
     @JvmField internal var `returnValue`: Int = 0,
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Int = 0,
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructU32(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultU32(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructU32) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultU32) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteU32 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructU32.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultU32.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructI32(
+internal open class UniffiForeignFutureResultI32(
     @JvmField internal var `returnValue`: Int = 0,
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Int = 0,
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructI32(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultI32(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructI32) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultI32) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteI32 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructI32.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultI32.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructU64(
+internal open class UniffiForeignFutureResultU64(
     @JvmField internal var `returnValue`: Long = 0.toLong(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Long = 0.toLong(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructU64(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultU64(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructU64) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultU64) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteU64 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructU64.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultU64.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructI64(
+internal open class UniffiForeignFutureResultI64(
     @JvmField internal var `returnValue`: Long = 0.toLong(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Long = 0.toLong(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructI64(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultI64(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructI64) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultI64) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteI64 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructI64.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultI64.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructF32(
+internal open class UniffiForeignFutureResultF32(
     @JvmField internal var `returnValue`: Float = 0.0f,
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Float = 0.0f,
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructF32(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultF32(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructF32) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultF32) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteF32 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructF32.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultF32.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructF64(
+internal open class UniffiForeignFutureResultF64(
     @JvmField internal var `returnValue`: Double = 0.0,
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Double = 0.0,
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructF64(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultF64(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructF64) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultF64) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteF64 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructF64.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultF64.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructPointer(
-    @JvmField internal var `returnValue`: Pointer = Pointer.NULL,
-    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-) : Structure() {
-    class UniffiByValue(
-        `returnValue`: Pointer = Pointer.NULL,
-        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructPointer(`returnValue`,`callStatus`,), Structure.ByValue
-
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructPointer) {
-        `returnValue` = other.`returnValue`
-        `callStatus` = other.`callStatus`
-    }
-
-}
-internal interface UniffiForeignFutureCompletePointer : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructPointer.UniffiByValue,)
-}
-@Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructRustBuffer(
+internal open class UniffiForeignFutureResultRustBuffer(
     @JvmField internal var `returnValue`: RustBuffer.ByValue = RustBuffer.ByValue(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: RustBuffer.ByValue = RustBuffer.ByValue(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructRustBuffer(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultRustBuffer(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructRustBuffer) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultRustBuffer) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteRustBuffer : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructRustBuffer.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultRustBuffer.UniffiByValue,)
 }
 @Structure.FieldOrder("callStatus")
-internal open class UniffiForeignFutureStructVoid(
+internal open class UniffiForeignFutureResultVoid(
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructVoid(`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultVoid(`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructVoid) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultVoid) {
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructVoid.UniffiByValue,)
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// For large crates we prevent `MethodTooLargeException` (see #2340)
-// N.B. the name of the extension is very misleading, since it is 
-// rather `InterfaceTooLargeException`, caused by too many methods 
-// in the interface for large crates.
-//
-// By splitting the otherwise huge interface into two parts
-// * UniffiLib 
-// * IntegrityCheckingUniffiLib (this)
-// we allow for ~2x as many methods in the UniffiLib interface.
-// 
-// The `ffi_uniffi_contract_version` method and all checksum methods are put 
-// into `IntegrityCheckingUniffiLib` and these methods are called only once,
-// when the library is loaded.
-internal interface IntegrityCheckingUniffiLib : Library {
-    // Integrity check functions only
-    fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_assets(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_balance(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_buy(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_clear_closed_deals(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles_advanced(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_closed_deals(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_opened_deals(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_history(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_is_demo(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_reconnect(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_result(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_result_with_timeout(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_sell(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_server_time(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_shutdown(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_subscribe(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_trade(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_unsubscribe(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new(
-): Short
-fun uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new_with_url(
-): Short
-fun ffi_binary_options_tools_uni_uniffi_contract_version(
-): Int
-
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultVoid.UniffiByValue,)
 }
 
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
-internal interface UniffiLib : Library {
-    companion object {
-        internal val INSTANCE: UniffiLib by lazy {
-            val componentName = "binary_options_tools_uni"
-            // For large crates we prevent `MethodTooLargeException` (see #2340)
-            // N.B. the name of the extension is very misleading, since it is 
-            // rather `InterfaceTooLargeException`, caused by too many methods 
-            // in the interface for large crates.
-            //
-            // By splitting the otherwise huge interface into two parts
-            // * UniffiLib (this)
-            // * IntegrityCheckingUniffiLib
-            // And all checksum methods are put into `IntegrityCheckingUniffiLib`
-            // we allow for ~2x as many methods in the UniffiLib interface.
-            // 
-            // Thus we first load the library with `loadIndirect` as `IntegrityCheckingUniffiLib`
-            // so that we can (optionally!) call `uniffiCheckApiChecksums`...
-            loadIndirect<IntegrityCheckingUniffiLib>(componentName)
-                .also { lib: IntegrityCheckingUniffiLib ->
-                    uniffiCheckContractApiVersion(lib)
-                    uniffiCheckApiChecksums(lib)
-                }
-            // ... and then we load the library as `UniffiLib`
-            // N.B. we cannot use `loadIndirect` once and then try to cast it to `UniffiLib`
-            // => results in `java.lang.ClassCastException: com.sun.proxy.$Proxy cannot be cast to ...`
-            // error. So we must call `loadIndirect` twice. For crates large enough
-            // to trigger this issue, the performance impact is negligible, running on
-            // a macOS M1 machine the `loadIndirect` call takes ~50ms.
-            val lib = loadIndirect<UniffiLib>(componentName)
-            // No need to check the contract version and checksums, since 
-            // we already did that with `IntegrityCheckingUniffiLib` above.
-            // Loading of library with integrity check done.
-            lib
-        }
-        
-        // The Cleaner for the whole library
-        internal val CLEANER: UniffiCleaner by lazy {
-            UniffiCleaner.create()
-        }
+
+// For large crates we prevent `MethodTooLargeException` (see #2340)
+// N.B. the name of the extension is very misleading, since it is
+// rather `InterfaceTooLargeException`, caused by too many methods
+// in the interface for large crates.
+//
+// By splitting the otherwise huge interface into two parts
+// * UniffiLib (this)
+// * IntegrityCheckingUniffiLib
+// And all checksum methods are put into `IntegrityCheckingUniffiLib`
+// we allow for ~2x as many methods in the UniffiLib interface.
+//
+// Note: above all written when we used JNA's `loadIndirect` etc.
+// We now use JNA's "direct mapping" - unclear if same considerations apply exactly.
+internal object IntegrityCheckingUniffiLib {
+    init {
+        Native.register(IntegrityCheckingUniffiLib::class.java, findLibraryName(componentName = "binary_options_tools_uni"))
+        uniffiCheckContractApiVersion(this)
+        uniffiCheckApiChecksums(this)
     }
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_assets(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_balance(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_buy(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_clear_closed_deals(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_create_raw_handler(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles_advanced(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_closed_deals(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_opened_deals(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_history(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_is_demo(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_payout(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_reconnect(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_result(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_result_with_timeout(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_sell(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_server_time(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_shutdown(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_subscribe(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_trade(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_pocketoption_unsubscribe(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_and_wait(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_binary(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_text(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_rawhandler_wait_next(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_method_validator_check(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_init(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new_with_url(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_constructor_validator_all(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_constructor_validator_any(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_constructor_validator_contains(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_constructor_validator_ends_with(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_constructor_validator_ne(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_constructor_validator_new(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_constructor_validator_regex(
+    ): Short
+    external fun uniffi_binary_options_tools_uni_checksum_constructor_validator_starts_with(
+    ): Short
+    external fun ffi_binary_options_tools_uni_uniffi_contract_version(
+    ): Int
+    
+        
+}
 
-    // FFI functions
-    fun uniffi_binary_options_tools_uni_fn_clone_pocketoption(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-): Pointer
-fun uniffi_binary_options_tools_uni_fn_free_pocketoption(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+internal object UniffiLib {
+    
+    // The Cleaner for the whole library
+    internal val CLEANER: UniffiCleaner by lazy {
+        UniffiCleaner.create()
+    }
+    
+
+    init {
+        Native.register(UniffiLib::class.java, findLibraryName(componentName = "binary_options_tools_uni"))
+        
+    }
+    external fun uniffi_binary_options_tools_uni_fn_clone_pocketoption(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun uniffi_binary_options_tools_uni_fn_free_pocketoption(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Unit
-fun uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new(`ssid`: RustBuffer.ByValue,
+external fun uniffi_binary_options_tools_uni_fn_constructor_pocketoption_init(`ssid`: RustBuffer.ByValue,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new_with_url(`ssid`: RustBuffer.ByValue,`url`: RustBuffer.ByValue,
+external fun uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new(`ssid`: RustBuffer.ByValue,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_assets(`ptr`: Pointer,
+external fun uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new_with_url(`ssid`: RustBuffer.ByValue,`url`: RustBuffer.ByValue,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_balance(`ptr`: Pointer,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_assets(`ptr`: Long,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_buy(`ptr`: Pointer,`asset`: RustBuffer.ByValue,`time`: Int,`amount`: Double,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_balance(`ptr`: Long,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals(`ptr`: Pointer,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_buy(`ptr`: Long,`asset`: RustBuffer.ByValue,`time`: Int,`amount`: Double,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles(`ptr`: Pointer,`asset`: RustBuffer.ByValue,`period`: Long,`offset`: Long,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals(`ptr`: Long,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced(`ptr`: Pointer,`asset`: RustBuffer.ByValue,`period`: Long,`time`: Long,`offset`: Long,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_create_raw_handler(`ptr`: Long,`validator`: Long,`keepAlive`: RustBuffer.ByValue,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals(`ptr`: Pointer,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles(`ptr`: Long,`asset`: RustBuffer.ByValue,`period`: Long,`offset`: Long,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals(`ptr`: Pointer,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced(`ptr`: Long,`asset`: RustBuffer.ByValue,`period`: Long,`time`: Long,`offset`: Long,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_history(`ptr`: Pointer,`asset`: RustBuffer.ByValue,`period`: Int,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals(`ptr`: Long,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals(`ptr`: Long,
+): Long
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_history(`ptr`: Long,`asset`: RustBuffer.ByValue,`period`: Int,
+): Long
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Byte
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect(`ptr`: Pointer,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_payout(`ptr`: Long,`asset`: RustBuffer.ByValue,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_result(`ptr`: Pointer,`id`: RustBuffer.ByValue,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect(`ptr`: Long,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout(`ptr`: Pointer,`id`: RustBuffer.ByValue,`timeoutSecs`: Long,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_result(`ptr`: Long,`id`: RustBuffer.ByValue,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_sell(`ptr`: Pointer,`asset`: RustBuffer.ByValue,`time`: Int,`amount`: Double,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout(`ptr`: Long,`id`: RustBuffer.ByValue,`timeoutSecs`: Long,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time(`ptr`: Pointer,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_sell(`ptr`: Long,`asset`: RustBuffer.ByValue,`time`: Int,`amount`: Double,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown(`ptr`: Pointer,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time(`ptr`: Long,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe(`ptr`: Pointer,`asset`: RustBuffer.ByValue,`durationSecs`: Long,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown(`ptr`: Long,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_trade(`ptr`: Pointer,`asset`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`time`: Int,`amount`: Double,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe(`ptr`: Long,`asset`: RustBuffer.ByValue,`durationSecs`: Long,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe(`ptr`: Pointer,`asset`: RustBuffer.ByValue,
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_trade(`ptr`: Long,`asset`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`time`: Int,`amount`: Double,
 ): Long
-fun uniffi_binary_options_tools_uni_fn_clone_subscriptionstream(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
-): Pointer
-fun uniffi_binary_options_tools_uni_fn_free_subscriptionstream(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+external fun uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe(`ptr`: Long,`asset`: RustBuffer.ByValue,
+): Long
+external fun uniffi_binary_options_tools_uni_fn_clone_rawhandler(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun uniffi_binary_options_tools_uni_fn_free_rawhandler(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Unit
-fun uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next(`ptr`: Pointer,
+external fun uniffi_binary_options_tools_uni_fn_method_rawhandler_send_and_wait(`ptr`: Long,`message`: RustBuffer.ByValue,
 ): Long
-fun ffi_binary_options_tools_uni_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
-): RustBuffer.ByValue
-fun ffi_binary_options_tools_uni_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-): RustBuffer.ByValue
-fun ffi_binary_options_tools_uni_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+external fun uniffi_binary_options_tools_uni_fn_method_rawhandler_send_binary(`ptr`: Long,`data`: RustBuffer.ByValue,
+): Long
+external fun uniffi_binary_options_tools_uni_fn_method_rawhandler_send_text(`ptr`: Long,`message`: RustBuffer.ByValue,
+): Long
+external fun uniffi_binary_options_tools_uni_fn_method_rawhandler_wait_next(`ptr`: Long,
+): Long
+external fun uniffi_binary_options_tools_uni_fn_clone_subscriptionstream(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun uniffi_binary_options_tools_uni_fn_free_subscriptionstream(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Unit
-fun ffi_binary_options_tools_uni_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus, 
-): RustBuffer.ByValue
-fun ffi_binary_options_tools_uni_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+external fun uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next(`ptr`: Long,
+): Long
+external fun uniffi_binary_options_tools_uni_fn_clone_validator(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun uniffi_binary_options_tools_uni_fn_free_validator(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_cancel_u8(`handle`: Long,
-): Unit
-fun ffi_binary_options_tools_uni_rust_future_free_u8(`handle`: Long,
-): Unit
-fun ffi_binary_options_tools_uni_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+external fun uniffi_binary_options_tools_uni_fn_constructor_validator_all(`validators`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun uniffi_binary_options_tools_uni_fn_constructor_validator_any(`validators`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun uniffi_binary_options_tools_uni_fn_constructor_validator_contains(`substring`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun uniffi_binary_options_tools_uni_fn_constructor_validator_ends_with(`suffix`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun uniffi_binary_options_tools_uni_fn_constructor_validator_ne(`validator`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun uniffi_binary_options_tools_uni_fn_constructor_validator_new(uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun uniffi_binary_options_tools_uni_fn_constructor_validator_regex(`pattern`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun uniffi_binary_options_tools_uni_fn_constructor_validator_starts_with(`prefix`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun uniffi_binary_options_tools_uni_fn_method_validator_check(`ptr`: Long,`message`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): Byte
-fun ffi_binary_options_tools_uni_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+external fun ffi_binary_options_tools_uni_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun ffi_binary_options_tools_uni_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun ffi_binary_options_tools_uni_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_cancel_i8(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun ffi_binary_options_tools_uni_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_free_i8(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_cancel_u8(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+external fun ffi_binary_options_tools_uni_rust_future_free_u8(`handle`: Long,
+): Unit
+external fun ffi_binary_options_tools_uni_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Byte
-fun ffi_binary_options_tools_uni_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_cancel_u16(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_cancel_i8(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_free_u16(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_free_i8(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+external fun ffi_binary_options_tools_uni_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun ffi_binary_options_tools_uni_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_binary_options_tools_uni_rust_future_cancel_u16(`handle`: Long,
+): Unit
+external fun ffi_binary_options_tools_uni_rust_future_free_u16(`handle`: Long,
+): Unit
+external fun ffi_binary_options_tools_uni_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Short
-fun ffi_binary_options_tools_uni_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_cancel_i16(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_cancel_i16(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_free_i16(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_free_i16(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+external fun ffi_binary_options_tools_uni_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Short
-fun ffi_binary_options_tools_uni_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_cancel_u32(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_cancel_u32(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_free_u32(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_free_u32(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+external fun ffi_binary_options_tools_uni_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Int
-fun ffi_binary_options_tools_uni_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_cancel_i32(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_cancel_i32(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_free_i32(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_free_i32(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+external fun ffi_binary_options_tools_uni_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Int
-fun ffi_binary_options_tools_uni_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_cancel_u64(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_cancel_u64(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_free_u64(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_free_u64(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+external fun ffi_binary_options_tools_uni_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Long
-fun ffi_binary_options_tools_uni_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_cancel_i64(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_cancel_i64(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_free_i64(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_free_i64(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+external fun ffi_binary_options_tools_uni_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Long
-fun ffi_binary_options_tools_uni_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_cancel_f32(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_cancel_f32(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_free_f32(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_free_f32(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+external fun ffi_binary_options_tools_uni_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Float
-fun ffi_binary_options_tools_uni_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_cancel_f64(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_cancel_f64(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_free_f64(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_free_f64(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+external fun ffi_binary_options_tools_uni_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Double
-fun ffi_binary_options_tools_uni_rust_future_poll_pointer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_cancel_pointer(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_cancel_rust_buffer(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_free_pointer(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_free_rust_buffer(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-): Pointer
-fun ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-): Unit
-fun ffi_binary_options_tools_uni_rust_future_cancel_rust_buffer(`handle`: Long,
-): Unit
-fun ffi_binary_options_tools_uni_rust_future_free_rust_buffer(`handle`: Long,
-): Unit
-fun ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+external fun ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-fun ffi_binary_options_tools_uni_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_cancel_void(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_cancel_void(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_free_void(`handle`: Long,
+external fun ffi_binary_options_tools_uni_rust_future_free_void(`handle`: Long,
 ): Unit
-fun ffi_binary_options_tools_uni_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+external fun ffi_binary_options_tools_uni_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): Unit
 
+    
 }
 
 private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
     // Get the bindings contract version from our ComponentInterface
-    val bindings_contract_version = 29
+    val bindings_contract_version = 30
     // Get the scaffolding contract version by calling the into the dylib
     val scaffolding_contract_version = lib.ffi_binary_options_tools_uni_uniffi_contract_version()
     if (bindings_contract_version != scaffolding_contract_version) {
@@ -1065,6 +958,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_clear_closed_deals() != 9178.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_create_raw_handler() != 34256.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles() != 23490.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1081,6 +977,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_is_demo() != 19411.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_payout() != 5344.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_reconnect() != 9220.toShort()) {
@@ -1110,7 +1009,25 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_binary_options_tools_uni_checksum_method_pocketoption_unsubscribe() != 29837.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_and_wait() != 12420.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_binary() != 12514.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_text() != 41075.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_binary_options_tools_uni_checksum_method_rawhandler_wait_next() != 65338.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next() != 13448.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_binary_options_tools_uni_checksum_method_validator_check() != 57297.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_init() != 50054.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new() != 31315.toShort()) {
@@ -1119,20 +1036,47 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new_with_url() != 40992.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_all() != 22652.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_any() != 239.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_contains() != 4008.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_ends_with() != 3462.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_ne() != 13897.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_new() != 49602.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_regex() != 42529.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_binary_options_tools_uni_checksum_constructor_validator_starts_with() != 32570.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
 }
 
 /**
  * @suppress
  */
 public fun uniffiEnsureInitialized() {
-    UniffiLib.INSTANCE
+    IntegrityCheckingUniffiLib
+    // UniffiLib() initialized as objects are used, but we still need to explicitly
+    // reference it so initialization across crates works as expected.
+    UniffiLib
 }
 
 // Async support
 // Async return type handlers
 
 internal const val UNIFFI_RUST_FUTURE_POLL_READY = 0.toByte()
-internal const val UNIFFI_RUST_FUTURE_POLL_MAYBE_READY = 1.toByte()
+internal const val UNIFFI_RUST_FUTURE_POLL_WAKE = 1.toByte()
 
 internal val uniffiContinuationHandleMap = UniffiHandleMap<CancellableContinuation<Byte>>()
 
@@ -1232,11 +1176,22 @@ inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
     }
 
 /** 
+ * Placeholder object used to signal that we're constructing an interface with a FFI handle.
+ *
+ * This is the first argument for interface constructors that input a raw handle. It exists is that
+ * so we can avoid signature conflicts when an interface has a regular constructor than inputs a
+ * Long.
+ *
+ * @suppress
+ * */
+object UniffiWithHandle
+
+/** 
  * Used to instantiate an interface without an actual pointer, for fakes in tests, mostly.
  *
  * @suppress
  * */
-object NoPointer
+object NoHandle
 /**
  * The cleaner interface for Object finalization code to run.
  * This is the entry point to any implementation that we're using.
@@ -1497,22 +1452,38 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
     }
 }
 
+/**
+ * @suppress
+ */
+public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
+    override fun read(buf: ByteBuffer): ByteArray {
+        val len = buf.getInt()
+        val byteArr = ByteArray(len)
+        buf.get(byteArr)
+        return byteArr
+    }
+    override fun allocationSize(value: ByteArray): ULong {
+        return 4UL + value.size.toULong()
+    }
+    override fun write(value: ByteArray, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        buf.put(value)
+    }
+}
 
-// This template implements a class for working with a Rust struct via a Pointer/Arc<T>
+
+// This template implements a class for working with a Rust struct via a handle
 // to the live Rust struct on the other side of the FFI.
-//
-// Each instance implements core operations for working with the Rust `Arc<T>` and the
-// Kotlin Pointer to work with the live Rust struct on the other side of the FFI.
 //
 // There's some subtlety here, because we have to be careful not to operate on a Rust
 // struct after it has been dropped, and because we must expose a public API for freeing
 // theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
 //
-//   * Each instance holds an opaque pointer to the underlying Rust struct.
-//     Method calls need to read this pointer from the object's state and pass it in to
+//   * Each instance holds an opaque handle to the underlying Rust struct.
+//     Method calls need to read this handle from the object's state and pass it in to
 //     the Rust FFI.
 //
-//   * When an instance is no longer needed, its pointer should be passed to a
+//   * When an instance is no longer needed, its handle should be passed to a
 //     special destructor function provided by the Rust FFI, which will drop the
 //     underlying Rust struct.
 //
@@ -1537,13 +1508,13 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
 //      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
 //         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
 //
-// If we try to implement this with mutual exclusion on access to the pointer, there is the
+// If we try to implement this with mutual exclusion on access to the handle, there is the
 // possibility of a race between a method call and a concurrent call to `destroy`:
 //
-//    * Thread A starts a method call, reads the value of the pointer, but is interrupted
-//      before it can pass the pointer over the FFI to Rust.
+//    * Thread A starts a method call, reads the value of the handle, but is interrupted
+//      before it can pass the handle over the FFI to Rust.
 //    * Thread B calls `destroy` and frees the underlying Rust struct.
-//    * Thread A resumes, passing the already-read pointer value to Rust and triggering
+//    * Thread A resumes, passing the already-read handle value to Rust and triggering
 //      a use-after-free.
 //
 // One possible solution would be to use a `ReadWriteLock`, with each method call taking
@@ -1596,6 +1567,7 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
 //
 
 
+//
 /**
  * The main client for interacting with the PocketOption platform.
  *
@@ -1645,6 +1617,40 @@ public interface PocketOptionInterface {
     suspend fun `clearClosedDeals`()
     
     /**
+     * Creates a raw handler for advanced WebSocket message operations.
+     *
+     * This allows you to send custom messages and receive filtered responses
+     * based on a validator. Useful for implementing custom protocols or
+     * accessing features not directly exposed by the API.
+     *
+     * # Arguments
+     *
+     * * `validator` - Validator to filter incoming messages
+     * * `keep_alive` - Optional message to send on reconnect (e.g., for re-subscribing)
+     *
+     * # Returns
+     *
+     * A `RawHandler` object for sending and receiving messages
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * # Create a validator for balance updates
+     * validator = Validator.contains('"balance"')
+     * handler = await client.create_raw_handler(validator, None)
+     *
+     * # Send a custom message
+     * await handler.send_text('42["getBalance"]')
+     *
+     * # Wait for response
+     * response = await handler.wait_next()
+     * print(f"Received: {response}")
+     * ```
+     */
+    suspend fun `createRawHandler`(`validator`: Validator, `keepAlive`: kotlin.String?): RawHandler
+    
+    /**
      * Gets historical candle data for a specific asset.
      */
     suspend fun `getCandles`(`asset`: kotlin.String, `period`: kotlin.Long, `offset`: kotlin.Long): List<Candle>
@@ -1677,6 +1683,34 @@ public interface PocketOptionInterface {
      * `true` if the account is a demo account, `false` otherwise.
      */
     fun `isDemo`(): kotlin.Boolean
+    
+    /**
+     * Gets the payout percentage for a specific asset.
+     *
+     * Returns the profit percentage you'll receive if a trade on this asset wins.
+     * For example, 0.8 means 80% profit (if you bet $1, you get $1.80 back).
+     *
+     * # Arguments
+     *
+     * * `asset` - The symbol of the asset (e.g., "EURUSD_otc")
+     *
+     * # Returns
+     *
+     * The payout percentage as a float, or None if the asset is not available
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * payout = await client.payout("EURUSD_otc")
+     * if payout:
+     * print(f"Payout: {payout * 100}%")
+     * # Example output: "Payout: 80.0%"
+     * else:
+     * print("Asset not available")
+     * ```
+     */
+    suspend fun `payout`(`asset`: kotlin.String): kotlin.Double?
     
     /**
      * Disconnects and reconnects the client.
@@ -1787,24 +1821,30 @@ public interface PocketOptionInterface {
 open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
 {
 
-    constructor(pointer: Pointer) {
-        this.pointer = pointer
-        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
+    @Suppress("UNUSED_PARAMETER")
+    /**
+     * @suppress
+     */
+    constructor(withHandle: UniffiWithHandle, handle: Long) {
+        this.handle = handle
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
     }
 
     /**
+     * @suppress
+     *
      * This constructor can be used to instantiate a fake object. Only used for tests. Any
      * attempt to actually use an object constructed this way will fail as there is no
      * connected Rust object.
      */
     @Suppress("UNUSED_PARAMETER")
-    constructor(noPointer: NoPointer) {
-        this.pointer = null
-        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
+    constructor(noHandle: NoHandle) {
+        this.handle = 0
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
     }
     // Note no constructor generated for this object as it is async.
 
-    protected val pointer: Pointer?
+    protected val handle: Long
     protected val cleanable: UniffiCleaner.Cleanable
 
     private val wasDestroyed = AtomicBoolean(false)
@@ -1826,7 +1866,7 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
         this.destroy()
     }
 
-    internal inline fun <R> callWithPointer(block: (ptr: Pointer) -> R): R {
+    internal inline fun <R> callWithHandle(block: (handle: Long) -> R): R {
         // Check and increment the call counter, to keep the object alive.
         // This needs a compare-and-set retry loop in case of concurrent updates.
         do {
@@ -1838,9 +1878,9 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
                 throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
             }
         } while (! this.callCounter.compareAndSet(c, c + 1L))
-        // Now we can safely do the method call without the pointer being freed concurrently.
+        // Now we can safely do the method call without the handle being freed concurrently.
         try {
-            return block(this.uniffiClonePointer())
+            return block(this.uniffiCloneHandle())
         } finally {
             // This decrement always matches the increment we performed above.
             if (this.callCounter.decrementAndGet() == 0L) {
@@ -1851,19 +1891,27 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
 
     // Use a static inner class instead of a closure so as not to accidentally
     // capture `this` as part of the cleanable's action.
-    private class UniffiCleanAction(private val pointer: Pointer?) : Runnable {
+    private class UniffiCleanAction(private val handle: Long) : Runnable {
         override fun run() {
-            pointer?.let { ptr ->
-                uniffiRustCall { status ->
-                    UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_free_pocketoption(ptr, status)
-                }
+            if (handle == 0.toLong()) {
+                // Fake object created with `NoHandle`, don't try to free.
+                return;
+            }
+            uniffiRustCall { status ->
+                UniffiLib.uniffi_binary_options_tools_uni_fn_free_pocketoption(handle, status)
             }
         }
     }
 
-    fun uniffiClonePointer(): Pointer {
+    /**
+     * @suppress
+     */
+    fun uniffiCloneHandle(): Long {
+        if (handle == 0.toLong()) {
+            throw InternalException("uniffiCloneHandle() called on NoHandle object");
+        }
         return uniffiRustCall() { status ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_clone_pocketoption(pointer!!, status)
+            UniffiLib.uniffi_binary_options_tools_uni_fn_clone_pocketoption(handle, status)
         }
     }
 
@@ -1878,15 +1926,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `assets`() : List<Asset>? {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_assets(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_assets(
+                uniffiHandle,
                 
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterOptionalSequenceTypeAsset.lift(it) },
         // Error FFI converter
@@ -1907,15 +1955,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `balance`() : kotlin.Double {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_balance(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_balance(
+                uniffiHandle,
                 
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_f64(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_f64(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_f64(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_f64(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_f64(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_f64(future) },
         // lift function
         { FfiConverterDouble.lift(it) },
         // Error FFI converter
@@ -1933,15 +1981,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `buy`(`asset`: kotlin.String, `time`: kotlin.UInt, `amount`: kotlin.Double) : Deal {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_buy(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_buy(
+                uniffiHandle,
                 FfiConverterString.lower(`asset`),FfiConverterUInt.lower(`time`),FfiConverterDouble.lower(`amount`),
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeDeal.lift(it) },
         // Error FFI converter
@@ -1956,20 +2004,73 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `clearClosedDeals`() {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals(
+                uniffiHandle,
                 
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_void(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void(future) },
         // lift function
         { Unit },
         
         // Error FFI converter
         UniffiNullRustCallStatusErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Creates a raw handler for advanced WebSocket message operations.
+     *
+     * This allows you to send custom messages and receive filtered responses
+     * based on a validator. Useful for implementing custom protocols or
+     * accessing features not directly exposed by the API.
+     *
+     * # Arguments
+     *
+     * * `validator` - Validator to filter incoming messages
+     * * `keep_alive` - Optional message to send on reconnect (e.g., for re-subscribing)
+     *
+     * # Returns
+     *
+     * A `RawHandler` object for sending and receiving messages
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * # Create a validator for balance updates
+     * validator = Validator.contains('"balance"')
+     * handler = await client.create_raw_handler(validator, None)
+     *
+     * # Send a custom message
+     * await handler.send_text('42["getBalance"]')
+     *
+     * # Wait for response
+     * response = await handler.wait_next()
+     * print(f"Received: {response}")
+     * ```
+     */
+    @Throws(UniException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `createRawHandler`(`validator`: Validator, `keepAlive`: kotlin.String?) : RawHandler {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_create_raw_handler(
+                uniffiHandle,
+                FfiConverterTypeValidator.lower(`validator`),FfiConverterOptionalString.lower(`keepAlive`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_u64(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u64(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u64(future) },
+        // lift function
+        { FfiConverterTypeRawHandler.lift(it) },
+        // Error FFI converter
+        UniException.ErrorHandler,
     )
     }
 
@@ -1981,15 +2082,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `getCandles`(`asset`: kotlin.String, `period`: kotlin.Long, `offset`: kotlin.Long) : List<Candle> {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles(
+                uniffiHandle,
                 FfiConverterString.lower(`asset`),FfiConverterLong.lower(`period`),FfiConverterLong.lower(`offset`),
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterSequenceTypeCandle.lift(it) },
         // Error FFI converter
@@ -2005,15 +2106,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `getCandlesAdvanced`(`asset`: kotlin.String, `period`: kotlin.Long, `time`: kotlin.Long, `offset`: kotlin.Long) : List<Candle> {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced(
+                uniffiHandle,
                 FfiConverterString.lower(`asset`),FfiConverterLong.lower(`period`),FfiConverterLong.lower(`time`),FfiConverterLong.lower(`offset`),
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterSequenceTypeCandle.lift(it) },
         // Error FFI converter
@@ -2028,15 +2129,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `getClosedDeals`() : List<Deal> {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals(
+                uniffiHandle,
                 
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterSequenceTypeDeal.lift(it) },
         // Error FFI converter
@@ -2051,15 +2152,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `getOpenedDeals`() : List<Deal> {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals(
+                uniffiHandle,
                 
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterSequenceTypeDeal.lift(it) },
         // Error FFI converter
@@ -2075,15 +2176,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `history`(`asset`: kotlin.String, `period`: kotlin.UInt) : List<Candle> {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_history(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_history(
+                uniffiHandle,
                 FfiConverterString.lower(`asset`),FfiConverterUInt.lower(`period`),
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterSequenceTypeCandle.lift(it) },
         // Error FFI converter
@@ -2100,15 +2201,62 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
      * `true` if the account is a demo account, `false` otherwise.
      */override fun `isDemo`(): kotlin.Boolean {
             return FfiConverterBoolean.lift(
-    callWithPointer {
+    callWithHandle {
     uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo(
-        it, _status)
+    UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo(
+        it,
+        _status)
 }
     }
     )
     }
     
+
+    
+    /**
+     * Gets the payout percentage for a specific asset.
+     *
+     * Returns the profit percentage you'll receive if a trade on this asset wins.
+     * For example, 0.8 means 80% profit (if you bet $1, you get $1.80 back).
+     *
+     * # Arguments
+     *
+     * * `asset` - The symbol of the asset (e.g., "EURUSD_otc")
+     *
+     * # Returns
+     *
+     * The payout percentage as a float, or None if the asset is not available
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * payout = await client.payout("EURUSD_otc")
+     * if payout:
+     * print(f"Payout: {payout * 100}%")
+     * # Example output: "Payout: 80.0%"
+     * else:
+     * print("Asset not available")
+     * ```
+     */
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `payout`(`asset`: kotlin.String) : kotlin.Double? {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_payout(
+                uniffiHandle,
+                FfiConverterString.lower(`asset`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterOptionalDouble.lift(it) },
+        // Error FFI converter
+        UniffiNullRustCallStatusErrorHandler,
+    )
+    }
 
     
     /**
@@ -2118,15 +2266,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `reconnect`() {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect(
+                uniffiHandle,
                 
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_void(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void(future) },
         // lift function
         { Unit },
         
@@ -2151,15 +2299,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `result`(`id`: kotlin.String) : Deal {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_result(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result(
+                uniffiHandle,
                 FfiConverterString.lower(`id`),
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeDeal.lift(it) },
         // Error FFI converter
@@ -2184,15 +2332,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `resultWithTimeout`(`id`: kotlin.String, `timeoutSecs`: kotlin.ULong) : Deal {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout(
+                uniffiHandle,
                 FfiConverterString.lower(`id`),FfiConverterULong.lower(`timeoutSecs`),
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeDeal.lift(it) },
         // Error FFI converter
@@ -2210,15 +2358,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `sell`(`asset`: kotlin.String, `time`: kotlin.UInt, `amount`: kotlin.Double) : Deal {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_sell(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_sell(
+                uniffiHandle,
                 FfiConverterString.lower(`asset`),FfiConverterUInt.lower(`time`),FfiConverterDouble.lower(`amount`),
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeDeal.lift(it) },
         // Error FFI converter
@@ -2233,15 +2381,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `serverTime`() : kotlin.Long {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time(
+                uniffiHandle,
                 
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_i64(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_i64(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_i64(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_i64(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_i64(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_i64(future) },
         // lift function
         { FfiConverterLong.lift(it) },
         // Error FFI converter
@@ -2260,15 +2408,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `shutdown`() {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown(
+                uniffiHandle,
                 
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_void(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void(future) },
         // lift function
         { Unit },
         
@@ -2294,15 +2442,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `subscribe`(`asset`: kotlin.String, `durationSecs`: kotlin.ULong) : SubscriptionStream {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe(
+                uniffiHandle,
                 FfiConverterString.lower(`asset`),FfiConverterULong.lower(`durationSecs`),
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_pointer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_pointer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_pointer(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_u64(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u64(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u64(future) },
         // lift function
         { FfiConverterTypeSubscriptionStream.lift(it) },
         // Error FFI converter
@@ -2331,15 +2479,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `trade`(`asset`: kotlin.String, `action`: Action, `time`: kotlin.UInt, `amount`: kotlin.Double) : Deal {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_trade(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_trade(
+                uniffiHandle,
                 FfiConverterString.lower(`asset`),FfiConverterTypeAction.lower(`action`),FfiConverterUInt.lower(`time`),FfiConverterDouble.lower(`amount`),
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeDeal.lift(it) },
         // Error FFI converter
@@ -2355,15 +2503,15 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `unsubscribe`(`asset`: kotlin.String) {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe(
+                uniffiHandle,
                 FfiConverterString.lower(`asset`),
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_void(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_void(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_void(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void(future) },
         // lift function
         { Unit },
         
@@ -2375,7 +2523,52 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     
 
     
+
+
+    
     companion object {
+        
+    /**
+     * Creates a new instance of the PocketOption client.
+     *
+     * This is the primary constructor for the client. It requires a session ID (ssid)
+     * to authenticate with the PocketOption servers.
+     *
+     * # Arguments
+     *
+     * * `ssid` - The session ID for your PocketOption account.
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * import asyncio
+     * from binaryoptionstoolsuni import PocketOption
+     *
+     * async def main():
+     * ssid = "YOUR_SESSION_ID"
+     * api = await PocketOption.init(ssid)
+     * balance = await api.balance()
+     * print(f"Balance: {balance}")
+     *
+     * asyncio.run(main())
+     * ```
+     */
+    @Throws(UniException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+     suspend fun `init`(`ssid`: kotlin.String) : PocketOption {
+        return uniffiRustCallAsync(
+        UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_init(FfiConverterString.lower(`ssid`),),
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_u64(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u64(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u64(future) },
+        // lift function
+        { FfiConverterTypePocketOption.lift(it) },
+        // Error FFI converter
+        UniException.ErrorHandler,
+    )
+    }
+
         
     /**
      * Creates a new instance of the PocketOption client with a custom WebSocket URL.
@@ -2392,10 +2585,10 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
      suspend fun `newWithUrl`(`ssid`: kotlin.String, `url`: kotlin.String) : PocketOption {
         return uniffiRustCallAsync(
-        UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new_with_url(FfiConverterString.lower(`ssid`),FfiConverterString.lower(`url`),),
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_pointer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_pointer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_pointer(future) },
+        UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new_with_url(FfiConverterString.lower(`ssid`),FfiConverterString.lower(`url`),),
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_u64(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_u64(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_u64(future) },
         // lift function
         { FfiConverterTypePocketOption.lift(it) },
         // Error FFI converter
@@ -2408,50 +2601,43 @@ open class PocketOption: Disposable, AutoCloseable, PocketOptionInterface
     
 }
 
+
 /**
  * @suppress
  */
-public object FfiConverterTypePocketOption: FfiConverter<PocketOption, Pointer> {
-
-    override fun lower(value: PocketOption): Pointer {
-        return value.uniffiClonePointer()
+public object FfiConverterTypePocketOption: FfiConverter<PocketOption, Long> {
+    override fun lower(value: PocketOption): Long {
+        return value.uniffiCloneHandle()
     }
 
-    override fun lift(value: Pointer): PocketOption {
-        return PocketOption(value)
+    override fun lift(value: Long): PocketOption {
+        return PocketOption(UniffiWithHandle, value)
     }
 
     override fun read(buf: ByteBuffer): PocketOption {
-        // The Rust code always writes pointers as 8 bytes, and will
-        // fail to compile if they don't fit.
-        return lift(Pointer(buf.getLong()))
+        return lift(buf.getLong())
     }
 
     override fun allocationSize(value: PocketOption) = 8UL
 
     override fun write(value: PocketOption, buf: ByteBuffer) {
-        // The Rust code always expects pointers written as 8 bytes,
-        // and will fail to compile if they don't fit.
-        buf.putLong(Pointer.nativeValue(lower(value)))
+        buf.putLong(lower(value))
     }
 }
 
 
-// This template implements a class for working with a Rust struct via a Pointer/Arc<T>
+// This template implements a class for working with a Rust struct via a handle
 // to the live Rust struct on the other side of the FFI.
-//
-// Each instance implements core operations for working with the Rust `Arc<T>` and the
-// Kotlin Pointer to work with the live Rust struct on the other side of the FFI.
 //
 // There's some subtlety here, because we have to be careful not to operate on a Rust
 // struct after it has been dropped, and because we must expose a public API for freeing
 // theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
 //
-//   * Each instance holds an opaque pointer to the underlying Rust struct.
-//     Method calls need to read this pointer from the object's state and pass it in to
+//   * Each instance holds an opaque handle to the underlying Rust struct.
+//     Method calls need to read this handle from the object's state and pass it in to
 //     the Rust FFI.
 //
-//   * When an instance is no longer needed, its pointer should be passed to a
+//   * When an instance is no longer needed, its handle should be passed to a
 //     special destructor function provided by the Rust FFI, which will drop the
 //     underlying Rust struct.
 //
@@ -2476,13 +2662,13 @@ public object FfiConverterTypePocketOption: FfiConverter<PocketOption, Pointer> 
 //      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
 //         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
 //
-// If we try to implement this with mutual exclusion on access to the pointer, there is the
+// If we try to implement this with mutual exclusion on access to the handle, there is the
 // possibility of a race between a method call and a concurrent call to `destroy`:
 //
-//    * Thread A starts a method call, reads the value of the pointer, but is interrupted
-//      before it can pass the pointer over the FFI to Rust.
+//    * Thread A starts a method call, reads the value of the handle, but is interrupted
+//      before it can pass the handle over the FFI to Rust.
 //    * Thread B calls `destroy` and frees the underlying Rust struct.
-//    * Thread A resumes, passing the already-read pointer value to Rust and triggering
+//    * Thread A resumes, passing the already-read handle value to Rust and triggering
 //      a use-after-free.
 //
 // One possible solution would be to use a `ReadWriteLock`, with each method call taking
@@ -2535,6 +2721,473 @@ public object FfiConverterTypePocketOption: FfiConverter<PocketOption, Pointer> 
 //
 
 
+//
+/**
+ * Handler for advanced raw WebSocket message operations.
+ *
+ * Provides low-level access to send messages and receive filtered responses
+ * based on a validator. Each handler maintains its own message stream.
+ */
+public interface RawHandlerInterface {
+    
+    /**
+     * Send a message and wait for the next matching response.
+     *
+     * # Arguments
+     *
+     * * `message` - Message to send
+     *
+     * # Returns
+     *
+     * The first response that matches this handler's validator
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * response = await handler.send_and_wait('42["getBalance"]')
+     * data = json.loads(response)
+     * ```
+     */
+    suspend fun `sendAndWait`(`message`: kotlin.String): kotlin.String
+    
+    /**
+     * Send a binary message through this handler.
+     *
+     * # Arguments
+     *
+     * * `data` - Binary data to send
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * await handler.send_binary(b'\\x00\\x01\\x02')
+     * ```
+     */
+    suspend fun `sendBinary`(`data`: kotlin.ByteArray)
+    
+    /**
+     * Send a text message through this handler.
+     *
+     * # Arguments
+     *
+     * * `message` - Text message to send
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * await handler.send_text('42["ping"]')
+     * ```
+     */
+    suspend fun `sendText`(`message`: kotlin.String)
+    
+    /**
+     * Wait for the next message that matches this handler's validator.
+     *
+     * # Returns
+     *
+     * The next matching message
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * message = await handler.wait_next()
+     * print(f"Received: {message}")
+     * ```
+     */
+    suspend fun `waitNext`(): kotlin.String
+    
+    companion object
+}
+
+/**
+ * Handler for advanced raw WebSocket message operations.
+ *
+ * Provides low-level access to send messages and receive filtered responses
+ * based on a validator. Each handler maintains its own message stream.
+ */
+open class RawHandler: Disposable, AutoCloseable, RawHandlerInterface
+{
+
+    @Suppress("UNUSED_PARAMETER")
+    /**
+     * @suppress
+     */
+    constructor(withHandle: UniffiWithHandle, handle: Long) {
+        this.handle = handle
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
+    }
+
+    /**
+     * @suppress
+     *
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noHandle: NoHandle) {
+        this.handle = 0
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
+    }
+
+    protected val handle: Long
+    protected val cleanable: UniffiCleaner.Cleanable
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithHandle(block: (handle: Long) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the handle being freed concurrently.
+        try {
+            return block(this.uniffiCloneHandle())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val handle: Long) : Runnable {
+        override fun run() {
+            if (handle == 0.toLong()) {
+                // Fake object created with `NoHandle`, don't try to free.
+                return;
+            }
+            uniffiRustCall { status ->
+                UniffiLib.uniffi_binary_options_tools_uni_fn_free_rawhandler(handle, status)
+            }
+        }
+    }
+
+    /**
+     * @suppress
+     */
+    fun uniffiCloneHandle(): Long {
+        if (handle == 0.toLong()) {
+            throw InternalException("uniffiCloneHandle() called on NoHandle object");
+        }
+        return uniffiRustCall() { status ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_clone_rawhandler(handle, status)
+        }
+    }
+
+    
+    /**
+     * Send a message and wait for the next matching response.
+     *
+     * # Arguments
+     *
+     * * `message` - Message to send
+     *
+     * # Returns
+     *
+     * The first response that matches this handler's validator
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * response = await handler.send_and_wait('42["getBalance"]')
+     * data = json.loads(response)
+     * ```
+     */
+    @Throws(UniException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `sendAndWait`(`message`: kotlin.String) : kotlin.String {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_and_wait(
+                uniffiHandle,
+                FfiConverterString.lower(`message`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterString.lift(it) },
+        // Error FFI converter
+        UniException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Send a binary message through this handler.
+     *
+     * # Arguments
+     *
+     * * `data` - Binary data to send
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * await handler.send_binary(b'\\x00\\x01\\x02')
+     * ```
+     */
+    @Throws(UniException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `sendBinary`(`data`: kotlin.ByteArray) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_binary(
+                uniffiHandle,
+                FfiConverterByteArray.lower(`data`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void(future) },
+        // lift function
+        { Unit },
+        
+        // Error FFI converter
+        UniException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Send a text message through this handler.
+     *
+     * # Arguments
+     *
+     * * `message` - Text message to send
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * await handler.send_text('42["ping"]')
+     * ```
+     */
+    @Throws(UniException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `sendText`(`message`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_text(
+                uniffiHandle,
+                FfiConverterString.lower(`message`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_void(future) },
+        // lift function
+        { Unit },
+        
+        // Error FFI converter
+        UniException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Wait for the next message that matches this handler's validator.
+     *
+     * # Returns
+     *
+     * The next matching message
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * message = await handler.wait_next()
+     * print(f"Received: {message}")
+     * ```
+     */
+    @Throws(UniException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `waitNext`() : kotlin.String {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_wait_next(
+                uniffiHandle,
+                
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterString.lift(it) },
+        // Error FFI converter
+        UniException.ErrorHandler,
+    )
+    }
+
+    
+
+    
+
+
+    
+    
+    /**
+     * @suppress
+     */
+    companion object
+    
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRawHandler: FfiConverter<RawHandler, Long> {
+    override fun lower(value: RawHandler): Long {
+        return value.uniffiCloneHandle()
+    }
+
+    override fun lift(value: Long): RawHandler {
+        return RawHandler(UniffiWithHandle, value)
+    }
+
+    override fun read(buf: ByteBuffer): RawHandler {
+        return lift(buf.getLong())
+    }
+
+    override fun allocationSize(value: RawHandler) = 8UL
+
+    override fun write(value: RawHandler, buf: ByteBuffer) {
+        buf.putLong(lower(value))
+    }
+}
+
+
+// This template implements a class for working with a Rust struct via a handle
+// to the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque handle to the underlying Rust struct.
+//     Method calls need to read this handle from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its handle should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the handle, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the handle, but is interrupted
+//      before it can pass the handle over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read handle value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
+//
 /**
  * Represents a stream of subscription data.
  *
@@ -2606,23 +3259,29 @@ public interface SubscriptionStreamInterface {
 open class SubscriptionStream: Disposable, AutoCloseable, SubscriptionStreamInterface
 {
 
-    constructor(pointer: Pointer) {
-        this.pointer = pointer
-        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
+    @Suppress("UNUSED_PARAMETER")
+    /**
+     * @suppress
+     */
+    constructor(withHandle: UniffiWithHandle, handle: Long) {
+        this.handle = handle
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
     }
 
     /**
+     * @suppress
+     *
      * This constructor can be used to instantiate a fake object. Only used for tests. Any
      * attempt to actually use an object constructed this way will fail as there is no
      * connected Rust object.
      */
     @Suppress("UNUSED_PARAMETER")
-    constructor(noPointer: NoPointer) {
-        this.pointer = null
-        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
+    constructor(noHandle: NoHandle) {
+        this.handle = 0
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
     }
 
-    protected val pointer: Pointer?
+    protected val handle: Long
     protected val cleanable: UniffiCleaner.Cleanable
 
     private val wasDestroyed = AtomicBoolean(false)
@@ -2644,7 +3303,7 @@ open class SubscriptionStream: Disposable, AutoCloseable, SubscriptionStreamInte
         this.destroy()
     }
 
-    internal inline fun <R> callWithPointer(block: (ptr: Pointer) -> R): R {
+    internal inline fun <R> callWithHandle(block: (handle: Long) -> R): R {
         // Check and increment the call counter, to keep the object alive.
         // This needs a compare-and-set retry loop in case of concurrent updates.
         do {
@@ -2656,9 +3315,9 @@ open class SubscriptionStream: Disposable, AutoCloseable, SubscriptionStreamInte
                 throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
             }
         } while (! this.callCounter.compareAndSet(c, c + 1L))
-        // Now we can safely do the method call without the pointer being freed concurrently.
+        // Now we can safely do the method call without the handle being freed concurrently.
         try {
-            return block(this.uniffiClonePointer())
+            return block(this.uniffiCloneHandle())
         } finally {
             // This decrement always matches the increment we performed above.
             if (this.callCounter.decrementAndGet() == 0L) {
@@ -2669,19 +3328,27 @@ open class SubscriptionStream: Disposable, AutoCloseable, SubscriptionStreamInte
 
     // Use a static inner class instead of a closure so as not to accidentally
     // capture `this` as part of the cleanable's action.
-    private class UniffiCleanAction(private val pointer: Pointer?) : Runnable {
+    private class UniffiCleanAction(private val handle: Long) : Runnable {
         override fun run() {
-            pointer?.let { ptr ->
-                uniffiRustCall { status ->
-                    UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_free_subscriptionstream(ptr, status)
-                }
+            if (handle == 0.toLong()) {
+                // Fake object created with `NoHandle`, don't try to free.
+                return;
+            }
+            uniffiRustCall { status ->
+                UniffiLib.uniffi_binary_options_tools_uni_fn_free_subscriptionstream(handle, status)
             }
         }
     }
 
-    fun uniffiClonePointer(): Pointer {
+    /**
+     * @suppress
+     */
+    fun uniffiCloneHandle(): Long {
+        if (handle == 0.toLong()) {
+            throw InternalException("uniffiCloneHandle() called on NoHandle object");
+        }
         return uniffiRustCall() { status ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_clone_subscriptionstream(pointer!!, status)
+            UniffiLib.uniffi_binary_options_tools_uni_fn_clone_subscriptionstream(handle, status)
         }
     }
 
@@ -2729,15 +3396,15 @@ open class SubscriptionStream: Disposable, AutoCloseable, SubscriptionStreamInte
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `next`() : Candle {
         return uniffiRustCallAsync(
-        callWithPointer { thisPtr ->
-            UniffiLib.INSTANCE.uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next(
-                thisPtr,
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next(
+                uniffiHandle,
                 
             )
         },
-        { future, callback, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
-        { future, continuation -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
-        { future -> UniffiLib.INSTANCE.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
+        { future, callback, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_binary_options_tools_uni_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_binary_options_tools_uni_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeCandle.lift(it) },
         // Error FFI converter
@@ -2748,36 +3415,506 @@ open class SubscriptionStream: Disposable, AutoCloseable, SubscriptionStreamInte
     
 
     
+
+
     
+    
+    /**
+     * @suppress
+     */
     companion object
     
 }
 
+
 /**
  * @suppress
  */
-public object FfiConverterTypeSubscriptionStream: FfiConverter<SubscriptionStream, Pointer> {
-
-    override fun lower(value: SubscriptionStream): Pointer {
-        return value.uniffiClonePointer()
+public object FfiConverterTypeSubscriptionStream: FfiConverter<SubscriptionStream, Long> {
+    override fun lower(value: SubscriptionStream): Long {
+        return value.uniffiCloneHandle()
     }
 
-    override fun lift(value: Pointer): SubscriptionStream {
-        return SubscriptionStream(value)
+    override fun lift(value: Long): SubscriptionStream {
+        return SubscriptionStream(UniffiWithHandle, value)
     }
 
     override fun read(buf: ByteBuffer): SubscriptionStream {
-        // The Rust code always writes pointers as 8 bytes, and will
-        // fail to compile if they don't fit.
-        return lift(Pointer(buf.getLong()))
+        return lift(buf.getLong())
     }
 
     override fun allocationSize(value: SubscriptionStream) = 8UL
 
     override fun write(value: SubscriptionStream, buf: ByteBuffer) {
-        // The Rust code always expects pointers written as 8 bytes,
-        // and will fail to compile if they don't fit.
-        buf.putLong(Pointer.nativeValue(lower(value)))
+        buf.putLong(lower(value))
+    }
+}
+
+
+// This template implements a class for working with a Rust struct via a handle
+// to the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque handle to the underlying Rust struct.
+//     Method calls need to read this handle from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its handle should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the handle, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the handle, but is interrupted
+//      before it can pass the handle over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read handle value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
+//
+/**
+ * Validator for filtering WebSocket messages.
+ *
+ * Provides various methods to validate messages using different strategies
+ * like regex matching, prefix/suffix checking, and logical combinations.
+ */
+public interface ValidatorInterface {
+    
+    /**
+     * Checks if a message matches this validator's conditions.
+     *
+     * # Arguments
+     *
+     * * `message` - String to validate
+     *
+     * # Returns
+     *
+     * True if message matches the validator's conditions, False otherwise
+     */
+    fun `check`(`message`: kotlin.String): kotlin.Boolean
+    
+    companion object
+}
+
+/**
+ * Validator for filtering WebSocket messages.
+ *
+ * Provides various methods to validate messages using different strategies
+ * like regex matching, prefix/suffix checking, and logical combinations.
+ */
+open class Validator: Disposable, AutoCloseable, ValidatorInterface
+{
+
+    @Suppress("UNUSED_PARAMETER")
+    /**
+     * @suppress
+     */
+    constructor(withHandle: UniffiWithHandle, handle: Long) {
+        this.handle = handle
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
+    }
+
+    /**
+     * @suppress
+     *
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noHandle: NoHandle) {
+        this.handle = 0
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
+    }
+    /**
+     * Creates a default validator that accepts all messages.
+     */
+    constructor() :
+        this(UniffiWithHandle, 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_new(
+    
+        _status)
+}
+    )
+
+    protected val handle: Long
+    protected val cleanable: UniffiCleaner.Cleanable
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithHandle(block: (handle: Long) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the handle being freed concurrently.
+        try {
+            return block(this.uniffiCloneHandle())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val handle: Long) : Runnable {
+        override fun run() {
+            if (handle == 0.toLong()) {
+                // Fake object created with `NoHandle`, don't try to free.
+                return;
+            }
+            uniffiRustCall { status ->
+                UniffiLib.uniffi_binary_options_tools_uni_fn_free_validator(handle, status)
+            }
+        }
+    }
+
+    /**
+     * @suppress
+     */
+    fun uniffiCloneHandle(): Long {
+        if (handle == 0.toLong()) {
+            throw InternalException("uniffiCloneHandle() called on NoHandle object");
+        }
+        return uniffiRustCall() { status ->
+            UniffiLib.uniffi_binary_options_tools_uni_fn_clone_validator(handle, status)
+        }
+    }
+
+    
+    /**
+     * Checks if a message matches this validator's conditions.
+     *
+     * # Arguments
+     *
+     * * `message` - String to validate
+     *
+     * # Returns
+     *
+     * True if message matches the validator's conditions, False otherwise
+     */override fun `check`(`message`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_binary_options_tools_uni_fn_method_validator_check(
+        it,
+        FfiConverterString.lower(`message`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+
+    
+
+
+    
+    companion object {
+        
+    /**
+     * Creates a validator that requires all input validators to match.
+     *
+     * # Arguments
+     *
+     * * `validators` - List of validators that all must match
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * # Match messages that start with "Hello" and end with "World"
+     * v = Validator.all([
+     * Validator.starts_with("Hello"),
+     * Validator.ends_with("World")
+     * ])
+     * assert v.check("Hello Beautiful World") == True
+     * assert v.check("Hello Beautiful") == False
+     * ```
+     */ fun `all`(`validators`: List<Validator>): Validator {
+            return FfiConverterTypeValidator.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_all(
+    
+        FfiConverterSequenceTypeValidator.lower(`validators`),_status)
+}
+    )
+    }
+    
+
+        
+    /**
+     * Creates a validator that requires at least one input validator to match.
+     *
+     * # Arguments
+     *
+     * * `validators` - List of validators where at least one must match
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * # Match messages containing either "success" or "completed"
+     * v = Validator.any([
+     * Validator.contains("success"),
+     * Validator.contains("completed")
+     * ])
+     * assert v.check("operation successful") == True
+     * assert v.check("task completed") == True
+     * assert v.check("in progress") == False
+     * ```
+     */ fun `any`(`validators`: List<Validator>): Validator {
+            return FfiConverterTypeValidator.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_any(
+    
+        FfiConverterSequenceTypeValidator.lower(`validators`),_status)
+}
+    )
+    }
+    
+
+        
+    /**
+     * Creates a validator that checks if messages contain a specific substring.
+     *
+     * # Arguments
+     *
+     * * `substring` - String that should be present in messages
+     */ fun `contains`(`substring`: kotlin.String): Validator {
+            return FfiConverterTypeValidator.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_contains(
+    
+        FfiConverterString.lower(`substring`),_status)
+}
+    )
+    }
+    
+
+        
+    /**
+     * Creates a validator that checks if messages end with a specific suffix.
+     *
+     * # Arguments
+     *
+     * * `suffix` - String that messages should end with
+     */ fun `endsWith`(`suffix`: kotlin.String): Validator {
+            return FfiConverterTypeValidator.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_ends_with(
+    
+        FfiConverterString.lower(`suffix`),_status)
+}
+    )
+    }
+    
+
+        
+    /**
+     * Creates a validator that negates another validator's result.
+     *
+     * # Arguments
+     *
+     * * `validator` - Validator whose result should be negated
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * # Match messages that don't contain "error"
+     * v = Validator.ne(Validator.contains("error"))
+     * assert v.check("success message") == True
+     * assert v.check("error occurred") == False
+     * ```
+     */ fun `ne`(`validator`: Validator): Validator {
+            return FfiConverterTypeValidator.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_ne(
+    
+        FfiConverterTypeValidator.lower(`validator`),_status)
+}
+    )
+    }
+    
+
+        
+    /**
+     * Creates a validator that uses regex pattern matching.
+     *
+     * # Arguments
+     *
+     * * `pattern` - Regular expression pattern
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * # Match messages starting with a number
+     * validator = Validator.regex(r"^\d+")
+     * assert validator.check("123 message") == True
+     * assert validator.check("abc") == False
+     * ```
+     */
+    @Throws(UniException::class) fun `regex`(`pattern`: kotlin.String): Validator {
+            return FfiConverterTypeValidator.lift(
+    uniffiRustCallWithError(UniException) { _status ->
+    UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_regex(
+    
+        FfiConverterString.lower(`pattern`),_status)
+}
+    )
+    }
+    
+
+        
+    /**
+     * Creates a validator that checks if messages start with a specific prefix.
+     *
+     * # Arguments
+     *
+     * * `prefix` - String that messages should start with
+     */ fun `startsWith`(`prefix`: kotlin.String): Validator {
+            return FfiConverterTypeValidator.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_binary_options_tools_uni_fn_constructor_validator_starts_with(
+    
+        FfiConverterString.lower(`prefix`),_status)
+}
+    )
+    }
+    
+
+        
+    }
+    
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeValidator: FfiConverter<Validator, Long> {
+    override fun lower(value: Validator): Long {
+        return value.uniffiCloneHandle()
+    }
+
+    override fun lift(value: Long): Validator {
+        return Validator(UniffiWithHandle, value)
+    }
+
+    override fun read(buf: ByteBuffer): Validator {
+        return lift(buf.getLong())
+    }
+
+    override fun allocationSize(value: Validator) = 8UL
+
+    override fun write(value: Validator, buf: ByteBuffer) {
+        buf.putLong(lower(value))
     }
 }
 
@@ -2802,15 +3939,25 @@ public object FfiConverterTypeSubscriptionStream: FfiConverter<SubscriptionStrea
  * ```
  */
 data class Asset (
-    var `id`: kotlin.Int, 
-    var `name`: kotlin.String, 
-    var `symbol`: kotlin.String, 
-    var `isOtc`: kotlin.Boolean, 
-    var `isActive`: kotlin.Boolean, 
-    var `payout`: kotlin.Int, 
-    var `allowedCandles`: List<CandleLength>, 
+    var `id`: kotlin.Int
+    , 
+    var `name`: kotlin.String
+    , 
+    var `symbol`: kotlin.String
+    , 
+    var `isOtc`: kotlin.Boolean
+    , 
+    var `isActive`: kotlin.Boolean
+    , 
+    var `payout`: kotlin.Int
+    , 
+    var `allowedCandles`: List<CandleLength>
+    , 
     var `assetType`: AssetType
-) {
+    
+){
+    
+
     
     companion object
 }
@@ -2876,14 +4023,23 @@ public object FfiConverterTypeAsset: FfiConverterRustBuffer<Asset> {
  * ```
  */
 data class Candle (
-    var `symbol`: kotlin.String, 
-    var `timestamp`: kotlin.Long, 
-    var `open`: kotlin.Double, 
-    var `high`: kotlin.Double, 
-    var `low`: kotlin.Double, 
-    var `close`: kotlin.Double, 
+    var `symbol`: kotlin.String
+    , 
+    var `timestamp`: kotlin.Long
+    , 
+    var `open`: kotlin.Double
+    , 
+    var `high`: kotlin.Double
+    , 
+    var `low`: kotlin.Double
+    , 
+    var `close`: kotlin.Double
+    , 
     var `volume`: kotlin.Double?
-) {
+    
+){
+    
+
     
     companion object
 }
@@ -2944,7 +4100,10 @@ public object FfiConverterTypeCandle: FfiConverterRustBuffer<Candle> {
  */
 data class CandleLength (
     var `time`: kotlin.UInt
-) {
+    
+){
+    
+
     
     companion object
 }
@@ -2990,33 +4149,61 @@ public object FfiConverterTypeCandleLength: FfiConverterRustBuffer<CandleLength>
  * ```
  */
 data class Deal (
-    var `id`: kotlin.String, 
-    var `openTime`: kotlin.String, 
-    var `closeTime`: kotlin.String, 
-    var `openTimestamp`: kotlin.Long, 
-    var `closeTimestamp`: kotlin.Long, 
-    var `uid`: kotlin.ULong, 
-    var `requestId`: kotlin.String?, 
-    var `amount`: kotlin.Double, 
-    var `profit`: kotlin.Double, 
-    var `percentProfit`: kotlin.Int, 
-    var `percentLoss`: kotlin.Int, 
-    var `openPrice`: kotlin.Double, 
-    var `closePrice`: kotlin.Double, 
-    var `command`: kotlin.Int, 
-    var `asset`: kotlin.String, 
-    var `isDemo`: kotlin.UInt, 
-    var `copyTicket`: kotlin.String, 
-    var `openMs`: kotlin.Int, 
-    var `closeMs`: kotlin.Int?, 
-    var `optionType`: kotlin.Int, 
-    var `isRollover`: kotlin.Boolean?, 
-    var `isCopySignal`: kotlin.Boolean?, 
-    var `isAi`: kotlin.Boolean?, 
-    var `currency`: kotlin.String, 
-    var `amountUsd`: kotlin.Double?, 
+    var `id`: kotlin.String
+    , 
+    var `openTime`: kotlin.String
+    , 
+    var `closeTime`: kotlin.String
+    , 
+    var `openTimestamp`: kotlin.Long
+    , 
+    var `closeTimestamp`: kotlin.Long
+    , 
+    var `uid`: kotlin.ULong
+    , 
+    var `requestId`: kotlin.String?
+    , 
+    var `amount`: kotlin.Double
+    , 
+    var `profit`: kotlin.Double
+    , 
+    var `percentProfit`: kotlin.Int
+    , 
+    var `percentLoss`: kotlin.Int
+    , 
+    var `openPrice`: kotlin.Double
+    , 
+    var `closePrice`: kotlin.Double
+    , 
+    var `command`: kotlin.Int
+    , 
+    var `asset`: kotlin.String
+    , 
+    var `isDemo`: kotlin.UInt
+    , 
+    var `copyTicket`: kotlin.String
+    , 
+    var `openMs`: kotlin.Int
+    , 
+    var `closeMs`: kotlin.Int?
+    , 
+    var `optionType`: kotlin.Int
+    , 
+    var `isRollover`: kotlin.Boolean?
+    , 
+    var `isCopySignal`: kotlin.Boolean?
+    , 
+    var `isAi`: kotlin.Boolean?
+    , 
+    var `currency`: kotlin.String
+    , 
+    var `amountUsd`: kotlin.Double?
+    , 
     var `amountUsd2`: kotlin.Double?
-) {
+    
+){
+    
+
     
     companion object
 }
@@ -3271,6 +4458,14 @@ sealed class UniException: kotlin.Exception() {
             get() = "v1=${ v1 }"
     }
     
+    class Validator(
+        
+        val v1: kotlin.String
+        ) : UniException() {
+        override val message
+            get() = "v1=${ v1 }"
+    }
+    
 
     companion object ErrorHandler : UniffiRustCallStatusErrorHandler<UniException> {
         override fun lift(error_buf: RustBuffer.ByValue): UniException = FfiConverterTypeUniError.lift(error_buf)
@@ -3296,6 +4491,9 @@ public object FfiConverterTypeUniError : FfiConverterRustBuffer<UniException> {
             3 -> UniException.Uuid(
                 FfiConverterString.read(buf),
                 )
+            4 -> UniException.Validator(
+                FfiConverterString.read(buf),
+                )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
         }
     }
@@ -3317,6 +4515,11 @@ public object FfiConverterTypeUniError : FfiConverterRustBuffer<UniException> {
                 4UL
                 + FfiConverterString.allocationSize(value.v1)
             )
+            is UniException.Validator -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.v1)
+            )
         }
     }
 
@@ -3334,6 +4537,11 @@ public object FfiConverterTypeUniError : FfiConverterRustBuffer<UniException> {
             }
             is UniException.Uuid -> {
                 buf.putInt(3)
+                FfiConverterString.write(value.v1, buf)
+                Unit
+            }
+            is UniException.Validator -> {
+                buf.putInt(4)
                 FfiConverterString.write(value.v1, buf)
                 Unit
             }
@@ -3498,6 +4706,34 @@ public object FfiConverterOptionalSequenceTypeAsset: FfiConverterRustBuffer<List
         } else {
             buf.put(1)
             FfiConverterSequenceTypeAsset.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeValidator: FfiConverterRustBuffer<List<Validator>> {
+    override fun read(buf: ByteBuffer): List<Validator> {
+        val len = buf.getInt()
+        return List<Validator>(len) {
+            FfiConverterTypeValidator.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<Validator>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeValidator.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<Validator>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeValidator.write(it, buf)
         }
     }
 }

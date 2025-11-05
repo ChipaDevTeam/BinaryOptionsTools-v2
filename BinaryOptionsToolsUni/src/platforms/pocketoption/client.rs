@@ -10,8 +10,10 @@ use crate::error::UniError;
 use binary_options_tools::error::BinaryOptionsError;
 
 use super::{
+    raw_handler::RawHandler,
     stream::SubscriptionStream,
     types::{Action, Asset, Candle, Deal},
+    validator::Validator,
 };
 
 /// The main client for interacting with the PocketOption platform.
@@ -390,5 +392,84 @@ impl PocketOption {
             .shutdown()
             .await
             .map_err(|e| UniError::from(BinaryOptionsError::from(e)))
+    }
+
+    /// Creates a raw handler for advanced WebSocket message operations.
+    ///
+    /// This allows you to send custom messages and receive filtered responses
+    /// based on a validator. Useful for implementing custom protocols or
+    /// accessing features not directly exposed by the API.
+    ///
+    /// # Arguments
+    ///
+    /// * `validator` - Validator to filter incoming messages
+    /// * `keep_alive` - Optional message to send on reconnect (e.g., for re-subscribing)
+    ///
+    /// # Returns
+    ///
+    /// A `RawHandler` object for sending and receiving messages
+    ///
+    /// # Examples
+    ///
+    /// ## Python
+    /// ```python
+    /// # Create a validator for balance updates
+    /// validator = Validator.contains('"balance"')
+    /// handler = await client.create_raw_handler(validator, None)
+    ///
+    /// # Send a custom message
+    /// await handler.send_text('42["getBalance"]')
+    ///
+    /// # Wait for response
+    /// response = await handler.wait_next()
+    /// print(f"Received: {response}")
+    /// ```
+    #[uniffi::method]
+    pub async fn create_raw_handler(
+        &self,
+        validator: Arc<Validator>,
+        keep_alive: Option<String>,
+    ) -> Result<Arc<RawHandler>, UniError> {
+        use binary_options_tools::pocketoption::modules::raw::Outgoing;
+        
+        let keep_alive_msg = keep_alive.map(Outgoing::Text);
+        let inner_handler = self
+            .inner
+            .create_raw_handler(validator.inner().clone(), keep_alive_msg)
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
+
+        Ok(RawHandler::from_inner(inner_handler))
+    }
+
+    /// Gets the payout percentage for a specific asset.
+    ///
+    /// Returns the profit percentage you'll receive if a trade on this asset wins.
+    /// For example, 0.8 means 80% profit (if you bet $1, you get $1.80 back).
+    ///
+    /// # Arguments
+    ///
+    /// * `asset` - The symbol of the asset (e.g., "EURUSD_otc")
+    ///
+    /// # Returns
+    ///
+    /// The payout percentage as a float, or None if the asset is not available
+    ///
+    /// # Examples
+    ///
+    /// ## Python
+    /// ```python
+    /// payout = await client.payout("EURUSD_otc")
+    /// if payout:
+    ///     print(f"Payout: {payout * 100}%")
+    ///     # Example output: "Payout: 80.0%"
+    /// else:
+    ///     print("Asset not available")
+    /// ```
+    #[uniffi::method]
+    pub async fn payout(&self, asset: String) -> Option<f64> {
+        let assets = self.inner.assets().await?;
+        let asset_info = assets.0.get(&asset)?;
+        Some(asset_info.payout as f64 / 100.0)
     }
 }
