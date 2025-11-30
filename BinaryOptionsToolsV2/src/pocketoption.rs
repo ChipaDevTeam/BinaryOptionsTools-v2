@@ -117,10 +117,15 @@ impl RawHandlerRust {
     }
 
     /// Send a message and wait for the next matching response
-    pub fn send_and_wait<'py>(&self, py: Python<'py>, message: String) -> PyResult<Bound<'py, PyAny>> {
+    pub fn send_and_wait<'py>(
+        &self,
+        py: Python<'py>,
+        message: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let handler = self.handler.clone();
         future_into_py(py, async move {
-            let outgoing = binary_options_tools::pocketoption::modules::raw::Outgoing::Text(message);
+            let outgoing =
+                binary_options_tools::pocketoption::modules::raw::Outgoing::Text(message);
             let response = handler
                 .lock()
                 .await
@@ -368,7 +373,13 @@ impl RawPocketOption {
                 let payouts: HashMap<&String, i32> = assets
                     .0
                     .iter()
-                    .filter_map(|(asset, symbol)| if symbol.is_active { Some((asset, symbol.payout)) } else { None })
+                    .filter_map(|(asset, symbol)| {
+                        if symbol.is_active {
+                            Some((asset, symbol.payout))
+                        } else {
+                            None
+                        }
+                    })
                     .collect();
                 Ok(serde_json::to_string(&payouts).map_err(BinaryErrorPy::from)?)
             }
@@ -692,7 +703,10 @@ impl RawPocketOption {
     pub fn unsubscribe<'py>(&self, py: Python<'py>, asset: String) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
-            client.unsubscribe(asset).await.map_err(BinaryErrorPy::from)?;
+            client
+                .unsubscribe(asset)
+                .await
+                .map_err(BinaryErrorPy::from)?;
             Python::attach(|py| py.None().into_py_any(py))
         })
     }
@@ -708,9 +722,8 @@ impl RawPocketOption {
         let validator = validator.get().clone();
         future_into_py(py, async move {
             let crate_validator: CrateValidator = validator.into();
-            let keep_alive_msg = keep_alive.map(|msg| {
-                binary_options_tools::pocketoption::modules::raw::Outgoing::Text(msg)
-            });
+            let keep_alive_msg = keep_alive
+                .map(|msg| binary_options_tools::pocketoption::modules::raw::Outgoing::Text(msg));
             let handler = client
                 .create_raw_handler(crate_validator, keep_alive_msg)
                 .await

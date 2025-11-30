@@ -20,7 +20,9 @@ use crate::{
             balance::BalanceModule,
             deals::DealsApiModule,
             get_candles::GetCandlesApiModule,
+            historical_data::HistoricalDataApiModule,
             keep_alive::{InitModule, KeepAliveModule},
+            pending_trades::PendingTradesApiModule,
             raw::{
                 Outgoing, RawApiModule, RawHandle as InnerRawHandle, RawHandler as InnerRawHandler,
             },
@@ -30,7 +32,7 @@ use crate::{
         },
         ssid::Ssid,
         state::{State, StateBuilder},
-        types::{Action, Assets, Deal},
+        types::{Action, Assets, Deal, PendingOrder},
     },
     utils::print_handler,
 };
@@ -76,6 +78,8 @@ impl PocketOption {
             .with_module::<DealsApiModule>()
             .with_module::<SubscriptionsApiModule>()
             .with_module::<GetCandlesApiModule>()
+            .with_module::<PendingTradesApiModule>()
+            .with_module::<HistoricalDataApiModule>()
             .with_module::<RawApiModule>()
             .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg))))
     }
@@ -109,6 +113,8 @@ impl PocketOption {
             .with_module::<DealsApiModule>()
             .with_module::<SubscriptionsApiModule>()
             .with_module::<GetCandlesApiModule>()
+            .with_module::<PendingTradesApiModule>()
+            .with_module::<HistoricalDataApiModule>()
             .with_module::<RawApiModule>()
             .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)));
         let (client, mut runner) = builder.build().await?;
@@ -305,6 +311,63 @@ impl PocketOption {
         self.client.state.trade_state.get_closed_deal(deal_id).await
     }
 
+    /// Opens a pending order.
+    /// # Arguments
+    /// * `open_type` - The type of the pending order.
+    /// * `amount` - The amount to trade.
+    /// * `asset` - The asset to trade.
+    /// * `open_time` - The time to open the trade.
+    /// * `open_price` - The price to open the trade at.
+    /// * `timeframe` - The duration of the trade.
+    /// * `min_payout` - The minimum payout percentage.
+    /// * `command` - The trade direction (0 for Call, 1 for Put).
+    /// # Returns
+    /// A `PocketResult` containing the `PendingOrder` if successful, or an error if the trade fails.
+    pub async fn open_pending_order(
+        &self,
+        open_type: u32,
+        amount: f64,
+        asset: String,
+        open_time: u32,
+        open_price: f64,
+        timeframe: u32,
+        min_payout: u32,
+        command: u32,
+    ) -> PocketResult<PendingOrder> {
+        if let Some(handle) = self.client.get_handle::<PendingTradesApiModule>().await {
+            handle
+                .open_pending_order(
+                    open_type,
+                    amount,
+                    asset,
+                    open_time,
+                    open_price,
+                    timeframe,
+                    min_payout,
+                    command,
+                )
+                .await
+        } else {
+            Err(BinaryOptionsError::General("PendingTradesApiModule not found".into()).into())
+        }
+    }
+
+    /// Gets the currently pending deals.
+    /// # Returns
+    /// A `HashMap` containing the pending deals, keyed by their UUID.
+    pub async fn get_pending_deals(&self) -> HashMap<Uuid, PendingOrder> {
+        self.client.state.trade_state.get_pending_deals().await
+    }
+
+    /// Gets a specific pending deal by its ID.
+    /// # Arguments
+    /// * `deal_id` - The ID of the pending deal to retrieve.
+    /// # Returns
+    /// An `Option` containing the `PendingOrder` if found, or `None` otherwise.
+    pub async fn get_pending_deal(&self, deal_id: Uuid) -> Option<PendingOrder> {
+        self.client.state.trade_state.get_pending_deal(deal_id).await
+    }
+
     /// Subscribes to a specific asset's updates.
     pub async fn subscribe(
         &self,
@@ -422,20 +485,32 @@ impl PocketOption {
     /// * `period` - The time period for each candle in seconds.
     /// # Returns
     /// A `PocketResult` containing a vector of `Candle` if successful, or an error if the request fails.
+    /// # Example
+    /// ```
+    /// use binary_options_tools_pocketoption::PocketOption;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> binary_options_tools_core_pre::error::CoreResult<()> {
+    ///     let pocket_option = PocketOption::new("your_session_id").await?;
+    ///     let history = pocket_option.history("EURUSD_otc", 5).await?;
+    ///     println!("Received {} candles from history", history.len());
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn history(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<Candle>> {
-        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await {
+        if let Some(handle) = self.client.get_handle::<HistoricalDataApiModule>().await {
             if let Some(assets) = self.assets().await {
                 if assets.get(&asset.to_string()).is_some() {
-                    handle.history(asset.to_string(), period).await
+                    handle.get_history(asset.to_string(), period).await
                 } else {
                     Err(PocketError::InvalidAsset(asset.to_string()))
                 }
             } else {
                 // If assets are not loaded yet, still try to get candles
-                handle.history(asset.to_string(), period).await
+                handle.get_history(asset.to_string(), period).await
             }
         } else {
-            Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
+            Err(BinaryOptionsError::General("HistoricalDataApiModule not found".into()).into())
         }
     }
 

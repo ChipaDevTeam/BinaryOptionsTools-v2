@@ -83,6 +83,21 @@ impl Validator {
     }
 }
 
+impl PartialEq for Validator {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Validator::None, Validator::None) => true,
+            (Validator::StartsWith(a), Validator::StartsWith(b)) => a == b,
+            (Validator::EndsWith(a), Validator::EndsWith(b)) => a == b,
+            (Validator::Contains(a), Validator::Contains(b)) => a == b,
+            (Validator::Not(a), Validator::Not(b)) => a == b,
+            (Validator::All(a), Validator::All(b)) => a == b,
+            (Validator::Any(a), Validator::Any(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
 impl ValidatorTrait for Validator {
     fn call(&self, data: &str) -> bool {
         match self {

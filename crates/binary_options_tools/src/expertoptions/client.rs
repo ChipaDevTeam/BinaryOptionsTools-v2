@@ -108,7 +108,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_expert_options_connection() {
-        tracing_subscriber::fmt::init();
+        let _ = tracing_subscriber::fmt::try_init();
 
         let token = "759c67788715ca4e2e64c9ebb39e1c65";
         let demo = true;

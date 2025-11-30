@@ -10,6 +10,7 @@ use uuid::Uuid;
 mod tests {
     use super::*;
     use binary_options_tools::pocketoption::modules::raw::{RawApiModule, RawHandle, RawHandler};
+    use binary_options_tools::traits::ValidatorTrait;
     use binary_options_tools_core_pre::reimports::{AsyncReceiver, AsyncSender, bounded_async};
     use binary_options_tools_core_pre::traits::{ApiModule, Rule};
     use std::collections::HashMap;
@@ -70,7 +71,7 @@ mod tests {
         let (cmd_tx, cmd_rx) = bounded_async(10);
         let (resp_tx, resp_rx) = bounded_async(10);
 
-        let handle = RawHandle::new(cmd_tx, resp_rx);
+        let _handle = RawApiModule::create_handle(cmd_tx, resp_rx);
 
         assert!(true); // Handle creation succeeded
     }
@@ -197,15 +198,15 @@ mod tests {
         state.add_raw_validator(id, validator);
 
         // Test matching message
-        let matching_msg = Message::Text("this is a test message".to_string());
+        let matching_msg = Message::Text("this is a test message".to_string().into());
         assert!(rule.call(&matching_msg));
 
         // Test non-matching message
-        let non_matching_msg = Message::Text("hello world".to_string());
+        let non_matching_msg = Message::Text("hello world".to_string().into());
         assert!(!rule.call(&non_matching_msg));
 
         // Test binary message
-        let binary_msg = Message::Binary(b"test data".to_vec());
+        let binary_msg = Message::Binary(b"test data".to_vec().into());
         assert!(rule.call(&binary_msg));
     }
 
@@ -217,7 +218,7 @@ mod tests {
         };
 
         // Test with no validators
-        let msg = Message::Text("any message".to_string());
+        let msg = Message::Text("any message".to_string().into());
         assert!(!rule.call(&msg));
     }
 }

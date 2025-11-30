@@ -7,6 +7,7 @@ use std::sync::Arc;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use binary_options_tools::traits::ValidatorTrait;
 
     #[test]
     fn test_validator_none() {

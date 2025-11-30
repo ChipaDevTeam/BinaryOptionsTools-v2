@@ -10,7 +10,7 @@ use uuid::Uuid;
 use binary_options_tools_core_pre::traits::AppState;
 
 use crate::pocketoption::types::ServerTimeState;
-use crate::pocketoption::types::{Assets, Deal};
+use crate::pocketoption::types::{Assets, Deal, PendingOrder};
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     ssid::Ssid,
@@ -252,12 +252,19 @@ pub struct TradeState {
     pub opened_deals: RwLock<HashMap<Uuid, Deal>>,
     /// A map of recently closed deals, keyed by their UUID.
     pub closed_deals: RwLock<HashMap<Uuid, Deal>>,
+    /// A map of pending deals, keyed by their UUID.
+    pub pending_deals: RwLock<HashMap<Uuid, PendingOrder>>,
 }
 
 impl TradeState {
     /// Adds a new opened deal.
     pub async fn add_opened_deal(&self, deal: Deal) {
         self.opened_deals.write().await.insert(deal.id, deal);
+    }
+
+    /// Adds a new pending deal.
+    pub async fn add_pending_deal(&self, deal: PendingOrder) {
+        self.pending_deals.write().await.insert(deal.ticket, deal);
     }
 
     /// Adds or updates deals in the opened_deals map.
@@ -321,5 +328,20 @@ impl TradeState {
     /// Retrieves a closed deal by its ID.
     pub async fn get_closed_deal(&self, deal_id: Uuid) -> Option<Deal> {
         self.closed_deals.read().await.get(&deal_id).cloned()
+    }
+
+    /// Retrieves a pending deal by its ID.
+    pub async fn get_pending_deal(&self, deal_id: Uuid) -> Option<PendingOrder> {
+        self.pending_deals.read().await.get(&deal_id).cloned()
+    }
+
+    /// Retrieves all pending deals.
+    pub async fn get_pending_deals(&self) -> HashMap<Uuid, PendingOrder> {
+        self.pending_deals.read().await.clone()
+    }
+
+    /// Removes a pending deal by its ID.
+    pub async fn remove_pending_deal(&self, deal_id: &Uuid) -> Option<PendingOrder> {
+        self.pending_deals.write().await.remove(deal_id)
     }
 }

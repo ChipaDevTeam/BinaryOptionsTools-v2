@@ -2,6 +2,8 @@ pub mod assets;
 pub mod balance;
 pub mod deals;
 pub mod get_candles;
+pub mod historical_data;
+pub mod pending_trades;
 /// Module implementations for PocketOption client
 ///
 /// This module provides specialized handlers for different aspects of the

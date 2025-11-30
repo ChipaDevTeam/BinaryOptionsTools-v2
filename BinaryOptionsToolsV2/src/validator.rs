@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use pyo3::{
-    Bound, PyResult, pyclass, pymethods, Py, PyAny,
+    Bound, Py, PyAny, PyResult, pyclass, pymethods,
     types::{PyAnyMethods, PyList},
 };
 use regex::Regex;

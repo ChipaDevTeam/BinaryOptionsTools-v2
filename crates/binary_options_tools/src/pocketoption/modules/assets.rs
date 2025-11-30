@@ -92,12 +92,12 @@ mod tests {
   ]"#;
 
         let asset: Asset = dbg!(serde_json::from_str(json).unwrap());
-        assert_eq!(asset.id, 1);
+        assert_eq!(asset.id, 5);
         assert_eq!(asset.symbol, "AAPL");
         assert_eq!(asset.name, "Apple");
         assert!(!asset.is_otc);
-        assert_eq!(asset.payout, 60);
-        assert_eq!(asset.allowed_candles.len(), 3);
-        // assert_eq!(asset.allowed_candles[0].0, 60);
+        assert_eq!(asset.payout, 50);
+        assert_eq!(asset.allowed_candles.len(), 12);
+        assert_eq!(asset.allowed_candles[0].duration(), 60);
     }
 }

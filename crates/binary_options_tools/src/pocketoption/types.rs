@@ -576,6 +576,65 @@ impl fmt::Display for OpenOrder {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingOrder {
+    pub ticket: Uuid,
+    pub open_type: u32,
+    pub amount: f64,
+    pub symbol: String,
+    pub open_time: String,
+    pub open_price: f64,
+    pub timeframe: u32,
+    pub min_payout: u32,
+    pub command: u32,
+    pub date_created: String,
+    pub id: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenPendingOrder {
+    open_type: u32,
+    amount: f64,
+    asset: String,
+    open_time: u32,
+    open_price: f64,
+    timeframe: u32,
+    min_payout: u32,
+    command: u32,
+}
+
+impl OpenPendingOrder {
+    pub fn new(
+        open_type: u32,
+        amount: f64,
+        asset: String,
+        open_time: u32,
+        open_price: f64,
+        timeframe: u32,
+        min_payout: u32,
+        command: u32,
+    ) -> Self {
+        Self {
+            open_type,
+            amount,
+            asset,
+            open_time,
+            open_price,
+            timeframe,
+            min_payout,
+            command,
+        }
+    }
+}
+
+impl fmt::Display for OpenPendingOrder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let data = serde_json::to_string(&self).map_err(|_| fmt::Error)?;
+        write!(f, "42[\"openPendingOrder\",{data}]")
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

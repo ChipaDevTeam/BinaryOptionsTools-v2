@@ -8,6 +8,7 @@ use std::time::Duration;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use binary_options_tools::traits::ValidatorTrait;
     use tokio_tungstenite::tungstenite::Message;
     use uuid::Uuid;
 
@@ -27,18 +28,11 @@ mod tests {
         }
     }
 
-    // Test the PocketOption client construction
-    #[tokio::test]
-    async fn test_pocket_option_new_with_url() {
-        // This test would require a valid SSID and URL to connect to
-        // For now, we'll just verify the function signature compiles
-        let _ = PocketOption::new_with_url;
-        assert!(true);
-    }
 
     // Test raw handle functionality
     #[tokio::test]
     async fn test_raw_handle_functionality() {
+        let _ = tracing_subscriber::fmt::try_init();
         // This test would require a connected client
         // For now, we'll just verify the function signatures compile
         let _ = PocketOption::raw_handle;
