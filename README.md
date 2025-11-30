@@ -78,11 +78,7 @@ Currently supporting **PocketOption** (Quick Trading Mode) with both real and de
 
 #### Using pip (Prebuilt Wheels):
 ```bash
-# Windows
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/master/wheels/BinaryOptionsToolsV2-0.1.8-cp38-abi3-win_amd64.whl?raw=true"
-
-# Linux
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/master/wheels/BinaryOptionsToolsV2-0.2.0-cp38-abi3-manylinux_2_34_x86_64.whl?raw=true"
+pip install binaryoptionstoolsv2
 ```
 
 **Requirements**: Python 3.8 or higher
