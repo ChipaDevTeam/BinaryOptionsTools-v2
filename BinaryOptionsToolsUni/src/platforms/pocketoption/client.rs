@@ -472,4 +472,28 @@ impl PocketOption {
         let asset_info = assets.0.get(&asset)?;
         Some(asset_info.payout as f64 / 100.0)
     }
+
+    /// Gets the trade history.
+    ///
+    /// This is an alias for `get_closed_deals`.
+    #[uniffi::method]
+    pub async fn get_trade_history(&self) -> Vec<Deal> {
+        self.get_closed_deals().await
+    }
+
+    /// Gets the end time of a deal by its ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The ID of the deal to check.
+    ///
+    /// # Returns
+    ///
+    /// The close timestamp as a Unix timestamp, or `None` if the deal is not found.
+    #[uniffi::method]
+    pub async fn get_deal_end_time(&self, id: String) -> Option<i64> {
+        let deals = self.inner.get_closed_deals().await;
+        let deal_id = Uuid::parse_str(&id).ok()?;
+        deals.get(&deal_id).map(|d| d.close_timestamp.timestamp())
+    }
 }
