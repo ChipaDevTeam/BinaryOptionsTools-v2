@@ -40,7 +40,6 @@ enum ServerResponse {
     Fail(String),
 }
 
-#[derive(Clone)]
 pub struct HistoricalDataHandle {
     sender: AsyncSender<Command>,
     receiver: AsyncReceiver<CommandResponse>,
@@ -79,6 +78,7 @@ pub struct HistoricalDataApiModule {
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
+    last_req_id: Option<Uuid>,
 }
 
 #[async_trait]
@@ -100,6 +100,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
             command_responder,
             message_receiver,
             to_ws_sender,
+            last_req_id: None,
         }
     }
 
@@ -116,6 +117,10 @@ impl ApiModule<State> for HistoricalDataApiModule {
                 Ok(cmd) = self.command_receiver.recv() => {
                     match cmd {
                         Command::GetHistory { asset, period, req_id } => {
+                            if self.last_req_id.is_some() {
+                                warn!(target: "HistoricalDataApiModule", "Overwriting a pending request. Concurrent get_history calls are not supported.");
+                            }
+                            self.last_req_id = Some(req_id);
                             let msg = format!("42[\"getHistory\",{{\"asset\":\"{}\",\"period\":{}}}]", asset, period);
                             self.to_ws_sender.send(Message::text(msg)).await?;
                         }
@@ -126,20 +131,26 @@ impl ApiModule<State> for HistoricalDataApiModule {
                         if let Ok(response) = serde_json::from_slice::<ServerResponse>(data) {
                             match response {
                                 ServerResponse::Success(candles) => {
-                                    if let Some(candle) = candles.first() {
-                                        let req_id = Uuid::new_v4(); // This is a placeholder, as the server does not return a request id for this message.
+                                    if let Some(req_id) = self.last_req_id.take() {
                                         self.command_responder.send(CommandResponse::Success {
                                             req_id,
                                             candles,
                                         }).await?;
+                                    } else {
+                                        warn!(target: "HistoricalDataApiModule", "Received history data but no req_id was pending. Discarding.");
                                     }
                                 }
                                 ServerResponse::Fail(e) => {
+                                    self.last_req_id = None;
                                     self.command_responder.send(CommandResponse::Error(e)).await?;
                                 }
                             }
                         } else {
-                            warn!(target: "HistoricalDataApiModule", "Received unrecognized message: {:?}", msg);
+                            let data_as_string = String::from_utf8_lossy(data);
+                            warn!(
+                                target: "HistoricalDataApiModule",
+                                "Failed to deserialize message. Data: {}", data_as_string
+                            );
                         }
                     }
                 }
@@ -148,6 +159,6 @@ impl ApiModule<State> for HistoricalDataApiModule {
     }
 
     fn rule(_: Arc<State>) -> Box<dyn Rule + Send + Sync> {
-        Box::new(MultiPatternRule::new(vec!["451-[\"updateHistory\"]"]))
+        Box::new(MultiPatternRule::new(vec!["updateHistory"]))
     }
 }

@@ -250,13 +250,20 @@ impl MultiPatternRule {
 
 impl Rule for MultiPatternRule {
     fn call(&self, msg: &Message) -> bool {
-        // tracing::info!("Called with message: {:?}", msg);
         match msg {
             Message::Text(text) => {
-                for pattern in &self.patterns {
-                    if text.starts_with(pattern) {
-                        self.valid.store(true, Ordering::SeqCst);
-                        return false;
+                if let Some(start) = text.find('[') {
+                    if let Ok(value) = serde_json::from_str::<Value>(&text[start..]) {
+                        if let Some(arr) = value.as_array() {
+                            if let Some(event_name) = arr.get(0).and_then(|v| v.as_str()) {
+                                for pattern in &self.patterns {
+                                    if event_name == pattern {
+                                        self.valid.store(true, Ordering::SeqCst);
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 false

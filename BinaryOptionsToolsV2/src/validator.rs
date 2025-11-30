@@ -161,12 +161,31 @@ impl RawValidator {
         })
     }
 
-    pub fn check(&self, _msg: String) -> bool {
-        // TODO: Restore validation logic when the new API supports it
-        // For now, return true as a placeholder
-        true
-        // let raw = RawWebsocketMessage::from(msg);
-        // self.validate(&raw)
+    pub fn check(&self, msg: String) -> bool {
+        let validator: CrateValidator = self.clone().into();
+        validator.call(&msg)
+    }
+}
+
+impl RawValidator {
+    fn call(&self, data: &str) -> bool {
+        match self {
+            RawValidator::None() => true,
+            RawValidator::Regex(validator) => validator.regex.is_match(data),
+            RawValidator::StartsWith(prefix) => data.starts_with(prefix),
+            RawValidator::EndsWith(suffix) => data.ends_with(suffix),
+            RawValidator::Contains(substring) => data.contains(substring),
+            RawValidator::All(validators) => validators.0.iter().all(|v| v.call(data)),
+            RawValidator::Any(validators) => validators.0.iter().any(|v| v.call(data)),
+            RawValidator::Not(validator) => !validator.0.call(data),
+            RawValidator::Custom(py_custom) => Python::with_gil(|py| {
+                let func = py_custom.custom.as_ref();
+                match func.call1(py, (data,)) {
+                    Ok(result) => result.extract::<bool>(py).unwrap_or(false),
+                    Err(_) => false,
+                }
+            }),
+        }
     }
 }
 

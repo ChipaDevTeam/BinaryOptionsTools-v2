@@ -48,7 +48,6 @@ enum ServerResponse {
     Fail(Box<FailOpenOrder>),
 }
 
-#[derive(Clone)]
 pub struct PendingTradesHandle {
     sender: AsyncSender<Command>,
     receiver: AsyncReceiver<CommandResponse>,
@@ -112,6 +111,7 @@ pub struct PendingTradesApiModule {
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
+    last_req_id: Option<Uuid>,
 }
 
 #[async_trait]
@@ -133,6 +133,7 @@ impl ApiModule<State> for PendingTradesApiModule {
             command_responder,
             message_receiver,
             to_ws_sender,
+            last_req_id: None,
         }
     }
 
@@ -149,6 +150,10 @@ impl ApiModule<State> for PendingTradesApiModule {
                 Ok(cmd) = self.command_receiver.recv() => {
                     match cmd {
                         Command::OpenPendingOrder { open_type, amount, asset, open_time, open_price, timeframe, min_payout, command, req_id } => {
+                            if self.last_req_id.is_some() {
+                                warn!(target: "PendingTradesApiModule", "Overwriting a pending request. Concurrent open_pending_order calls are not supported.");
+                            }
+                            self.last_req_id = Some(req_id);
                             let order = OpenPendingOrder::new(open_type, amount, asset, open_time, open_price, timeframe, min_payout, command);
                             self.to_ws_sender.send(Message::text(order.to_string())).await?;
                         }
@@ -161,17 +166,26 @@ impl ApiModule<State> for PendingTradesApiModule {
                                 ServerResponse::Success(pending_order) => {
                                     self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
                                     info!(target: "PendingTradesApiModule", "Pending trade opened: {}", pending_order.ticket);
+                                    let response_req_id = self.last_req_id.take().unwrap_or_else(|| {
+                                        warn!(target: "PendingTradesApiModule", "Received successopenPendingOrder but no req_id was pending. Using ticket as fallback req_id.");
+                                        pending_order.ticket
+                                    });
                                     self.command_responder.send(CommandResponse::Success {
-                                        req_id: pending_order.ticket,
+                                        req_id: response_req_id,
                                         pending_order,
                                     }).await?;
                                 }
                                 ServerResponse::Fail(fail) => {
+                                    self.last_req_id = None;
                                     self.command_responder.send(CommandResponse::Error(fail)).await?;
                                 }
                             }
                         } else {
-                            warn!(target: "PendingTradesApiModule", "Received unrecognized message: {:?}", msg);
+                            let data_as_string = String::from_utf8_lossy(data);
+                            warn!(
+                                target: "PendingTradesApiModule",
+                                "Failed to deserialize message. Data: {}", data_as_string
+                            );
                         }
                     }
                 }
@@ -181,8 +195,8 @@ impl ApiModule<State> for PendingTradesApiModule {
 
     fn rule(_: Arc<State>) -> Box<dyn Rule + Send + Sync> {
         Box::new(MultiPatternRule::new(vec![
-            "451-[\"successopenPendingOrder\"",
-            "451-[\"failopenPendingOrder\"",
+            "successopenPendingOrder",
+            "failopenPendingOrder",
         ]))
     }
 }
