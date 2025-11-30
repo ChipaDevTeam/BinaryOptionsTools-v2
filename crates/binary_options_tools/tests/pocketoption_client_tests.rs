@@ -28,7 +28,6 @@ mod tests {
         }
     }
 
-
     // Test raw handle functionality
     #[tokio::test]
     async fn test_raw_handle_functionality() {

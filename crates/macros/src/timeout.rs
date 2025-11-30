@@ -1,6 +1,6 @@
 use proc_macro2::Span;
-use quote::{quote, ToTokens};
-use syn::{parse::Parse, Expr, FnArg, ItemFn, Pat, PatIdent, Token};
+use quote::{ToTokens, quote};
+use syn::{Expr, FnArg, ItemFn, Pat, PatIdent, Token, parse::Parse};
 
 pub struct Timeout {
     args: TimeoutArgs,

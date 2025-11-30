@@ -55,8 +55,7 @@ impl Ssid {
     pub fn parse(data: impl ToString) -> CoreResult<Self> {
         let data = data.to_string();
         let parsed = if data.trim().starts_with(r#"42["auth","#) {
-            data
-                .trim()
+            data.trim()
                 .strip_prefix(r#"42["auth","#)
                 .ok_or(CoreError::SsidParsing(
                     "Error parsing ssid string into object".into(),

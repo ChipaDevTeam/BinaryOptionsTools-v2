@@ -14,7 +14,7 @@ use uuid::Uuid;
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
-    types::{FailOpenOrder, MultiPatternRule, PendingOrder, OpenPendingOrder},
+    types::{FailOpenOrder, MultiPatternRule, OpenPendingOrder, PendingOrder},
 };
 
 #[derive(Debug)]
@@ -83,7 +83,10 @@ impl PendingTradesHandle {
             .map_err(CoreError::from)?;
         loop {
             match self.receiver.recv().await {
-                Ok(CommandResponse::Success { req_id, pending_order }) => {
+                Ok(CommandResponse::Success {
+                    req_id,
+                    pending_order,
+                }) => {
                     if req_id == id {
                         return Ok(*pending_order);
                     } else {

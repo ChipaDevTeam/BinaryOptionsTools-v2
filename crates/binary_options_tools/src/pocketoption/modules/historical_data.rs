@@ -12,10 +12,10 @@ use tracing::warn;
 use uuid::Uuid;
 
 use crate::pocketoption::{
+    candle::Candle,
     error::{PocketError, PocketResult},
     state::State,
     types::MultiPatternRule,
-    candle::Candle,
 };
 
 #[derive(Debug)]
@@ -29,10 +29,7 @@ pub enum Command {
 
 #[derive(Debug)]
 pub enum CommandResponse {
-    Success {
-        req_id: Uuid,
-        candles: Vec<Candle>,
-    },
+    Success { req_id: Uuid, candles: Vec<Candle> },
     Error(String),
 }
 
@@ -151,8 +148,6 @@ impl ApiModule<State> for HistoricalDataApiModule {
     }
 
     fn rule(_: Arc<State>) -> Box<dyn Rule + Send + Sync> {
-        Box::new(MultiPatternRule::new(vec![
-            "451-[\"updateHistory\"]",
-        ]))
+        Box::new(MultiPatternRule::new(vec!["451-[\"updateHistory\"]"]))
     }
 }

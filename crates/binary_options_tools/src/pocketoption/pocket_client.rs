@@ -337,14 +337,7 @@ impl PocketOption {
         if let Some(handle) = self.client.get_handle::<PendingTradesApiModule>().await {
             handle
                 .open_pending_order(
-                    open_type,
-                    amount,
-                    asset,
-                    open_time,
-                    open_price,
-                    timeframe,
-                    min_payout,
-                    command,
+                    open_type, amount, asset, open_time, open_price, timeframe, min_payout, command,
                 )
                 .await
         } else {
@@ -365,7 +358,11 @@ impl PocketOption {
     /// # Returns
     /// An `Option` containing the `PendingOrder` if found, or `None` otherwise.
     pub async fn get_pending_deal(&self, deal_id: Uuid) -> Option<PendingOrder> {
-        self.client.state.trade_state.get_pending_deal(deal_id).await
+        self.client
+            .state
+            .trade_state
+            .get_pending_deal(deal_id)
+            .await
     }
 
     /// Subscribes to a specific asset's updates.
