@@ -69,7 +69,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_timeout_macro() -> anyhow::Result<()> {
-        let _ = start_tracing(true);
+        start_tracing(true).expect("Failed to start tracing in test");
 
         #[timeout(1, tracing(level = "info", skip(_tester)))]
         async fn this_is_a_test(_tester: Tester) -> anyhow::Result<()> {
