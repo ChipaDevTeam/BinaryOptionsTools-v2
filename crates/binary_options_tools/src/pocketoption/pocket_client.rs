@@ -484,7 +484,7 @@ impl PocketOption {
     /// A `PocketResult` containing a vector of `Candle` if successful, or an error if the request fails.
     /// # Example
     /// ```
-    /// use binary_options_tools_pocketoption::PocketOption;
+    /// use binary_options_tools::pocketoption::PocketOption;
     ///
     /// #[tokio::main]
     /// async fn main() -> binary_options_tools_core_pre::error::CoreResult<()> {
