@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use binary_options_tools_core_pre::{
@@ -7,7 +7,7 @@ use binary_options_tools_core_pre::{
     traits::{ApiModule, Rule},
 };
 use serde::Deserialize;
-use tokio::select;
+use tokio::{select, time::timeout};
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -53,6 +53,15 @@ pub struct PendingTradesHandle {
     receiver: AsyncReceiver<CommandResponse>,
 }
 
+impl Clone for PendingTradesHandle {
+    fn clone(&self) -> Self {
+        Self {
+            sender: self.sender.clone(),
+            receiver: self.receiver.clone(),
+        }
+    }
+}
+
 impl PendingTradesHandle {
     pub async fn open_pending_order(
         &self,
@@ -70,7 +79,7 @@ impl PendingTradesHandle {
             .send(Command::OpenPendingOrder {
                 open_type,
                 amount,
-                asset,
+                asset: asset.clone(),
                 open_time,
                 open_price,
                 timeframe,
@@ -81,25 +90,33 @@ impl PendingTradesHandle {
             .await
             .map_err(CoreError::from)?;
         loop {
-            match self.receiver.recv().await {
-                Ok(CommandResponse::Success {
+            match timeout(Duration::from_secs(10), self.receiver.recv()).await {
+                Ok(Ok(CommandResponse::Success {
                     req_id,
                     pending_order,
-                }) => {
+                })) => {
                     if req_id == id {
                         return Ok(*pending_order);
                     } else {
+                        warn!("Received response for unknown req_id: {}", req_id);
                         continue;
                     }
                 }
-                Ok(CommandResponse::Error(fail)) => {
+                Ok(Ok(CommandResponse::Error(fail))) => {
                     return Err(PocketError::FailOpenOrder {
                         error: fail.error,
                         amount: fail.amount,
                         asset: fail.asset,
                     });
                 }
-                Err(e) => return Err(CoreError::from(e).into()),
+                Ok(Err(e)) => return Err(CoreError::from(e).into()),
+                Err(_) => {
+                    return Err(PocketError::Timeout {
+                        task: "open_pending_order".to_string(),
+                        context: format!("asset: {}, open_type: {}", asset, open_type),
+                        duration: Duration::from_secs(10),
+                    })
+                }
             }
         }
     }

@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use binary_options_tools_core_pre::{
@@ -7,7 +7,7 @@ use binary_options_tools_core_pre::{
     traits::{ApiModule, Rule},
 };
 use serde::Deserialize;
-use tokio::select;
+use tokio::{select, time::timeout};
 use tracing::warn;
 use uuid::Uuid;
 
@@ -45,28 +45,44 @@ pub struct HistoricalDataHandle {
     receiver: AsyncReceiver<CommandResponse>,
 }
 
+impl Clone for HistoricalDataHandle {
+    fn clone(&self) -> Self {
+        Self {
+            sender: self.sender.clone(),
+            receiver: self.receiver.clone(),
+        }
+    }
+}
+
 impl HistoricalDataHandle {
     pub async fn get_history(&self, asset: String, period: u32) -> PocketResult<Vec<Candle>> {
         let id = Uuid::new_v4();
         self.sender
             .send(Command::GetHistory {
-                asset,
+                asset: asset.clone(),
                 period,
                 req_id: id,
             })
             .await
             .map_err(CoreError::from)?;
         loop {
-            match self.receiver.recv().await {
-                Ok(CommandResponse::Success { req_id, candles }) => {
+            match timeout(Duration::from_secs(10), self.receiver.recv()).await {
+                Ok(Ok(CommandResponse::Success { req_id, candles })) => {
                     if req_id == id {
                         return Ok(candles);
                     } else {
                         continue;
                     }
                 }
-                Ok(CommandResponse::Error(e)) => return Err(PocketError::General(e)),
-                Err(e) => return Err(CoreError::from(e).into()),
+                Ok(Ok(CommandResponse::Error(e))) => return Err(PocketError::General(e)),
+                Ok(Err(e)) => return Err(CoreError::from(e).into()),
+                Err(_) => {
+                    return Err(PocketError::Timeout {
+                        task: "get_history".to_string(),
+                        context: format!("asset: {}, period: {}", asset, period),
+                        duration: Duration::from_secs(10),
+                    })
+                }
             }
         }
     }

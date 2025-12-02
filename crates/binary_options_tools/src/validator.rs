@@ -90,9 +90,11 @@ impl PartialEq for Validator {
             (Validator::StartsWith(a), Validator::StartsWith(b)) => a == b,
             (Validator::EndsWith(a), Validator::EndsWith(b)) => a == b,
             (Validator::Contains(a), Validator::Contains(b)) => a == b,
+            (Validator::Regex(a), Validator::Regex(b)) => a.as_str() == b.as_str(),
             (Validator::Not(a), Validator::Not(b)) => a == b,
             (Validator::All(a), Validator::All(b)) => a == b,
             (Validator::Any(a), Validator::Any(b)) => a == b,
+            (Validator::Custom(a), Validator::Custom(b)) => Arc::ptr_eq(a, b),
             _ => false,
         }
     }
