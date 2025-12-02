@@ -289,7 +289,7 @@ mod tests {
     #[tokio::test]
     async fn test_start_tracing_stream() {
         let (layer, receiver) = create_logs_iterator_test("ERROR".to_string());
-        let _ = start_tracing(".".to_string(), "DEBUG".to_string(), false, vec![layer]);
+        start_tracing(".".to_string(), "DEBUG".to_string(), false, vec![layer]).expect("Failed to initialize tracing for test");
 
         async fn log() {
             let mut num = 0;
