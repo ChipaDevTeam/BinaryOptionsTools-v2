@@ -151,10 +151,6 @@ impl ApiModule<State> for TradesApiModule {
     }
 
     async fn run(&mut self) -> CoreResult<()> {
-        // TODO: Implement the main run loop.
-        // This loop should handle both incoming commands from the handle
-        // and incoming WebSocket messages for trade responses.
-        //
         loop {
             select! {
               Ok(cmd) = self.command_receiver.recv() => {
