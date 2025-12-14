@@ -387,13 +387,6 @@ impl ApiModule<State> for SubscriptionsApiModule {
                 Ok(cmd) = self.command_receiver.recv() => {
                     match cmd {
                         Command::Subscribe { asset, command_id } => {
-                            // TODO: Handle subscription request
-                            // 1. Check if max subscriptions reached
-                            // 2. Create stream channel
-                            // 3. Send WebSocket subscription message
-                            // 4. Store subscription info
-                            // 5. Send success response with stream receiver
-
                             if self.is_max_subscriptions_reached().await {
                                 self.command_responder.send(CommandResponse::SubscriptionFailed {
                                     command_id,
