@@ -301,6 +301,8 @@ pub struct ClientRunner<S: AppState> {
     pub(crate) state: Arc<S>,
     // Flag to determine if the next connection is a fresh one.
     pub(crate) is_hard_disconnect: bool,
+    // Flag to keep the client disconnected until explicitly commanded to connect.
+    pub(crate) explicit_disconnect: bool,
     // Flag to terminate the main run loop.
     pub(crate) shutdown_requested: bool,
 
@@ -328,9 +330,34 @@ impl<S: AppState> ClientRunner<S> {
     /// - **Active Session**: Middleware `on_send`/`on_receive` called for each message
     /// - **Disconnection**: Middleware `on_disconnect` called before cleanup
     pub async fn run(&mut self) {
-        // TODO: Add a way to disconnect and keep the connection closed intill specified otherwhise
         // The outermost loop runs until a shutdown is commanded.
         while !self.shutdown_requested {
+            if self.explicit_disconnect {
+                info!(target: "Runner", "Client is explicitly disconnected. Waiting for Connect/Reconnect command...");
+                // Wait for a command to reconnect or shutdown
+                if let Ok(cmd) = self.runner_command_rx.recv().await {
+                    match cmd {
+                        RunnerCommand::Connect | RunnerCommand::Reconnect => {
+                            self.explicit_disconnect = false;
+                            // Proceed to connect logic below
+                        }
+                        RunnerCommand::Shutdown => {
+                            self.shutdown_requested = true;
+                            // Loop will terminate
+                            continue;
+                        }
+                        RunnerCommand::Disconnect => {
+                            // Already disconnected
+                            continue;
+                        }
+                    }
+                } else {
+                    // Channel closed, shutdown
+                    self.shutdown_requested = true;
+                    continue;
+                }
+            }
+
             // Execute middleware on_connect hook
             let middleware_context =
                 MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
@@ -467,6 +494,7 @@ impl<S: AppState> ClientRunner<S> {
 
                                 self.state.clear_temporal_data().await;
                                 self.is_hard_disconnect = true;
+                                self.explicit_disconnect = true;
                                 if let Some(writer_task) = writer_task_opt.take() {
                                     writer_task.abort();
                                 }

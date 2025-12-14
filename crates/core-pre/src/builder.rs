@@ -418,6 +418,7 @@ impl<S: AppState> ClientBuilder<S> {
             state: self.state,
             router: Arc::new(router),
             is_hard_disconnect: true,
+            explicit_disconnect: false,
             shutdown_requested: false,
             to_ws_sender: to_ws_tx,
             to_ws_receiver: to_ws_rx,
