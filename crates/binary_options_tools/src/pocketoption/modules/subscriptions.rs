@@ -332,8 +332,8 @@ pub struct SubscriptionsApiModule {
 
 #[async_trait]
 impl ReconnectCallback<State> for SubscriptionCallback {
-    async fn call(&self, _: Arc<State>, ws_sender: &AsyncSender<Message>) -> CoreResult<()> {
-        tokio::time::sleep(Duration::from_secs(2)).await; // FIXME: This is a temporary delay, it may need to be fine tuned
+    async fn call(&self, state: Arc<State>, ws_sender: &AsyncSender<Message>) -> CoreResult<()> {
+        tokio::time::sleep(Duration::from_secs(state.reconnection_delay)).await;
         // Resubscribe to all active subscriptions
         for symbol in self.active_subscriptions.read().await.keys() {
             tokio::time::sleep(Duration::from_secs(1)).await;

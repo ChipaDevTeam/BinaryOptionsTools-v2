@@ -45,6 +45,8 @@ pub struct State {
     pub trade_state: Arc<TradeState>,
     /// Holds the current validators for the raw module keyed by ID
     pub raw_validators: SyncRwLock<HashMap<Uuid, Validator>>,
+    /// Delay before attempting to reconnect to the server (in seconds)
+    pub reconnection_delay: u64,
 }
 
 /// Builder pattern for creating State instances
@@ -56,6 +58,7 @@ pub struct StateBuilder {
     ssid: Option<Ssid>,
     default_connection_url: Option<String>,
     default_symbol: Option<String>,
+    reconnection_delay: Option<u64>,
 }
 
 impl StateBuilder {
@@ -86,6 +89,15 @@ impl StateBuilder {
         self
     }
 
+    /// Set the reconnection delay in seconds
+    ///
+    /// # Arguments
+    /// * `delay` - Delay in seconds
+    pub fn reconnection_delay(mut self, delay: u64) -> Self {
+        self.reconnection_delay = Some(delay);
+        self
+    }
+
     /// Build the final State instance
     ///
     /// # Returns
@@ -104,6 +116,7 @@ impl StateBuilder {
             assets: RwLock::new(None),
             trade_state: Arc::new(TradeState::default()),
             raw_validators: SyncRwLock::new(HashMap::new()),
+            reconnection_delay: self.reconnection_delay.unwrap_or(2),
         })
     }
 }
