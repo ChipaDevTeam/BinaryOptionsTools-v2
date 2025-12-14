@@ -575,10 +575,6 @@ impl SubscriptionsApiModule {
     /// # Returns
     /// * `PocketResult<bool>` - True if subscription was removed, false if not found
     async fn remove_subscription(&mut self, asset: &str) -> CoreResult<bool> {
-        // TODO: Implement subscription removal
-        // 1. Remove from active_subscriptions
-        // 2. Remove from asset_to_subscription
-        // 3. Return removed subscription info
         if let Some(stream_sender) = self.active_subscriptions.write().await.remove(asset) {
             stream_sender.send(StreamData::Terminated { reason: "Unsubscribed from main module".to_string() })
                 .await.inspect_err(|e| warn!(target: "SubscriptionsApiModule", "Failed to send termination signal: {}", e))?;
