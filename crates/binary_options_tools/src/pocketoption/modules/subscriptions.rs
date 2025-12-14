@@ -375,13 +375,6 @@ impl ApiModule<State> for SubscriptionsApiModule {
     }
 
     async fn run(&mut self) -> CoreResult<()> {
-        // TODO: Implement the main run loop
-        // This loop should handle:
-        // 1. Incoming commands (Subscribe, Unsubscribe, StreamTerminationRequest)
-        // 2. Incoming WebSocket messages with asset data
-        // 3. Managing subscription limits
-        // 4. Forwarding data to appropriate streams
-        //
         loop {
             select! {
                 Ok(cmd) = self.command_receiver.recv() => {
