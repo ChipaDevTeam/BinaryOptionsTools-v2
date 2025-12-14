@@ -48,12 +48,12 @@ mod tests {
     use tokio::time::sleep;
     use tracing::debug;
 
-    use binary_options_tools_core_pre::utils::tracing::start_tracing;
     use binary_options_tools_macros::{deserialize, serialize, timeout};
     #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
     struct Test {
         name: String,
     }
+    use tracing_test::traced_test; // Add this import.
 
     #[test]
     fn test_deserialize_macro() {
@@ -68,8 +68,8 @@ mod tests {
     struct Tester;
 
     #[tokio::test]
+    #[traced_test]
     async fn test_timeout_macro() -> anyhow::Result<()> {
-        start_tracing(true).expect("Failed to start tracing in test");
 
         #[timeout(1, tracing(level = "info", skip(_tester)))]
         async fn this_is_a_test(_tester: Tester) -> anyhow::Result<()> {

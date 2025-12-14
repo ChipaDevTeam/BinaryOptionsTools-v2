@@ -13,7 +13,7 @@ use binary_options_tools_core_pre::{
     traits::{ApiModule, Rule},
 };
 use serde::Deserialize;
-use tracing::info;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::pocketoption::{
@@ -234,7 +234,10 @@ impl ApiModule<State> for DealsApiModule {
                                         Err(e) => return Err(CoreError::from(e)),
                                     }
                                 },
-                                _ => {}
+                                ExpectedMessage::None => {
+                                    warn!(target: "DealsApiModule", "Received unexpected binary message when no header was seen.");
+                                }
+
                             }
                             expected = ExpectedMessage::None;
                         },

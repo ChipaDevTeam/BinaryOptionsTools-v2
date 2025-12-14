@@ -17,6 +17,9 @@ use crate::pocketoption::{
     types::{FailOpenOrder, MultiPatternRule, OpenPendingOrder, PendingOrder},
 };
 
+const PENDING_ORDER_TIMEOUT: Duration = Duration::from_secs(10);
+const MAX_MISMATCH_RETRIES: usize = 5;
+
 #[derive(Debug)]
 pub enum Command {
     OpenPendingOrder {
@@ -63,6 +66,15 @@ impl Clone for PendingTradesHandle {
 }
 
 impl PendingTradesHandle {
+    /// Opens a pending order on the PocketOption platform.
+    ///
+    /// **Warning:** Concurrent calls to this method on the same `PendingTradesHandle`
+    /// are *not supported*. Executing multiple `open_pending_order` calls concurrently
+    /// will lead to warnings (due to overwriting the module's internal `last_req_id`)
+    /// and a high likelihood of one or more calls timing out due to response mismatches.
+    /// It is critical to ensure that calls to this method are serialized or awaited
+    /// sequentially by the caller. Unmatched or late responses are dropped by the module
+    /// to prevent ambiguous correlation, which will result in a timeout for the caller.
     pub async fn open_pending_order(
         &self,
         open_type: u32,
@@ -89,8 +101,9 @@ impl PendingTradesHandle {
             })
             .await
             .map_err(CoreError::from)?;
+        let mut mismatch_count = 0;
         loop {
-            match timeout(Duration::from_secs(10), self.receiver.recv()).await {
+            match timeout(PENDING_ORDER_TIMEOUT, self.receiver.recv()).await {
                 Ok(Ok(CommandResponse::Success {
                     req_id,
                     pending_order,
@@ -99,6 +112,17 @@ impl PendingTradesHandle {
                         return Ok(*pending_order);
                     } else {
                         warn!("Received response for unknown req_id: {}", req_id);
+                        mismatch_count += 1;
+                        if mismatch_count >= MAX_MISMATCH_RETRIES {
+                            return Err(PocketError::Timeout {
+                                task: "open_pending_order".to_string(),
+                                context: format!(
+                                    "asset: {}, open_type: {}, exceeded mismatch retries",
+                                    asset, open_type
+                                ),
+                                duration: PENDING_ORDER_TIMEOUT,
+                            });
+                        }
                         continue;
                     }
                 }
@@ -114,7 +138,7 @@ impl PendingTradesHandle {
                     return Err(PocketError::Timeout {
                         task: "open_pending_order".to_string(),
                         context: format!("asset: {}, open_type: {}", asset, open_type),
-                        duration: Duration::from_secs(10),
+                        duration: PENDING_ORDER_TIMEOUT,
                     })
                 }
             }
@@ -122,6 +146,19 @@ impl PendingTradesHandle {
     }
 }
 
+/// This API module handles the creation of pending trade orders.
+///
+/// **Concurrency and Correlation Notes:**
+/// - This module is designed with the assumption that at most one `OpenPendingOrder`
+///   request is in-flight at any given time per client. Concurrent calls to
+///   `open_pending_order` on the `PendingTradesHandle` will lead to warnings
+///   and potential timeouts, as the module's internal state (`last_req_id`)
+///   can only track a single pending request.
+/// - The `last_req_id` is a purely client-managed correlation ID. The PocketOption
+///   server protocol for pending orders does not echo this `req_id` in its responses.
+/// - When a success response for a pending order arrives and no `last_req_id` is currently
+///   pending, the module drops the response and logs a warning. This avoids returning
+///   ambiguous or incorrect correlation IDs to the caller.
 pub struct PendingTradesApiModule {
     state: Arc<State>,
     command_receiver: AsyncReceiver<Command>,
@@ -183,14 +220,14 @@ impl ApiModule<State> for PendingTradesApiModule {
                                 ServerResponse::Success(pending_order) => {
                                     self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
                                     info!(target: "PendingTradesApiModule", "Pending trade opened: {}", pending_order.ticket);
-                                    let response_req_id = self.last_req_id.take().unwrap_or_else(|| {
-                                        warn!(target: "PendingTradesApiModule", "Received successopenPendingOrder but no req_id was pending. Using ticket as fallback req_id.");
-                                        pending_order.ticket
-                                    });
-                                    self.command_responder.send(CommandResponse::Success {
-                                        req_id: response_req_id,
-                                        pending_order,
-                                    }).await?;
+                                    if let Some(req_id) = self.last_req_id.take() {
+                                        self.command_responder.send(CommandResponse::Success {
+                                            req_id,
+                                            pending_order,
+                                        }).await?;
+                                    } else {
+                                        warn!(target: "PendingTradesApiModule", "Received successopenPendingOrder but no req_id was pending. Dropping response to avoid ambiguity.");
+                                    }
                                 }
                                 ServerResponse::Fail(fail) => {
                                     self.last_req_id = None;

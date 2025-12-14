@@ -35,6 +35,23 @@ pub struct PyCustom {
 
 #[pyclass]
 #[derive(Clone)]
+/// `RawValidator` provides a flexible way to filter WebSocket messages
+/// within the Python API. It encapsulates various validation strategies,
+/// including regular expressions, substring checks, and custom Python
+/// callables.
+///
+/// This class is designed to be used with `RawHandler` to define which
+/// incoming messages should be processed.
+///
+/// # Python Custom Validator Behavior
+/// When using the `RawValidator.custom()` constructor:
+/// - The provided Python callable (`func`) must accept exactly one string
+///   argument, which will be the incoming WebSocket message data.
+/// - The callable should return a boolean value (`True` or `False`).
+/// - If the callable raises an exception, or if its return value cannot
+///   be interpreted as a boolean, the validation will silently fail and
+///   be treated as `False`. No Python exception will be propagated back
+///   to the calling Python code at the point of validation.
 pub enum RawValidator {
     None(),
     Regex(RegexValidator),
@@ -155,6 +172,19 @@ impl RawValidator {
     }
 
     #[staticmethod]
+    /// Creates a custom validator using a Python callable.
+    ///
+    /// The `func` callable will be invoked with the incoming WebSocket message
+    /// as a single string argument. It must return `True` to validate the message
+    /// or `False` otherwise.
+    ///
+    /// **Behavior on Error/Invalid Return:**
+    /// If `func` raises an exception or returns a non-boolean value,
+    /// the validation will silently fail and be treated as `False`.
+    /// No exception will be propagated.
+    ///
+    /// # Arguments
+    /// * `func` - A Python callable that accepts one string argument and returns a boolean.
     pub fn custom(func: Py<PyAny>) -> Self {
         Self::Custom(PyCustom {
             custom: Arc::new(func),

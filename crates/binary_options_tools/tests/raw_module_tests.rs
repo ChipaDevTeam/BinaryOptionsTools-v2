@@ -1,17 +1,19 @@
 //! Integration tests for the Raw module functionality
 
-use binary_options_tools::pocketoption::modules::raw::{Command, CommandResponse, Outgoing};
+use binary_options_tools::pocketoption::modules::raw::{Command, CommandResponse, Outgoing, RawApiModule};
 use binary_options_tools::validator::Validator;
 use std::sync::Arc;
 use tokio_tungstenite::tungstenite::Message;
 use uuid::Uuid;
+use tracing_test::traced_test; // Add this import
+use binary_options_tools_core_pre::reimports::{AsyncReceiver, AsyncSender}; // Import from reimports
+use binary_options_tools_core_pre::reimports::{AsyncReceiver, AsyncSender}; // Import from reimports
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use binary_options_tools::pocketoption::modules::raw::{RawApiModule, RawHandle, RawHandler};
     use binary_options_tools::traits::ValidatorTrait;
-    use binary_options_tools_core_pre::reimports::{AsyncReceiver, AsyncSender, bounded_async};
+    use binary_options_tools_core_pre::reimports::bounded_async;
     use binary_options_tools_core_pre::traits::{ApiModule, Rule};
     use std::collections::HashMap;
     use tokio::sync::RwLock;
@@ -34,6 +36,7 @@ mod tests {
             validators.insert(id, validator);
         }
 
+        #[allow(dead_code)] // This is a mock, so it might not be used in all tests
         pub fn remove_raw_validator(&self, id: &Uuid) -> bool {
             let mut validators = self.raw_validators.try_write().unwrap();
             validators.remove(id).is_some()
@@ -67,9 +70,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test] // Add traced_test macro
     async fn test_raw_handle_creation() {
-        let (cmd_tx, cmd_rx) = bounded_async(10);
-        let (resp_tx, resp_rx) = bounded_async(10);
+        let (cmd_tx, _cmd_rx) = bounded_async(10); // Prefix with _ to mark as unused
+        let (_resp_tx, resp_rx) = bounded_async(10); // Prefix with _ to mark as unused
 
         let _handle = RawApiModule::create_handle(cmd_tx, resp_rx);
 
@@ -77,6 +81,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test] // Add traced_test macro
     async fn test_outgoing_enum() {
         let text_msg = Outgoing::Text("test message".to_string());
         let binary_msg = Outgoing::Binary(vec![1, 2, 3, 4]);
@@ -93,6 +98,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test] // Add traced_test macro
     async fn test_command_enum() {
         let validator = Validator::starts_with("test".to_string());
         let command_id = Uuid::new_v4();
@@ -143,6 +149,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test] // Add traced_test macro
     async fn test_command_response_enum() {
         let command_id = Uuid::new_v4();
         let id = Uuid::new_v4();
@@ -186,6 +193,7 @@ mod tests {
 
     // Test the RawRule implementation
     #[tokio::test]
+    #[traced_test] // Add traced_test macro
     async fn test_raw_rule_call() {
         let state = Arc::new(MockState::new());
         let rule = MockRule {
@@ -211,6 +219,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test] // Add traced_test macro
     async fn test_raw_rule_with_no_validators() {
         let state = Arc::new(MockState::new());
         let rule = MockRule {

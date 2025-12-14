@@ -7,10 +7,13 @@ use std::{
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use binary_options_tools_core_pre::traits::AppState;
+use binary_options_tools_core_pre::{
+    reimports::{AsyncSender, Message},
+    traits::AppState,
+};
 
 use crate::pocketoption::types::ServerTimeState;
-use crate::pocketoption::types::{Assets, Deal, PendingOrder};
+use crate::pocketoption::types::{Assets, Deal, PendingOrder, SubscriptionEvent, Outgoing};
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     ssid::Ssid,
@@ -44,7 +47,15 @@ pub struct State {
     /// Holds the state for all trading-related data.
     pub trade_state: Arc<TradeState>,
     /// Holds the current validators for the raw module keyed by ID
-    pub raw_validators: SyncRwLock<HashMap<Uuid, Validator>>,
+    pub raw_validators: SyncRwLock<HashMap<Uuid, Arc<Validator>>>,
+    /// Active subscriptions mapped by subscription symbol
+    pub active_subscriptions: RwLock<HashMap<String, AsyncSender<SubscriptionEvent>>>,
+    /// Active history requests
+    pub histories: RwLock<Vec<(String, u32, Uuid)>>,
+    /// Sinks for raw module
+    pub raw_sinks: RwLock<HashMap<Uuid, Arc<AsyncSender<Arc<Message>>>>>,
+    /// Keep alive messages for raw module
+    pub raw_keep_alive: Arc<RwLock<HashMap<Uuid, Outgoing>>>,
 }
 
 /// Builder pattern for creating State instances
@@ -104,6 +115,10 @@ impl StateBuilder {
             assets: RwLock::new(None),
             trade_state: Arc::new(TradeState::default()),
             raw_validators: SyncRwLock::new(HashMap::new()),
+            active_subscriptions: RwLock::new(HashMap::new()),
+            histories: RwLock::new(Vec::new()),
+            raw_sinks: RwLock::new(HashMap::new()),
+            raw_keep_alive: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 }
@@ -180,7 +195,13 @@ impl State {
     /// Current server time as DateTime<Utc>
     pub async fn get_server_datetime(&self) -> DateTime<Utc> {
         let timestamp = self.get_server_time().await;
-        DateTime::from_timestamp(timestamp as i64, 0).unwrap_or_else(Utc::now)
+        match DateTime::from_timestamp(timestamp as i64, 0) {
+            Some(dt) => dt,
+            None => {
+                tracing::warn!("Failed to convert server timestamp {} to DateTime<Utc>. Defaulting to Utc::now().", timestamp);
+                Utc::now()
+            }
+        }
     }
 
     /// Convert local time to server time
@@ -224,7 +245,7 @@ impl State {
         self.raw_validators
             .write()
             .expect("Failed to acquire write lock")
-            .insert(id, validator);
+            .insert(id, Arc::new(validator));
     }
 
     /// Removes a validator by ID. Returns whether it existed.

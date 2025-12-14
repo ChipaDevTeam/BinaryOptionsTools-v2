@@ -16,13 +16,14 @@ use crate::pocketoption::state::State;
 use crate::traits::ValidatorTrait;
 use crate::validator::Validator;
 
-/// Outgoing message to WS
-#[derive(Clone, Debug)]
-pub enum Outgoing {
-    Text(String),
-    Binary(Vec<u8>),
-}
+pub use crate::pocketoption::types::Outgoing;
 
+/// Raw module for sending and receiving raw messages from the PocketOption websocket.
+///
+/// This module allows for the creation of per-validator handlers (`RawHandler`) that can
+/// send `Outgoing` messages and subscribe to incoming messages matching a specific validator.
+/// `Outgoing` is the canonical message type for raw send operations.
+///
 /// Commands for RawApiModule
 #[derive(Debug)]
 pub enum Command {
@@ -185,7 +186,7 @@ pub struct RawApiModule {
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
-    sinks: Arc<RwLock<HashMap<Uuid, AsyncSender<Arc<Message>>>>>,
+    sinks: Arc<RwLock<HashMap<Uuid, Arc<AsyncSender<Arc<Message>>>>>>,
     keep_alive_msgs: Arc<RwLock<HashMap<Uuid, Outgoing>>>,
 }
 
@@ -262,7 +263,7 @@ impl ApiModule<State> for RawApiModule {
                                 self.keep_alive_msgs.write().await.insert(id, msg);
                             }
                             let (tx, rx) = bounded_async(64);
-                            self.sinks.write().await.insert(id, tx);
+                            self.sinks.write().await.insert(id, Arc::new(tx));
                             self.command_responder.send(CommandResponse::Created { command_id, id, stream_receiver: rx }).await?;
                         }
                         Command::Remove { id, command_id } => {
@@ -287,13 +288,24 @@ impl ApiModule<State> for RawApiModule {
                         _ => String::new(),
                     };
                     if content.is_empty() { continue; }
-                    let validators = self.state.raw_validators.read().expect("Failed to acquire read lock").clone();
-                    let sinks = self.sinks.read().await.clone();
-                    for (id, validator) in validators.into_iter() {
-                        if validator.call(content.as_str())
-                            && let Some(tx) = sinks.get(&id) {
+
+                    let mut targets = Vec::new();
+                    {
+                        let validators = self.state.raw_validators.read().expect("Failed to acquire read lock");
+                        for (id, validator) in validators.iter() {
+                            if validator.call(content.as_str()) {
+                                targets.push(*id);
+                            }
+                        }
+                    }
+
+                    if !targets.is_empty() {
+                        let sinks = self.sinks.read().await;
+                        for id in targets {
+                            if let Some(tx) = sinks.get(&id) {
                                 let _ = tx.send(msg.clone()).await; // best effort
                             }
+                        }
                     }
                 }
             }
@@ -305,7 +317,11 @@ impl ApiModule<State> for RawApiModule {
     }
 
     fn callback(
-        &self,
+        shared_state: Arc<State>,
+        _command_receiver: AsyncReceiver<Self::Command>,
+        _command_responder: AsyncSender<Self::CommandResponse>,
+        _message_receiver: AsyncReceiver<Arc<Message>>,
+        _to_ws_sender: AsyncSender<Message>,
     ) -> binary_options_tools_core_pre::error::CoreResult<
         Option<Box<dyn binary_options_tools_core_pre::traits::ReconnectCallback<State>>>,
     > {
@@ -335,7 +351,7 @@ impl ApiModule<State> for RawApiModule {
             }
         }
         Ok(Some(Box::new(CB {
-            msgs: self.keep_alive_msgs.clone(),
+            msgs: shared_state.raw_keep_alive.clone(),
         })))
     }
 }

@@ -46,3 +46,4 @@ regex = "1.11.1"
 [dev-dependencies]
 tracing-subscriber = "0.3.22"
 tokio-tungstenite = "0.28.0"
+tracing-test = "0.2.5"

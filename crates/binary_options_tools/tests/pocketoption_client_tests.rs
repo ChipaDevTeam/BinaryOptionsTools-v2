@@ -3,14 +3,12 @@
 use binary_options_tools::pocketoption::modules::raw::Outgoing;
 use binary_options_tools::pocketoption::pocket_client::PocketOption;
 use binary_options_tools::validator::Validator;
-use std::time::Duration;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use binary_options_tools::traits::ValidatorTrait;
-    use tokio_tungstenite::tungstenite::Message;
-    use uuid::Uuid;
+    use tracing_test::traced_test; // Explicitly re-add to ensure only one instance
 
     #[test]
     fn test_outgoing_enum() {
@@ -30,8 +28,8 @@ mod tests {
 
     // Test raw handle functionality
     #[tokio::test]
+    #[traced_test]
     async fn test_raw_handle_functionality() {
-        let _ = tracing_subscriber::fmt::try_init();
         // This test would require a connected client
         // For now, we'll just verify the function signatures compile
         let _ = PocketOption::raw_handle;
@@ -61,6 +59,7 @@ mod tests {
 
     // Test error handling scenarios
     #[tokio::test]
+    #[traced_test]
     async fn test_error_handling_scenarios() {
         // Test that error types are properly defined
         let _ = binary_options_tools::pocketoption::error::PocketError::General("test".to_string());

@@ -230,6 +230,21 @@ impl Rule for TwoStepRule {
 }
 
 /// More advanced implementation of the TwoStepRule that allows for multipple patterns
+///
+/// **Message Routing with `MultiPatternRule`:**
+/// This rule is designed to process Socket.IO messages that follow a common pattern
+/// for event-based communication. It expects incoming `Message::Text` to be a JSON
+/// array where the first element is a string representing the logical event name.
+///
+/// - **Patterns:** The `patterns` provided to `MultiPatternRule::new` should be the
+///   *exact logical event names* (e.g., `"updateHistory"`, `"successOpenOrder"`).
+/// - **Framing:** Do *not* include any numeric prefixes (like `42` or `451-`) or other
+///   Socket.IO framing characters in the patterns. These will be automatically handled
+///   by the rule's parsing logic.
+/// - **Behavior:** When a `Message::Text` containing a matching event name is received,
+///   the rule internally flags `valid` as true. The *next* `Message::Binary` received
+///   after this flag is set will be considered part of the two-step message and allowed
+///   to pass through (by returning `true` from `call`). All other messages will be filtered.
 pub struct MultiPatternRule {
     valid: AtomicBool,
     patterns: Vec<String>,
@@ -642,6 +657,22 @@ impl fmt::Display for OpenPendingOrder {
         write!(f, "42[\"openPendingOrder\",{data}]")
     }
 }
+#[derive(Debug, Clone)]
+pub enum SubscriptionEvent {
+    Update {
+        asset: String,
+        price: f64,
+        timestamp: f64,
+    },
+    Terminated { reason: String },
+}
+
+#[derive(Clone, Debug)]
+pub enum Outgoing {
+    Text(String),
+    Binary(Vec<u8>),
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
