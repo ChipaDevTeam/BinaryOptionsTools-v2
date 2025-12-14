@@ -167,6 +167,7 @@ impl EnhancedConnectionManager {
     ) -> BinaryOptionsResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
         use crate::reimports::{Connector, connect_async_tls_with_config};
         use tokio_tungstenite::tungstenite::http::Request;
+        use native_tls::TlsConnector;
 
         let request = Request::builder()
             .uri(url.as_str())
@@ -179,9 +180,9 @@ impl EnhancedConnectionManager {
             .body(())?;
 
         let connector = if self.ssl_verify {
-            Connector::default()
+            Connector::NativeTls(TlsConnector::new().map_err(|e| BinaryOptionsToolsError::WebsocketConnectionError(tokio_tungstenite::tungstenite::Error::Tls(tokio_tungstenite::tungstenite::error::TlsError::Native(e))))?)
         } else {
-            Connector::default() // TODO: Configure for no SSL verification
+            Connector::NativeTls(TlsConnector::builder().danger_accept_invalid_certs(true).build().map_err(|e| BinaryOptionsToolsError::WebsocketConnectionError(tokio_tungstenite::tungstenite::Error::Tls(tokio_tungstenite::tungstenite::error::TlsError::Native(e))))?)
         };
 
         let start = Instant::now();
