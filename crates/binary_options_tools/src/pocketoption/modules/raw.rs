@@ -186,8 +186,6 @@ pub struct RawApiModule {
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
-    sinks: Arc<RwLock<HashMap<Uuid, Arc<AsyncSender<Arc<Message>>>>>>,
-    keep_alive_msgs: Arc<RwLock<HashMap<Uuid, Outgoing>>>,
 }
 
 pub struct RawRule {
@@ -239,8 +237,6 @@ impl ApiModule<State> for RawApiModule {
             command_responder,
             message_receiver,
             to_ws_sender,
-            sinks: Arc::new(RwLock::new(HashMap::new())),
-            keep_alive_msgs: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -260,16 +256,16 @@ impl ApiModule<State> for RawApiModule {
                             let id = Uuid::new_v4();
                             self.state.add_raw_validator(id, validator);
                             if let Some(msg) = keep_alive.clone() {
-                                self.keep_alive_msgs.write().await.insert(id, msg);
+                                self.state.raw_keep_alive.write().await.insert(id, msg);
                             }
                             let (tx, rx) = bounded_async(64);
-                            self.sinks.write().await.insert(id, Arc::new(tx));
+                            self.state.raw_sinks.write().await.insert(id, Arc::new(tx));
                             self.command_responder.send(CommandResponse::Created { command_id, id, stream_receiver: rx }).await?;
                         }
                         Command::Remove { id, command_id } => {
                             let existed_state = self.state.remove_raw_validator(&id);
-                            let existed_sink = self.sinks.write().await.remove(&id).is_some();
-                            self.keep_alive_msgs.write().await.remove(&id);
+                            let existed_sink = self.state.raw_sinks.write().await.remove(&id).is_some();
+                            self.state.raw_keep_alive.write().await.remove(&id);
                             self.command_responder.send(CommandResponse::Removed { command_id, id, existed: existed_state || existed_sink }).await?;
                         }
                         Command::Send(Outgoing::Text(text)) => {
@@ -300,7 +296,7 @@ impl ApiModule<State> for RawApiModule {
                     }
 
                     if !targets.is_empty() {
-                        let sinks = self.sinks.read().await;
+                        let sinks = self.state.raw_sinks.read().await;
                         for id in targets {
                             if let Some(tx) = sinks.get(&id) {
                                 let _ = tx.send(msg.clone()).await; // best effort
