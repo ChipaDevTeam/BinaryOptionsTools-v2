@@ -21,7 +21,7 @@ class SyncSubscription:
 class RawHandlerSync:
     """
     Synchronous handler for advanced raw WebSocket message operations.
-    
+
     Provides low-level access to send messages and receive filtered responses
     based on a validator. Each handler maintains its own message stream.
     """
@@ -29,7 +29,7 @@ class RawHandlerSync:
     def __init__(self, async_handler, loop):
         """
         Initialize RawHandlerSync with an async handler and event loop.
-        
+
         Args:
             async_handler: The underlying async RawHandler instance
             loop: Event loop for running async operations
@@ -40,10 +40,10 @@ class RawHandlerSync:
     def send_text(self, message: str) -> None:
         """
         Send a text message through this handler.
-        
+
         Args:
             message: Text message to send
-            
+
         Example:
             ```python
             handler.send_text('42["ping"]')
@@ -54,10 +54,10 @@ class RawHandlerSync:
     def send_binary(self, data: bytes) -> None:
         """
         Send a binary message through this handler.
-        
+
         Args:
             data: Binary data to send
-            
+
         Example:
             ```python
             handler.send_binary(b'\\x00\\x01\\x02')
@@ -68,13 +68,13 @@ class RawHandlerSync:
     def send_and_wait(self, message: str) -> str:
         """
         Send a message and wait for the next matching response.
-        
+
         Args:
             message: Message to send
-            
+
         Returns:
             str: The first response that matches this handler's validator
-            
+
         Example:
             ```python
             response = handler.send_and_wait('42["getBalance"]')
@@ -86,10 +86,10 @@ class RawHandlerSync:
     def wait_next(self) -> str:
         """
         Wait for the next message that matches this handler's validator.
-        
+
         Returns:
             str: The next matching message
-            
+
         Example:
             ```python
             message = handler.wait_next()
@@ -101,10 +101,10 @@ class RawHandlerSync:
     def subscribe(self):
         """
         Subscribe to messages matching this handler's validator.
-        
+
         Returns:
             Iterator[str]: Stream of matching messages
-            
+
         Example:
             ```python
             stream = handler.subscribe()
@@ -120,7 +120,7 @@ class RawHandlerSync:
     def id(self) -> str:
         """
         Get the unique ID of this handler.
-        
+
         Returns:
             str: Handler UUID
         """
@@ -450,24 +450,24 @@ class PocketOption:
     ) -> "RawHandlerSync":
         """
         Creates a raw handler for advanced WebSocket message handling.
-        
+
         Args:
             validator: Validator instance to filter incoming messages
             keep_alive: Optional message to send on reconnection
-            
+
         Returns:
             RawHandlerSync: Sync handler instance for sending/receiving messages
-            
+
         Example:
             ```python
             from BinaryOptionsToolsV2.validator import Validator
-            
+
             validator = Validator.starts_with('42["signals"')
             handler = client.create_raw_handler(validator)
-            
+
             # Send and wait for response
             response = handler.send_and_wait('42["signals/subscribe"]')
-            
+
             # Or subscribe to stream
             for message in handler.subscribe():
                 print(message)

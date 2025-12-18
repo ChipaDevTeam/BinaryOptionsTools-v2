@@ -46,7 +46,7 @@ Currently, only Python 3.9 to 3.12 is supported.
 
 ## Compile from source (Not recommended)
 
-* Make sure you have `rust` and `cargo` installed (Check here)
+- Make sure you have `rust` and `cargo` installed (Check here)
 
 - Install [`maturin`](https://www.maturin.rs/installation) in order to compile the library
 

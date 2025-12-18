@@ -1,5 +1,5 @@
 /core/target
 /rust/target    
 /examples/*.log
-.qodo
 /target
+BinaryOptionsToolsV2\target

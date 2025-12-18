@@ -7,7 +7,6 @@ use tokio_tungstenite::tungstenite::Message;
 use uuid::Uuid;
 use tracing_test::traced_test; // Add this import
 use binary_options_tools_core_pre::reimports::{AsyncReceiver, AsyncSender}; // Import from reimports
-use binary_options_tools_core_pre::reimports::{AsyncReceiver, AsyncSender}; // Import from reimports
 
 #[cfg(test)]
 mod tests {
