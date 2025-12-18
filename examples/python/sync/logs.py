@@ -1,5 +1,5 @@
-from BinaryOptionsToolsV2.tracing import start_logs
 from BinaryOptionsToolsV2.pocketoption import PocketOption
+from BinaryOptionsToolsV2.tracing import start_logs
 
 
 # Main part of the code

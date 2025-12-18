@@ -1,10 +1,9 @@
 # Import necessary modules
-from BinaryOptionsToolsV2.tracing import Logger, LogBuilder
+import time
 from datetime import timedelta
-
 from multiprocessing import Process
 
-import time
+from BinaryOptionsToolsV2.tracing import LogBuilder, Logger
 
 
 def main():

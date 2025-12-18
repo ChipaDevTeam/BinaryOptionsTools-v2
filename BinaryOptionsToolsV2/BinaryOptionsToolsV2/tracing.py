@@ -1,9 +1,9 @@
 import json
-from BinaryOptionsToolsV2 import start_tracing
-from BinaryOptionsToolsV2 import Logger as RustLogger
-from BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
-
 from datetime import timedelta
+
+from BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
+from BinaryOptionsToolsV2 import Logger as RustLogger
+from BinaryOptionsToolsV2 import start_tracing
 
 
 class LogSubscription:

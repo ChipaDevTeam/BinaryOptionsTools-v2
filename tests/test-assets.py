@@ -1,6 +1,7 @@
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 import asyncio
 import os
+
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
 
 # Function to read assets from a file

@@ -1,8 +1,7 @@
 # from BinaryOptionsToolsV2 import PyConfig
-from typing import Dict, Any, List
-from dataclasses import dataclass
-
 import json
+from dataclasses import dataclass
+from typing import Any, Dict, List
 
 
 class PyConfig:

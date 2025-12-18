@@ -1,8 +1,9 @@
+import asyncio
+import time
+from datetime import timedelta
+
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 from BinaryOptionsToolsV2.tracing import start_logs
-from datetime import timedelta
-import time
-import asyncio
 
 
 # Main part of the code

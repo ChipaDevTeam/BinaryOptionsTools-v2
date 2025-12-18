@@ -1,21 +1,23 @@
 import asyncio
-import time
+import getpass
 import json  # For the SSID formatting function
 import sys
-import getpass
+import time
 from datetime import datetime, timedelta, timezone
+
+from colorama import Back, Fore, init
 from tabulate import tabulate  # Keep if catalogador is re-enabled (currently not used)
-from colorama import init, Fore, Back
 
 # Imports for Selenium Login
 try:
-    from selenium import webdriver
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions
-    from selenium.webdriver.chrome.service import Service
-    from webdriver_manager.chrome import ChromeDriverManager
     import urllib.parse
+
+    from selenium import webdriver
+    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support import expected_conditions
+    from selenium.webdriver.support.ui import WebDriverWait
+    from webdriver_manager.chrome import ChromeDriverManager
 
     SELENIUM_AVAILABLE = True
 except ImportError:

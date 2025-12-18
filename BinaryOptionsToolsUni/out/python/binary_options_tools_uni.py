@@ -14,21 +14,21 @@
 # helpers directly inline like we're doing here.
 
 from __future__ import annotations
-import os
-import sys
-import ctypes
-from dataclasses import dataclass
-import enum
-import struct
+
+import asyncio
 import contextlib
+import ctypes
 import datetime
-import threading
+import enum
 import itertools
+import os
+import platform
+import struct
+import sys
+import threading
 import traceback
 import typing
-import asyncio
-import platform
-
+from dataclasses import dataclass
 
 # Used for default argument values
 _DEFAULT = object()  # type: typing.Any

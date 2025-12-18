@@ -1,12 +1,11 @@
-from BinaryOptionsToolsV2.validator import Validator
-from BinaryOptionsToolsV2.config import Config
-from BinaryOptionsToolsV2 import RawPocketOption, Logger
-from datetime import timedelta
-
-
 import asyncio
 import json
 import sys
+from datetime import timedelta
+
+from BinaryOptionsToolsV2 import Logger, RawPocketOption
+from BinaryOptionsToolsV2.config import Config
+from BinaryOptionsToolsV2.validator import Validator
 
 
 class AsyncSubscription:
