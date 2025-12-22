@@ -83,6 +83,9 @@ pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/master/w
 
 # Linux
 pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/master/wheels/BinaryOptionsToolsV2-0.2.0-cp38-abi3-manylinux_2_34_x86_64.whl?raw=true"
+
+# Mac
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/master/wheels/BinaryOptionsToolsV2-0.2.1-cp38-abi3-macosx_11_0_arm64.whl?raw=true"
 ```
 
 **Requirements**: Python 3.8 or higher
