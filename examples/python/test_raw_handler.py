@@ -5,8 +5,11 @@ Example script demonstrating the new connection control and raw handler features
 import asyncio
 import json
 
-from BinaryOptionsToolsV2.pocketoption import (PocketOption, PocketOptionAsync,
-                                               RawHandler)
+from BinaryOptionsToolsV2.pocketoption import (
+    PocketOption,
+    PocketOptionAsync,
+    RawHandler,
+)
 from BinaryOptionsToolsV2.validator import Validator
 
 

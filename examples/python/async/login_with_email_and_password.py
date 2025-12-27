@@ -6,8 +6,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from colorama import Back, Fore, init
-from tabulate import \
-    tabulate  # Keep if catalogador is re-enabled (currently not used)
+from tabulate import tabulate  # Keep if catalogador is re-enabled (currently not used)
 
 # Imports for Selenium Login
 try:
