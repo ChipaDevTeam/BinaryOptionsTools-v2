@@ -139,7 +139,7 @@ impl PendingTradesHandle {
                         task: "open_pending_order".to_string(),
                         context: format!("asset: {}, open_type: {}", asset, open_type),
                         duration: PENDING_ORDER_TIMEOUT,
-                    })
+                    });
                 }
             }
         }

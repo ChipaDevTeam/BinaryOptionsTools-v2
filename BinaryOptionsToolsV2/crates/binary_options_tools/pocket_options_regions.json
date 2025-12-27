@@ -1,0 +1,121 @@
+[
+    {
+      "url": "wss://demo-api-eu.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "DEMO",
+      "latitude": 50.0,
+      "longitude": 10.0,
+      "demo": true
+    },
+    {
+      "url": "wss://api-eu.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "EUROPE",
+      "latitude": 50.0,
+      "longitude": 10.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-sc.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "SEYCHELLES",
+      "latitude": -4.0,
+      "longitude": 55.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-hk.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "HONG_KONG",
+      "latitude": 22.0,
+      "longitude": 114.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-spb.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "RUSSIA_SPB",
+      "latitude": 60.0,
+      "longitude": 30.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-fr2.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "FRANCE_2",
+      "latitude": 46.0,
+      "longitude": 2.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-us4.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "US_WEST_4",
+      "latitude": 37.0,
+      "longitude": -122.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-us3.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "US_WEST_3",
+      "latitude": 34.0,
+      "longitude": -118.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-us2.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "US_WEST_2",
+      "latitude": 39.0,
+      "longitude": -77.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-us-north.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "US_NORTH",
+      "latitude": 42.0,
+      "longitude": -71.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-msk.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "RUSSIA_MOSCOW",
+      "latitude": 55.0,
+      "longitude": 37.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-l.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "LATIN_AMERICA",
+      "latitude": 0.0,
+      "longitude": -45.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-in.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "INDIA",
+      "latitude": 20.0,
+      "longitude": 77.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-fr.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "FRANCE",
+      "latitude": 46.0,
+      "longitude": 2.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-fin.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "FINLAND",
+      "latitude": 62.0,
+      "longitude": 27.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-c.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "CHINA",
+      "latitude": 35.0,
+      "longitude": 105.0,
+      "demo": false
+    },
+    {
+      "url": "wss://api-asia.po.market/socket.io/?EIO=4&transport=websocket",
+      "name": "ASIA",
+      "latitude": 10.0,
+      "longitude": 100.0,
+      "demo": false
+    }
+  ]

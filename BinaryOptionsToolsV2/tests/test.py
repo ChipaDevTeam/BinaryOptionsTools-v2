@@ -1,15 +1,15 @@
 import asyncio
 
 # print(BinaryOptionsToolsV2)
-from BinaryOptionsToolsV2.BinaryOptionsToolsV2.pocketoption.asyncronous import (
-    PocketOptionAsync,
-)
+from BinaryOptionsToolsV2.BinaryOptionsToolsV2.pocketoption.asyncronous import \
+    PocketOptionAsync
 
 # import pandas as pd # type: ignore
 # import json
 
 # import BinaryOptionsToolsV2
 # from BinaryOptionsToolsV2 import connect
+
 
 
 # async def main(ssid):

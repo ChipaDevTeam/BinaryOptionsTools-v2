@@ -12,20 +12,8 @@ __pycache__/
 env/
 bin/
 build/
-develop-eggs/
 dist/
-eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-include/
-man/
 venv/
-*.egg-info/
-.installed.cfg
-*.egg
 
 # Installer logs
 pip-log.txt
@@ -39,32 +27,10 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
-
-# Translations
-*.mo
-
-# Mr Developer
-.mr.developer.cfg
-.project
-.pydevproject
-
-# Rope
-.ropeproject
-
-# Django stuff:
-*.log
-*.pot
-
 .DS_Store
 
-# Sphinx documentation
-docs/_build/
-
-# PyCharm
-.idea/
-
-# VSCode
-.vscode/
-
-# Pyenv
-.python-version
+# maturin builds
+/target/maturin
+/target/release
+/target
+.rustc_info.json

@@ -93,7 +93,7 @@ Serves as the entry point for the package, exposing all essential components of 
 
 ### Inside the `pocketoption` folder there are 2 main files
 
-2. `asynchronous.py`
+1. `asynchronous.py`
 
 This file implements the `PocketOptionAsync` class, which provides an asynchronous interface to interact with Pocket Option.
 
@@ -148,7 +148,7 @@ async def main():
 asyncio.run(main()) 
 ```
 
-3. `synchronous.py`
+1. `synchronous.py`
 
 This file implements the `PocketOption` class, a synchronous wrapper around the asynchronous interface provided by `PocketOptionAsync`.
 
@@ -200,7 +200,7 @@ result = client.check_win(trade_id)
 print(f"Trade result: {result}")
 ```
 
-4. Differences Between PocketOption and PocketOptionAsync
+1. Differences Between PocketOption and PocketOptionAsync
 
 | Feature                | PocketOption (Synchronous) | PocketOptionAsync (Asynchronous) |
 |------------------------|----------------------------|----------------------------------|

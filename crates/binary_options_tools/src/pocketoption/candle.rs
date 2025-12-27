@@ -38,7 +38,7 @@ pub struct Candle {
     // pub is_closed: bool,
 }
 
-#[derive(Default, Clone, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct BaseCandle {
     pub timestamp: f64,
     pub open: f64,

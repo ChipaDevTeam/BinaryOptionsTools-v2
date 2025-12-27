@@ -1,12 +1,14 @@
 //! Integration tests for the Raw module functionality
 
-use binary_options_tools::pocketoption::modules::raw::{Command, CommandResponse, Outgoing, RawApiModule};
+use binary_options_tools::pocketoption::modules::raw::{
+    Command, CommandResponse, Outgoing, RawApiModule,
+};
 use binary_options_tools::validator::Validator;
+use binary_options_tools_core_pre::reimports::{AsyncReceiver, AsyncSender};
 use std::sync::Arc;
 use tokio_tungstenite::tungstenite::Message;
-use uuid::Uuid;
 use tracing_test::traced_test; // Add this import
-use binary_options_tools_core_pre::reimports::{AsyncReceiver, AsyncSender}; // Import from reimports
+use uuid::Uuid; // Import from reimports
 
 #[cfg(test)]
 mod tests {

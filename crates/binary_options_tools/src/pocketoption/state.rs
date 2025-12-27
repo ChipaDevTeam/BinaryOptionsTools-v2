@@ -13,7 +13,7 @@ use binary_options_tools_core_pre::{
 };
 
 use crate::pocketoption::types::ServerTimeState;
-use crate::pocketoption::types::{Assets, Deal, PendingOrder, SubscriptionEvent, Outgoing};
+use crate::pocketoption::types::{Assets, Deal, Outgoing, PendingOrder, SubscriptionEvent};
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     ssid::Ssid,
@@ -198,7 +198,10 @@ impl State {
         match DateTime::from_timestamp(timestamp as i64, 0) {
             Some(dt) => dt,
             None => {
-                tracing::warn!("Failed to convert server timestamp {} to DateTime<Utc>. Defaulting to Utc::now().", timestamp);
+                tracing::warn!(
+                    "Failed to convert server timestamp {} to DateTime<Utc>. Defaulting to Utc::now().",
+                    timestamp
+                );
                 Utc::now()
             }
         }

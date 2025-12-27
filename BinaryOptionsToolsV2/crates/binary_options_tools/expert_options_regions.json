@@ -1,0 +1,37 @@
+[
+  {
+    "url": "wss://fr24g1eu.expertoption.com/",
+    "name": "EUROPE",
+    "latitude": 50.0,
+    "longitude": 10.0,
+    "demo": false
+  },
+  {
+    "url": "wss://fr24g1in.expertoption.com/",
+    "name": "INDIA",
+    "latitude": 20.0,
+    "longitude": 77.0,
+    "demo": false
+  },
+  {
+    "url": "wss://fr24g1hk.expertoption.com/",
+    "name": "HONG_KONG",
+    "latitude": 22.0,
+    "longitude": 114.0,
+    "demo": false
+  },
+  {
+    "url": "wss://fr24g1sg.expertoption.com/",
+    "name": "SINGAPORE",
+    "latitude": 1.35,
+    "longitude": 103.8,
+    "demo": false
+  },
+  {
+    "url": "wss://fr24g1us.expertoption.com/",
+    "name": "UNITED_STATES",
+    "latitude": 39.0,
+    "longitude": -98.0,
+    "demo": false
+  }
+]

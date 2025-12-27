@@ -664,7 +664,9 @@ pub enum SubscriptionEvent {
         price: f64,
         timestamp: f64,
     },
-    Terminated { reason: String },
+    Terminated {
+        reason: String,
+    },
 }
 
 #[derive(Clone, Debug)]

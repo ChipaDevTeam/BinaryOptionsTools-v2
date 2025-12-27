@@ -3,6 +3,7 @@
 Complete reference guide for all features and methods available in the BinaryOptionsToolsV2 Python library.
 
 ## Table of Contents
+
 - [Trading Operations](#trading-operations)
 - [Account Management](#account-management)
 - [Market Data](#market-data)
@@ -21,6 +22,7 @@ Complete reference guide for all features and methods available in the BinaryOpt
 | **Check Trade Result** | `await client.check_win(trade_id)` | `client.check_win(trade_id)` | Checks if a trade won, lost, or drew. Returns dict with `result` ("win"/"loss"/"draw") and `profit`. |
 
 ### Trading Example
+
 ```python
 # Async
 import asyncio
@@ -54,6 +56,7 @@ print(f"Result: {trade['result']}, Profit: {trade['profit']}")
 | **Clear Closed Deals** | `await client.clear_closed_deals()` | `client.clear_closed_deals()` | Removes all closed deals from memory. Returns nothing. |
 
 ### Account Management Example
+
 ```python
 # Async
 import asyncio
@@ -91,6 +94,7 @@ closed_trades = client.closed_deals()
 | **Get Server Time** | `await client.get_server_time()` | `client.get_server_time()` | Returns current server time as UNIX timestamp (int). |
 
 ### Market Data Example
+
 ```python
 # Async
 import asyncio
@@ -117,6 +121,7 @@ server_time = client.get_server_time()
 ```
 
 ### Candle Data Structure
+
 ```python
 {
     "time": "2025-01-01T12:00:00Z",  # ISO format timestamp
@@ -142,6 +147,7 @@ server_time = client.get_server_time()
 ### Subscription Examples
 
 #### Async Subscriptions
+
 ```python
 import asyncio
 from datetime import timedelta
@@ -174,6 +180,7 @@ await client.unsubscribe("EURUSD_otc")
 ```
 
 #### Sync Subscriptions
+
 ```python
 import time
 from datetime import timedelta
@@ -208,6 +215,7 @@ client.unsubscribe("EURUSD_otc")
 | **Reconnect** | `await client.reconnect()` | `client.reconnect()` | Disconnects and immediately reconnects. Useful for resetting connection state. |
 
 ### Connection Management Example
+
 ```python
 # Async
 import asyncio
@@ -259,6 +267,7 @@ The Raw Handler API provides low-level WebSocket access for custom protocol impl
 ### Raw Handler Examples
 
 #### Async Raw Handler
+
 ```python
 import asyncio
 from BinaryOptionsToolsV2 import PocketOptionAsync, Validator
@@ -288,6 +297,7 @@ print(f"Handler ID: {handler_id}")
 ```
 
 #### Sync Raw Handler
+
 ```python
 import time
 from BinaryOptionsToolsV2 import PocketOption, Validator
@@ -326,6 +336,7 @@ Validators filter incoming WebSocket messages. Create complex filters using the 
 | **Any (OR)** | `Validator.any([validator1, validator2, ...])` | Matches if ANY validator matches (logical OR). |
 
 #### Validator Examples
+
 ```python
 from BinaryOptionsToolsV2 import Validator
 
@@ -374,6 +385,7 @@ client = PocketOption(
 ```
 
 **Use cases for custom URLs:**
+
 - Testing with custom/mock servers
 - Using proxy servers
 - Connecting to alternative regional endpoints
@@ -392,6 +404,7 @@ client = PocketOptionAsync(ssid, config=config)  # config parameter is ignored
 ```
 
 **Current Behavior:**
+
 - ❌ Config parameter is accepted but ignored
 - ❌ All configuration values use hardcoded defaults
 - ✅ Only the `url` parameter actually works
@@ -411,6 +424,7 @@ client = PocketOptionAsync(ssid, config=config)  # config parameter is ignored
 | `urls` | List[str] | Platform defaults | List of WebSocket URLs for fallback |
 
 If you need custom configuration options, please:
+
 - Open an issue on [GitHub](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues)
 - Contact us on [Discord](https://discord.gg/p7YyFqSmAz)
 
@@ -419,6 +433,7 @@ If you need custom configuration options, please:
 ## Complete Usage Examples
 
 ### Basic Trading Bot (Async)
+
 ```python
 import asyncio
 from BinaryOptionsToolsV2 import PocketOptionAsync
@@ -451,6 +466,7 @@ asyncio.run(main())
 ```
 
 ### Basic Trading Bot (Sync)
+
 ```python
 import time
 from BinaryOptionsToolsV2 import PocketOption
@@ -471,6 +487,7 @@ client.disconnect()
 ```
 
 ### Real-time Data Monitoring (Async)
+
 ```python
 import asyncio
 from datetime import timedelta
@@ -502,6 +519,7 @@ asyncio.run(monitor_price())
 ```
 
 ### Advanced Strategy with Raw Handler (Async)
+
 ```python
 import asyncio
 import json
@@ -543,6 +561,7 @@ asyncio.run(advanced_strategy())
 ```
 
 ### Multi-Asset Monitoring (Sync)
+
 ```python
 import time
 from datetime import timedelta
@@ -616,6 +635,7 @@ asyncio.run(safe_trading())
 ## Best Practices
 
 ### 1. Always Close Connections
+
 ```python
 # Async - use try/finally
 import asyncio
@@ -639,6 +659,7 @@ finally:
 ```
 
 ### 2. Use Demo Account for Testing
+
 ```python
 import time
 
@@ -651,6 +672,7 @@ if not client.is_demo():
 ```
 
 ### 3. Handle Connection Issues
+
 ```python
 import asyncio
 
@@ -670,6 +692,7 @@ except TimeoutError:
 ```
 
 ### 4. Unsubscribe When Done
+
 ```python
 import asyncio
 
@@ -686,6 +709,7 @@ await client.unsubscribe("EURUSD_otc")
 ```
 
 ### 5. Validate Assets Before Trading
+
 ```python
 import asyncio
 

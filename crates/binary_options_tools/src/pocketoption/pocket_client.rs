@@ -9,6 +9,7 @@ use binary_options_tools_core_pre::{
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+use crate::pocketoption::types::Outgoing;
 use crate::{
     error::BinaryOptionsError,
     pocketoption::{
@@ -34,7 +35,6 @@ use crate::{
     },
     utils::print_handler,
 };
-use crate::pocketoption::types::Outgoing;
 
 const MINIMUM_TRADE_AMOUNT: f64 = 1.0;
 const MAXIMUM_TRADE_AMOUNT: f64 = 20000.0;

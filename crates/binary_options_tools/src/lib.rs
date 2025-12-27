@@ -70,7 +70,6 @@ mod tests {
     #[tokio::test]
     #[traced_test]
     async fn test_timeout_macro() -> anyhow::Result<()> {
-
         #[timeout(1, tracing(level = "info", skip(_tester)))]
         async fn this_is_a_test(_tester: Tester) -> anyhow::Result<()> {
             debug!("Test");

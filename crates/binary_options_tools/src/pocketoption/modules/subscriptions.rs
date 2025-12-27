@@ -127,8 +127,6 @@ pub struct SubscriptionStream {
     sub_type: SubscriptionType,
 }
 
-
-
 /// Callback for when there is a disconnection
 struct SubscriptionCallback;
 
@@ -145,8 +143,6 @@ impl ReconnectCallback<State> for SubscriptionCallback {
         Ok(())
     }
 }
-
-
 
 #[derive(Clone)]
 pub struct SubscriptionsHandle {
@@ -574,12 +570,19 @@ impl SubscriptionsApiModule {
         }
 
         // Check if subscription already exists
-        if self.state.active_subscriptions.read().await.contains_key(&asset) {
+        if self
+            .state
+            .active_subscriptions
+            .read()
+            .await
+            .contains_key(&asset)
+        {
             return Err(SubscriptionError::SubscriptionAlreadyExists.into());
         }
 
         // Add to active subscriptions
-        self.state.active_subscriptions
+        self.state
+            .active_subscriptions
             .write()
             .await
             .insert(asset, stream_sender);
@@ -685,7 +688,10 @@ impl SubscriptionStream {
                         return Ok(());
                     }
                 }
-                Ok(CommandResponse::UnsubscriptionFailed { command_id: id, error }) => {
+                Ok(CommandResponse::UnsubscriptionFailed {
+                    command_id: id,
+                    error,
+                }) => {
                     if id == command_id {
                         return Err(*error);
                     }

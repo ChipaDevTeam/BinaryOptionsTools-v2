@@ -279,7 +279,8 @@ impl ApiModule<State> for ProfileModule {
         _command_responder: AsyncSender<Self::CommandResponse>,
         _message_receiver: AsyncReceiver<Arc<Message>>,
         _to_ws_sender: AsyncSender<Message>,
-    ) -> binary_options_tools_core_pre::error::CoreResult<Option<Box<dyn ReconnectCallback<State>>>> {
+    ) -> binary_options_tools_core_pre::error::CoreResult<Option<Box<dyn ReconnectCallback<State>>>>
+    {
         struct CB;
         #[async_trait::async_trait]
         impl ReconnectCallback<State> for CB {
