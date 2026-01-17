@@ -54,6 +54,7 @@ enum ServerResponse {
 pub struct PendingTradesHandle {
     sender: AsyncSender<Command>,
     receiver: AsyncReceiver<CommandResponse>,
+    call_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl Clone for PendingTradesHandle {
@@ -61,6 +62,7 @@ impl Clone for PendingTradesHandle {
         Self {
             sender: self.sender.clone(),
             receiver: self.receiver.clone(),
+            call_lock: self.call_lock.clone(),
         }
     }
 }
@@ -68,13 +70,8 @@ impl Clone for PendingTradesHandle {
 impl PendingTradesHandle {
     /// Opens a pending order on the PocketOption platform.
     ///
-    /// **Warning:** Concurrent calls to this method on the same `PendingTradesHandle`
-    /// are *not supported*. Executing multiple `open_pending_order` calls concurrently
-    /// will lead to warnings (due to overwriting the module's internal `last_req_id`)
-    /// and a high likelihood of one or more calls timing out due to response mismatches.
-    /// It is critical to ensure that calls to this method are serialized or awaited
-    /// sequentially by the caller. Unmatched or late responses are dropped by the module
-    /// to prevent ambiguous correlation, which will result in a timeout for the caller.
+    /// This method is now thread-safe and will serialize requests to prevent
+    /// concurrent access issues.
     pub async fn open_pending_order(
         &self,
         open_type: u32,
@@ -86,6 +83,7 @@ impl PendingTradesHandle {
         min_payout: u32,
         command: u32,
     ) -> PocketResult<PendingOrder> {
+        let _lock = self.call_lock.lock().await;
         let id = Uuid::new_v4();
         self.sender
             .send(Command::OpenPendingOrder {
@@ -195,7 +193,11 @@ impl ApiModule<State> for PendingTradesApiModule {
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
     ) -> Self::Handle {
-        PendingTradesHandle { sender, receiver }
+        PendingTradesHandle {
+            sender,
+            receiver,
+            call_lock: Arc::new(tokio::sync::Mutex::new(())),
+        }
     }
 
     async fn run(&mut self) -> CoreResult<()> {
