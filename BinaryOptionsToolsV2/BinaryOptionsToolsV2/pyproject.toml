@@ -8,7 +8,7 @@ description = "A library to connect to PocketOption using python with async and 
 authors = [
     {name = "ChipaDevTeam", email = "your-email@example.com"}
 ]
-license = {text = "BSD"}
+license = { file = "LICENSE" }
 readme = "Readme.md"
 homepage = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
 repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"

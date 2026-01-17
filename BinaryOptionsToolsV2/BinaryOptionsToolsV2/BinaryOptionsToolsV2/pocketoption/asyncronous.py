@@ -10,7 +10,7 @@ from BinaryOptionsToolsV2.validator import Validator
 
 class AsyncSubscription:
     def __init__(self, subscription):
-        """asynchronous Iterator over json objects"""
+        """Asynchronous Iterator over json objects"""
         self.subscription = subscription
 
     def __aiter__(self):
