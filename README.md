@@ -163,7 +163,7 @@ async def main():
     duration = 60  # 60 seconds
     
     # The `buy` function is used for "call" trades. For "put" trades, use the `sell` method.
-    trade_id, deal = await client.buy(asset, duration, amount)
+    trade_id, deal = await client.buy(asset, amount, duration)
     # trade_id, deal = await client.sell(asset, duration, amount)
     print(f"Trade placed: {deal}")
     
