@@ -138,7 +138,7 @@ async def main():
     print("Account Balance:", balance) 
     
     # Place a trade
-    trade_id, deal = await client.buy("EURUSD_otc", 60, 1.0)
+    trade_id, deal = await client.buy("EURUSD_otc", 1.0, 60)
     print(f"Trade placed: {deal}")
     
     # Check result
