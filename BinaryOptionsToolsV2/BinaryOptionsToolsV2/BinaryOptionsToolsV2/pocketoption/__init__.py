@@ -6,7 +6,7 @@ as well as specific classes for Pocket Option trading.
 """
 
 __all__ = [
-    "asyncronous",
+    "asynchronous",
     "syncronous",
     "PocketOptionAsync",
     "PocketOption",
@@ -14,6 +14,6 @@ __all__ = [
     "RawHandlerSync",
 ]
 
-from . import asyncronous, syncronous
-from .asyncronous import PocketOptionAsync, RawHandler
-from .syncronous import PocketOption, RawHandlerSync
+from . import asynchronous, syncronous
+from .asynchronous import PocketOptionAsync, RawHandler
+from .synchronousimport PocketOption, RawHandlerSync

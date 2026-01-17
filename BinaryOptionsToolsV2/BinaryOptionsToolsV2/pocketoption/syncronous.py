@@ -5,7 +5,7 @@ from datetime import timedelta
 from BinaryOptionsToolsV2.config import Config
 from BinaryOptionsToolsV2.validator import Validator
 
-from .asyncronous import PocketOptionAsync
+from .asynchronous import PocketOptionAsync
 
 
 class SyncSubscription:

@@ -1,7 +1,7 @@
 import asyncio
 
 # print(BinaryOptionsToolsV2)
-from BinaryOptionsToolsV2.BinaryOptionsToolsV2.pocketoption.asyncronous import (
+from BinaryOptionsToolsV2.BinaryOptionsToolsV2.pocketoption.asynchronous import (
     PocketOptionAsync,
 )
 

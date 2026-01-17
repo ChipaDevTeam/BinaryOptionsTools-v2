@@ -49,7 +49,7 @@ def main():
     # Demonstrate sync usage
     def log_sync():
         """
-        Syncronous logging function demonstrating sync usage.
+        synchronouslogging function demonstrating sync usage.
         """
         logger.debug("This is a synchronous debug message")
         time.sleep(5)  # Simulate some work
