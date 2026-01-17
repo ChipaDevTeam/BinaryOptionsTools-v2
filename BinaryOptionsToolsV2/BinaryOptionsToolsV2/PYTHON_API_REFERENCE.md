@@ -396,11 +396,10 @@ client = PocketOption(
 **Important**: The `Config` class exists in the Python codebase but is **NOT currently used** by the library. The Rust backend does not accept configuration parameters, and all settings use internal defaults.
 
 ```python
-# This code will NOT have any effect:
 from BinaryOptionsToolsV2 import Config
 
 config = Config.from_dict({"timeout_secs": 60})
-client = PocketOptionAsync(ssid, config=config)  # config parameter is ignored
+client = PocketOptionAsync(ssid, config=config)
 ```
 
 **Current Behavior:**
