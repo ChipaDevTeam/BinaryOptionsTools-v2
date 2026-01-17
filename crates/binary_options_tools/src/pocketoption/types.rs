@@ -409,39 +409,38 @@ impl<'de> Deserialize<'de> for Asset {
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[allow(unused)]
-        struct AssetRaw {
-            id: i32,
-            symbol: String,
-            name: String,
-            asset_type: AssetType,
-            in1: i32,
-            payout: i32,
-            in3: i32,
-            in4: i32,
-            in5: i32,
-            otc: i32,
-            in7: i32,
-            in8: i32,
-            arr: Vec<String>,
-            in9: i64,
-            valid: bool,
-            times: Vec<CandleLength>,
-            in10: i32,
-            in11: i32,
-            in12: i64,
-        }
+        struct AssetRawTuple(
+            i32,
+            String,
+            String,
+            AssetType,
+            i32,
+            i32,
+            i32,
+            i32,
+            i32,
+            i32,
+            i32,
+            i32,
+            Vec<String>,
+            i64,
+            bool,
+            Vec<CandleLength>,
+            i32,
+            i32,
+            i64,
+        );
 
-        let raw: AssetRaw = AssetRaw::deserialize(deserializer)?;
+        let raw: AssetRawTuple = AssetRawTuple::deserialize(deserializer)?;
         Ok(Asset {
-            id: raw.id,
-            symbol: raw.symbol,
-            name: raw.name,
-            is_otc: raw.otc == 1,
-            is_active: raw.valid,
-            payout: raw.payout,
-            allowed_candles: raw.times,
-            asset_type: raw.asset_type,
+            id: raw.0,
+            symbol: raw.1,
+            name: raw.2,
+            asset_type: raw.3,
+            payout: raw.5,
+            is_otc: raw.9 == 1,
+            is_active: raw.14,
+            allowed_candles: raw.15,
         })
     }
 }

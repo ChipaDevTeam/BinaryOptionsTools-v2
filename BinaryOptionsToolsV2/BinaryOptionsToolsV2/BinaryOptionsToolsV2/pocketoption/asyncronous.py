@@ -173,7 +173,6 @@ class PocketOptionAsync:
 
 
             Warning: This class is designed for asynchronous operations and should be used within an async context.
-            This version doesn't support the `Config` class.
         Note:
             - The configuration becomes locked once initialized and cannot be modified afterwards
             - Custom URLs provided in the `url` parameter take precedence over URLs in the configuration

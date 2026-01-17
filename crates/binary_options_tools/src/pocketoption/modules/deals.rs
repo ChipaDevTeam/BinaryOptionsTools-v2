@@ -172,7 +172,7 @@ impl ApiModule<State> for DealsApiModule {
         loop {
             tokio::select! {
                 Ok(msg) = self.ws_receiver.recv() => {
-                    info!("Received message: {:?}", msg);
+                    tracing::debug!("Received message: {:?}", msg);
                     match msg.as_ref() {
                         Message::Text(text) => {
                             if text.starts_with(UPDATE_OPENED_DEALS) {

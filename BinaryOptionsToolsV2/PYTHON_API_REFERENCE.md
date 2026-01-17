@@ -391,28 +391,19 @@ client = PocketOption(
 - Connecting to alternative regional endpoints
 - Development and debugging
 
-### ⚠️ Config Class (Currently Not Functional)
+### Config Class
 
-**Important**: The `Config` class exists in the Python codebase but is **NOT currently used** by the library. The Rust backend does not accept configuration parameters, and all settings use internal defaults.
+**Important**: The `Config` class exists in the Python codebase.
 
 ```python
-# This code will NOT have any effect:
+# This code will have effect:
 from BinaryOptionsToolsV2 import Config
 
 config = Config.from_dict({"timeout_secs": 60})
-client = PocketOptionAsync(ssid, config=config)  # config parameter is ignored
+client = PocketOptionAsync(ssid, config=config)
 ```
 
-**Current Behavior:**
-
-- ❌ Config parameter is accepted but ignored
-- ❌ All configuration values use hardcoded defaults
-- ✅ Only the `url` parameter actually works
-- ✅ Built-in automatic reconnection with exponential backoff
-- ✅ Built-in connection and operation timeouts
-- ✅ Built-in WebSocket keepalive
-
-**Planned Configuration Parameters** (not yet implemented):
+**Configuration Parameters**:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|

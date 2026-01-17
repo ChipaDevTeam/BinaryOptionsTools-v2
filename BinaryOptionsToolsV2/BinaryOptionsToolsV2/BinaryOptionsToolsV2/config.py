@@ -62,8 +62,6 @@ class Config:
     """
     Python wrapper around PyConfig that provides additional functionality
     for configuration management.
-
-    Warning: This version of the `PocketOption` and `PocketOptionAsync` classes doesn't use `Config`
     """
 
     max_allowed_loops: int = 100
