@@ -31,7 +31,7 @@ pub fn get_index() -> PocketResult<u64> {
 }
 
 pub async fn get_user_location(ip_address: &str) -> PocketResult<(f64, f64)> {
-    let response = reqwest::get(format!("{}{}", IP_API_URL, ip_address)).await?;
+    let response = reqwest::get(format!("{IP_API_URL}{ip_address}")).await?;
     let json: Value = response.json().await?;
 
     let lat = json["lat"].as_f64().unwrap();
