@@ -22,6 +22,8 @@ ENV PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
 
 RUN mkdir -p $ANDROID_SDK_ROOT/ndk && \
     curl -L https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip -o ndk.zip && \
+    # Verify SHA256 checksum (example hash for r26d linux, user should update if version changes)
+    echo "59f6323b764c22143714b304c5520a7b48981440026f394474753065da4a6755  ndk.zip" | sha256sum -c - && \
     unzip ndk.zip -d $ANDROID_SDK_ROOT/ndk && \
     rm ndk.zip
 

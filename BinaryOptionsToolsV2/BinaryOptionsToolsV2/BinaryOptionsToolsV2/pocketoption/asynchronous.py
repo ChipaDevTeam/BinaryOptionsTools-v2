@@ -288,17 +288,20 @@ class PocketOptionAsync:
             ValueError: If trade_id is invalid
             TimeoutError: If result check times out
         """
-        # end_time = await self.client.get_deal_end_time(id)
+        end_time = await self.client.get_deal_end_time(id)
 
-        # if end_time is not None:
-        #     duration = end_time - int(time.time())
-        #     if duration <= 0:
-        #         duration = 5 # If duration is less than 0 then the trade is closed and the function should take less than 5 seconds to run
-        # else:
-        #     duration = 5
-        # duration += self.config.extra_duration
+        if end_time is not None:
+            # Import time here since it might not be at top level
+            import time as py_time
 
-        # self.logger.debug(f"Timeout set to: {duration} (6 extra seconds)")
+            duration = end_time - int(py_time.time())
+            if duration <= 0:
+                duration = 5  # If duration is less than 0 then the trade is closed and the function should take less than 5 seconds to run
+        else:
+            duration = self.config.timeout_secs
+        duration += self.config.extra_duration
+
+        # self.logger.debug(f"Timeout set to: {duration} (extra seconds included)")
         async def check(id):
             trade = await self.client.check_win(id)
             trade = json.loads(trade)
@@ -311,7 +314,7 @@ class PocketOptionAsync:
                 trade["result"] = "loss"
             return trade
 
-        return await check(id)
+        return await _timeout(check(id), duration)
 
     async def get_candles(self, asset: str, period: int, offset: int) -> list[dict]:
         """

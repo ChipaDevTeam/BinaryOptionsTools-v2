@@ -110,12 +110,12 @@ We're working to restore all functionality with improved stability and performan
 #### Using pip
 
 ```bash
-pip install binaryoptionstoolsv2
+pip install BinaryOptionsToolsV2
 ```
 
 **Requirements**:
-- **OS**: Windows
-- **Python**: 3.9 - 3.12
+- **OS**: Windows, Linux, macOS
+- **Python**: 3.8 - 3.12
 
 #### Building from Source
 
@@ -151,7 +151,7 @@ import asyncio
 async def main():
     # Initialize client with SSID
     client = PocketOptionAsync(ssid="your-session-id")
-    await asyncio.sleep(5) # Wait for connection to be established
+    await client.connect() # Wait for connection to be established
     
     # Get account balance
     balance = await client.balance()
@@ -164,7 +164,7 @@ async def main():
     
     # The `buy` function is used for "call" trades. For "put" trades, use the `sell` method.
     trade_id, deal = await client.buy(asset, amount, duration)
-    # trade_id, deal = await client.sell(asset, duration, amount)
+    # trade_id, deal = await client.sell(asset, amount, duration)
     print(f"Trade placed: {deal}")
     
     # Check if trade won
@@ -185,12 +185,12 @@ import time
 
 # Initialize client
 client = PocketOption(ssid="your-session-id")
-time.sleep(5) # Wait for connection to be established
+client.connect() # Wait for connection to be established
 
 # Place trade (blocking)
 # The `buy` function is used for "call" trades. For "put" trades, use the `sell` method.
-trade_id, deal = client.buy("EURUSD_otc", 60, 1.0)
-# trade_id, deal = client.sell("EURUSD_otc", 60, 1.0)
+trade_id, deal = client.buy("EURUSD_otc", 1.0, 60)
+# trade_id, deal = client.sell("EURUSD_otc", 1.0, 60)
 print(f"Trade placed: {deal}")
 result = client.check_win(trade_id)
 print(f"Trade result: {result}")

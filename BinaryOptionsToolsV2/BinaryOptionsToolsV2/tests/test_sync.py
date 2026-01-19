@@ -1,6 +1,6 @@
 import time
 
-from BinaryOptionsToolsV2.BinaryOptionsToolsV2.pocketoption.synchronousimport (
+from BinaryOptionsToolsV2.BinaryOptionsToolsV2.pocketoption.synchronous import (
     PocketOption,
 )
 

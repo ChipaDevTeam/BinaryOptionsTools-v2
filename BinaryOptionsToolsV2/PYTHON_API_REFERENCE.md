@@ -395,6 +395,8 @@ client = PocketOption(
 
 **Important**: The `Config` class exists in the Python codebase.
 
+**Note:** Configuration parameters are currently ignored by the underlying Rust client. This feature will be enabled in a future release.
+
 ```python
 # This code will have effect:
 from BinaryOptionsToolsV2 import Config

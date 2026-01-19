@@ -132,7 +132,11 @@ impl RawHandlerRust {
                 .send_and_wait(outgoing)
                 .await
                 .map_err(BinaryErrorPy::from)?;
-            let msg_str = response.to_text().unwrap_or_default().to_string();
+            let msg_str = if let Some(text) = response.to_text().ok() {
+                text.to_string()
+            } else {
+                arc_message_to_string(&response)
+            };
             Python::attach(|py| msg_str.into_py_any(py))
         })
     }
@@ -147,7 +151,11 @@ impl RawHandlerRust {
                 .wait_next()
                 .await
                 .map_err(BinaryErrorPy::from)?;
-            let msg_str = response.to_text().unwrap_or_default().to_string();
+            let msg_str = if let Some(text) = response.to_text().ok() {
+                text.to_string()
+            } else {
+                arc_message_to_string(&response)
+            };
             Python::attach(|py| msg_str.into_py_any(py))
         })
     }

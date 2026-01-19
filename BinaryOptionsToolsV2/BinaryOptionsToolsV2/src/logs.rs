@@ -38,11 +38,19 @@ pub fn start_tracing(
         .create(true)
         .open(format!("{}/logs.log", &path))?;
     let default = fmt::Layer::default().with_writer(NoneWriter).boxed();
-    let mut layers = layers
-        .into_iter()
-        .flat_map(|l| Arc::try_unwrap(l.layer))
-        .collect::<Vec<Box<dyn Layer<Registry> + Send + Sync>>>();
-    layers.push(default);
+    let mut inner_layers = Vec::new();
+    for l in layers {
+        match Arc::try_unwrap(l.layer) {
+            Ok(layer) => inner_layers.push(layer),
+            Err(_) => {
+                // If we can't unwrap, it means the layer is shared somewhere else.
+                // We shouldn't panic, but we also can't add it to the subscriber as a unique Box.
+                // For now, we log a warning and skip it.
+                eprintln!("Warning: Failed to unwrap StreamLogsLayer. Layer dropped.");
+            }
+        }
+    }
+    inner_layers.push(default);
     println!("Length of layers: {}", layers.len());
     let subscriber = tracing_subscriber::registry()
         // .with(filtered_layer)
@@ -63,11 +71,14 @@ pub fn start_tracing(
         );
 
     if terminal {
-        let _ = subscriber
+        subscriber
             .with(fmt::Layer::default().with_filter(level))
-            .try_init();
+            .try_init()
+            .map_err(|e| BinaryErrorPy::Uninitialized(e.to_string()))?;
     } else {
-        let _ = subscriber.try_init();
+        subscriber
+            .try_init()
+            .map_err(|e| BinaryErrorPy::Uninitialized(e.to_string()))?;
     }
 
     Ok(())
@@ -216,7 +227,10 @@ impl LogBuilder {
             .layers
             .drain(..)
             .collect::<Vec<Box<dyn Layer<Registry> + Send + Sync>>>();
-        tracing_subscriber::registry().with(layers).init();
+        tracing_subscriber::registry()
+            .with(layers)
+            .try_init()
+            .map_err(|e| BinaryErrorPy::Uninitialized(e.to_string()))?;
         Ok(())
     }
 }
