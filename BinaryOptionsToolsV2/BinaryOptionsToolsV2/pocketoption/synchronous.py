@@ -151,7 +151,9 @@ class SyncRawSubscription:
 
 
 class PocketOption:
-    def __init__(self, ssid: str, config: Config | dict | str = None, **_):
+    def __init__(
+        self, ssid: str, url: str | None = None, config: Config | dict | str = None, **_
+    ):
         """
         Initializes a new PocketOption instance.
 
@@ -210,7 +212,7 @@ class PocketOption:
             - All async operations are wrapped to provide a synchronous interface
         """
         self.loop = asyncio.new_event_loop()
-        self._client = PocketOptionAsync(ssid, config)
+        self._client = PocketOptionAsync(ssid, url=url, config=config)
 
     def __del__(self):
         self.loop.close()
@@ -302,7 +304,9 @@ class PocketOption:
         "Removes all the closed deals from memory, this function doesn't return anything"
         self.loop.run_until_complete(self._client.clear_closed_deals())
 
-    def payout(self, asset: None | str | list[str] = None) -> dict | list[str] | int:
+    def payout(
+        self, asset: None | str | list[str] = None
+    ) -> dict[str, int] | list[int] | int:
         "Returns a dict of asset | payout for each asset, if 'asset' is not None then it will return the payout of the asset or a list of the payouts for each asset it was passed"
         return self.loop.run_until_complete(self._client.payout(asset))
 

@@ -193,7 +193,7 @@ class PocketOptionAsync:
             if url is not None:
                 self.client = RawPocketOption.new_with_url(ssid, url)
             else:
-                self.client = RawPocketOption(ssid, config)
+                self.client = RawPocketOption(ssid)
         else:
             self.config = Config()
             if url is not None:
@@ -405,7 +405,7 @@ class PocketOptionAsync:
 
     async def payout(
         self, asset: None | str | list[str] = None
-    ) -> dict | list[int] | int:
+    ) -> dict[str, int | None] | list[int | None] | int | None:
         """
         Retrieves current payout percentages for all assets.
 

@@ -38,9 +38,7 @@ Currently supporting **PocketOption** (Quick Trading Mode) with both real and de
 **Temporarily Unavailable Features**:
 
 - Trade history (`history`)
-- Closed deals management
 - Payout information retrieval
-- Raw message sending
 - Deal end time queries
 
 We're working to restore all functionality with improved stability and performance.
@@ -52,7 +50,7 @@ We're working to restore all functionality with improved stability and performan
 - **Trade Execution**: Place buy/sell orders on any available asset
 - **Trade Monitoring**: Check trade results with configurable timeouts
 - **Balance Management**: Real-time account balance retrieval
-- **Open/Closed Deals**: Access detailed trade history and active positions
+- **Open/Closed Deals**: Access active positions and closed deals
 
 ### Market Data
 
