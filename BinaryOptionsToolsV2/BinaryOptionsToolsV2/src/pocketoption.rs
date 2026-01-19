@@ -172,7 +172,13 @@ impl RawHandlerRust {
             // Create a boxed stream that yields String values
             let boxed_stream = async_stream::stream! {
                 while let Ok(msg) = receiver.recv().await {
-                    let msg_str = msg.to_text().unwrap_or_default().to_string();
+                    let msg_str = if let Ok(text) = msg.to_text() {
+                        text.to_string()
+                    } else if let tungstenite::Message::Binary(data) = &msg {
+                        String::from_utf8_lossy(data).into_owned()
+                    } else {
+                        String::new()
+                    };
                     yield Ok(msg_str);
                 }
             }
@@ -648,7 +654,13 @@ impl RawPocketOption {
                         match tokio::time::timeout(remaining_time, receiver.recv()).await {
                             Ok(Ok(msg)) => {
                                 // Convert the message to a string
-                                let msg_str = msg.to_text().unwrap_or_default().to_string();
+                                let msg_str = if let Ok(text) = msg.to_text() {
+                                    text.to_string()
+                                } else if let tungstenite::Message::Binary(data) = &msg {
+                                    format!("{:?}", data)
+                                } else {
+                                    String::new()
+                                };
                                 yield Ok(msg_str);
                             }
                             Ok(Err(_)) => break, // Channel closed
@@ -659,7 +671,13 @@ impl RawPocketOption {
                     // No timeout, just receive messages indefinitely
                     while let Ok(msg) = receiver.recv().await {
                         // Convert the message to a string
-                        let msg_str = msg.to_text().unwrap_or_default().to_string();
+                        let msg_str = if let Ok(text) = msg.to_text() {
+                            text.to_string()
+                        } else if let tungstenite::Message::Binary(data) = &msg {
+                            format!("{:?}", data)
+                        } else {
+                            String::new()
+                        };
                         yield Ok(msg_str);
                     }
                 }

@@ -365,10 +365,11 @@ mod tests {
         let response_payload = r#"{
             "asset": "CADJPY_otc",
             "period": 60,
-            "candles": [
-                [1766378160, 122.24, 122.23, 122.259, 122.184],
-                [1766378100, 122.204, 122.243, 122.272, 122.204]
-            ]
+            "o": [122.24, 122.204],
+            "h": [122.259, 122.272],
+            "l": [122.184, 122.204],
+            "c": [122.23, 122.243],
+            "t": [1766378160, 1766378100]
         }"#;
 
         let msg = Message::Binary(response_payload.as_bytes().to_vec().into());
@@ -453,9 +454,11 @@ mod tests {
         let response_payload = r#"{
             "asset": "AUDUSD_otc",
             "period": 60,
-            "candles": [
-                [1766378160, 0.59563, 0.59514, 0.59563, 0.59511]
-            ]
+            "o": [0.59563],
+            "h": [0.59563],
+            "l": [0.59511],
+            "c": [0.59514],
+            "t": [1766378160]
         }"#;
 
         let msg = Message::Text(response_payload.to_string().into());

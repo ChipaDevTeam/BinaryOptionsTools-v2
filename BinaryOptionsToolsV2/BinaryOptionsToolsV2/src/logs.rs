@@ -51,10 +51,10 @@ pub fn start_tracing(
         }
     }
     inner_layers.push(default);
-    println!("Length of layers: {}", layers.len());
+    println!("Length of layers: {}", inner_layers.len());
     let subscriber = tracing_subscriber::registry()
         // .with(filtered_layer)
-        .with(layers)
+        .with(inner_layers)
         .with(
             // log-error file, to log the errors that arise
             fmt::layer()
