@@ -387,11 +387,7 @@ impl PocketOption {
                     Err(PocketError::InvalidAsset(asset.to_string()))
                 }
             } else {
-                // Should we allow subscribing if assets aren't loaded?
-                // For now, let's assume assets must be loaded to validate.
-                // Or we can just try subscribing anyway.
-                // Original logic seemed to require assets.
-                 Err(BinaryOptionsError::General("Assets not loaded".into()).into())
+                Err(BinaryOptionsError::General("Assets not found".into()).into())
             }
         } else {
             Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
@@ -407,7 +403,7 @@ impl PocketOption {
                     Err(PocketError::InvalidAsset(asset.to_string()))
                 }
             } else {
-                 Err(BinaryOptionsError::General("Assets not loaded".into()).into())
+                Err(BinaryOptionsError::General("Assets not found".into()).into())
             }
         } else {
             Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
