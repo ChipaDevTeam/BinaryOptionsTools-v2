@@ -654,13 +654,7 @@ impl RawPocketOption {
                         match tokio::time::timeout(remaining_time, receiver.recv()).await {
                             Ok(Ok(msg)) => {
                                 // Convert the message to a string
-                                let msg_str = if let Ok(text) = msg.to_text() {
-                                    text.to_string()
-                                } else if let tungstenite::Message::Binary(data) = &msg {
-                                    format!("{:?}", data)
-                                } else {
-                                    String::new()
-                                };
+                                let msg_str = message_to_string(&msg);
                                 yield Ok(msg_str);
                             }
                             Ok(Err(_)) => break, // Channel closed
@@ -671,13 +665,7 @@ impl RawPocketOption {
                     // No timeout, just receive messages indefinitely
                     while let Ok(msg) = receiver.recv().await {
                         // Convert the message to a string
-                        let msg_str = if let Ok(text) = msg.to_text() {
-                            text.to_string()
-                        } else if let tungstenite::Message::Binary(data) = &msg {
-                            format!("{:?}", data)
-                        } else {
-                            String::new()
-                        };
+                        let msg_str = message_to_string(&msg);
                         yield Ok(msg_str);
                     }
                 }
