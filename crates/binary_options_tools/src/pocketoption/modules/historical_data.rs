@@ -44,7 +44,16 @@ pub struct HistoryResponse {
     #[serde(default)]
     #[allow(dead_code)]
     history: Option<Vec<Vec<f64>>>,
-    candles: Vec<Vec<f64>>,
+    // Separate arrays for OHLC data
+    o: Vec<f64>,
+    h: Vec<f64>,
+    l: Vec<f64>,
+    c: Vec<f64>,
+    #[serde(alias = "t")]
+    timestamps: Vec<u64>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    v: Option<Vec<f64>>, // Volume might be optional
 }
 
 #[derive(Deserialize)]
@@ -213,24 +222,42 @@ impl ApiModule<State> for HistoricalDataApiModule {
                             }
                             ServerResponse::History(history_response) => {
                                 if let Some(req_id) = self.last_req_id.take() {
-                                    let mut candles = Vec::with_capacity(history_response.candles.len());
+                                    let len = history_response.timestamps.len();
+                                    let mut candles = Vec::with_capacity(len);
                                     let symbol = history_response.asset;
-                                    // The candles array is expected to be [timestamp, open, close, high, low] based on BaseCandle struct order and field names usually matching T, O, C, L, H or similar.
-                                    // However, in standard candles it is often T, O, H, L, C or T, O, C, H, L.
-                                    // Our analysis of the provided JSON suggests: [Timestamp, Open, Close, High, Low].
-                                    for raw_candle in history_response.candles {
-                                        if raw_candle.len() >= 5 {
-                                            let base_candle = BaseCandle {
-                                                timestamp: raw_candle[0],
-                                                open: raw_candle[1],
-                                                close: raw_candle[2],
-                                                high: raw_candle[3],
-                                                low: raw_candle[4],
-                                                volume: None,
-                                            };
-                                            if let Ok(candle) = Candle::try_from((base_candle, symbol.clone())) {
-                                                candles.push(candle);
-                                            }
+
+                                    // Check if all arrays have the same length (basic validation)
+                                    if history_response.o.len() != len
+                                        || history_response.h.len() != len
+                                        || history_response.l.len() != len
+                                        || history_response.c.len() != len
+                                    {
+                                        warn!(
+                                            target: "HistoricalDataApiModule",
+                                            "History response array lengths mismatch. Timestamps: {}, Open: {}, High: {}, Low: {}, Close: {}",
+                                            len, history_response.o.len(), history_response.h.len(), history_response.l.len(), history_response.c.len()
+                                        );
+                                        // We might still try to parse as many as possible or fail.
+                                        // Let's iterate up to the minimum length to be safe.
+                                    }
+
+                                    let min_len = len
+                                        .min(history_response.o.len())
+                                        .min(history_response.h.len())
+                                        .min(history_response.l.len())
+                                        .min(history_response.c.len());
+
+                                    for i in 0..min_len {
+                                        let base_candle = BaseCandle {
+                                            timestamp: history_response.timestamps[i] as f64,
+                                            open: history_response.o[i],
+                                            close: history_response.c[i],
+                                            high: history_response.h[i],
+                                            low: history_response.l[i],
+                                            volume: history_response.v.as_ref().and_then(|v| v.get(i).cloned()),
+                                        };
+                                        if let Ok(candle) = Candle::try_from((base_candle, symbol.clone())) {
+                                            candles.push(candle);
                                         }
                                     }
 

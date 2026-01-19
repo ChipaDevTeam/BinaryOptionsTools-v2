@@ -493,8 +493,11 @@ impl PocketOption {
     #[uniffi::method]
     pub async fn get_deal_end_time(&self, id: String) -> Option<i64> {
         let deal_id = Uuid::parse_str(&id).ok()?;
+        if let Some(d) = self.inner.get_closed_deal(deal_id).await {
+            return Some(d.close_timestamp.timestamp());
+        }
         self.inner
-            .get_closed_deal(deal_id)
+            .get_opened_deal(deal_id)
             .await
             .map(|d| d.close_timestamp.timestamp())
     }

@@ -10,7 +10,7 @@ from BinaryOptionsToolsV2.validator import Validator
 
 class AsyncSubscription:
     def __init__(self, subscription):
-        """asynchronous Iterator over json objects"""
+        """Asynchronous Iterator over json objects"""
         self.subscription = subscription
 
     def __aiter__(self):
@@ -173,7 +173,6 @@ class PocketOptionAsync:
 
 
             Warning: This class is designed for asynchronous operations and should be used within an async context.
-            This version doesn't support the `Config` class.
         Note:
             - The configuration becomes locked once initialized and cannot be modified afterwards
             - Custom URLs provided in the `url` parameter take precedence over URLs in the configuration
@@ -289,17 +288,19 @@ class PocketOptionAsync:
             ValueError: If trade_id is invalid
             TimeoutError: If result check times out
         """
-        # end_time = await self.client.get_deal_end_time(id)
+        end_time = await self.client.get_deal_end_time(id)
 
-        # if end_time is not None:
-        #     duration = end_time - int(time.time())
-        #     if duration <= 0:
-        #         duration = 5 # If duration is less than 0 then the trade is closed and the function should take less than 5 seconds to run
-        # else:
-        #     duration = 5
-        # duration += self.config.extra_duration
+        if end_time is not None:
+            # Import time here since it might not be at top level
+            import time as py_time
+            duration = end_time - int(py_time.time())
+            if duration <= 0:
+                duration = 5 # If duration is less than 0 then the trade is closed and the function should take less than 5 seconds to run
+        else:
+            duration = self.config.timeout_secs
+        duration += self.config.extra_duration
 
-        # self.logger.debug(f"Timeout set to: {duration} (6 extra seconds)")
+        # self.logger.debug(f"Timeout set to: {duration} (extra seconds included)")
         async def check(id):
             trade = await self.client.check_win(id)
             trade = json.loads(trade)
@@ -312,7 +313,7 @@ class PocketOptionAsync:
                 trade["result"] = "loss"
             return trade
 
-        return await check(id)
+        return await _timeout(check(id), duration)
 
     async def get_candles(self, asset: str, period: int, offset: int) -> list[dict]:
         """

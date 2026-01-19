@@ -15,7 +15,7 @@ use tokio::net::TcpStream;
 use url::Url;
 
 const IP_API_URL: &str = "http://ip-api.com/json/";
-const IPIFY_URL: &str = "https://api.ipify.org?format=json";
+const IPIFY_URL: &str = "https://i.pn/json/";
 const EARTH_RADIUS_KM: f64 = 6371.0;
 const POCKET_OPTION_ORIGIN: &str = "https://pocketoption.com";
 const WEBSOCKET_VERSION: &str = "13";
@@ -57,7 +57,13 @@ pub fn calculate_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 pub async fn get_public_ip() -> PocketResult<String> {
     let response = reqwest::get(IPIFY_URL).await?;
     let json: serde_json::Value = response.json().await?;
-    Ok(json["ip"].as_str().unwrap().to_string())
+    match json["ip"].as_str() {
+        Some(ip) => Ok(ip.to_string()),
+        None => Err(PocketError::General(format!(
+            "Failed to retrieve public IP from {}. Response: {:?}",
+            IPIFY_URL, json
+        ))),
+    }
 }
 
 pub async fn try_connect(

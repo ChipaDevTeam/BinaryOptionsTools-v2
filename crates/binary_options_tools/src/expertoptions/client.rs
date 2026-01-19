@@ -110,7 +110,9 @@ mod tests {
     async fn test_expert_options_connection() {
         let _ = tracing_subscriber::fmt::try_init();
 
-        let token = "759c67788715ca4e2e64c9ebb39e1c65";
+        // Use environment variable or fallback to a default (possibly a public demo token)
+        let token = std::env::var("EXPERT_OPTIONS_TOKEN")
+            .unwrap_or_else(|_| "759c67788715ca4e2e64c9ebb39e1c65".to_string());
         let demo = true;
 
         let expert_options = ExpertOptions::new(token, demo).await;
@@ -123,7 +125,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_expert_options_change_account_type() {
-        let token = "759c67788715ca4e2e64c9ebb39e1c65";
+        // Use environment variable or fallback to a default (possibly a public demo token)
+        let token = std::env::var("EXPERT_OPTIONS_TOKEN")
+            .unwrap_or_else(|_| "759c67788715ca4e2e64c9ebb39e1c65".to_string());
         let demo = true;
 
         let expert_options = ExpertOptions::new(token, demo).await;

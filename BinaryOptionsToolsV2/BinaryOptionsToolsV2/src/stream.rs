@@ -6,7 +6,7 @@ use futures_util::{
 };
 use pyo3::{
     PyResult,
-    exceptions::{PyStopAsyncIteration, PyStopIteration},
+    exceptions::{PyRuntimeError, PyStopAsyncIteration, PyStopIteration},
 };
 use tokio::sync::Mutex;
 
@@ -20,13 +20,7 @@ where
     match stream.next().await {
         Some(item) => match item {
             Ok(itm) => Ok(itm),
-            Err(e) => {
-                println!("Error: {e:?}");
-                match sync {
-                    true => Err(PyStopIteration::new_err(e.to_string())),
-                    false => Err(PyStopAsyncIteration::new_err(e.to_string())),
-                }
-            }
+            Err(e) => Err(PyRuntimeError::new_err(e.to_string())),
         },
         None => match sync {
             true => Err(PyStopIteration::new_err("Stream exhausted")),

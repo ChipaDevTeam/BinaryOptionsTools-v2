@@ -14,6 +14,6 @@ __all__ = [
     "RawHandlerSync",
 ]
 
-from . import asynchronous, syncronous
+from . import asynchronous, synchronous
 from .asynchronous import PocketOptionAsync, RawHandler
-from .synchronousimport PocketOption, RawHandlerSync
+from .synchronous import PocketOption, RawHandlerSync

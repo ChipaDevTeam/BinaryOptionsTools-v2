@@ -1,12 +1,17 @@
 import asyncio
-import getpass
 import json  # For the SSID formatting function
 import sys
-import time
 from datetime import datetime, timedelta, timezone
 
-from colorama import Back, Fore, init
+from colorama import Fore, init
 from tabulate import tabulate  # Keep if catalogador is re-enabled (currently not used)
+
+init()  # Initialize colorama
+
+# Define colors
+red = Fore.RED
+green = Fore.GREEN
+yellow = Fore.YELLOW
 
 # Imports for Selenium Login
 try:
