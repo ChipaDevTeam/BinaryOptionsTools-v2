@@ -379,13 +379,15 @@ impl PocketOption {
         asset: impl ToString,
         sub_type: SubscriptionType,
     ) -> PocketResult<SubscriptionStream> {
-        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await
-            && let Some(assets) = self.assets().await
-        {
-            if assets.get(&asset.to_string()).is_some() {
-                handle.subscribe(asset.to_string(), sub_type).await
+        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await {
+            if let Some(assets) = self.assets().await {
+                if assets.get(&asset.to_string()).is_some() {
+                    handle.subscribe(asset.to_string(), sub_type).await
+                } else {
+                    Err(PocketError::InvalidAsset(asset.to_string()))
+                }
             } else {
-                Err(PocketError::InvalidAsset(asset.to_string()))
+                Err(BinaryOptionsError::General("Assets not found".into()).into())
             }
         } else {
             Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
@@ -393,13 +395,15 @@ impl PocketOption {
     }
 
     pub async fn unsubscribe(&self, asset: impl ToString) -> PocketResult<()> {
-        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await
-            && let Some(assets) = self.assets().await
-        {
-            if assets.get(&asset.to_string()).is_some() {
-                handle.unsubscribe(asset.to_string()).await
+        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await {
+            if let Some(assets) = self.assets().await {
+                if assets.get(&asset.to_string()).is_some() {
+                    handle.unsubscribe(asset.to_string()).await
+                } else {
+                    Err(PocketError::InvalidAsset(asset.to_string()))
+                }
             } else {
-                Err(PocketError::InvalidAsset(asset.to_string()))
+                Err(BinaryOptionsError::General("Assets not found".into()).into())
             }
         } else {
             Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
