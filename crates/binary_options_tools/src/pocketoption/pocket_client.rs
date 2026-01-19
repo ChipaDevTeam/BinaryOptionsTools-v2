@@ -387,8 +387,7 @@ impl PocketOption {
                     Err(PocketError::InvalidAsset(asset.to_string()))
                 }
             } else {
-                // Should not happen as subscribe calls assets().await which gets current assets or None
-                Err(BinaryOptionsError::General("Assets not available".into()).into())
+                Err(BinaryOptionsError::General("Assets not found".into()).into())
             }
         } else {
             Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
@@ -404,7 +403,7 @@ impl PocketOption {
                     Err(PocketError::InvalidAsset(asset.to_string()))
                 }
             } else {
-                Err(BinaryOptionsError::General("Assets not available".into()).into())
+                Err(BinaryOptionsError::General("Assets not found".into()).into())
             }
         } else {
             Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
