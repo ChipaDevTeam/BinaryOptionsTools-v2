@@ -293,9 +293,10 @@ class PocketOptionAsync:
         if end_time is not None:
             # Import time here since it might not be at top level
             import time as py_time
+
             duration = end_time - int(py_time.time())
             if duration <= 0:
-                duration = 5 # If duration is less than 0 then the trade is closed and the function should take less than 5 seconds to run
+                duration = 5  # If duration is less than 0 then the trade is closed and the function should take less than 5 seconds to run
         else:
             duration = self.config.timeout_secs
         duration += self.config.extra_duration
