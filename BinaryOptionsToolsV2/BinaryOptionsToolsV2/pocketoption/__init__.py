@@ -7,7 +7,7 @@ as well as specific classes for Pocket Option trading.
 
 __all__ = [
     "asynchronous",
-    "syncronous",
+    "synchronous",
     "PocketOptionAsync",
     "PocketOption",
     "RawHandler",

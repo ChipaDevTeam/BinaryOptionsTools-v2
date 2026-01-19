@@ -208,6 +208,7 @@ class PocketOption:
             - Invalid configuration values will raise appropriate exceptions
             - The event loop is automatically closed when the instance is deleted
             - All async operations are wrapped to provide a synchronous interface
+
         """
         self.loop = asyncio.new_event_loop()
         self._client = PocketOptionAsync(ssid, config)
