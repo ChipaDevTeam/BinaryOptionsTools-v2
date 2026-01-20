@@ -72,7 +72,9 @@ jobs:
           source .venv/bin/activate
           pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
           pip install pytest
-          pytest
+          mkdir test_run
+          cd test_run
+          pytest ../tests
       - name: pytest
         if: ${{ !startsWith(matrix.platform.target, 'x86') && matrix.platform.target != 'ppc64' }}
         uses: uraimo/run-on-arch-action@v2
@@ -88,7 +90,9 @@ jobs:
             set -e
             cd BinaryOptionsToolsV2
             pip3 install BinaryOptionsToolsV2 --find-links dist --force-reinstall
-            pytest
+            mkdir test_run
+            cd test_run
+            pytest ../tests
 
   musllinux:
     runs-on: ${{ matrix.platform.runner }}
@@ -142,7 +146,9 @@ jobs:
             source .venv/bin/activate
             pip install BinaryOptionsToolsV2 --no-index --find-links dist --force-reinstall
             pip install pytest
-            pytest
+            mkdir test_run
+            cd test_run
+            pytest ../tests
       - name: pytest
         if: ${{ !startsWith(matrix.platform.target, 'x86') }}
         uses: uraimo/run-on-arch-action@v2
@@ -159,7 +165,9 @@ jobs:
             source .venv/bin/activate
             pip install pytest
             pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
-            pytest
+            mkdir test_run
+            cd test_run
+            pytest ../tests
 
   windows:
     runs-on: ${{ matrix.platform.runner }}
@@ -209,7 +217,9 @@ jobs:
           source .venv/Scripts/activate
           pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
           pip install pytest
-          pytest
+          mkdir test_run
+          cd test_run
+          pytest ../tests
 
   macos:
     runs-on: ${{ matrix.platform.runner }}
@@ -252,7 +262,9 @@ jobs:
           source .venv/bin/activate
           pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
           pip install pytest
-          pytest
+          mkdir test_run
+          cd test_run
+          pytest ../tests
 
   emscripten:
     runs-on: ${{ matrix.platform.runner }}
@@ -310,7 +322,9 @@ jobs:
           source .venv/bin/activate
           pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
           pip install pytest
-          python -m pytest
+          mkdir test_run
+          cd test_run
+          python -m pytest ../tests
 
   sdist:
     runs-on: ubuntu-latest
