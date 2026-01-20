@@ -53,7 +53,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.13t
+          args: --release --out dist -i python3.12t
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
           working-directory: BinaryOptionsToolsV2
@@ -124,7 +124,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.13t
+          args: --release --out dist -i python3.12t
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: musllinux_1_2
           working-directory: BinaryOptionsToolsV2
@@ -193,13 +193,13 @@ jobs:
           working-directory: BinaryOptionsToolsV2
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.13t
+          python-version: 3.12t
           architecture: ${{ matrix.platform.target }}
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.13t
+          args: --release --out dist -i python3.12t
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           working-directory: BinaryOptionsToolsV2
       - name: Upload wheels
@@ -246,7 +246,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.13t
+          args: --release --out dist -i python3.12t
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           working-directory: BinaryOptionsToolsV2
       - name: Upload wheels
@@ -302,7 +302,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.13t
+          args: --release --out dist -i python3.12t
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           rust-toolchain: nightly
           working-directory: BinaryOptionsToolsV2
