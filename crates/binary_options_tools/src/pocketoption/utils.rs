@@ -70,11 +70,16 @@ pub async fn try_connect(
     ssid: Ssid,
     url: String,
 ) -> ConnectorResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
-    let tls_connector: native_tls::TlsConnector = native_tls::TlsConnector::builder()
-        .build()
-        .map_err(|e| ConnectorError::Tls(e.to_string()))?;
+    let mut root_store = rustls::RootCertStore::empty();
+    let certs_result = rustls_native_certs::load_native_certs();
+    for cert in certs_result.certs {
+        root_store.add(cert).ok();
+    }
+    let tls_config = rustls::ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
 
-    let connector = Connector::NativeTls(tls_connector);
+    let connector = Connector::Rustls(std::sync::Arc::new(tls_config));
 
     let user_agent = ssid.user_agent();
     let t_url = Url::parse(&url).map_err(|e| ConnectorError::UrlParsing(e.to_string()))?;
