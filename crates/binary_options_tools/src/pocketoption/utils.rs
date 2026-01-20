@@ -66,6 +66,36 @@ pub async fn get_public_ip() -> PocketResult<String> {
     }
 }
 
+/// Attempts to establish a TLS WebSocket connection to the given URL using rustls and the system's root certificates.
+///
+/// The function builds a rustls client configuration from native certificates, constructs an HTTP
+/// request with the necessary WebSocket upgrade headers (including Origin and a generated
+/// `Sec-Websocket-Key`), and performs a TLS WebSocket handshake. On success it returns a connected
+/// WebSocket stream ready for sending and receiving messages.
+///
+/// # Returns
+///
+/// A connected `WebSocketStream<MaybeTlsStream<TcpStream>>` on success, or a `ConnectorError` describing the failure.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use pocketoption::utils::try_connect;
+/// # use pocketoption::types::Ssid;
+/// # tokio_test::block_on(async {
+/// // Obtain or construct an `Ssid` appropriate for your environment:
+/// let ssid = /* create or obtain Ssid */ unimplemented!();
+/// let url = "wss://example.com/socket".to_string();
+/// let ws = try_connect(ssid, url).await;
+/// match ws {
+///     Ok(stream) => {
+///         // use the connected WebSocket stream
+///         let _ = stream;
+///     }
+///     Err(e) => eprintln!("connection failed: {}", e),
+/// }
+/// # });
+/// ```
 pub async fn try_connect(
     ssid: Ssid,
     url: String,

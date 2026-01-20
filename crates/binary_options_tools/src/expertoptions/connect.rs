@@ -55,6 +55,30 @@ impl ConnectorTrait<State> for ExpertConnect {
     }
 }
 
+/// Attempts to establish a TLS-upgraded WebSocket connection to the specified URL using the provided user agent.
+///
+/// This function loads native root certificates into a rustls ClientConfig, builds the WebSocket HTTP request with required headers (including Origin, User-Agent, Upgrade, Connection, and Sec-WebSocket headers), performs the TLS handshake and WebSocket upgrade, and returns the established WebSocket stream.
+///
+/// # Parameters
+/// - `agent`: User-Agent string to send in the request header.
+/// - `url`: Target WebSocket URL to connect to.
+///
+/// # Returns
+/// The established `WebSocketStream<MaybeTlsStream<TcpStream>>` on success; a `ConnectorError` describing the failure otherwise.
+///
+/// # Examples
+///
+/// ```no_run
+/// # tokio::main
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let ws = crate::try_connect(
+///     "my-agent/1.0".to_string(),
+///     "wss://example.com/socket".to_string(),
+/// ).await?;
+/// // use `ws`...
+/// # Ok(())
+/// # }
+/// ```
 pub async fn try_connect(
     agent: String,
     url: String,
