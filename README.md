@@ -303,12 +303,10 @@ pytest tests/
 
 ### Planned Features
 
-- [x] Pending order support
-- [x] Historical data fetching
 - [ ] Expert Options platform integration
 - [ ] JavaScript/TypeScript native bindings
 - [ ] WebAssembly support for browser usage
-- [ ] Advanced order types (stop-loss, take-profit)
+- [ ] Advanced order types (stop-loss, take-profit) - Only available for Forex accounts, not Quick Trading (QT) accounts
 - [ ] Historical data export tools
 - [ ] Strategy backtesting framework
 
