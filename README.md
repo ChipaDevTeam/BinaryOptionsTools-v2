@@ -319,8 +319,8 @@ pytest tests/
 
 ### Platform Support
 
-- [x] PocketOption (Quick Trading)
-- [x] PocketOption (Pending Orders)
+- [x] PocketOption Quick Trading
+- [x] PocketOption Pending Orders (BETA)
 - [ ] Expert Options
 - [ ] IQ Option (planned)
 
