@@ -181,7 +181,8 @@ impl Validator {
         &self.inner
     }
 
-    /// Creates a Validator from an inner validator
+    /// Creates a Validator from an inner validator which is used internally when converting `InnerValidator` to `Arc<Self>`, in such we need the dead code allowance.
+    #[allow(dead_code)]
     pub(crate) fn from_inner(inner: InnerValidator) -> Arc<Self> {
         Arc::new(Self { inner })
     }
