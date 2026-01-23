@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::Once;
 
 use binary_options_tools_core_pre::{
     error::CoreResult,
@@ -8,6 +9,14 @@ use binary_options_tools_core_pre::{
 };
 
 pub mod serialize;
+
+static INIT: Once = Once::new();
+
+pub fn init_crypto_provider() {
+    INIT.call_once(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
 
 /// Lightweight message printer for debugging purposes
 ///

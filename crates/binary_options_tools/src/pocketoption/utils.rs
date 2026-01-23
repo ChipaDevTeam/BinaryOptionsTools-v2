@@ -10,6 +10,7 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     ssid::Ssid,
 };
+use crate::utils::init_crypto_provider;
 use serde_json::Value;
 use tokio::net::TcpStream;
 use url::Url;
@@ -70,6 +71,7 @@ pub async fn try_connect(
     ssid: Ssid,
     url: String,
 ) -> ConnectorResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
+    init_crypto_provider();
     let mut root_store = rustls::RootCertStore::empty();
     let certs_result = rustls_native_certs::load_native_certs();
     for cert in certs_result.certs {

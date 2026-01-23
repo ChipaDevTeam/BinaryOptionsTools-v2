@@ -13,6 +13,7 @@ use tracing::{info, warn};
 use url::Url;
 
 use crate::expertoptions::{regions::Regions, state::State};
+use crate::utils::init_crypto_provider;
 
 #[derive(Clone)]
 pub struct ExpertConnect;
@@ -59,6 +60,7 @@ pub async fn try_connect(
     agent: String,
     url: String,
 ) -> ConnectorResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
+    init_crypto_provider();
     let mut root_store = rustls::RootCertStore::empty();
     let certs_result = rustls_native_certs::load_native_certs();
     for cert in certs_result.certs {
