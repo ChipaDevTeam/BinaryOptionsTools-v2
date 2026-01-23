@@ -1,11 +1,16 @@
 [package]
-name = "binary-options-tools"
-version = "0.1.8"
+name = "binary_options_tools"
+version = "0.1.9"
 edition = "2024"
+authors = ["ChipaDevTeam"]
 repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
-readme = "README.md"
-description = "`binary-options-tools` crate and the python library `BinaryOptionsToolsV2`."
-license = "MIT"
+homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+readme = "Readme.md"
+description = "High-performance Rust library for binary options trading automation. Supports PocketOption with real-time data streaming, trade execution, and WebSocket API access. Foundation for Python bindings in BinaryOptionsToolsV2."
+keywords = ["binary-options", "trading", "pocketoption", "automation", "websocket"]
+categories = ["api-bindings", "asynchronous", "web-programming"]
+license-file = "../../LICENSE"
 
 # [workspace]
 # members = [
@@ -14,29 +19,29 @@ license = "MIT"
 
 
 [dependencies]
-binary-options-tools-macros = { path = "../macros", version = "0.1.1" }
-binary-options-tools-core-pre = { path = "../core-pre", version = "0.1.0" }
+binary-options-tools-macros = { path = "../macros", version = "0.1.4" }
+binary-options-tools-core-pre = { path = "../core-pre", version = "0.1.1" }
 
 anyhow = "1.0.98"
-async-channel = "2.3.1"
+async-channel = "2.5.0"
 async-trait = "0.1.85"
-chrono = { version = "0.4.39", features = ["serde"] }
+chrono = { version = "0.4.42", features = ["serde"] }
 futures-util = "0.3.31"
 native-tls = "0.2.12"
 php_serde = "0.6.0"
-rand = "0.9.1"
+rand = "0.9.2"
 reqwest = { version = "0.12.15", features = ["json"] }
 serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
+serde_json = "1.0.145"
 thiserror = "2.0.12"
 tokio = { version = "1.44.2", features = ["full"] }
 tracing = "0.1.41"
 # url = { version = "2.5.4", features = ["serde"] }
 uuid = { version = "1.16.0", features = ["serde", "v4"] }
-url = "2.5.4"
+url = "2.5.7"
 serde-enum-str = "0.4.0"
 rust_decimal = { version = "1.37.2", features = ["macros", "serde-float"] }
 regex = "1.11.1"
 
 [dev-dependencies]
-tracing-subscriber = "0.3.19"
+tracing-subscriber = "0.3.20"

@@ -2,10 +2,15 @@
 name = "binary-options-tools-core"
 version = "0.1.7"
 edition = "2024"
+authors = ["ChipaDevTeam"]
 repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
-readme = "README.md"
-description = "The core of the `binary-options-tools` crate and the python library `BinaryOptionsToolsV2`."
-license = "MIT"
+homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+readme = "readme.md"
+description = "Core library for binary options trading tools. Provides WebSocket client implementation, message handling, and async runtime management for the binary-options-tools ecosystem."
+keywords = ["binary-options", "websocket", "trading", "core", "async"]
+categories = ["asynchronous", "network-programming", "api-bindings"]
+license-file = "../../LICENSE"
 
 [features]
 

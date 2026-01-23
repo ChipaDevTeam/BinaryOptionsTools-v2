@@ -50,9 +50,9 @@ typedef void (*UniffiRustFutureContinuationCallback)(uint64_t, int8_t
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_FREE
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_FREE
-typedef void (*UniffiForeignFutureFree)(uint64_t
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK
+typedef void (*UniffiForeignFutureDroppedCallback)(uint64_t
     );
 
 #endif
@@ -62,203 +62,200 @@ typedef void (*UniffiCallbackInterfaceFree)(uint64_t
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE
-typedef struct UniffiForeignFuture {
-    uint64_t handle;
-    UniffiForeignFutureFree _Nonnull free;
-} UniffiForeignFuture;
+#ifndef UNIFFI_FFIDEF_CALLBACK_INTERFACE_CLONE
+#define UNIFFI_FFIDEF_CALLBACK_INTERFACE_CLONE
+typedef uint64_t (*UniffiCallbackInterfaceClone)(uint64_t
+    );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U8
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U8
-typedef struct UniffiForeignFutureStructU8 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK_STRUCT
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK_STRUCT
+typedef struct UniffiForeignFutureDroppedCallbackStruct {
+    uint64_t handle;
+    UniffiForeignFutureDroppedCallback _Nonnull free;
+} UniffiForeignFutureDroppedCallbackStruct;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U8
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U8
+typedef struct UniffiForeignFutureResultU8 {
     uint8_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructU8;
+} UniffiForeignFutureResultU8;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U8
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U8
-typedef void (*UniffiForeignFutureCompleteU8)(uint64_t, UniffiForeignFutureStructU8
+typedef void (*UniffiForeignFutureCompleteU8)(uint64_t, UniffiForeignFutureResultU8
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I8
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I8
-typedef struct UniffiForeignFutureStructI8 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I8
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I8
+typedef struct UniffiForeignFutureResultI8 {
     int8_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructI8;
+} UniffiForeignFutureResultI8;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I8
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I8
-typedef void (*UniffiForeignFutureCompleteI8)(uint64_t, UniffiForeignFutureStructI8
+typedef void (*UniffiForeignFutureCompleteI8)(uint64_t, UniffiForeignFutureResultI8
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U16
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U16
-typedef struct UniffiForeignFutureStructU16 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U16
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U16
+typedef struct UniffiForeignFutureResultU16 {
     uint16_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructU16;
+} UniffiForeignFutureResultU16;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U16
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U16
-typedef void (*UniffiForeignFutureCompleteU16)(uint64_t, UniffiForeignFutureStructU16
+typedef void (*UniffiForeignFutureCompleteU16)(uint64_t, UniffiForeignFutureResultU16
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I16
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I16
-typedef struct UniffiForeignFutureStructI16 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I16
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I16
+typedef struct UniffiForeignFutureResultI16 {
     int16_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructI16;
+} UniffiForeignFutureResultI16;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I16
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I16
-typedef void (*UniffiForeignFutureCompleteI16)(uint64_t, UniffiForeignFutureStructI16
+typedef void (*UniffiForeignFutureCompleteI16)(uint64_t, UniffiForeignFutureResultI16
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U32
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U32
-typedef struct UniffiForeignFutureStructU32 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U32
+typedef struct UniffiForeignFutureResultU32 {
     uint32_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructU32;
+} UniffiForeignFutureResultU32;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U32
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U32
-typedef void (*UniffiForeignFutureCompleteU32)(uint64_t, UniffiForeignFutureStructU32
+typedef void (*UniffiForeignFutureCompleteU32)(uint64_t, UniffiForeignFutureResultU32
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I32
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I32
-typedef struct UniffiForeignFutureStructI32 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I32
+typedef struct UniffiForeignFutureResultI32 {
     int32_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructI32;
+} UniffiForeignFutureResultI32;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I32
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I32
-typedef void (*UniffiForeignFutureCompleteI32)(uint64_t, UniffiForeignFutureStructI32
+typedef void (*UniffiForeignFutureCompleteI32)(uint64_t, UniffiForeignFutureResultI32
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U64
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U64
-typedef struct UniffiForeignFutureStructU64 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U64
+typedef struct UniffiForeignFutureResultU64 {
     uint64_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructU64;
+} UniffiForeignFutureResultU64;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U64
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U64
-typedef void (*UniffiForeignFutureCompleteU64)(uint64_t, UniffiForeignFutureStructU64
+typedef void (*UniffiForeignFutureCompleteU64)(uint64_t, UniffiForeignFutureResultU64
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I64
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I64
-typedef struct UniffiForeignFutureStructI64 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I64
+typedef struct UniffiForeignFutureResultI64 {
     int64_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructI64;
+} UniffiForeignFutureResultI64;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I64
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I64
-typedef void (*UniffiForeignFutureCompleteI64)(uint64_t, UniffiForeignFutureStructI64
+typedef void (*UniffiForeignFutureCompleteI64)(uint64_t, UniffiForeignFutureResultI64
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_F32
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_F32
-typedef struct UniffiForeignFutureStructF32 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F32
+typedef struct UniffiForeignFutureResultF32 {
     float returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructF32;
+} UniffiForeignFutureResultF32;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F32
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F32
-typedef void (*UniffiForeignFutureCompleteF32)(uint64_t, UniffiForeignFutureStructF32
+typedef void (*UniffiForeignFutureCompleteF32)(uint64_t, UniffiForeignFutureResultF32
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_F64
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_F64
-typedef struct UniffiForeignFutureStructF64 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F64
+typedef struct UniffiForeignFutureResultF64 {
     double returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructF64;
+} UniffiForeignFutureResultF64;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F64
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F64
-typedef void (*UniffiForeignFutureCompleteF64)(uint64_t, UniffiForeignFutureStructF64
+typedef void (*UniffiForeignFutureCompleteF64)(uint64_t, UniffiForeignFutureResultF64
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_POINTER
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_POINTER
-typedef struct UniffiForeignFutureStructPointer {
-    void*_Nonnull returnValue;
-    RustCallStatus callStatus;
-} UniffiForeignFutureStructPointer;
-
-#endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_POINTER
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_POINTER
-typedef void (*UniffiForeignFutureCompletePointer)(uint64_t, UniffiForeignFutureStructPointer
-    );
-
-#endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_RUST_BUFFER
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_RUST_BUFFER
-typedef struct UniffiForeignFutureStructRustBuffer {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_RUST_BUFFER
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_RUST_BUFFER
+typedef struct UniffiForeignFutureResultRustBuffer {
     RustBuffer returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructRustBuffer;
+} UniffiForeignFutureResultRustBuffer;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_RUST_BUFFER
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_RUST_BUFFER
-typedef void (*UniffiForeignFutureCompleteRustBuffer)(uint64_t, UniffiForeignFutureStructRustBuffer
+typedef void (*UniffiForeignFutureCompleteRustBuffer)(uint64_t, UniffiForeignFutureResultRustBuffer
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_VOID
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_VOID
-typedef struct UniffiForeignFutureStructVoid {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_VOID
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_VOID
+typedef struct UniffiForeignFutureResultVoid {
     RustCallStatus callStatus;
-} UniffiForeignFutureStructVoid;
+} UniffiForeignFutureResultVoid;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_VOID
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_VOID
-typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureStructVoid
+typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureResultVoid
     );
 
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CLONE_POCKETOPTION
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CLONE_POCKETOPTION
-void*_Nonnull uniffi_binary_options_tools_uni_fn_clone_pocketoption(void*_Nonnull ptr, RustCallStatus *_Nonnull out_status
+uint64_t uniffi_binary_options_tools_uni_fn_clone_pocketoption(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_FREE_POCKETOPTION
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_FREE_POCKETOPTION
-void uniffi_binary_options_tools_uni_fn_free_pocketoption(void*_Nonnull ptr, RustCallStatus *_Nonnull out_status
+void uniffi_binary_options_tools_uni_fn_free_pocketoption(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_POCKETOPTION_INIT
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_POCKETOPTION_INIT
+uint64_t uniffi_binary_options_tools_uni_fn_constructor_pocketoption_init(RustBuffer ssid
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_POCKETOPTION_NEW
@@ -273,112 +270,208 @@ uint64_t uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new_with_ur
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_ASSETS
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_ASSETS
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_assets(void*_Nonnull ptr
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_assets(uint64_t ptr
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_BALANCE
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_BALANCE
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_balance(void*_Nonnull ptr
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_balance(uint64_t ptr
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_BUY
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_BUY
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_buy(void*_Nonnull ptr, RustBuffer asset, uint32_t time, double amount
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_buy(uint64_t ptr, RustBuffer asset, uint32_t time, double amount
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_CLEAR_CLOSED_DEALS
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_CLEAR_CLOSED_DEALS
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals(void*_Nonnull ptr
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals(uint64_t ptr
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_CREATE_RAW_HANDLER
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_CREATE_RAW_HANDLER
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_create_raw_handler(uint64_t ptr, uint64_t validator, RustBuffer keep_alive
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_GET_CANDLES
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_GET_CANDLES
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles(void*_Nonnull ptr, RustBuffer asset, int64_t period, int64_t offset
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles(uint64_t ptr, RustBuffer asset, int64_t period, int64_t offset
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_GET_CANDLES_ADVANCED
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_GET_CANDLES_ADVANCED
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced(void*_Nonnull ptr, RustBuffer asset, int64_t period, int64_t time, int64_t offset
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced(uint64_t ptr, RustBuffer asset, int64_t period, int64_t time, int64_t offset
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_GET_CLOSED_DEALS
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_GET_CLOSED_DEALS
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals(void*_Nonnull ptr
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals(uint64_t ptr
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_GET_OPENED_DEALS
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_GET_OPENED_DEALS
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals(void*_Nonnull ptr
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals(uint64_t ptr
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_HISTORY
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_HISTORY
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_history(void*_Nonnull ptr, RustBuffer asset, uint32_t period
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_history(uint64_t ptr, RustBuffer asset, uint32_t period
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_IS_DEMO
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_IS_DEMO
-int8_t uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo(void*_Nonnull ptr, RustCallStatus *_Nonnull out_status
+int8_t uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo(uint64_t ptr, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_PAYOUT
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_PAYOUT
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_payout(uint64_t ptr, RustBuffer asset
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_RECONNECT
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_RECONNECT
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect(void*_Nonnull ptr
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect(uint64_t ptr
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_RESULT
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_RESULT
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_result(void*_Nonnull ptr, RustBuffer id
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_result(uint64_t ptr, RustBuffer id
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_RESULT_WITH_TIMEOUT
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_RESULT_WITH_TIMEOUT
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout(void*_Nonnull ptr, RustBuffer id, uint64_t timeout_secs
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout(uint64_t ptr, RustBuffer id, uint64_t timeout_secs
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_SELL
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_SELL
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_sell(void*_Nonnull ptr, RustBuffer asset, uint32_t time, double amount
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_sell(uint64_t ptr, RustBuffer asset, uint32_t time, double amount
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_SERVER_TIME
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_SERVER_TIME
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time(void*_Nonnull ptr
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time(uint64_t ptr
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_SHUTDOWN
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_SHUTDOWN
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown(void*_Nonnull ptr
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown(uint64_t ptr
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_SUBSCRIBE
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_SUBSCRIBE
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe(void*_Nonnull ptr, RustBuffer asset, uint64_t duration_secs
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe(uint64_t ptr, RustBuffer asset, uint64_t duration_secs
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_TRADE
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_TRADE
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_trade(void*_Nonnull ptr, RustBuffer asset, RustBuffer action, uint32_t time, double amount
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_trade(uint64_t ptr, RustBuffer asset, RustBuffer action, uint32_t time, double amount
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_UNSUBSCRIBE
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_POCKETOPTION_UNSUBSCRIBE
-uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe(void*_Nonnull ptr, RustBuffer asset
+uint64_t uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe(uint64_t ptr, RustBuffer asset
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CLONE_RAWHANDLER
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CLONE_RAWHANDLER
+uint64_t uniffi_binary_options_tools_uni_fn_clone_rawhandler(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_FREE_RAWHANDLER
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_FREE_RAWHANDLER
+void uniffi_binary_options_tools_uni_fn_free_rawhandler(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_RAWHANDLER_SEND_AND_WAIT
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_RAWHANDLER_SEND_AND_WAIT
+uint64_t uniffi_binary_options_tools_uni_fn_method_rawhandler_send_and_wait(uint64_t ptr, RustBuffer message
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_RAWHANDLER_SEND_BINARY
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_RAWHANDLER_SEND_BINARY
+uint64_t uniffi_binary_options_tools_uni_fn_method_rawhandler_send_binary(uint64_t ptr, RustBuffer data
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_RAWHANDLER_SEND_TEXT
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_RAWHANDLER_SEND_TEXT
+uint64_t uniffi_binary_options_tools_uni_fn_method_rawhandler_send_text(uint64_t ptr, RustBuffer message
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_RAWHANDLER_WAIT_NEXT
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_RAWHANDLER_WAIT_NEXT
+uint64_t uniffi_binary_options_tools_uni_fn_method_rawhandler_wait_next(uint64_t ptr
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CLONE_SUBSCRIPTIONSTREAM
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CLONE_SUBSCRIPTIONSTREAM
-void*_Nonnull uniffi_binary_options_tools_uni_fn_clone_subscriptionstream(void*_Nonnull ptr, RustCallStatus *_Nonnull out_status
+uint64_t uniffi_binary_options_tools_uni_fn_clone_subscriptionstream(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_FREE_SUBSCRIPTIONSTREAM
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_FREE_SUBSCRIPTIONSTREAM
-void uniffi_binary_options_tools_uni_fn_free_subscriptionstream(void*_Nonnull ptr, RustCallStatus *_Nonnull out_status
+void uniffi_binary_options_tools_uni_fn_free_subscriptionstream(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_SUBSCRIPTIONSTREAM_NEXT
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_SUBSCRIPTIONSTREAM_NEXT
-uint64_t uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next(void*_Nonnull ptr
+uint64_t uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next(uint64_t ptr
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CLONE_VALIDATOR
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CLONE_VALIDATOR
+uint64_t uniffi_binary_options_tools_uni_fn_clone_validator(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_FREE_VALIDATOR
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_FREE_VALIDATOR
+void uniffi_binary_options_tools_uni_fn_free_validator(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_ALL
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_ALL
+uint64_t uniffi_binary_options_tools_uni_fn_constructor_validator_all(RustBuffer validators, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_ANY
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_ANY
+uint64_t uniffi_binary_options_tools_uni_fn_constructor_validator_any(RustBuffer validators, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_CONTAINS
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_CONTAINS
+uint64_t uniffi_binary_options_tools_uni_fn_constructor_validator_contains(RustBuffer substring, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_ENDS_WITH
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_ENDS_WITH
+uint64_t uniffi_binary_options_tools_uni_fn_constructor_validator_ends_with(RustBuffer suffix, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_NE
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_NE
+uint64_t uniffi_binary_options_tools_uni_fn_constructor_validator_ne(uint64_t validator, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_NEW
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_NEW
+uint64_t uniffi_binary_options_tools_uni_fn_constructor_validator_new(RustCallStatus *_Nonnull out_status
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_REGEX
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_REGEX
+uint64_t uniffi_binary_options_tools_uni_fn_constructor_validator_regex(RustBuffer pattern, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_STARTS_WITH
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_CONSTRUCTOR_VALIDATOR_STARTS_WITH
+uint64_t uniffi_binary_options_tools_uni_fn_constructor_validator_starts_with(RustBuffer prefix, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_VALIDATOR_CHECK
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_FN_METHOD_VALIDATOR_CHECK
+int8_t uniffi_binary_options_tools_uni_fn_method_validator_check(uint64_t ptr, RustBuffer message, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_FFI_BINARY_OPTIONS_TOOLS_UNI_RUSTBUFFER_ALLOC
@@ -601,26 +694,6 @@ void ffi_binary_options_tools_uni_rust_future_free_f64(uint64_t handle
 double ffi_binary_options_tools_uni_rust_future_complete_f64(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_FFI_BINARY_OPTIONS_TOOLS_UNI_RUST_FUTURE_POLL_POINTER
-#define UNIFFI_FFIDEF_FFI_BINARY_OPTIONS_TOOLS_UNI_RUST_FUTURE_POLL_POINTER
-void ffi_binary_options_tools_uni_rust_future_poll_pointer(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
-);
-#endif
-#ifndef UNIFFI_FFIDEF_FFI_BINARY_OPTIONS_TOOLS_UNI_RUST_FUTURE_CANCEL_POINTER
-#define UNIFFI_FFIDEF_FFI_BINARY_OPTIONS_TOOLS_UNI_RUST_FUTURE_CANCEL_POINTER
-void ffi_binary_options_tools_uni_rust_future_cancel_pointer(uint64_t handle
-);
-#endif
-#ifndef UNIFFI_FFIDEF_FFI_BINARY_OPTIONS_TOOLS_UNI_RUST_FUTURE_FREE_POINTER
-#define UNIFFI_FFIDEF_FFI_BINARY_OPTIONS_TOOLS_UNI_RUST_FUTURE_FREE_POINTER
-void ffi_binary_options_tools_uni_rust_future_free_pointer(uint64_t handle
-);
-#endif
-#ifndef UNIFFI_FFIDEF_FFI_BINARY_OPTIONS_TOOLS_UNI_RUST_FUTURE_COMPLETE_POINTER
-#define UNIFFI_FFIDEF_FFI_BINARY_OPTIONS_TOOLS_UNI_RUST_FUTURE_COMPLETE_POINTER
-void*_Nonnull ffi_binary_options_tools_uni_rust_future_complete_pointer(uint64_t handle, RustCallStatus *_Nonnull out_status
-);
-#endif
 #ifndef UNIFFI_FFIDEF_FFI_BINARY_OPTIONS_TOOLS_UNI_RUST_FUTURE_POLL_RUST_BUFFER
 #define UNIFFI_FFIDEF_FFI_BINARY_OPTIONS_TOOLS_UNI_RUST_FUTURE_POLL_RUST_BUFFER
 void ffi_binary_options_tools_uni_rust_future_poll_rust_buffer(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
@@ -685,6 +758,12 @@ uint16_t uniffi_binary_options_tools_uni_checksum_method_pocketoption_clear_clos
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_POCKETOPTION_CREATE_RAW_HANDLER
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_POCKETOPTION_CREATE_RAW_HANDLER
+uint16_t uniffi_binary_options_tools_uni_checksum_method_pocketoption_create_raw_handler(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_POCKETOPTION_GET_CANDLES
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_POCKETOPTION_GET_CANDLES
 uint16_t uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles(void
@@ -718,6 +797,12 @@ uint16_t uniffi_binary_options_tools_uni_checksum_method_pocketoption_history(vo
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_POCKETOPTION_IS_DEMO
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_POCKETOPTION_IS_DEMO
 uint16_t uniffi_binary_options_tools_uni_checksum_method_pocketoption_is_demo(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_POCKETOPTION_PAYOUT
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_POCKETOPTION_PAYOUT
+uint16_t uniffi_binary_options_tools_uni_checksum_method_pocketoption_payout(void
     
 );
 #endif
@@ -775,9 +860,45 @@ uint16_t uniffi_binary_options_tools_uni_checksum_method_pocketoption_unsubscrib
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_RAWHANDLER_SEND_AND_WAIT
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_RAWHANDLER_SEND_AND_WAIT
+uint16_t uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_and_wait(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_RAWHANDLER_SEND_BINARY
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_RAWHANDLER_SEND_BINARY
+uint16_t uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_binary(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_RAWHANDLER_SEND_TEXT
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_RAWHANDLER_SEND_TEXT
+uint16_t uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_text(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_RAWHANDLER_WAIT_NEXT
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_RAWHANDLER_WAIT_NEXT
+uint16_t uniffi_binary_options_tools_uni_checksum_method_rawhandler_wait_next(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_SUBSCRIPTIONSTREAM_NEXT
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_SUBSCRIPTIONSTREAM_NEXT
 uint16_t uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_VALIDATOR_CHECK
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_METHOD_VALIDATOR_CHECK
+uint16_t uniffi_binary_options_tools_uni_checksum_method_validator_check(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_POCKETOPTION_INIT
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_POCKETOPTION_INIT
+uint16_t uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_init(void
     
 );
 #endif
@@ -790,6 +911,54 @@ uint16_t uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new(v
 #ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_POCKETOPTION_NEW_WITH_URL
 #define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_POCKETOPTION_NEW_WITH_URL
 uint16_t uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new_with_url(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_ALL
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_ALL
+uint16_t uniffi_binary_options_tools_uni_checksum_constructor_validator_all(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_ANY
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_ANY
+uint16_t uniffi_binary_options_tools_uni_checksum_constructor_validator_any(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_CONTAINS
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_CONTAINS
+uint16_t uniffi_binary_options_tools_uni_checksum_constructor_validator_contains(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_ENDS_WITH
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_ENDS_WITH
+uint16_t uniffi_binary_options_tools_uni_checksum_constructor_validator_ends_with(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_NE
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_NE
+uint16_t uniffi_binary_options_tools_uni_checksum_constructor_validator_ne(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_NEW
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_NEW
+uint16_t uniffi_binary_options_tools_uni_checksum_constructor_validator_new(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_REGEX
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_REGEX
+uint16_t uniffi_binary_options_tools_uni_checksum_constructor_validator_regex(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_STARTS_WITH
+#define UNIFFI_FFIDEF_UNIFFI_BINARY_OPTIONS_TOOLS_UNI_CHECKSUM_CONSTRUCTOR_VALIDATOR_STARTS_WITH
+uint16_t uniffi_binary_options_tools_uni_checksum_constructor_validator_starts_with(void
     
 );
 #endif

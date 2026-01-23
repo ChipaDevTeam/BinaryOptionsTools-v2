@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "mcp-mermaid": {
+      "command": "npx",
+      "args": ["-y", "mcp-mermaid"]
+    },
+    "rust-doc-mcp": {
+      "type": "stdio",
+      "command": "rdoc-mcp",
+      "args": ["-s", "stdio"]
+    }
+  }
+}

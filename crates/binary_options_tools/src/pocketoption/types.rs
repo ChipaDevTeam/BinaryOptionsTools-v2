@@ -355,6 +355,11 @@ impl Asset {
         if !self.is_active {
             return Err(PocketError::InvalidAsset("Asset is not active".into()));
         }
+        if 24 * 60 * 60 % time != 0 {
+            return Err(PocketError::InvalidAsset(
+                "Time must be a divisor of 86400 (24 hours)".into(),
+            ));
+        }
         Ok(())
     }
 }

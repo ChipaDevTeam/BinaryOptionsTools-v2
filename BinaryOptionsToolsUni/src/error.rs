@@ -10,6 +10,8 @@ pub enum UniError {
     PocketOption(String),
     #[error("An error occurred with UUID parsing: {0}")]
     Uuid(String),
+    #[error("An error occurred with validator: {0}")]
+    Validator(String),
 }
 
 impl From<BinaryOptionsError> for UniError {

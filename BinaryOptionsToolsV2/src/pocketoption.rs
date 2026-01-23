@@ -82,14 +82,104 @@ pub struct RawStreamIterator {
 }
 
 #[pyclass]
-#[derive(Clone)]
-pub struct RawHandle {
-    handle: binary_options_tools::pocketoption::modules::raw::RawHandle,
+pub struct RawHandlerRust {
+    handler: Arc<Mutex<binary_options_tools::pocketoption::modules::raw::RawHandler>>,
 }
 
-#[pyclass]
-pub struct RawHandler {
-    handler: Arc<Mutex<binary_options_tools::pocketoption::modules::raw::RawHandler>>,
+#[pymethods]
+impl RawHandlerRust {
+    /// Send a text message through this handler
+    pub fn send_text<'py>(&self, py: Python<'py>, message: String) -> PyResult<Bound<'py, PyAny>> {
+        let handler = self.handler.clone();
+        future_into_py(py, async move {
+            handler
+                .lock()
+                .await
+                .send_text(message)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Ok(())
+        })
+    }
+
+    /// Send a binary message through this handler
+    pub fn send_binary<'py>(&self, py: Python<'py>, data: Vec<u8>) -> PyResult<Bound<'py, PyAny>> {
+        let handler = self.handler.clone();
+        future_into_py(py, async move {
+            handler
+                .lock()
+                .await
+                .send_binary(data)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Ok(())
+        })
+    }
+
+    /// Send a message and wait for the next matching response
+    pub fn send_and_wait<'py>(&self, py: Python<'py>, message: String) -> PyResult<Bound<'py, PyAny>> {
+        let handler = self.handler.clone();
+        future_into_py(py, async move {
+            let outgoing = binary_options_tools::pocketoption::modules::raw::Outgoing::Text(message);
+            let response = handler
+                .lock()
+                .await
+                .send_and_wait(outgoing)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let msg_str = response.to_text().unwrap_or_default().to_string();
+            Python::attach(|py| msg_str.into_py_any(py))
+        })
+    }
+
+    /// Wait for the next matching message
+    pub fn wait_next<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let handler = self.handler.clone();
+        future_into_py(py, async move {
+            let response = handler
+                .lock()
+                .await
+                .wait_next()
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let msg_str = response.to_text().unwrap_or_default().to_string();
+            Python::attach(|py| msg_str.into_py_any(py))
+        })
+    }
+
+    /// Subscribe to messages matching this handler's validator
+    pub fn subscribe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let handler = self.handler.clone();
+        future_into_py(py, async move {
+            let receiver = {
+                let handler_guard = handler.lock().await;
+                handler_guard.subscribe()
+            };
+
+            // Create a boxed stream that yields String values
+            let boxed_stream = async_stream::stream! {
+                while let Ok(msg) = receiver.recv().await {
+                    let msg_str = msg.to_text().unwrap_or_default().to_string();
+                    yield Ok(msg_str);
+                }
+            }
+            .boxed()
+            .fuse();
+
+            let stream = Arc::new(Mutex::new(boxed_stream));
+            Python::attach(|py| RawStreamIterator { stream }.into_py_any(py))
+        })
+    }
+
+    /// Get the handler's unique ID
+    pub fn id(&self, py: Python<'_>) -> PyResult<String> {
+        let runtime = get_runtime(py)?;
+        let handler = self.handler.clone();
+        runtime.block_on(async move {
+            let handler_guard = handler.lock().await;
+            Ok(handler_guard.id().to_string())
+        })
+    }
 }
 
 #[pymethods]
@@ -135,7 +225,7 @@ impl RawPocketOption {
                 .map_err(BinaryErrorPy::from)?;
             let deal = serde_json::to_string(&res.1).map_err(BinaryErrorPy::from)?;
             let result = vec![res.0.to_string(), deal];
-            Python::with_gil(|py| result.into_py_any(py))
+            Python::attach(|py| result.into_py_any(py))
         })
     }
 
@@ -154,7 +244,7 @@ impl RawPocketOption {
                 .map_err(BinaryErrorPy::from)?;
             let deal = serde_json::to_string(&res.1).map_err(BinaryErrorPy::from)?;
             let result = vec![res.0.to_string(), deal];
-            Python::with_gil(|py| result.into_py_any(py))
+            Python::attach(|py| result.into_py_any(py))
         })
     }
 
@@ -165,7 +255,7 @@ impl RawPocketOption {
                 .result(Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?)
                 .await
                 .map_err(BinaryErrorPy::from)?;
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 serde_json::to_string(&res)
                     .map_err(BinaryErrorPy::from)?
                     .into_py_any(py)
@@ -212,7 +302,7 @@ impl RawPocketOption {
                 .get_candles(asset, period, offset)
                 .await
                 .map_err(BinaryErrorPy::from)?;
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 serde_json::to_string(&res)
                     .map_err(BinaryErrorPy::from)?
                     .into_py_any(py)
@@ -234,7 +324,7 @@ impl RawPocketOption {
                 .get_candles_advanced(asset, period, time, offset)
                 .await
                 .map_err(BinaryErrorPy::from)?;
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 serde_json::to_string(&res)
                     .map_err(BinaryErrorPy::from)?
                     .into_py_any(py)
@@ -250,7 +340,7 @@ impl RawPocketOption {
         let client = self.client.clone();
         future_into_py(py, async move {
             let deals = client.get_closed_deals().await;
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 serde_json::to_string(&deals)
                     .map_err(BinaryErrorPy::from)?
                     .into_py_any(py)
@@ -262,7 +352,7 @@ impl RawPocketOption {
         let client = self.client.clone();
         future_into_py(py, async move {
             client.clear_closed_deals().await;
-            Python::with_gil(|py| py.None().into_py_any(py))
+            Python::attach(|py| py.None().into_py_any(py))
         })
     }
 
@@ -278,7 +368,7 @@ impl RawPocketOption {
                 let payouts: HashMap<&String, i32> = assets
                     .0
                     .iter()
-                    .map(|(asset, symbol)| (asset, symbol.payout))
+                    .filter_map(|(asset, symbol)| if symbol.is_active { Some((asset, symbol.payout)) } else { None })
                     .collect();
                 Ok(serde_json::to_string(&payouts).map_err(BinaryErrorPy::from)?)
             }
@@ -299,7 +389,7 @@ impl RawPocketOption {
                 .history(asset, period)
                 .await
                 .map_err(BinaryErrorPy::from)?;
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 serde_json::to_string(&res)
                     .map_err(BinaryErrorPy::from)?
                     .into_py_any(py)
@@ -322,7 +412,7 @@ impl RawPocketOption {
             let boxed_stream = subscription.to_stream().boxed().fuse();
             let stream = Arc::new(Mutex::new(boxed_stream));
 
-            Python::with_gil(|py| StreamIterator { stream }.into_py_any(py))
+            Python::attach(|py| StreamIterator { stream }.into_py_any(py))
         })
     }
 
@@ -342,7 +432,7 @@ impl RawPocketOption {
             let boxed_stream = subscription.to_stream().boxed().fuse();
             let stream = Arc::new(Mutex::new(boxed_stream));
 
-            Python::with_gil(|py| StreamIterator { stream }.into_py_any(py))
+            Python::attach(|py| StreamIterator { stream }.into_py_any(py))
         })
     }
 
@@ -362,7 +452,7 @@ impl RawPocketOption {
             let boxed_stream = subscription.to_stream().boxed().fuse();
             let stream = Arc::new(Mutex::new(boxed_stream));
 
-            Python::with_gil(|py| StreamIterator { stream }.into_py_any(py))
+            Python::attach(|py| StreamIterator { stream }.into_py_any(py))
         })
     }
 
@@ -385,7 +475,7 @@ impl RawPocketOption {
             let boxed_stream = subscription.to_stream().boxed().fuse();
             let stream = Arc::new(Mutex::new(boxed_stream));
 
-            Python::with_gil(|py| StreamIterator { stream }.into_py_any(py))
+            Python::attach(|py| StreamIterator { stream }.into_py_any(py))
         })
     }
 
@@ -420,7 +510,7 @@ impl RawPocketOption {
         let validator = validator.get().clone();
         future_into_py(py, async move {
             let response = send_raw_message_and_wait(&client, validator, message).await?;
-            Python::with_gil(|py| response.into_py_any(py))
+            Python::attach(|py| response.into_py_any(py))
         })
     }
 
@@ -442,7 +532,7 @@ impl RawPocketOption {
                         "Operation timed out".into(),
                     ))
                 })?;
-            Python::with_gil(|py| response?.into_py_any(py))
+            Python::attach(|py| response?.into_py_any(py))
         })
     }
 
@@ -465,7 +555,7 @@ impl RawPocketOption {
                     send_raw_message_and_wait(&client, validator.clone(), message.clone());
                 match tokio::time::timeout(timeout, send_future).await {
                     Ok(Ok(response)) => {
-                        return Python::with_gil(|py| response.into_py_any(py));
+                        return Python::attach(|py| response.into_py_any(py));
                     }
                     Ok(Err(e)) => {
                         if retries < max_retries {
@@ -539,7 +629,7 @@ impl RawPocketOption {
                         match tokio::time::timeout(remaining_time, receiver.recv()).await {
                             Ok(Ok(msg)) => {
                                 // Convert the message to a string
-                                let msg_str = arc_message_to_string(&msg);
+                                let msg_str = msg.to_text().unwrap_or_default().to_string();
                                 yield Ok(msg_str);
                             }
                             Ok(Err(_)) => break, // Channel closed
@@ -550,7 +640,7 @@ impl RawPocketOption {
                     // No timeout, just receive messages indefinitely
                     while let Ok(msg) = receiver.recv().await {
                         // Convert the message to a string
-                        let msg_str = arc_message_to_string(&msg);
+                        let msg_str = msg.to_text().unwrap_or_default().to_string();
                         yield Ok(msg_str);
                     }
                 }
@@ -559,7 +649,7 @@ impl RawPocketOption {
             .fuse();
 
             let stream = Arc::new(Mutex::new(boxed_stream));
-            Python::with_gil(|py| RawStreamIterator { stream }.into_py_any(py))
+            Python::attach(|py| RawStreamIterator { stream }.into_py_any(py))
         })
     }
 
@@ -571,36 +661,66 @@ impl RawPocketOption {
         )
     }
 
-    /// Get a handle to the Raw module for custom message processing.
-    /// Returns a RawHandle that can be used to create RawHandlers.
-    pub fn raw_handle<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    /// Disconnects the client while keeping the configuration intact.
+    pub fn disconnect<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
-            let handle = client.raw_handle().await.map_err(BinaryErrorPy::from)?;
-            Python::with_gil(|py| RawHandle { handle }.into_py_any(py))
+            client.disconnect().await.map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| py.None().into_py_any(py))
         })
     }
 
-    /// Create a RawHandler bound to a validator.
-    /// Returns a RawHandler that can send and receive messages.
+    /// Establishes a connection after a manual disconnect.
+    pub fn connect<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            client.connect().await.map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| py.None().into_py_any(py))
+        })
+    }
+
+    /// Disconnects and reconnects the client.
+    pub fn reconnect<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            client.reconnect().await.map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| py.None().into_py_any(py))
+        })
+    }
+
+    /// Unsubscribes from an asset's stream by asset name.
+    pub fn unsubscribe<'py>(&self, py: Python<'py>, asset: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            client.unsubscribe(asset).await.map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| py.None().into_py_any(py))
+        })
+    }
+
+    /// Creates a raw handler with validator and optional keep-alive message.
     pub fn create_raw_handler<'py>(
         &self,
         py: Python<'py>,
         validator: Bound<'py, RawValidator>,
-        keep_alive_message: Option<String>,
+        keep_alive: Option<String>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         let validator = validator.get().clone();
         future_into_py(py, async move {
             let crate_validator: CrateValidator = validator.into();
-            let keep_alive = keep_alive_message.map(|msg| {
+            let keep_alive_msg = keep_alive.map(|msg| {
                 binary_options_tools::pocketoption::modules::raw::Outgoing::Text(msg)
             });
             let handler = client
-                .create_raw_handler(crate_validator, keep_alive)
+                .create_raw_handler(crate_validator, keep_alive_msg)
                 .await
                 .map_err(BinaryErrorPy::from)?;
-            Python::with_gil(|py| RawHandler { handler: Arc::new(Mutex::new(handler)) }.into_py_any(py))
+            Python::attach(|py| {
+                RawHandlerRust {
+                    handler: Arc::new(Mutex::new(handler)),
+                }
+                .into_py_any(py)
+            })
         })
     }
 }
