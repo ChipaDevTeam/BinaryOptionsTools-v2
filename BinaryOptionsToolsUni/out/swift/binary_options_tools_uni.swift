@@ -352,19 +352,29 @@ private func uniffiTraitInterfaceCallWithError<T, E>(
         callStatus.pointee.errorBuf = FfiConverterString.lower(String(describing: error))
     }
 }
+// Initial value and increment amount for handles. 
+// These ensure that SWIFT handles always have the lowest bit set
+fileprivate let UNIFFI_HANDLEMAP_INITIAL: UInt64 = 1
+fileprivate let UNIFFI_HANDLEMAP_DELTA: UInt64 = 2
+
 fileprivate final class UniffiHandleMap<T>: @unchecked Sendable {
     // All mutation happens with this lock held, which is why we implement @unchecked Sendable.
     private let lock = NSLock()
     private var map: [UInt64: T] = [:]
-    private var currentHandle: UInt64 = 1
+    private var currentHandle: UInt64 = UNIFFI_HANDLEMAP_INITIAL
 
     func insert(obj: T) -> UInt64 {
         lock.withLock {
-            let handle = currentHandle
-            currentHandle += 1
-            map[handle] = obj
-            return handle
+            return doInsert(obj)
         }
+    }
+
+    // Low-level insert function, this assumes `lock` is held.
+    private func doInsert(_ obj: T) -> UInt64 {
+        let handle = currentHandle
+        currentHandle += UNIFFI_HANDLEMAP_DELTA
+        map[handle] = obj
+        return handle
     }
 
      func get(handle: UInt64) throws -> T {
@@ -373,6 +383,15 @@ fileprivate final class UniffiHandleMap<T>: @unchecked Sendable {
                 throw UniffiInternalError.unexpectedStaleHandle
             }
             return obj
+        }
+    }
+
+     func clone(handle: UInt64) throws -> UInt64 {
+        try lock.withLock {
+            guard let obj = map[handle] else {
+                throw UniffiInternalError.unexpectedStaleHandle
+            }
+            return doInsert(obj)
         }
     }
 
@@ -542,6 +561,24 @@ fileprivate struct FfiConverterString: FfiConverter {
     }
 }
 
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterData: FfiConverterRustBuffer {
+    typealias SwiftType = Data
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
+        let len: Int32 = try readInt(&buf)
+        return Data(try readBytes(&buf, count: Int(len)))
+    }
+
+    public static func write(_ value: Data, into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        writeBytes(&buf, value)
+    }
+}
+
 
 
 
@@ -594,6 +631,40 @@ public protocol PocketOptionProtocol: AnyObject, Sendable {
     func clearClosedDeals() async 
     
     /**
+     * Creates a raw handler for advanced WebSocket message operations.
+     *
+     * This allows you to send custom messages and receive filtered responses
+     * based on a validator. Useful for implementing custom protocols or
+     * accessing features not directly exposed by the API.
+     *
+     * # Arguments
+     *
+     * * `validator` - Validator to filter incoming messages
+     * * `keep_alive` - Optional message to send on reconnect (e.g., for re-subscribing)
+     *
+     * # Returns
+     *
+     * A `RawHandler` object for sending and receiving messages
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * # Create a validator for balance updates
+     * validator = Validator.contains('"balance"')
+     * handler = await client.create_raw_handler(validator, None)
+     *
+     * # Send a custom message
+     * await handler.send_text('42["getBalance"]')
+     *
+     * # Wait for response
+     * response = await handler.wait_next()
+     * print(f"Received: {response}")
+     * ```
+     */
+    func createRawHandler(validator: Validator, keepAlive: String?) async throws  -> RawHandler
+    
+    /**
      * Gets historical candle data for a specific asset.
      */
     func getCandles(asset: String, period: Int64, offset: Int64) async throws  -> [Candle]
@@ -626,6 +697,34 @@ public protocol PocketOptionProtocol: AnyObject, Sendable {
      * `true` if the account is a demo account, `false` otherwise.
      */
     func isDemo()  -> Bool
+    
+    /**
+     * Gets the payout percentage for a specific asset.
+     *
+     * Returns the profit percentage you'll receive if a trade on this asset wins.
+     * For example, 0.8 means 80% profit (if you bet $1, you get $1.80 back).
+     *
+     * # Arguments
+     *
+     * * `asset` - The symbol of the asset (e.g., "EURUSD_otc")
+     *
+     * # Returns
+     *
+     * The payout percentage as a float, or None if the asset is not available
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * payout = await client.payout("EURUSD_otc")
+     * if payout:
+     * print(f"Payout: {payout * 100}%")
+     * # Example output: "Payout: 80.0%"
+     * else:
+     * print("Asset not available")
+     * ```
+     */
+    func payout(asset: String) async  -> Double?
     
     /**
      * Disconnects and reconnects the client.
@@ -732,13 +831,13 @@ public protocol PocketOptionProtocol: AnyObject, Sendable {
  * multi-language bindings.
  */
 open class PocketOption: PocketOptionProtocol, @unchecked Sendable {
-    fileprivate let pointer: UnsafeMutableRawPointer!
+    fileprivate let handle: UInt64
 
-    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    public struct NoPointer {
+    public struct NoHandle {
         public init() {}
     }
 
@@ -748,27 +847,27 @@ open class PocketOption: PocketOptionProtocol, @unchecked Sendable {
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
-        self.pointer = pointer
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
     }
 
     // This constructor can be used to instantiate a fake object.
-    // - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
     //
     // - Warning:
-    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    public init(noPointer: NoPointer) {
-        self.pointer = nil
+    public init(noHandle: NoHandle) {
+        self.handle = 0
     }
 
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
-        return try! rustCall { uniffi_binary_options_tools_uni_fn_clone_pocketoption(self.pointer, $0) }
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_binary_options_tools_uni_fn_clone_pocketoption(self.handle, $0) }
     }
     /**
      * Creates a new instance of the PocketOption client.
@@ -797,31 +896,68 @@ open class PocketOption: PocketOptionProtocol, @unchecked Sendable {
      * ```
      */
 public convenience init(ssid: String)async throws  {
-    let pointer =
+    let handle =
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new(FfiConverterString.lower(ssid)
                 )
             },
-            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_pointer,
-            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_pointer,
-            freeFunc: ffi_binary_options_tools_uni_rust_future_free_pointer,
+            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_u64,
+            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_u64,
+            freeFunc: ffi_binary_options_tools_uni_rust_future_free_u64,
             liftFunc: FfiConverterTypePocketOption_lift,
             errorHandler: FfiConverterTypeUniError_lift
         )
         
-        .uniffiClonePointer()
-    self.init(unsafeFromRawPointer: pointer)
+        .uniffiCloneHandle()
+    self.init(unsafeFromHandle: handle)
 }
 
     deinit {
-        guard let pointer = pointer else {
-            return
-        }
-
-        try! rustCall { uniffi_binary_options_tools_uni_fn_free_pocketoption(pointer, $0) }
+        try! rustCall { uniffi_binary_options_tools_uni_fn_free_pocketoption(handle, $0) }
     }
 
+    
+    /**
+     * Creates a new instance of the PocketOption client.
+     *
+     * This is the primary constructor for the client. It requires a session ID (ssid)
+     * to authenticate with the PocketOption servers.
+     *
+     * # Arguments
+     *
+     * * `ssid` - The session ID for your PocketOption account.
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * import asyncio
+     * from binaryoptionstoolsuni import PocketOption
+     *
+     * async def main():
+     * ssid = "YOUR_SESSION_ID"
+     * api = await PocketOption.init(ssid)
+     * balance = await api.balance()
+     * print(f"Balance: {balance}")
+     *
+     * asyncio.run(main())
+     * ```
+     */
+public static func `init`(ssid: String)async throws  -> PocketOption  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_binary_options_tools_uni_fn_constructor_pocketoption_init(FfiConverterString.lower(ssid)
+                )
+            },
+            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_u64,
+            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_u64,
+            freeFunc: ffi_binary_options_tools_uni_rust_future_free_u64,
+            liftFunc: FfiConverterTypePocketOption_lift,
+            errorHandler: FfiConverterTypeUniError_lift
+        )
+}
     
     /**
      * Creates a new instance of the PocketOption client with a custom WebSocket URL.
@@ -841,9 +977,9 @@ public static func newWithUrl(ssid: String, url: String)async throws  -> PocketO
                 uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new_with_url(FfiConverterString.lower(ssid),FfiConverterString.lower(url)
                 )
             },
-            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_pointer,
-            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_pointer,
-            freeFunc: ffi_binary_options_tools_uni_rust_future_free_pointer,
+            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_u64,
+            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_u64,
+            freeFunc: ffi_binary_options_tools_uni_rust_future_free_u64,
             liftFunc: FfiConverterTypePocketOption_lift,
             errorHandler: FfiConverterTypeUniError_lift
         )
@@ -863,7 +999,7 @@ open func assets()async  -> [Asset]?  {
         try!  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_assets(
-                    self.uniffiClonePointer()
+                    self.uniffiCloneHandle()
                     
                 )
             },
@@ -890,7 +1026,7 @@ open func balance()async  -> Double  {
         try!  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_balance(
-                    self.uniffiClonePointer()
+                    self.uniffiCloneHandle()
                     
                 )
             },
@@ -913,7 +1049,7 @@ open func buy(asset: String, time: UInt32, amount: Double)async throws  -> Deal 
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_buy(
-                    self.uniffiClonePointer(),
+                    self.uniffiCloneHandle(),
                     FfiConverterString.lower(asset),FfiConverterUInt32.lower(time),FfiConverterDouble.lower(amount)
                 )
             },
@@ -933,7 +1069,7 @@ open func clearClosedDeals()async   {
         try!  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals(
-                    self.uniffiClonePointer()
+                    self.uniffiCloneHandle()
                     
                 )
             },
@@ -947,6 +1083,55 @@ open func clearClosedDeals()async   {
 }
     
     /**
+     * Creates a raw handler for advanced WebSocket message operations.
+     *
+     * This allows you to send custom messages and receive filtered responses
+     * based on a validator. Useful for implementing custom protocols or
+     * accessing features not directly exposed by the API.
+     *
+     * # Arguments
+     *
+     * * `validator` - Validator to filter incoming messages
+     * * `keep_alive` - Optional message to send on reconnect (e.g., for re-subscribing)
+     *
+     * # Returns
+     *
+     * A `RawHandler` object for sending and receiving messages
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * # Create a validator for balance updates
+     * validator = Validator.contains('"balance"')
+     * handler = await client.create_raw_handler(validator, None)
+     *
+     * # Send a custom message
+     * await handler.send_text('42["getBalance"]')
+     *
+     * # Wait for response
+     * response = await handler.wait_next()
+     * print(f"Received: {response}")
+     * ```
+     */
+open func createRawHandler(validator: Validator, keepAlive: String?)async throws  -> RawHandler  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_binary_options_tools_uni_fn_method_pocketoption_create_raw_handler(
+                    self.uniffiCloneHandle(),
+                    FfiConverterTypeValidator_lower(validator),FfiConverterOptionString.lower(keepAlive)
+                )
+            },
+            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_u64,
+            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_u64,
+            freeFunc: ffi_binary_options_tools_uni_rust_future_free_u64,
+            liftFunc: FfiConverterTypeRawHandler_lift,
+            errorHandler: FfiConverterTypeUniError_lift
+        )
+}
+    
+    /**
      * Gets historical candle data for a specific asset.
      */
 open func getCandles(asset: String, period: Int64, offset: Int64)async throws  -> [Candle]  {
@@ -954,7 +1139,7 @@ open func getCandles(asset: String, period: Int64, offset: Int64)async throws  -
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles(
-                    self.uniffiClonePointer(),
+                    self.uniffiCloneHandle(),
                     FfiConverterString.lower(asset),FfiConverterInt64.lower(period),FfiConverterInt64.lower(offset)
                 )
             },
@@ -974,7 +1159,7 @@ open func getCandlesAdvanced(asset: String, period: Int64, time: Int64, offset: 
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced(
-                    self.uniffiClonePointer(),
+                    self.uniffiCloneHandle(),
                     FfiConverterString.lower(asset),FfiConverterInt64.lower(period),FfiConverterInt64.lower(time),FfiConverterInt64.lower(offset)
                 )
             },
@@ -994,7 +1179,7 @@ open func getClosedDeals()async  -> [Deal]  {
         try!  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals(
-                    self.uniffiClonePointer()
+                    self.uniffiCloneHandle()
                     
                 )
             },
@@ -1015,7 +1200,7 @@ open func getOpenedDeals()async  -> [Deal]  {
         try!  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals(
-                    self.uniffiClonePointer()
+                    self.uniffiCloneHandle()
                     
                 )
             },
@@ -1036,7 +1221,7 @@ open func history(asset: String, period: UInt32)async throws  -> [Candle]  {
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_history(
-                    self.uniffiClonePointer(),
+                    self.uniffiCloneHandle(),
                     FfiConverterString.lower(asset),FfiConverterUInt32.lower(period)
                 )
             },
@@ -1057,9 +1242,54 @@ open func history(asset: String, period: UInt32)async throws  -> [Candle]  {
      */
 open func isDemo() -> Bool  {
     return try!  FfiConverterBool.lift(try! rustCall() {
-    uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo(self.uniffiClonePointer(),$0
+    uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo(
+            self.uniffiCloneHandle(),$0
     )
 })
+}
+    
+    /**
+     * Gets the payout percentage for a specific asset.
+     *
+     * Returns the profit percentage you'll receive if a trade on this asset wins.
+     * For example, 0.8 means 80% profit (if you bet $1, you get $1.80 back).
+     *
+     * # Arguments
+     *
+     * * `asset` - The symbol of the asset (e.g., "EURUSD_otc")
+     *
+     * # Returns
+     *
+     * The payout percentage as a float, or None if the asset is not available
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * payout = await client.payout("EURUSD_otc")
+     * if payout:
+     * print(f"Payout: {payout * 100}%")
+     * # Example output: "Payout: 80.0%"
+     * else:
+     * print("Asset not available")
+     * ```
+     */
+open func payout(asset: String)async  -> Double?  {
+    return
+        try!  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_binary_options_tools_uni_fn_method_pocketoption_payout(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(asset)
+                )
+            },
+            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
+            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
+            freeFunc: ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionDouble.lift,
+            errorHandler: nil
+            
+        )
 }
     
     /**
@@ -1070,7 +1300,7 @@ open func reconnect()async throws   {
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect(
-                    self.uniffiClonePointer()
+                    self.uniffiCloneHandle()
                     
                 )
             },
@@ -1098,7 +1328,7 @@ open func result(id: String)async throws  -> Deal  {
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_result(
-                    self.uniffiClonePointer(),
+                    self.uniffiCloneHandle(),
                     FfiConverterString.lower(id)
                 )
             },
@@ -1127,7 +1357,7 @@ open func resultWithTimeout(id: String, timeoutSecs: UInt64)async throws  -> Dea
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout(
-                    self.uniffiClonePointer(),
+                    self.uniffiCloneHandle(),
                     FfiConverterString.lower(id),FfiConverterUInt64.lower(timeoutSecs)
                 )
             },
@@ -1149,7 +1379,7 @@ open func sell(asset: String, time: UInt32, amount: Double)async throws  -> Deal
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_sell(
-                    self.uniffiClonePointer(),
+                    self.uniffiCloneHandle(),
                     FfiConverterString.lower(asset),FfiConverterUInt32.lower(time),FfiConverterDouble.lower(amount)
                 )
             },
@@ -1169,7 +1399,7 @@ open func serverTime()async  -> Int64  {
         try!  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time(
-                    self.uniffiClonePointer()
+                    self.uniffiCloneHandle()
                     
                 )
             },
@@ -1193,7 +1423,7 @@ open func shutdown()async throws   {
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown(
-                    self.uniffiClonePointer()
+                    self.uniffiCloneHandle()
                     
                 )
             },
@@ -1222,13 +1452,13 @@ open func subscribe(asset: String, durationSecs: UInt64)async throws  -> Subscri
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe(
-                    self.uniffiClonePointer(),
+                    self.uniffiCloneHandle(),
                     FfiConverterString.lower(asset),FfiConverterUInt64.lower(durationSecs)
                 )
             },
-            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_pointer,
-            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_pointer,
-            freeFunc: ffi_binary_options_tools_uni_rust_future_free_pointer,
+            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_u64,
+            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_u64,
+            freeFunc: ffi_binary_options_tools_uni_rust_future_free_u64,
             liftFunc: FfiConverterTypeSubscriptionStream_lift,
             errorHandler: FfiConverterTypeUniError_lift
         )
@@ -1255,7 +1485,7 @@ open func trade(asset: String, action: Action, time: UInt32, amount: Double)asyn
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_trade(
-                    self.uniffiClonePointer(),
+                    self.uniffiCloneHandle(),
                     FfiConverterString.lower(asset),FfiConverterTypeAction_lower(action),FfiConverterUInt32.lower(time),FfiConverterDouble.lower(amount)
                 )
             },
@@ -1275,7 +1505,7 @@ open func unsubscribe(asset: String)async throws   {
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe(
-                    self.uniffiClonePointer(),
+                    self.uniffiCloneHandle(),
                     FfiConverterString.lower(asset)
                 )
             },
@@ -1288,6 +1518,7 @@ open func unsubscribe(asset: String)async throws   {
 }
     
 
+    
 }
 
 
@@ -1295,33 +1526,24 @@ open func unsubscribe(asset: String)async throws   {
 @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypePocketOption: FfiConverter {
-
-    typealias FfiType = UnsafeMutableRawPointer
+    typealias FfiType = UInt64
     typealias SwiftType = PocketOption
 
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> PocketOption {
-        return PocketOption(unsafeFromRawPointer: pointer)
+    public static func lift(_ handle: UInt64) throws -> PocketOption {
+        return PocketOption(unsafeFromHandle: handle)
     }
 
-    public static func lower(_ value: PocketOption) -> UnsafeMutableRawPointer {
-        return value.uniffiClonePointer()
+    public static func lower(_ value: PocketOption) -> UInt64 {
+        return value.uniffiCloneHandle()
     }
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PocketOption {
-        let v: UInt64 = try readInt(&buf)
-        // The Rust code won't compile if a pointer won't fit in a UInt64.
-        // We have to go via `UInt` because that's the thing that's the size of a pointer.
-        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
-        if (ptr == nil) {
-            throw UniffiInternalError.unexpectedNullPointer
-        }
-        return try lift(ptr!)
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
     }
 
     public static func write(_ value: PocketOption, into buf: inout [UInt8]) {
-        // This fiddling is because `Int` is the thing that's the same size as a pointer.
-        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
-        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+        writeInt(&buf, lower(value))
     }
 }
 
@@ -1329,15 +1551,328 @@ public struct FfiConverterTypePocketOption: FfiConverter {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypePocketOption_lift(_ pointer: UnsafeMutableRawPointer) throws -> PocketOption {
-    return try FfiConverterTypePocketOption.lift(pointer)
+public func FfiConverterTypePocketOption_lift(_ handle: UInt64) throws -> PocketOption {
+    return try FfiConverterTypePocketOption.lift(handle)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypePocketOption_lower(_ value: PocketOption) -> UnsafeMutableRawPointer {
+public func FfiConverterTypePocketOption_lower(_ value: PocketOption) -> UInt64 {
     return FfiConverterTypePocketOption.lower(value)
+}
+
+
+
+
+
+
+/**
+ * Handler for advanced raw WebSocket message operations.
+ *
+ * Provides low-level access to send messages and receive filtered responses
+ * based on a validator. Each handler maintains its own message stream.
+ */
+public protocol RawHandlerProtocol: AnyObject, Sendable {
+    
+    /**
+     * Send a message and wait for the next matching response.
+     *
+     * # Arguments
+     *
+     * * `message` - Message to send
+     *
+     * # Returns
+     *
+     * The first response that matches this handler's validator
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * response = await handler.send_and_wait('42["getBalance"]')
+     * data = json.loads(response)
+     * ```
+     */
+    func sendAndWait(message: String) async throws  -> String
+    
+    /**
+     * Send a binary message through this handler.
+     *
+     * # Arguments
+     *
+     * * `data` - Binary data to send
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * await handler.send_binary(b'\\x00\\x01\\x02')
+     * ```
+     */
+    func sendBinary(data: Data) async throws 
+    
+    /**
+     * Send a text message through this handler.
+     *
+     * # Arguments
+     *
+     * * `message` - Text message to send
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * await handler.send_text('42["ping"]')
+     * ```
+     */
+    func sendText(message: String) async throws 
+    
+    /**
+     * Wait for the next message that matches this handler's validator.
+     *
+     * # Returns
+     *
+     * The next matching message
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * message = await handler.wait_next()
+     * print(f"Received: {message}")
+     * ```
+     */
+    func waitNext() async throws  -> String
+    
+}
+/**
+ * Handler for advanced raw WebSocket message operations.
+ *
+ * Provides low-level access to send messages and receive filtered responses
+ * based on a validator. Each handler maintains its own message stream.
+ */
+open class RawHandler: RawHandlerProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_binary_options_tools_uni_fn_clone_rawhandler(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        try! rustCall { uniffi_binary_options_tools_uni_fn_free_rawhandler(handle, $0) }
+    }
+
+    
+
+    
+    /**
+     * Send a message and wait for the next matching response.
+     *
+     * # Arguments
+     *
+     * * `message` - Message to send
+     *
+     * # Returns
+     *
+     * The first response that matches this handler's validator
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * response = await handler.send_and_wait('42["getBalance"]')
+     * data = json.loads(response)
+     * ```
+     */
+open func sendAndWait(message: String)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_binary_options_tools_uni_fn_method_rawhandler_send_and_wait(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(message)
+                )
+            },
+            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
+            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
+            freeFunc: ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeUniError_lift
+        )
+}
+    
+    /**
+     * Send a binary message through this handler.
+     *
+     * # Arguments
+     *
+     * * `data` - Binary data to send
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * await handler.send_binary(b'\\x00\\x01\\x02')
+     * ```
+     */
+open func sendBinary(data: Data)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_binary_options_tools_uni_fn_method_rawhandler_send_binary(
+                    self.uniffiCloneHandle(),
+                    FfiConverterData.lower(data)
+                )
+            },
+            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_void,
+            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_void,
+            freeFunc: ffi_binary_options_tools_uni_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeUniError_lift
+        )
+}
+    
+    /**
+     * Send a text message through this handler.
+     *
+     * # Arguments
+     *
+     * * `message` - Text message to send
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * await handler.send_text('42["ping"]')
+     * ```
+     */
+open func sendText(message: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_binary_options_tools_uni_fn_method_rawhandler_send_text(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(message)
+                )
+            },
+            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_void,
+            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_void,
+            freeFunc: ffi_binary_options_tools_uni_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeUniError_lift
+        )
+}
+    
+    /**
+     * Wait for the next message that matches this handler's validator.
+     *
+     * # Returns
+     *
+     * The next matching message
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * message = await handler.wait_next()
+     * print(f"Received: {message}")
+     * ```
+     */
+open func waitNext()async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_binary_options_tools_uni_fn_method_rawhandler_wait_next(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_binary_options_tools_uni_rust_future_poll_rust_buffer,
+            completeFunc: ffi_binary_options_tools_uni_rust_future_complete_rust_buffer,
+            freeFunc: ffi_binary_options_tools_uni_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeUniError_lift
+        )
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRawHandler: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = RawHandler
+
+    public static func lift(_ handle: UInt64) throws -> RawHandler {
+        return RawHandler(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: RawHandler) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RawHandler {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: RawHandler, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRawHandler_lift(_ handle: UInt64) throws -> RawHandler {
+    return try FfiConverterTypeRawHandler.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRawHandler_lower(_ value: RawHandler) -> UInt64 {
+    return FfiConverterTypeRawHandler.lower(value)
 }
 
 
@@ -1412,13 +1947,13 @@ public protocol SubscriptionStreamProtocol: AnyObject, Sendable {
  * consume the stream by repeatedly calling the `next` method.
  */
 open class SubscriptionStream: SubscriptionStreamProtocol, @unchecked Sendable {
-    fileprivate let pointer: UnsafeMutableRawPointer!
+    fileprivate let handle: UInt64
 
-    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    public struct NoPointer {
+    public struct NoHandle {
         public init() {}
     }
 
@@ -1428,36 +1963,32 @@ open class SubscriptionStream: SubscriptionStreamProtocol, @unchecked Sendable {
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
-        self.pointer = pointer
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
     }
 
     // This constructor can be used to instantiate a fake object.
-    // - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
     //
     // - Warning:
-    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    public init(noPointer: NoPointer) {
-        self.pointer = nil
+    public init(noHandle: NoHandle) {
+        self.handle = 0
     }
 
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
-        return try! rustCall { uniffi_binary_options_tools_uni_fn_clone_subscriptionstream(self.pointer, $0) }
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_binary_options_tools_uni_fn_clone_subscriptionstream(self.handle, $0) }
     }
     // No primary constructor declared for this class.
 
     deinit {
-        guard let pointer = pointer else {
-            return
-        }
-
-        try! rustCall { uniffi_binary_options_tools_uni_fn_free_subscriptionstream(pointer, $0) }
+        try! rustCall { uniffi_binary_options_tools_uni_fn_free_subscriptionstream(handle, $0) }
     }
 
     
@@ -1507,7 +2038,7 @@ open func next()async throws  -> Candle  {
         try  await uniffiRustCallAsync(
             rustFutureFunc: {
                 uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next(
-                    self.uniffiClonePointer()
+                    self.uniffiCloneHandle()
                     
                 )
             },
@@ -1520,6 +2051,7 @@ open func next()async throws  -> Candle  {
 }
     
 
+    
 }
 
 
@@ -1527,33 +2059,24 @@ open func next()async throws  -> Candle  {
 @_documentation(visibility: private)
 #endif
 public struct FfiConverterTypeSubscriptionStream: FfiConverter {
-
-    typealias FfiType = UnsafeMutableRawPointer
+    typealias FfiType = UInt64
     typealias SwiftType = SubscriptionStream
 
-    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> SubscriptionStream {
-        return SubscriptionStream(unsafeFromRawPointer: pointer)
+    public static func lift(_ handle: UInt64) throws -> SubscriptionStream {
+        return SubscriptionStream(unsafeFromHandle: handle)
     }
 
-    public static func lower(_ value: SubscriptionStream) -> UnsafeMutableRawPointer {
-        return value.uniffiClonePointer()
+    public static func lower(_ value: SubscriptionStream) -> UInt64 {
+        return value.uniffiCloneHandle()
     }
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SubscriptionStream {
-        let v: UInt64 = try readInt(&buf)
-        // The Rust code won't compile if a pointer won't fit in a UInt64.
-        // We have to go via `UInt` because that's the thing that's the size of a pointer.
-        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
-        if (ptr == nil) {
-            throw UniffiInternalError.unexpectedNullPointer
-        }
-        return try lift(ptr!)
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
     }
 
     public static func write(_ value: SubscriptionStream, into buf: inout [UInt8]) {
-        // This fiddling is because `Int` is the thing that's the same size as a pointer.
-        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
-        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+        writeInt(&buf, lower(value))
     }
 }
 
@@ -1561,15 +2084,323 @@ public struct FfiConverterTypeSubscriptionStream: FfiConverter {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeSubscriptionStream_lift(_ pointer: UnsafeMutableRawPointer) throws -> SubscriptionStream {
-    return try FfiConverterTypeSubscriptionStream.lift(pointer)
+public func FfiConverterTypeSubscriptionStream_lift(_ handle: UInt64) throws -> SubscriptionStream {
+    return try FfiConverterTypeSubscriptionStream.lift(handle)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeSubscriptionStream_lower(_ value: SubscriptionStream) -> UnsafeMutableRawPointer {
+public func FfiConverterTypeSubscriptionStream_lower(_ value: SubscriptionStream) -> UInt64 {
     return FfiConverterTypeSubscriptionStream.lower(value)
+}
+
+
+
+
+
+
+/**
+ * Validator for filtering WebSocket messages.
+ *
+ * Provides various methods to validate messages using different strategies
+ * like regex matching, prefix/suffix checking, and logical combinations.
+ */
+public protocol ValidatorProtocol: AnyObject, Sendable {
+    
+    /**
+     * Checks if a message matches this validator's conditions.
+     *
+     * # Arguments
+     *
+     * * `message` - String to validate
+     *
+     * # Returns
+     *
+     * True if message matches the validator's conditions, False otherwise
+     */
+    func check(message: String)  -> Bool
+    
+}
+/**
+ * Validator for filtering WebSocket messages.
+ *
+ * Provides various methods to validate messages using different strategies
+ * like regex matching, prefix/suffix checking, and logical combinations.
+ */
+open class Validator: ValidatorProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_binary_options_tools_uni_fn_clone_validator(self.handle, $0) }
+    }
+    /**
+     * Creates a default validator that accepts all messages.
+     */
+public convenience init() {
+    let handle =
+        try! rustCall() {
+    uniffi_binary_options_tools_uni_fn_constructor_validator_new($0
+    )
+}
+    self.init(unsafeFromHandle: handle)
+}
+
+    deinit {
+        try! rustCall { uniffi_binary_options_tools_uni_fn_free_validator(handle, $0) }
+    }
+
+    
+    /**
+     * Creates a validator that requires all input validators to match.
+     *
+     * # Arguments
+     *
+     * * `validators` - List of validators that all must match
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * # Match messages that start with "Hello" and end with "World"
+     * v = Validator.all([
+     * Validator.starts_with("Hello"),
+     * Validator.ends_with("World")
+     * ])
+     * assert v.check("Hello Beautiful World") == True
+     * assert v.check("Hello Beautiful") == False
+     * ```
+     */
+public static func all(validators: [Validator]) -> Validator  {
+    return try!  FfiConverterTypeValidator_lift(try! rustCall() {
+    uniffi_binary_options_tools_uni_fn_constructor_validator_all(
+        FfiConverterSequenceTypeValidator.lower(validators),$0
+    )
+})
+}
+    
+    /**
+     * Creates a validator that requires at least one input validator to match.
+     *
+     * # Arguments
+     *
+     * * `validators` - List of validators where at least one must match
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * # Match messages containing either "success" or "completed"
+     * v = Validator.any([
+     * Validator.contains("success"),
+     * Validator.contains("completed")
+     * ])
+     * assert v.check("operation successful") == True
+     * assert v.check("task completed") == True
+     * assert v.check("in progress") == False
+     * ```
+     */
+public static func any(validators: [Validator]) -> Validator  {
+    return try!  FfiConverterTypeValidator_lift(try! rustCall() {
+    uniffi_binary_options_tools_uni_fn_constructor_validator_any(
+        FfiConverterSequenceTypeValidator.lower(validators),$0
+    )
+})
+}
+    
+    /**
+     * Creates a validator that checks if messages contain a specific substring.
+     *
+     * # Arguments
+     *
+     * * `substring` - String that should be present in messages
+     */
+public static func contains(substring: String) -> Validator  {
+    return try!  FfiConverterTypeValidator_lift(try! rustCall() {
+    uniffi_binary_options_tools_uni_fn_constructor_validator_contains(
+        FfiConverterString.lower(substring),$0
+    )
+})
+}
+    
+    /**
+     * Creates a validator that checks if messages end with a specific suffix.
+     *
+     * # Arguments
+     *
+     * * `suffix` - String that messages should end with
+     */
+public static func endsWith(suffix: String) -> Validator  {
+    return try!  FfiConverterTypeValidator_lift(try! rustCall() {
+    uniffi_binary_options_tools_uni_fn_constructor_validator_ends_with(
+        FfiConverterString.lower(suffix),$0
+    )
+})
+}
+    
+    /**
+     * Creates a validator that negates another validator's result.
+     *
+     * # Arguments
+     *
+     * * `validator` - Validator whose result should be negated
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * # Match messages that don't contain "error"
+     * v = Validator.ne(Validator.contains("error"))
+     * assert v.check("success message") == True
+     * assert v.check("error occurred") == False
+     * ```
+     */
+public static func ne(validator: Validator) -> Validator  {
+    return try!  FfiConverterTypeValidator_lift(try! rustCall() {
+    uniffi_binary_options_tools_uni_fn_constructor_validator_ne(
+        FfiConverterTypeValidator_lower(validator),$0
+    )
+})
+}
+    
+    /**
+     * Creates a validator that uses regex pattern matching.
+     *
+     * # Arguments
+     *
+     * * `pattern` - Regular expression pattern
+     *
+     * # Examples
+     *
+     * ## Python
+     * ```python
+     * # Match messages starting with a number
+     * validator = Validator.regex(r"^\d+")
+     * assert validator.check("123 message") == True
+     * assert validator.check("abc") == False
+     * ```
+     */
+public static func regex(pattern: String)throws  -> Validator  {
+    return try  FfiConverterTypeValidator_lift(try rustCallWithError(FfiConverterTypeUniError_lift) {
+    uniffi_binary_options_tools_uni_fn_constructor_validator_regex(
+        FfiConverterString.lower(pattern),$0
+    )
+})
+}
+    
+    /**
+     * Creates a validator that checks if messages start with a specific prefix.
+     *
+     * # Arguments
+     *
+     * * `prefix` - String that messages should start with
+     */
+public static func startsWith(prefix: String) -> Validator  {
+    return try!  FfiConverterTypeValidator_lift(try! rustCall() {
+    uniffi_binary_options_tools_uni_fn_constructor_validator_starts_with(
+        FfiConverterString.lower(prefix),$0
+    )
+})
+}
+    
+
+    
+    /**
+     * Checks if a message matches this validator's conditions.
+     *
+     * # Arguments
+     *
+     * * `message` - String to validate
+     *
+     * # Returns
+     *
+     * True if message matches the validator's conditions, False otherwise
+     */
+open func check(message: String) -> Bool  {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_binary_options_tools_uni_fn_method_validator_check(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(message),$0
+    )
+})
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeValidator: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = Validator
+
+    public static func lift(_ handle: UInt64) throws -> Validator {
+        return Validator(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: Validator) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Validator {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: Validator, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeValidator_lift(_ handle: UInt64) throws -> Validator {
+    return try FfiConverterTypeValidator.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeValidator_lower(_ value: Validator) -> UInt64 {
+    return FfiConverterTypeValidator.lower(value)
 }
 
 
@@ -1593,7 +2424,7 @@ public func FfiConverterTypeSubscriptionStream_lower(_ value: SubscriptionStream
  * print(eurusd.name)
  * ```
  */
-public struct Asset {
+public struct Asset: Equatable, Hashable {
     public var id: Int32
     public var name: String
     public var symbol: String
@@ -1615,55 +2446,13 @@ public struct Asset {
         self.allowedCandles = allowedCandles
         self.assetType = assetType
     }
+
+    
 }
 
 #if compiler(>=6)
 extension Asset: Sendable {}
 #endif
-
-
-extension Asset: Equatable, Hashable {
-    public static func ==(lhs: Asset, rhs: Asset) -> Bool {
-        if lhs.id != rhs.id {
-            return false
-        }
-        if lhs.name != rhs.name {
-            return false
-        }
-        if lhs.symbol != rhs.symbol {
-            return false
-        }
-        if lhs.isOtc != rhs.isOtc {
-            return false
-        }
-        if lhs.isActive != rhs.isActive {
-            return false
-        }
-        if lhs.payout != rhs.payout {
-            return false
-        }
-        if lhs.allowedCandles != rhs.allowedCandles {
-            return false
-        }
-        if lhs.assetType != rhs.assetType {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-        hasher.combine(name)
-        hasher.combine(symbol)
-        hasher.combine(isOtc)
-        hasher.combine(isActive)
-        hasher.combine(payout)
-        hasher.combine(allowedCandles)
-        hasher.combine(assetType)
-    }
-}
-
-
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -1729,7 +2518,7 @@ public func FfiConverterTypeAsset_lower(_ value: Asset) -> RustBuffer {
  * print(f"Candle for {candle.symbol} at {candle.timestamp}: O={candle.open}, H={candle.high}, L={candle.low}, C={candle.close}")
  * ```
  */
-public struct Candle {
+public struct Candle: Equatable, Hashable {
     public var symbol: String
     public var timestamp: Int64
     public var `open`: Double
@@ -1749,51 +2538,13 @@ public struct Candle {
         self.close = close
         self.volume = volume
     }
+
+    
 }
 
 #if compiler(>=6)
 extension Candle: Sendable {}
 #endif
-
-
-extension Candle: Equatable, Hashable {
-    public static func ==(lhs: Candle, rhs: Candle) -> Bool {
-        if lhs.symbol != rhs.symbol {
-            return false
-        }
-        if lhs.timestamp != rhs.timestamp {
-            return false
-        }
-        if lhs.`open` != rhs.`open` {
-            return false
-        }
-        if lhs.high != rhs.high {
-            return false
-        }
-        if lhs.low != rhs.low {
-            return false
-        }
-        if lhs.close != rhs.close {
-            return false
-        }
-        if lhs.volume != rhs.volume {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(symbol)
-        hasher.combine(timestamp)
-        hasher.combine(`open`)
-        hasher.combine(high)
-        hasher.combine(low)
-        hasher.combine(close)
-        hasher.combine(volume)
-    }
-}
-
-
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -1854,7 +2605,7 @@ public func FfiConverterTypeCandle_lower(_ value: Candle) -> RustBuffer {
  * five_second_candle = CandleLength(time=5)
  * ```
  */
-public struct CandleLength {
+public struct CandleLength: Equatable, Hashable {
     public var time: UInt32
 
     // Default memberwise initializers are never public by default, so we
@@ -1862,27 +2613,13 @@ public struct CandleLength {
     public init(time: UInt32) {
         self.time = time
     }
+
+    
 }
 
 #if compiler(>=6)
 extension CandleLength: Sendable {}
 #endif
-
-
-extension CandleLength: Equatable, Hashable {
-    public static func ==(lhs: CandleLength, rhs: CandleLength) -> Bool {
-        if lhs.time != rhs.time {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(time)
-    }
-}
-
-
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -1935,7 +2672,7 @@ public func FfiConverterTypeCandleLength_lower(_ value: CandleLength) -> RustBuf
  * print(f"Trade {deal.id} on {deal.asset} resulted in a profit of {deal.profit}")
  * ```
  */
-public struct Deal {
+public struct Deal: Equatable, Hashable {
     public var id: String
     public var openTime: String
     public var closeTime: String
@@ -1993,127 +2730,13 @@ public struct Deal {
         self.amountUsd = amountUsd
         self.amountUsd2 = amountUsd2
     }
+
+    
 }
 
 #if compiler(>=6)
 extension Deal: Sendable {}
 #endif
-
-
-extension Deal: Equatable, Hashable {
-    public static func ==(lhs: Deal, rhs: Deal) -> Bool {
-        if lhs.id != rhs.id {
-            return false
-        }
-        if lhs.openTime != rhs.openTime {
-            return false
-        }
-        if lhs.closeTime != rhs.closeTime {
-            return false
-        }
-        if lhs.openTimestamp != rhs.openTimestamp {
-            return false
-        }
-        if lhs.closeTimestamp != rhs.closeTimestamp {
-            return false
-        }
-        if lhs.uid != rhs.uid {
-            return false
-        }
-        if lhs.requestId != rhs.requestId {
-            return false
-        }
-        if lhs.amount != rhs.amount {
-            return false
-        }
-        if lhs.profit != rhs.profit {
-            return false
-        }
-        if lhs.percentProfit != rhs.percentProfit {
-            return false
-        }
-        if lhs.percentLoss != rhs.percentLoss {
-            return false
-        }
-        if lhs.openPrice != rhs.openPrice {
-            return false
-        }
-        if lhs.closePrice != rhs.closePrice {
-            return false
-        }
-        if lhs.command != rhs.command {
-            return false
-        }
-        if lhs.asset != rhs.asset {
-            return false
-        }
-        if lhs.isDemo != rhs.isDemo {
-            return false
-        }
-        if lhs.copyTicket != rhs.copyTicket {
-            return false
-        }
-        if lhs.openMs != rhs.openMs {
-            return false
-        }
-        if lhs.closeMs != rhs.closeMs {
-            return false
-        }
-        if lhs.optionType != rhs.optionType {
-            return false
-        }
-        if lhs.isRollover != rhs.isRollover {
-            return false
-        }
-        if lhs.isCopySignal != rhs.isCopySignal {
-            return false
-        }
-        if lhs.isAi != rhs.isAi {
-            return false
-        }
-        if lhs.currency != rhs.currency {
-            return false
-        }
-        if lhs.amountUsd != rhs.amountUsd {
-            return false
-        }
-        if lhs.amountUsd2 != rhs.amountUsd2 {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-        hasher.combine(openTime)
-        hasher.combine(closeTime)
-        hasher.combine(openTimestamp)
-        hasher.combine(closeTimestamp)
-        hasher.combine(uid)
-        hasher.combine(requestId)
-        hasher.combine(amount)
-        hasher.combine(profit)
-        hasher.combine(percentProfit)
-        hasher.combine(percentLoss)
-        hasher.combine(openPrice)
-        hasher.combine(closePrice)
-        hasher.combine(command)
-        hasher.combine(asset)
-        hasher.combine(isDemo)
-        hasher.combine(copyTicket)
-        hasher.combine(openMs)
-        hasher.combine(closeMs)
-        hasher.combine(optionType)
-        hasher.combine(isRollover)
-        hasher.combine(isCopySignal)
-        hasher.combine(isAi)
-        hasher.combine(currency)
-        hasher.combine(amountUsd)
-        hasher.combine(amountUsd2)
-    }
-}
-
-
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -2247,12 +2870,14 @@ public func FfiConverterTypeDeal_lower(_ value: Deal) -> RustBuffer {
  * ```
  */
 
-public enum Action {
+public enum Action: Equatable, Hashable {
     
     case call
     case put
-}
 
+
+
+}
 
 #if compiler(>=6)
 extension Action: Sendable {}
@@ -2307,13 +2932,6 @@ public func FfiConverterTypeAction_lower(_ value: Action) -> RustBuffer {
 }
 
 
-extension Action: Equatable, Hashable {}
-
-
-
-
-
-
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
@@ -2332,15 +2950,17 @@ extension Action: Equatable, Hashable {}
  * ```
  */
 
-public enum AssetType {
+public enum AssetType: Equatable, Hashable {
     
     case stock
     case currency
     case commodity
     case cryptocurrency
     case index
-}
 
+
+
+}
 
 #if compiler(>=6)
 extension AssetType: Sendable {}
@@ -2413,15 +3033,8 @@ public func FfiConverterTypeAssetType_lower(_ value: AssetType) -> RustBuffer {
 }
 
 
-extension AssetType: Equatable, Hashable {}
 
-
-
-
-
-
-
-public enum UniError: Swift.Error {
+public enum UniError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
     
     
@@ -2431,8 +3044,21 @@ public enum UniError: Swift.Error {
     )
     case Uuid(String
     )
+    case Validator(String
+    )
+
+    
+
+    
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+    
 }
 
+#if compiler(>=6)
+extension UniError: Sendable {}
+#endif
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -2454,6 +3080,9 @@ public struct FfiConverterTypeUniError: FfiConverterRustBuffer {
             try FfiConverterString.read(from: &buf)
             )
         case 3: return .Uuid(
+            try FfiConverterString.read(from: &buf)
+            )
+        case 4: return .Validator(
             try FfiConverterString.read(from: &buf)
             )
 
@@ -2482,6 +3111,11 @@ public struct FfiConverterTypeUniError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(3))
             FfiConverterString.write(v1, into: &buf)
             
+        
+        case let .Validator(v1):
+            writeInt(&buf, Int32(4))
+            FfiConverterString.write(v1, into: &buf)
+            
         }
     }
 }
@@ -2500,21 +3134,6 @@ public func FfiConverterTypeUniError_lift(_ buf: RustBuffer) throws -> UniError 
 public func FfiConverterTypeUniError_lower(_ value: UniError) -> RustBuffer {
     return FfiConverterTypeUniError.lower(value)
 }
-
-
-extension UniError: Equatable, Hashable {}
-
-
-
-
-extension UniError: Foundation.LocalizedError {
-    public var errorDescription: String? {
-        String(reflecting: self)
-    }
-}
-
-
-
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -2639,6 +3258,31 @@ fileprivate struct FfiConverterOptionSequenceTypeAsset: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeValidator: FfiConverterRustBuffer {
+    typealias SwiftType = [Validator]
+
+    public static func write(_ value: [Validator], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeValidator.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Validator] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [Validator]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeValidator.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeAsset: FfiConverterRustBuffer {
     typealias SwiftType = [Asset]
 
@@ -2736,7 +3380,7 @@ fileprivate struct FfiConverterSequenceTypeDeal: FfiConverterRustBuffer {
     }
 }
 private let UNIFFI_RUST_FUTURE_POLL_READY: Int8 = 0
-private let UNIFFI_RUST_FUTURE_POLL_MAYBE_READY: Int8 = 1
+private let UNIFFI_RUST_FUTURE_POLL_WAKE: Int8 = 1
 
 fileprivate let uniffiContinuationHandleMap = UniffiHandleMap<UnsafeContinuation<Int8, Never>>()
 
@@ -2760,7 +3404,9 @@ fileprivate func uniffiRustCallAsync<F, T>(
         pollResult = await withUnsafeContinuation {
             pollFunc(
                 rustFuture,
-                uniffiFutureContinuationCallback,
+                { handle, pollResult in
+                    uniffiFutureContinuationCallback(handle: handle, pollResult: pollResult)
+                },
                 uniffiContinuationHandleMap.insert(obj: $0)
             )
         }
@@ -2791,7 +3437,7 @@ private enum InitializationResult {
 // the code inside is only computed once.
 private let initializationResult: InitializationResult = {
     // Get the bindings contract version from our ComponentInterface
-    let bindings_contract_version = 29
+    let bindings_contract_version = 30
     // Get the scaffolding contract version by calling the into the dylib
     let scaffolding_contract_version = ffi_binary_options_tools_uni_uniffi_contract_version()
     if bindings_contract_version != scaffolding_contract_version {
@@ -2807,6 +3453,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_binary_options_tools_uni_checksum_method_pocketoption_clear_closed_deals() != 9178) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_method_pocketoption_create_raw_handler() != 34256) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles() != 23490) {
@@ -2825,6 +3474,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_binary_options_tools_uni_checksum_method_pocketoption_is_demo() != 19411) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_method_pocketoption_payout() != 5344) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_binary_options_tools_uni_checksum_method_pocketoption_reconnect() != 9220) {
@@ -2854,13 +3506,55 @@ private let initializationResult: InitializationResult = {
     if (uniffi_binary_options_tools_uni_checksum_method_pocketoption_unsubscribe() != 29837) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_and_wait() != 12420) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_binary() != 12514) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_text() != 41075) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_method_rawhandler_wait_next() != 65338) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next() != 13448) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_method_validator_check() != 57297) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_init() != 50054) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new() != 31315) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new_with_url() != 40992) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_constructor_validator_all() != 22652) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_constructor_validator_any() != 239) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_constructor_validator_contains() != 4008) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_constructor_validator_ends_with() != 3462) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_constructor_validator_ne() != 13897) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_constructor_validator_new() != 49602) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_constructor_validator_regex() != 42529) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_binary_options_tools_uni_checksum_constructor_validator_starts_with() != 32570) {
         return InitializationResult.apiChecksumMismatch
     }
 
