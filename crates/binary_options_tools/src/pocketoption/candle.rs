@@ -283,10 +283,6 @@ impl BaseCandle {
 }
 
 impl SubscriptionType {
-    const SUPPORTED_DURATIONS: &[u64] = &[
-        5, 10, 15, 20, 30, 60, 120, 180, 300, 600, 900, 1800, 2700, 3600, 7200, 10800, 14400,
-    ];
-
     pub fn none() -> Self {
         SubscriptionType::None
     }
@@ -308,13 +304,13 @@ impl SubscriptionType {
     }
 
     pub fn time_aligned(duration: Duration) -> PocketResult<Self> {
-        if !Self::SUPPORTED_DURATIONS.contains(&duration.as_secs()) {
+        if !(24 * 60 * 60 % duration.as_secs() == 0) {
             warn!(
                 "Unsupported duration for time-aligned subscription: {:?}",
                 duration
             );
             return Err(PocketError::General(format!(
-                "Unsupported duration for time-aligned subscription: {duration:?}"
+                "Unsupported duration for time-aligned subscription: {duration:?}, duration should be a multiple of the number of seconds in a day"
             )));
         }
         Ok(SubscriptionType::TimeAligned {

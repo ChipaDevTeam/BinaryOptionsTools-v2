@@ -80,6 +80,26 @@ impl PocketOption {
             .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg))))
     }
 
+    /// Creates a new PocketOption client with the provided session ID.
+    ///
+    /// # Arguments
+    /// * `ssid` - The session ID (SSID cookie value) for authenticating with PocketOption.
+    ///
+    /// # Returns
+    /// A `PocketResult` containing the initialized `PocketOption` client.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use binary_options_tools::PocketOption;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let client = PocketOption::new("your-session-id").await?;
+    ///     let balance = client.balance().await;
+    ///     println!("Balance: {}", balance);
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn new(ssid: impl ToString) -> PocketResult<Self> {
         let builder = Self::builder(ssid)?;
         let (client, mut runner) = builder.build().await?;
@@ -93,6 +113,17 @@ impl PocketOption {
         })
     }
 
+    /// Creates a new PocketOption client with a custom WebSocket URL.
+    ///
+    /// This method allows you to specify a custom WebSocket URL for connecting to the PocketOption platform,
+    /// which can be useful for testing or connecting to alternative endpoints.
+    ///
+    /// # Arguments
+    /// * `ssid` - The session ID (SSID cookie value) for authenticating with PocketOption.
+    /// * `url` - The custom WebSocket URL to connect to.
+    ///
+    /// # Returns
+    /// A `PocketResult` containing the initialized `PocketOption` client.
     pub async fn new_with_url(ssid: impl ToString, url: String) -> PocketResult<Self> {
         let state = StateBuilder::default()
             .ssid(Ssid::parse(ssid)?)
@@ -158,6 +189,10 @@ impl PocketOption {
         -1.0
     }
 
+    /// Checks if the account is a demo account.
+    ///
+    /// # Returns
+    /// `true` if the account is a demo account, `false` if it's a real account.
     pub fn is_demo(&self) -> bool {
         let state = &self.client.state;
         state.ssid.demo()
@@ -324,6 +359,13 @@ impl PocketOption {
         }
     }
 
+    /// Unsubscribes from a specific asset's real-time updates.
+    ///
+    /// # Arguments
+    /// * `asset` - The asset symbol to unsubscribe from.
+    ///
+    /// # Returns
+    /// A `PocketResult` indicating success or an error if the unsubscribe operation fails.
     pub async fn unsubscribe(&self, asset: impl ToString) -> PocketResult<()> {
         if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await
             && let Some(assets) = self.assets().await
@@ -443,6 +485,19 @@ impl PocketOption {
         self.client.get_handle::<M>().await
     }
 
+    /// Disconnects the client while keeping the configuration intact.
+    /// The connection can be re-established later using `connect()`.
+    /// This is useful for temporarily closing the connection without losing credentials or settings.
+    pub async fn disconnect(&self) -> PocketResult<()> {
+        self.client.disconnect().await.map_err(PocketError::from)
+    }
+
+    /// Establishes a connection after a manual disconnect.
+    /// This will reconnect using the same configuration and credentials.
+    pub async fn connect(&self) -> PocketResult<()> {
+        self.client.reconnect().await.map_err(PocketError::from)
+    }
+
     /// Disconnects and reconnects the client.
     pub async fn reconnect(&self) -> PocketResult<()> {
         self.client.reconnect().await.map_err(PocketError::from)
@@ -491,7 +546,7 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_balance() {
         tracing_subscriber::fmt::init();
-        let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"\";s:10:\"ip_address\";s:15:\"191.113.139.200\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/119.\";s:13:\"last_activity\";i:1751681442;}e2cf2ff21c927851dbb4a781aa81a10e","isDemo":0,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]"#; // 42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	
+        let ssid = r#"42["auth",{"session":"gchu4nm327s30oiglrenfshr96","isDemo":1,"uid":115353941,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#; // 42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
         let balance = api.balance().await;
@@ -517,12 +572,12 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_buy_sell() {
         tracing_subscriber::fmt::init();
-        let ssid = r#"42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#;
+        let ssid = r#"42["auth",{"session":"gchu4nm327s30oiglrenfshr96","isDemo":1,"uid":115353941,"platform":2,"isFastHistory":true,"isOptimized":true}]		"#;
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
-        let buy_result = api.buy("EURUSD_otc", 60, 1.0).await.unwrap();
+        let buy_result = api.buy("EURUSD_otc", 3, 1.0).await.unwrap();
         println!("Buy Result: {buy_result:?}");
-        let sell_result = api.sell("EURUSD_otc", 60, 1.0).await.unwrap();
+        let sell_result = api.sell("EURUSD_otc", 3, 1.0).await.unwrap();
         println!("Sell Result: {sell_result:?}");
         api.shutdown().await.unwrap();
     }
@@ -530,11 +585,11 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_result() {
         tracing_subscriber::fmt::init();
-        let ssid = r#"42["auth",{"session":"dttf3u62d2kb6v888pjkte4ug6","isDemo":1,"uid":79165265,"platform":3,"isFastHistory":true,"isOptimized":true}]	"#;
+        let ssid = r#"42["auth",{"session":"gchu4nm327s30oiglrenfshr96","isDemo":1,"uid":115353941,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#;
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
-        let (buy_id, _) = api.buy("EURUSD_otc", 60, 1.0).await.unwrap();
-        let (sell_id, _) = api.sell("EURUSD_otc", 60, 1.0).await.unwrap();
+        let (buy_id, _) = api.buy("EURUSD", 60, 1.0).await.unwrap();
+        let (sell_id, _) = api.sell("EURUSD", 60, 1.0).await.unwrap();
 
         let buy_result = api.result(buy_id).await.unwrap();
         println!("Result ID: {buy_id}, Result: {buy_result:?}");

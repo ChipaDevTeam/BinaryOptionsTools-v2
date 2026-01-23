@@ -111,6 +111,21 @@ end
     end
   end
 
+  # The primitive Bytes type.
+
+  def self.allocFromBytes(value)
+    RustBuffer.allocWithBuilder do |builder|
+      builder.write_Bytes(value)
+      return builder.finalize
+    end
+  end
+
+  def consumeIntoBytes
+    consumeWithStream do |stream|
+      return stream.readBytes
+    end
+  end
+
   # The Record type Asset.
 
   def self.check_lower_TypeAsset(v)
@@ -370,6 +385,27 @@ end
     end
   end
 
+  # The Sequence<T> type for TypeValidator.
+
+  def self.check_lower_SequenceTypeValidator(v)
+    v.each do |item|
+      (Validator.uniffi_check_lower item)
+    end
+  end
+
+  def self.alloc_from_SequenceTypeValidator(v)
+    RustBuffer.allocWithBuilder do |builder|
+      builder.write_SequenceTypeValidator(v)
+      return builder.finalize()
+    end
+  end
+
+  def consumeIntoSequenceTypeValidator
+    consumeWithStream do |stream|
+      return stream.readSequenceTypeValidator
+    end
+  end
+
   # The Sequence<T> type for TypeAsset.
 
   def self.check_lower_SequenceTypeAsset(v)
@@ -537,18 +573,40 @@ class RustBufferStream
     read(size).force_encoding(Encoding::UTF_8)
   end
 
+  def readBytes
+    size = unpack_from 4, 'l>'
+
+    raise InternalError, 'Unexpected negative byte string length' if size.negative?
+
+    read(size).force_encoding(Encoding::BINARY)
+  end
+
   # The Object type PocketOption.
 
   def readTypePocketOption
-    pointer = FFI::Pointer.new unpack_from 8, 'Q>'
-    return PocketOption.uniffi_allocate(pointer)
+    handle = unpack_from 8, 'Q>'
+    return PocketOption.uniffi_allocate(handle)
+  end
+
+  # The Object type RawHandler.
+
+  def readTypeRawHandler
+    handle = unpack_from 8, 'Q>'
+    return RawHandler.uniffi_allocate(handle)
   end
 
   # The Object type SubscriptionStream.
 
   def readTypeSubscriptionStream
-    pointer = FFI::Pointer.new unpack_from 8, 'Q>'
-    return SubscriptionStream.uniffi_allocate(pointer)
+    handle = unpack_from 8, 'Q>'
+    return SubscriptionStream.uniffi_allocate(handle)
+  end
+
+  # The Object type Validator.
+
+  def readTypeValidator
+    handle = unpack_from 8, 'Q>'
+    return Validator.uniffi_allocate(handle)
   end
 
   # The Record type Asset.
@@ -692,6 +750,11 @@ class RustBufferStream
             readString()
         )
     end
+    if variant == 4
+        return UniError::Validator.new(
+            readString()
+        )
+    end
 
     raise InternalError, 'Unexpected variant tag for TypeUniError'
   end
@@ -765,6 +828,22 @@ class RustBufferStream
     else
       raise InternalError, 'Unexpected flag byte for OptionalSequenceTypeAsset'
     end
+  end
+
+  # The Sequence<T> type for TypeValidator.
+
+  def readSequenceTypeValidator
+    count = unpack_from 4, 'l>'
+
+    raise InternalError, 'Unexpected negative sequence length' if count.negative?
+
+    items = []
+
+    count.times do
+      items.append readTypeValidator
+    end
+
+    items
   end
 
   # The Sequence<T> type for TypeAsset.
@@ -911,18 +990,38 @@ class RustBufferBuilder
     write v
   end
 
+  def write_Bytes(v)
+    v = BinaryOptionsToolsUni::uniffi_bytes(v)
+    pack_into 4, 'l>', v.bytes.size
+    write v
+  end
+
   # The Object type PocketOption.
 
   def write_TypePocketOption(obj)
-    pointer = PocketOption.uniffi_lower obj
-    pack_into(8, 'Q>', pointer.address)
+    handle = PocketOption.uniffi_lower obj
+    pack_into(8, 'Q>', handle)
+  end
+
+  # The Object type RawHandler.
+
+  def write_TypeRawHandler(obj)
+    handle = RawHandler.uniffi_lower obj
+    pack_into(8, 'Q>', handle)
   end
 
   # The Object type SubscriptionStream.
 
   def write_TypeSubscriptionStream(obj)
-    pointer = SubscriptionStream.uniffi_lower obj
-    pack_into(8, 'Q>', pointer.address)
+    handle = SubscriptionStream.uniffi_lower obj
+    pack_into(8, 'Q>', handle)
+  end
+
+  # The Object type Validator.
+
+  def write_TypeValidator(obj)
+    handle = Validator.uniffi_lower obj
+    pack_into(8, 'Q>', handle)
   end
 
   # The Record type Asset.
@@ -1058,6 +1157,16 @@ class RustBufferBuilder
     end
   end
 
+  # The Sequence<T> type for TypeValidator.
+
+  def write_SequenceTypeValidator(items)
+    pack_into(4, 'l>', items.size)
+
+    items.each do |item|
+      self.write_TypeValidator(item)
+    end
+  end
+
   # The Sequence<T> type for TypeAsset.
 
   def write_SequenceTypeAsset(items)
@@ -1187,6 +1296,19 @@ module UniError
      "#{self.class.name}(=#{@.inspect})"
     end
   end
+  class Validator < StandardError
+    def initialize()
+        @ = 
+        super()
+      end
+
+    attr_reader :
+    
+
+    def to_s
+     "#{self.class.name}(=#{@.inspect})"
+    end
+  end
 
 end
 
@@ -1268,11 +1390,14 @@ module UniFFILib
   
 
   attach_function :uniffi_binary_options_tools_uni_fn_clone_pocketoption,
-    [:pointer, RustCallStatus.by_ref],
-    :pointer
+    [:uint64, RustCallStatus.by_ref],
+    :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_free_pocketoption,
-    [:pointer, RustCallStatus.by_ref],
+    [:uint64, RustCallStatus.by_ref],
     :void
+  attach_function :uniffi_binary_options_tools_uni_fn_constructor_pocketoption_init,
+    [RustBuffer.by_value, RustCallStatus.by_ref],
+    :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new,
     [RustBuffer.by_value, RustCallStatus.by_ref],
     :uint64
@@ -1280,71 +1405,128 @@ module UniFFILib
     [RustBuffer.by_value, RustBuffer.by_value, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_assets,
-    [:pointer, RustCallStatus.by_ref],
+    [:uint64, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_balance,
-    [:pointer, RustCallStatus.by_ref],
+    [:uint64, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_buy,
-    [:pointer, RustBuffer.by_value, :uint32, :double, RustCallStatus.by_ref],
+    [:uint64, RustBuffer.by_value, :uint32, :double, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals,
-    [:pointer, RustCallStatus.by_ref],
+    [:uint64, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_create_raw_handler,
+    [:uint64, :uint64, RustBuffer.by_value, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles,
-    [:pointer, RustBuffer.by_value, :int64, :int64, RustCallStatus.by_ref],
+    [:uint64, RustBuffer.by_value, :int64, :int64, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced,
-    [:pointer, RustBuffer.by_value, :int64, :int64, :int64, RustCallStatus.by_ref],
+    [:uint64, RustBuffer.by_value, :int64, :int64, :int64, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals,
-    [:pointer, RustCallStatus.by_ref],
+    [:uint64, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals,
-    [:pointer, RustCallStatus.by_ref],
+    [:uint64, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_history,
-    [:pointer, RustBuffer.by_value, :uint32, RustCallStatus.by_ref],
+    [:uint64, RustBuffer.by_value, :uint32, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo,
-    [:pointer, RustCallStatus.by_ref],
+    [:uint64, RustCallStatus.by_ref],
     :int8
+  attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_payout,
+    [:uint64, RustBuffer.by_value, RustCallStatus.by_ref],
+    :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect,
-    [:pointer, RustCallStatus.by_ref],
+    [:uint64, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_result,
-    [:pointer, RustBuffer.by_value, RustCallStatus.by_ref],
+    [:uint64, RustBuffer.by_value, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout,
-    [:pointer, RustBuffer.by_value, :uint64, RustCallStatus.by_ref],
+    [:uint64, RustBuffer.by_value, :uint64, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_sell,
-    [:pointer, RustBuffer.by_value, :uint32, :double, RustCallStatus.by_ref],
+    [:uint64, RustBuffer.by_value, :uint32, :double, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time,
-    [:pointer, RustCallStatus.by_ref],
+    [:uint64, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown,
-    [:pointer, RustCallStatus.by_ref],
+    [:uint64, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe,
-    [:pointer, RustBuffer.by_value, :uint64, RustCallStatus.by_ref],
+    [:uint64, RustBuffer.by_value, :uint64, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_trade,
-    [:pointer, RustBuffer.by_value, RustBuffer.by_value, :uint32, :double, RustCallStatus.by_ref],
+    [:uint64, RustBuffer.by_value, RustBuffer.by_value, :uint32, :double, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe,
-    [:pointer, RustBuffer.by_value, RustCallStatus.by_ref],
+    [:uint64, RustBuffer.by_value, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_clone_rawhandler,
+    [:uint64, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_free_rawhandler,
+    [:uint64, RustCallStatus.by_ref],
+    :void
+  attach_function :uniffi_binary_options_tools_uni_fn_method_rawhandler_send_and_wait,
+    [:uint64, RustBuffer.by_value, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_method_rawhandler_send_binary,
+    [:uint64, RustBuffer.by_value, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_method_rawhandler_send_text,
+    [:uint64, RustBuffer.by_value, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_method_rawhandler_wait_next,
+    [:uint64, RustCallStatus.by_ref],
     :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_clone_subscriptionstream,
-    [:pointer, RustCallStatus.by_ref],
-    :pointer
+    [:uint64, RustCallStatus.by_ref],
+    :uint64
   attach_function :uniffi_binary_options_tools_uni_fn_free_subscriptionstream,
-    [:pointer, RustCallStatus.by_ref],
+    [:uint64, RustCallStatus.by_ref],
     :void
   attach_function :uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next,
-    [:pointer, RustCallStatus.by_ref],
+    [:uint64, RustCallStatus.by_ref],
     :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_clone_validator,
+    [:uint64, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_free_validator,
+    [:uint64, RustCallStatus.by_ref],
+    :void
+  attach_function :uniffi_binary_options_tools_uni_fn_constructor_validator_all,
+    [RustBuffer.by_value, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_constructor_validator_any,
+    [RustBuffer.by_value, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_constructor_validator_contains,
+    [RustBuffer.by_value, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_constructor_validator_ends_with,
+    [RustBuffer.by_value, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_constructor_validator_ne,
+    [:uint64, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_constructor_validator_new,
+    [RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_constructor_validator_regex,
+    [RustBuffer.by_value, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_constructor_validator_starts_with,
+    [RustBuffer.by_value, RustCallStatus.by_ref],
+    :uint64
+  attach_function :uniffi_binary_options_tools_uni_fn_method_validator_check,
+    [:uint64, RustBuffer.by_value, RustCallStatus.by_ref],
+    :int8
   attach_function :ffi_binary_options_tools_uni_rustbuffer_alloc,
     [:uint64, RustCallStatus.by_ref],
     RustBuffer.by_value
@@ -1369,6 +1551,9 @@ module UniFFILib
   attach_function :uniffi_binary_options_tools_uni_checksum_method_pocketoption_clear_closed_deals,
     [RustCallStatus.by_ref],
     :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_method_pocketoption_create_raw_handler,
+    [RustCallStatus.by_ref],
+    :uint16
   attach_function :uniffi_binary_options_tools_uni_checksum_method_pocketoption_get_candles,
     [RustCallStatus.by_ref],
     :uint16
@@ -1385,6 +1570,9 @@ module UniFFILib
     [RustCallStatus.by_ref],
     :uint16
   attach_function :uniffi_binary_options_tools_uni_checksum_method_pocketoption_is_demo,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_method_pocketoption_payout,
     [RustCallStatus.by_ref],
     :uint16
   attach_function :uniffi_binary_options_tools_uni_checksum_method_pocketoption_reconnect,
@@ -1414,13 +1602,55 @@ module UniFFILib
   attach_function :uniffi_binary_options_tools_uni_checksum_method_pocketoption_unsubscribe,
     [RustCallStatus.by_ref],
     :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_and_wait,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_binary,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_method_rawhandler_send_text,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_method_rawhandler_wait_next,
+    [RustCallStatus.by_ref],
+    :uint16
   attach_function :uniffi_binary_options_tools_uni_checksum_method_subscriptionstream_next,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_method_validator_check,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_init,
     [RustCallStatus.by_ref],
     :uint16
   attach_function :uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new,
     [RustCallStatus.by_ref],
     :uint16
   attach_function :uniffi_binary_options_tools_uni_checksum_constructor_pocketoption_new_with_url,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_constructor_validator_all,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_constructor_validator_any,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_constructor_validator_contains,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_constructor_validator_ends_with,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_constructor_validator_ne,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_constructor_validator_new,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_constructor_validator_regex,
+    [RustCallStatus.by_ref],
+    :uint16
+  attach_function :uniffi_binary_options_tools_uni_checksum_constructor_validator_starts_with,
     [RustCallStatus.by_ref],
     :uint16
   attach_function :ffi_binary_options_tools_uni_uniffi_contract_version,
@@ -1684,29 +1914,28 @@ end
   
   class PocketOption
 
-  # A private helper for initializing instances of the class from a raw pointer,
+  # A private helper for initializing instances of the class from a raw handle,
   # bypassing any initialization logic and ensuring they are GC'd properly.
-  def self.uniffi_allocate(pointer)
-    pointer.autorelease = false
+  def self.uniffi_allocate(handle)
     inst = allocate
-    inst.instance_variable_set :@pointer, pointer
-    ObjectSpace.define_finalizer(inst, uniffi_define_finalizer_by_pointer(pointer, inst.object_id))
+    inst.instance_variable_set :@handle, handle
+    ObjectSpace.define_finalizer(inst, uniffi_define_finalizer_by_handle(handle, inst.object_id))
     return inst
   end
 
   # A private helper for registering an object finalizer.
   # N.B. it's important that this does not capture a reference
-  # to the actual instance, only its underlying pointer.
-  def self.uniffi_define_finalizer_by_pointer(pointer, object_id)
+  # to the actual instance, only its underlying handle.
+  def self.uniffi_define_finalizer_by_handle(handle, object_id)
     Proc.new do |_id|
       BinaryOptionsToolsUni.rust_call(
         :uniffi_binary_options_tools_uni_fn_free_pocketoption,
-        pointer
+        handle
       )
     end
   end
 
-  # A private helper for lowering instances into a raw pointer.
+  # A private helper for lowering instances into a raw handle.
   # This does an explicit typecheck, because accidentally lowering a different type of
   # object in a place where this type is expected, could lead to memory unsafety.
   def self.uniffi_check_lower(inst)
@@ -1715,24 +1944,32 @@ end
     end
   end
 
-  def uniffi_clone_pointer()
+  def uniffi_clone_handle()
     return BinaryOptionsToolsUni.rust_call(
       :uniffi_binary_options_tools_uni_fn_clone_pocketoption,
-      @pointer
+      @handle
     )
   end
 
   def self.uniffi_lower(inst)
-    return inst.uniffi_clone_pointer()
+    return inst.uniffi_clone_handle()
   end
   def initialize(ssid)
         ssid = BinaryOptionsToolsUni::uniffi_utf8(ssid)
         
-    pointer = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new,RustBuffer.allocFromString(ssid))
-    @pointer = pointer
-    ObjectSpace.define_finalizer(self, self.class.uniffi_define_finalizer_by_pointer(pointer, self.object_id))
+    handle = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new,RustBuffer.allocFromString(ssid))
+    @handle = handle
+    ObjectSpace.define_finalizer(self, self.class.uniffi_define_finalizer_by_handle(handle, self.object_id))
   end
 
+  def self.init(ssid)
+        ssid = BinaryOptionsToolsUni::uniffi_utf8(ssid)
+        
+    # Call the (fallible) function before creating any half-baked object instances.
+    # Lightly yucky way to bypass the usual "initialize" logic
+    # and just create a new instance with the required handle.
+    return uniffi_allocate(BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_constructor_pocketoption_init,RustBuffer.allocFromString(ssid)))
+  end
   def self.new_with_url(ssid, url)
         ssid = BinaryOptionsToolsUni::uniffi_utf8(ssid)
         
@@ -1740,17 +1977,17 @@ end
         
     # Call the (fallible) function before creating any half-baked object instances.
     # Lightly yucky way to bypass the usual "initialize" logic
-    # and just create a new instance with the required pointer.
+    # and just create a new instance with the required handle.
     return uniffi_allocate(BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_constructor_pocketoption_new_with_url,RustBuffer.allocFromString(ssid),RustBuffer.allocFromString(url)))
   end
   
 
   def assets()
-    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_assets,uniffi_clone_pointer(),)
+    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_assets,uniffi_clone_handle(),)
     return result.consumeIntoOptionalSequenceTypeAsset
   end
   def balance()
-    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_balance,uniffi_clone_pointer(),)
+    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_balance,uniffi_clone_handle(),)
     return result.to_f
   end
   def buy(asset, time, amount)
@@ -1760,13 +1997,21 @@ end
         
         amount = amount
         
-    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_buy,uniffi_clone_pointer(),RustBuffer.allocFromString(asset),time,amount)
+    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_buy,uniffi_clone_handle(),RustBuffer.allocFromString(asset),time,amount)
     return result.consumeIntoTypeDeal
   end
   def clear_closed_deals()
-      BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals,uniffi_clone_pointer(),)
+      BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals,uniffi_clone_handle(),)
   end
   
+  def create_raw_handler(validator, keep_alive)
+        validator = validator
+        (Validator.uniffi_check_lower validator)
+        keep_alive = (keep_alive ? BinaryOptionsToolsUni::uniffi_utf8(keep_alive) : nil)
+        RustBuffer.check_lower_Optionalstring(keep_alive)
+    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_create_raw_handler,uniffi_clone_handle(),(Validator.uniffi_lower validator),RustBuffer.alloc_from_Optionalstring(keep_alive))
+    return RawHandler.uniffi_allocate(result)
+  end
   def get_candles(asset, period, offset)
         asset = BinaryOptionsToolsUni::uniffi_utf8(asset)
         
@@ -1774,7 +2019,7 @@ end
         
         offset = BinaryOptionsToolsUni::uniffi_in_range(offset, "i64", -2**63, 2**63)
         
-    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles,uniffi_clone_pointer(),RustBuffer.allocFromString(asset),period,offset)
+    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles,uniffi_clone_handle(),RustBuffer.allocFromString(asset),period,offset)
     return result.consumeIntoSequenceTypeCandle
   end
   def get_candles_advanced(asset, period, time, offset)
@@ -1786,15 +2031,15 @@ end
         
         offset = BinaryOptionsToolsUni::uniffi_in_range(offset, "i64", -2**63, 2**63)
         
-    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced,uniffi_clone_pointer(),RustBuffer.allocFromString(asset),period,time,offset)
+    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_get_candles_advanced,uniffi_clone_handle(),RustBuffer.allocFromString(asset),period,time,offset)
     return result.consumeIntoSequenceTypeCandle
   end
   def get_closed_deals()
-    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals,uniffi_clone_pointer(),)
+    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_get_closed_deals,uniffi_clone_handle(),)
     return result.consumeIntoSequenceTypeDeal
   end
   def get_opened_deals()
-    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals,uniffi_clone_pointer(),)
+    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_get_opened_deals,uniffi_clone_handle(),)
     return result.consumeIntoSequenceTypeDeal
   end
   def history(asset, period)
@@ -1802,21 +2047,27 @@ end
         
         period = BinaryOptionsToolsUni::uniffi_in_range(period, "u32", 0, 2**32)
         
-    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_history,uniffi_clone_pointer(),RustBuffer.allocFromString(asset),period)
+    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_history,uniffi_clone_handle(),RustBuffer.allocFromString(asset),period)
     return result.consumeIntoSequenceTypeCandle
   end
   def is_demo()
-    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo,uniffi_clone_pointer(),)
+    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_is_demo,uniffi_clone_handle(),)
     return 1 == result
   end
+  def payout(asset)
+        asset = BinaryOptionsToolsUni::uniffi_utf8(asset)
+        
+    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_payout,uniffi_clone_handle(),RustBuffer.allocFromString(asset))
+    return result.consumeIntoOptionalf64
+  end
   def reconnect()
-      BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect,uniffi_clone_pointer(),)
+      BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect,uniffi_clone_handle(),)
   end
   
   def result(id)
         id = BinaryOptionsToolsUni::uniffi_utf8(id)
         
-    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_result,uniffi_clone_pointer(),RustBuffer.allocFromString(id))
+    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_result,uniffi_clone_handle(),RustBuffer.allocFromString(id))
     return result.consumeIntoTypeDeal
   end
   def result_with_timeout(id, timeout_secs)
@@ -1824,7 +2075,7 @@ end
         
         timeout_secs = BinaryOptionsToolsUni::uniffi_in_range(timeout_secs, "u64", 0, 2**64)
         
-    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout,uniffi_clone_pointer(),RustBuffer.allocFromString(id),timeout_secs)
+    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_result_with_timeout,uniffi_clone_handle(),RustBuffer.allocFromString(id),timeout_secs)
     return result.consumeIntoTypeDeal
   end
   def sell(asset, time, amount)
@@ -1834,15 +2085,15 @@ end
         
         amount = amount
         
-    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_sell,uniffi_clone_pointer(),RustBuffer.allocFromString(asset),time,amount)
+    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_sell,uniffi_clone_handle(),RustBuffer.allocFromString(asset),time,amount)
     return result.consumeIntoTypeDeal
   end
   def server_time()
-    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time,uniffi_clone_pointer(),)
+    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_pocketoption_server_time,uniffi_clone_handle(),)
     return result.to_i
   end
   def shutdown()
-      BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown,uniffi_clone_pointer(),)
+      BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown,uniffi_clone_handle(),)
   end
   
   def subscribe(asset, duration_secs)
@@ -1850,7 +2101,7 @@ end
         
         duration_secs = BinaryOptionsToolsUni::uniffi_in_range(duration_secs, "u64", 0, 2**64)
         
-    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe,uniffi_clone_pointer(),RustBuffer.allocFromString(asset),duration_secs)
+    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_subscribe,uniffi_clone_handle(),RustBuffer.allocFromString(asset),duration_secs)
     return SubscriptionStream.uniffi_allocate(result)
   end
   def trade(asset, action, time, amount)
@@ -1862,43 +2113,112 @@ end
         
         amount = amount
         
-    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_trade,uniffi_clone_pointer(),RustBuffer.allocFromString(asset),RustBuffer.alloc_from_TypeAction(action),time,amount)
+    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_trade,uniffi_clone_handle(),RustBuffer.allocFromString(asset),RustBuffer.alloc_from_TypeAction(action),time,amount)
     return result.consumeIntoTypeDeal
   end
   def unsubscribe(asset)
         asset = BinaryOptionsToolsUni::uniffi_utf8(asset)
         
-      BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe,uniffi_clone_pointer(),RustBuffer.allocFromString(asset))
+      BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe,uniffi_clone_handle(),RustBuffer.allocFromString(asset))
   end
   
   
 end
   
-  class SubscriptionStream
+  class RawHandler
 
-  # A private helper for initializing instances of the class from a raw pointer,
+  # A private helper for initializing instances of the class from a raw handle,
   # bypassing any initialization logic and ensuring they are GC'd properly.
-  def self.uniffi_allocate(pointer)
-    pointer.autorelease = false
+  def self.uniffi_allocate(handle)
     inst = allocate
-    inst.instance_variable_set :@pointer, pointer
-    ObjectSpace.define_finalizer(inst, uniffi_define_finalizer_by_pointer(pointer, inst.object_id))
+    inst.instance_variable_set :@handle, handle
+    ObjectSpace.define_finalizer(inst, uniffi_define_finalizer_by_handle(handle, inst.object_id))
     return inst
   end
 
   # A private helper for registering an object finalizer.
   # N.B. it's important that this does not capture a reference
-  # to the actual instance, only its underlying pointer.
-  def self.uniffi_define_finalizer_by_pointer(pointer, object_id)
+  # to the actual instance, only its underlying handle.
+  def self.uniffi_define_finalizer_by_handle(handle, object_id)
     Proc.new do |_id|
       BinaryOptionsToolsUni.rust_call(
-        :uniffi_binary_options_tools_uni_fn_free_subscriptionstream,
-        pointer
+        :uniffi_binary_options_tools_uni_fn_free_rawhandler,
+        handle
       )
     end
   end
 
-  # A private helper for lowering instances into a raw pointer.
+  # A private helper for lowering instances into a raw handle.
+  # This does an explicit typecheck, because accidentally lowering a different type of
+  # object in a place where this type is expected, could lead to memory unsafety.
+  def self.uniffi_check_lower(inst)
+    if not inst.is_a? self
+      raise TypeError.new "Expected a RawHandler instance, got #{inst}"
+    end
+  end
+
+  def uniffi_clone_handle()
+    return BinaryOptionsToolsUni.rust_call(
+      :uniffi_binary_options_tools_uni_fn_clone_rawhandler,
+      @handle
+    )
+  end
+
+  def self.uniffi_lower(inst)
+    return inst.uniffi_clone_handle()
+  end
+
+  
+
+  def send_and_wait(message)
+        message = BinaryOptionsToolsUni::uniffi_utf8(message)
+        
+    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_rawhandler_send_and_wait,uniffi_clone_handle(),RustBuffer.allocFromString(message))
+    return result.consumeIntoString
+  end
+  def send_binary(data)
+        data = BinaryOptionsToolsUni::uniffi_bytes(data)
+        
+      BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_rawhandler_send_binary,uniffi_clone_handle(),RustBuffer.allocFromBytes(data))
+  end
+  
+  def send_text(message)
+        message = BinaryOptionsToolsUni::uniffi_utf8(message)
+        
+      BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_rawhandler_send_text,uniffi_clone_handle(),RustBuffer.allocFromString(message))
+  end
+  
+  def wait_next()
+    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_rawhandler_wait_next,uniffi_clone_handle(),)
+    return result.consumeIntoString
+  end
+  
+end
+  
+  class SubscriptionStream
+
+  # A private helper for initializing instances of the class from a raw handle,
+  # bypassing any initialization logic and ensuring they are GC'd properly.
+  def self.uniffi_allocate(handle)
+    inst = allocate
+    inst.instance_variable_set :@handle, handle
+    ObjectSpace.define_finalizer(inst, uniffi_define_finalizer_by_handle(handle, inst.object_id))
+    return inst
+  end
+
+  # A private helper for registering an object finalizer.
+  # N.B. it's important that this does not capture a reference
+  # to the actual instance, only its underlying handle.
+  def self.uniffi_define_finalizer_by_handle(handle, object_id)
+    Proc.new do |_id|
+      BinaryOptionsToolsUni.rust_call(
+        :uniffi_binary_options_tools_uni_fn_free_subscriptionstream,
+        handle
+      )
+    end
+  end
+
+  # A private helper for lowering instances into a raw handle.
   # This does an explicit typecheck, because accidentally lowering a different type of
   # object in a place where this type is expected, could lead to memory unsafety.
   def self.uniffi_check_lower(inst)
@@ -1907,22 +2227,137 @@ end
     end
   end
 
-  def uniffi_clone_pointer()
+  def uniffi_clone_handle()
     return BinaryOptionsToolsUni.rust_call(
       :uniffi_binary_options_tools_uni_fn_clone_subscriptionstream,
-      @pointer
+      @handle
     )
   end
 
   def self.uniffi_lower(inst)
-    return inst.uniffi_clone_pointer()
+    return inst.uniffi_clone_handle()
   end
 
   
 
   def next()
-    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next,uniffi_clone_pointer(),)
+    result = BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_method_subscriptionstream_next,uniffi_clone_handle(),)
     return result.consumeIntoTypeCandle
+  end
+  
+end
+  
+  class Validator
+
+  # A private helper for initializing instances of the class from a raw handle,
+  # bypassing any initialization logic and ensuring they are GC'd properly.
+  def self.uniffi_allocate(handle)
+    inst = allocate
+    inst.instance_variable_set :@handle, handle
+    ObjectSpace.define_finalizer(inst, uniffi_define_finalizer_by_handle(handle, inst.object_id))
+    return inst
+  end
+
+  # A private helper for registering an object finalizer.
+  # N.B. it's important that this does not capture a reference
+  # to the actual instance, only its underlying handle.
+  def self.uniffi_define_finalizer_by_handle(handle, object_id)
+    Proc.new do |_id|
+      BinaryOptionsToolsUni.rust_call(
+        :uniffi_binary_options_tools_uni_fn_free_validator,
+        handle
+      )
+    end
+  end
+
+  # A private helper for lowering instances into a raw handle.
+  # This does an explicit typecheck, because accidentally lowering a different type of
+  # object in a place where this type is expected, could lead to memory unsafety.
+  def self.uniffi_check_lower(inst)
+    if not inst.is_a? self
+      raise TypeError.new "Expected a Validator instance, got #{inst}"
+    end
+  end
+
+  def uniffi_clone_handle()
+    return BinaryOptionsToolsUni.rust_call(
+      :uniffi_binary_options_tools_uni_fn_clone_validator,
+      @handle
+    )
+  end
+
+  def self.uniffi_lower(inst)
+    return inst.uniffi_clone_handle()
+  end
+  def initialize()
+    handle = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_constructor_validator_new,)
+    @handle = handle
+    ObjectSpace.define_finalizer(self, self.class.uniffi_define_finalizer_by_handle(handle, self.object_id))
+  end
+
+  def self.all(validators)
+        validators = validators
+        RustBuffer.check_lower_SequenceTypeValidator(validators)
+    # Call the (fallible) function before creating any half-baked object instances.
+    # Lightly yucky way to bypass the usual "initialize" logic
+    # and just create a new instance with the required handle.
+    return uniffi_allocate(BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_constructor_validator_all,RustBuffer.alloc_from_SequenceTypeValidator(validators)))
+  end
+  def self.any(validators)
+        validators = validators
+        RustBuffer.check_lower_SequenceTypeValidator(validators)
+    # Call the (fallible) function before creating any half-baked object instances.
+    # Lightly yucky way to bypass the usual "initialize" logic
+    # and just create a new instance with the required handle.
+    return uniffi_allocate(BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_constructor_validator_any,RustBuffer.alloc_from_SequenceTypeValidator(validators)))
+  end
+  def self.contains(substring)
+        substring = BinaryOptionsToolsUni::uniffi_utf8(substring)
+        
+    # Call the (fallible) function before creating any half-baked object instances.
+    # Lightly yucky way to bypass the usual "initialize" logic
+    # and just create a new instance with the required handle.
+    return uniffi_allocate(BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_constructor_validator_contains,RustBuffer.allocFromString(substring)))
+  end
+  def self.ends_with(suffix)
+        suffix = BinaryOptionsToolsUni::uniffi_utf8(suffix)
+        
+    # Call the (fallible) function before creating any half-baked object instances.
+    # Lightly yucky way to bypass the usual "initialize" logic
+    # and just create a new instance with the required handle.
+    return uniffi_allocate(BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_constructor_validator_ends_with,RustBuffer.allocFromString(suffix)))
+  end
+  def self.ne(validator)
+        validator = validator
+        (Validator.uniffi_check_lower validator)
+    # Call the (fallible) function before creating any half-baked object instances.
+    # Lightly yucky way to bypass the usual "initialize" logic
+    # and just create a new instance with the required handle.
+    return uniffi_allocate(BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_constructor_validator_ne,(Validator.uniffi_lower validator)))
+  end
+  def self.regex(pattern)
+        pattern = BinaryOptionsToolsUni::uniffi_utf8(pattern)
+        
+    # Call the (fallible) function before creating any half-baked object instances.
+    # Lightly yucky way to bypass the usual "initialize" logic
+    # and just create a new instance with the required handle.
+    return uniffi_allocate(BinaryOptionsToolsUni.rust_call_with_error(UniError,:uniffi_binary_options_tools_uni_fn_constructor_validator_regex,RustBuffer.allocFromString(pattern)))
+  end
+  def self.starts_with(prefix)
+        prefix = BinaryOptionsToolsUni::uniffi_utf8(prefix)
+        
+    # Call the (fallible) function before creating any half-baked object instances.
+    # Lightly yucky way to bypass the usual "initialize" logic
+    # and just create a new instance with the required handle.
+    return uniffi_allocate(BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_constructor_validator_starts_with,RustBuffer.allocFromString(prefix)))
+  end
+  
+
+  def check(message)
+        message = BinaryOptionsToolsUni::uniffi_utf8(message)
+        
+    result = BinaryOptionsToolsUni.rust_call(:uniffi_binary_options_tools_uni_fn_method_validator_check,uniffi_clone_handle(),RustBuffer.allocFromString(message))
+    return 1 == result
   end
   
 end

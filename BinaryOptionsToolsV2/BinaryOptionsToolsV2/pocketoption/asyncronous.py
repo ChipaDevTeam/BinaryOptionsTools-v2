@@ -21,6 +21,119 @@ class AsyncSubscription:
         return json.loads(await anext(self.subscription))
 
 
+class RawHandler:
+    """
+    Handler for advanced raw WebSocket message operations.
+    
+    Provides low-level access to send messages and receive filtered responses
+    based on a validator. Each handler maintains its own message stream.
+    """
+
+    def __init__(self, rust_handler):
+        """
+        Initialize RawHandler with a Rust handler instance.
+        
+        Args:
+            rust_handler: The underlying RawHandlerRust instance from PyO3
+        """
+        self._handler = rust_handler
+
+    async def send_text(self, message: str) -> None:
+        """
+        Send a text message through this handler.
+        
+        Args:
+            message: Text message to send
+            
+        Example:
+            ```python
+            await handler.send_text('42["ping"]')
+            ```
+        """
+        await self._handler.send_text(message)
+
+    async def send_binary(self, data: bytes) -> None:
+        """
+        Send a binary message through this handler.
+        
+        Args:
+            data: Binary data to send
+            
+        Example:
+            ```python
+            await handler.send_binary(b'\\x00\\x01\\x02')
+            ```
+        """
+        await self._handler.send_binary(data)
+
+    async def send_and_wait(self, message: str) -> str:
+        """
+        Send a message and wait for the next matching response.
+        
+        Args:
+            message: Message to send
+            
+        Returns:
+            str: The first response that matches this handler's validator
+            
+        Example:
+            ```python
+            response = await handler.send_and_wait('42["getBalance"]')
+            data = json.loads(response)
+            ```
+        """
+        return await self._handler.send_and_wait(message)
+
+    async def wait_next(self) -> str:
+        """
+        Wait for the next message that matches this handler's validator.
+        
+        Returns:
+            str: The next matching message
+            
+        Example:
+            ```python
+            message = await handler.wait_next()
+            print(f"Received: {message}")
+            ```
+        """
+        return await self._handler.wait_next()
+
+    async def subscribe(self):
+        """
+        Subscribe to messages matching this handler's validator.
+        
+        Returns:
+            AsyncIterator[str]: Stream of matching messages
+            
+        Example:
+            ```python
+            stream = await handler.subscribe()
+            async for message in stream:
+                data = json.loads(message)
+                print(f"Update: {data}")
+            ```
+        """
+        return await self._handler.subscribe()
+
+    def id(self) -> str:
+        """
+        Get the unique ID of this handler.
+        
+        Returns:
+            str: Handler UUID
+        """
+        return self._handler.id()
+
+    async def close(self) -> None:
+        """
+        Close this handler and clean up resources.
+        Note: The handler is automatically cleaned up when it goes out of scope.
+        """
+        # The Rust Drop implementation handles cleanup automatically
+        pass
+
+
 # This file contains all the async code for the PocketOption Module
 class PocketOptionAsync:
     def __init__(
@@ -404,116 +517,6 @@ class PocketOptionAsync:
             await self._subscribe_symbol_time_aligned_inner(asset, time)
         )
 
-    async def send_raw_message(self, message: str) -> None:
-        """
-        Sends a raw WebSocket message without waiting for a response.
-
-        Args:
-            message: Raw WebSocket message to send (e.g., '42["ping"]')
-        """
-        # await self.client.send_raw_message(message)
-        raise NotImplementedError(
-            "The send_raw_message method is not implemented in the PocketOptionAsync class. "
-        )
-
-    async def create_raw_order(self, message: str, validator: Validator) -> str:
-        """
-        Sends a raw WebSocket message and waits for a validated response.
-
-        Args:
-            message: Raw WebSocket message to send
-            validator: Validator instance to validate the response
-
-        Returns:
-            str: The first message that matches the validator's conditions
-
-        Example:
-            ```python
-            validator = Validator.starts_with('451-["signals/load"')
-            response = await client.create_raw_order(
-                '42["signals/subscribe"]',
-                validator
-            )
-            ```
-        """
-        # return await self.client.create_raw_order(message, validator.raw_validator)
-        raise NotImplementedError(
-            "The create_raw_order method is not implemented in the PocketOptionAsync class. "
-        )
-
-    async def create_raw_order_with_timeout(
-        self, message: str, validator: Validator, timeout: timedelta
-    ) -> str:
-        """
-        Similar to create_raw_order but with a timeout.
-
-        Args:
-            message: Raw WebSocket message to send
-            validator: Validator instance to validate the response
-            timeout: Maximum time to wait for a valid response
-
-        Returns:
-            str: The first message that matches the validator's conditions
-
-        Raises:
-            TimeoutError: If no valid response is received within the timeout period
-        """
-
-        # return await self.client.create_raw_order_with_timeout(message, validator.raw_validator, timeout)
-        raise NotImplementedError(
-            "The create_raw_order_with_timout method is not implemented in the PocketOptionAsync class. "
-        )
-
-    async def create_raw_order_with_timeout_and_retry(
-        self, message: str, validator: Validator, timeout: timedelta
-    ) -> str:
-        """
-        Similar to create_raw_order_with_timout but with automatic retry on failure.
-
-        Args:
-            message: Raw WebSocket message to send
-            validator: Validator instance to validate the response
-            timeout: Maximum time to wait for each attempt
-
-        Returns:
-            str: The first message that matches the validator's conditions
-        """
-
-        # return await self.client.create_raw_order_with_timeout_and_retry(message, validator.raw_validator, timeout)
-        raise NotImplementedError(
-            "The create_raw_order_with_timeout_and_retry method is not implemented in the PocketOptionAsync class. "
-        )
-
-    async def create_raw_iterator(
-        self, message: str, validator: Validator, timeout: timedelta | None = None
-    ):
-        """
-        Creates an async iterator that yields validated WebSocket messages.
-
-        Args:
-            message: Initial WebSocket message to send
-            validator: Validator instance to filter incoming messages
-            timeout: Optional timeout for the entire stream
-
-        Returns:
-            AsyncIterator yielding validated messages
-
-        Example:
-            ```python
-            validator = Validator.starts_with('{"signals":')
-            async for message in client.create_raw_iterator(
-                '42["signals/subscribe"]',
-                validator,
-                timeout=timedelta(minutes=5)
-            ):
-                print(f"Received: {message}")
-            ```
-        """
-        # return await self.client.create_raw_iterator(message, validator, timeout)
-        raise NotImplementedError(
-            "The create_raw_iterator method is not implemented in the PocketOptionAsync class. "
-        )
-
     async def get_server_time(self) -> int:
         """Returns the current server time as a UNIX timestamp"""
         return await self.client.get_server_time()
@@ -547,6 +550,99 @@ class PocketOptionAsync:
             ```
         """
         return self.client.is_demo()
+
+    async def disconnect(self) -> None:
+        """
+        Disconnects the client while keeping the configuration intact.
+        The connection can be re-established later using connect().
+
+        Example:
+            ```python
+            client = PocketOptionAsync(ssid)
+            # Use client...
+            await client.disconnect()
+            # Do other work...
+            await client.connect()
+            ```
+        """
+        await self.client.disconnect()
+
+    async def connect(self) -> None:
+        """
+        Establishes a connection after a manual disconnect.
+        Uses the same configuration and credentials.
+
+        Example:
+            ```python
+            await client.disconnect()
+            # Connection is closed
+            await client.connect()
+            # Connection is re-established
+            ```
+        """
+        await self.client.connect()
+
+    async def reconnect(self) -> None:
+        """
+        Disconnects and reconnects the client.
+
+        Example:
+            ```python
+            await client.reconnect()
+            ```
+        """
+        await self.client.reconnect()
+
+    async def unsubscribe(self, asset: str) -> None:
+        """
+        Unsubscribes from an asset's stream by asset name.
+
+        Args:
+            asset (str): Asset name to unsubscribe from (e.g., "EURUSD_otc")
+
+        Example:
+            ```python
+            # Subscribe to asset
+            subscription = await client.subscribe_symbol("EURUSD_otc")
+            # ... use subscription ...
+            # Unsubscribe when done
+            await client.unsubscribe("EURUSD_otc")
+            ```
+        """
+        await self.client.unsubscribe(asset)
+
+    async def create_raw_handler(
+        self, validator: Validator, keep_alive: str | None = None
+    ) -> "RawHandler":
+        """
+        Creates a raw handler for advanced WebSocket message handling.
+        
+        Args:
+            validator: Validator instance to filter incoming messages
+            keep_alive: Optional message to send on reconnection
+            
+        Returns:
+            RawHandler: Handler instance for sending/receiving messages
+            
+        Example:
+            ```python
+            from BinaryOptionsToolsV2.validator import Validator
+            
+            validator = Validator.starts_with('42["signals"')
+            handler = await client.create_raw_handler(validator)
+            
+            # Send and wait for response
+            response = await handler.send_and_wait('42["signals/subscribe"]')
+            
+            # Or subscribe to stream
+            async for message in handler.subscribe():
+                print(message)
+            ```
+        """
+        rust_handler = await self.client.create_raw_handler(
+            validator.raw_validator, keep_alive
+        )
+        return RawHandler(rust_handler)
 
 
 async def _timeout(future, timeout: int):

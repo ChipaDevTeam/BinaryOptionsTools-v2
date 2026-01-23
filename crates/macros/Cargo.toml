@@ -1,11 +1,16 @@
 [package]
 name = "binary-options-tools-macros"
 version = "0.1.4"
-edition = "2021"
+edition = "2024"
+authors = ["ChipaDevTeam"]
 repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
-readme = "README.md"
-description = "Macros for the `binary-options-tools` crate"
-license = "MIT"
+homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+readme = "readme.md"
+description = "Procedural macros for the binary-options-tools crate. Provides code generation and compile-time utilities for trading platform integrations."
+keywords = ["binary-options", "macros", "proc-macro", "trading"]
+categories = ["development-tools::procedural-macro-helpers"]
+license-file = "../../LICENSE"
 
 [lib]
 proc-macro = true
