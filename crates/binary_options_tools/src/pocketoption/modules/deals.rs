@@ -235,7 +235,16 @@ impl ApiModule<State> for DealsApiModule {
                                     }
                                 },
                                 ExpectedMessage::None => {
-                                    warn!(target: "DealsApiModule", "Received unexpected binary message when no header was seen.");
+                                    let payload_preview = if data.len() > 64 {
+                                        format!(
+                                            "Payload ({} bytes, truncated): {:?}",
+                                            data.len(),
+                                            &data[..64]
+                                        )
+                                    } else {
+                                        format!("Payload ({} bytes): {:?}", data.len(), data)
+                                    };
+                                    warn!(target: "DealsApiModule", "Received unexpected binary message when no header was seen. {}", payload_preview);
                                 }
 
                             }
