@@ -208,15 +208,18 @@ impl RawValidator {
             RawValidator::All(validators) => validators.0.iter().all(|v| v.call(data)),
             RawValidator::Any(validators) => validators.0.iter().any(|v| v.call(data)),
             RawValidator::Not(validator) => !validator.0.call(data),
-            RawValidator::Custom(py_custom) => {
+            RawValidator::Custom(py_custom) => Python::attach(|py| {
                 let func = py_custom.custom.as_ref();
-                // Use attach instead of with_gil to avoid deprecation warning
-                #[allow(deprecated)]
-                Python::with_gil(|py| match func.call1(py, (data,)) {
-                    Ok(result) => result.extract::<bool>(py).unwrap_or(false),
-                    Err(_) => false,
-                })
-            }
+                match func.call1(py, (data,)) {
+                    Ok(result) => {
+                        match result.extract::<bool>(py) {
+                            Ok(b) => b,
+                            Err(_) => false, // If we can't extract a bool, return false
+                        }
+                    }
+                    Err(_) => false, // If the function call fails, return false
+                }
+            }),
         }
     }
 }

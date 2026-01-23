@@ -306,7 +306,7 @@ class PocketOption:
 
     def payout(
         self, asset: None | str | list[str] = None
-    ) -> dict[str, int] | list[int] | int:
+    ) -> dict[str, int | None] | list[int | None] | int | None:
         "Returns a dict of asset | payout for each asset, if 'asset' is not None then it will return the payout of the asset or a list of the payouts for each asset it was passed"
         return self.loop.run_until_complete(self._client.payout(asset))
 

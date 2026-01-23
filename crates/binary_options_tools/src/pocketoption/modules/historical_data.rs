@@ -196,7 +196,15 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                 warn!(target: "HistoricalDataApiModule", "Overwriting a pending request. Concurrent get_history calls are not supported.");
                             }
                             self.last_req_id = Some(req_id);
-                            let msg = format!("42[\"changeSymbol\",{{\"asset\":\"{}\",\"period\":{}}}]", asset, period);
+                            let payload = serde_json::json!([
+                                "changeSymbol",
+                                {
+                                    "asset": asset,
+                                    "period": period
+                                }
+                            ]);
+                            let serialized_payload = serde_json::to_string(&payload)?;
+                            let msg = format!("42{}", serialized_payload);
                             self.to_ws_sender.send(Message::text(msg)).await?;
                         }
                     }
