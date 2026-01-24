@@ -522,6 +522,18 @@ class PocketOptionAsync:
         """Returns the current server time as a UNIX timestamp"""
         return await self.client.get_server_time()
 
+    async def wait_for_assets(self, timeout: float = 30.0) -> None:
+        """
+        Waits for the assets to be loaded from the server.
+
+        Args:
+            timeout (float): The maximum time to wait in seconds. Default is 30.0.
+
+        Raises:
+            TimeoutError: If the assets are not loaded within the timeout period.
+        """
+        await self.client.wait_for_assets(timeout)
+
     def is_demo(self) -> bool:
         """
         Checks if the current account is a demo account.

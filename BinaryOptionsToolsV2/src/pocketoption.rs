@@ -211,6 +211,22 @@ impl RawPocketOption {
         })
     }
 
+    pub fn wait_for_assets<'py>(
+        &self,
+        py: Python<'py>,
+        timeout_secs: f64,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        let duration = Duration::from_secs_f64(timeout_secs);
+        future_into_py(py, async move {
+            client
+                .wait_for_assets(duration)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| py.None().into_py_any(py))
+        })
+    }
+
     pub fn is_demo(&self) -> bool {
         self.client.is_demo()
     }

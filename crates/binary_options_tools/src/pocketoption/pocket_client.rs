@@ -268,6 +268,24 @@ impl PocketOption {
         None
     }
 
+    /// Waits for the assets to be loaded from the server.
+    /// # Arguments
+    /// * `timeout` - The maximum time to wait for assets to be loaded.
+    /// # Returns
+    /// `Ok(())` if assets are loaded, or an error if the timeout is reached.
+    pub async fn wait_for_assets(&self, timeout: Duration) -> PocketResult<()> {
+        let start = std::time::Instant::now();
+        loop {
+            if self.assets().await.is_some() {
+                return Ok(());
+            }
+            if start.elapsed() > timeout {
+                return Err(PocketError::General("Timeout waiting for assets".to_string()));
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+
     /// Checks the result of a trade by its ID.
     /// # Arguments
     /// * `id` - The ID of the trade to check.
