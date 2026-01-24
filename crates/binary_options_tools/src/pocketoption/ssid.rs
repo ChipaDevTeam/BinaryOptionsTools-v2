@@ -15,33 +15,56 @@ pub struct SessionData {
     last_activity: u64,
 }
 
+fn deserialize_uid<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let v: Value = Deserialize::deserialize(deserializer)?;
+    match v {
+        Value::Number(n) => n
+            .as_u64()
+            .map(|x| x as u32)
+            .ok_or_else(|| serde::de::Error::custom("Invalid number for uid")),
+        Value::String(s) => s
+            .parse::<u32>()
+            .map_err(|_| serde::de::Error::custom("Invalid string for uid")),
+        _ => Err(serde::de::Error::custom("Invalid type for uid")),
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Demo {
-    session: String,
-    is_demo: u32,
-    uid: u32,
-    platform: u32,
+    #[serde(alias = "sessionToken")]
+    pub session: String,
+    #[serde(default)]
+    pub is_demo: u32,
+    #[serde(deserialize_with = "deserialize_uid")]
+    pub uid: u32,
+    #[serde(default)]
+    pub platform: u32,
+    #[serde(alias = "currentUrl")]
+    pub current_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    is_fast_history: Option<bool>,
+    pub is_fast_history: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    is_optimized: Option<bool>,
+    pub is_optimized: Option<bool>,
     #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
-    extra: HashMap<String, Value>,
+    pub extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Real {
-    session: SessionData,
-    is_demo: u32,
-    uid: u32,
-    platform: u32,
-    raw: String,
-    is_fast_history: Option<bool>,
-    is_optimized: Option<bool>,
+    pub session: SessionData,
+    pub is_demo: u32,
+    pub uid: u32,
+    pub platform: u32,
+    pub raw: String,
+    pub is_fast_history: Option<bool>,
+    pub is_optimized: Option<bool>,
     #[serde(flatten)]
-    extra: HashMap<String, Value>,
+    pub extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -69,7 +92,10 @@ impl Ssid {
         };
         let ssid: Demo =
             serde_json::from_str(parsed).map_err(|e| CoreError::SsidParsing(e.to_string()))?;
-        if ssid.is_demo == 1 {
+        
+        let is_demo_url = ssid.current_url.as_deref().map(|s| s.contains("demo")).unwrap_or(false);
+
+        if ssid.is_demo == 1 || is_demo_url {
             Ok(Self::Demo(ssid))
         } else {
             let real = Real {
