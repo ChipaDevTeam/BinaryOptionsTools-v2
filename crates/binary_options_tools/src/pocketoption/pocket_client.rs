@@ -4,7 +4,9 @@ use binary_options_tools_core_pre::{
     builder::ClientBuilder,
     client::Client,
     testing::{TestingWrapper, TestingWrapperBuilder},
-    traits::ApiModule,
+    traits::{ApiModule, ReconnectCallback},
+    error::CoreResult,
+    reimports::AsyncSender,
 };
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -38,6 +40,31 @@ use crate::{
 
 const MINIMUM_TRADE_AMOUNT: f64 = 1.0;
 const MAXIMUM_TRADE_AMOUNT: f64 = 20000.0;
+
+/// Reconnection callback to verify potential lost trades
+struct TradeReconciliationCallback;
+
+#[async_trait::async_trait]
+impl ReconnectCallback<State> for TradeReconciliationCallback {
+    async fn call(&self, state: Arc<State>, _ws_sender: &AsyncSender<binary_options_tools_core_pre::reimports::Message>) -> CoreResult<()> {
+        let pending = state.trade_state.pending_market_orders.read().await;
+
+        for (req_id, (order, created_at)) in pending.iter() {
+            // If order was sent >5 seconds ago, verify it
+            if created_at.elapsed() > Duration::from_secs(5) {
+                tracing::warn!(target: "TradeReconciliation", "Verifying potentially lost trade: {} (sent {:?} ago). Order: {:?}", req_id, created_at.elapsed(), order);
+                // In a real implementation, we would try to fetch the trade status from the API if possible
+            }
+        }
+
+        // Clean up orders >120 seconds old (failed/timed out)
+        drop(pending); // Drop read lock before acquiring write lock
+        let mut pending = state.trade_state.pending_market_orders.write().await;
+        pending.retain(|_, (_, t)| t.elapsed() < Duration::from_secs(120));
+
+        Ok(())
+    }
+}
 
 /// PocketOption client for interacting with the PocketOption trading platform.
 ///
@@ -80,7 +107,8 @@ impl PocketOption {
             .with_module::<PendingTradesApiModule>()
             .with_module::<HistoricalDataApiModule>()
             .with_module::<RawApiModule>()
-            .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg))))
+            .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)))
+            .on_reconnect(Box::new(TradeReconciliationCallback)))
     }
 
     pub async fn new(ssid: impl ToString) -> PocketResult<Self> {
@@ -115,7 +143,8 @@ impl PocketOption {
             .with_module::<PendingTradesApiModule>()
             .with_module::<HistoricalDataApiModule>()
             .with_module::<RawApiModule>()
-            .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)));
+            .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)))
+            .on_reconnect(Box::new(TradeReconciliationCallback));
         let (client, mut runner) = builder.build().await?;
 
         let _runner = tokio::spawn(async move { runner.run().await });
@@ -196,6 +225,15 @@ impl PocketOption {
         amount: f64,
     ) -> PocketResult<(Uuid, Deal)> {
         let asset_str = asset.to_string();
+
+        // Fix #6: Input Validation
+        if !amount.is_finite() {
+            return Err(PocketError::General("Amount must be a finite number".into()));
+        }
+        if amount <= 0.0 {
+             return Err(PocketError::General("Amount must be positive".into()));
+        }
+
         self.validate_asset(&asset_str, time).await?;
 
         if amount < MINIMUM_TRADE_AMOUNT {
@@ -208,11 +246,36 @@ impl PocketOption {
                 "Amount must be at most {MAXIMUM_TRADE_AMOUNT}"
             )));
         }
+
+        // Fix #4: Duplicate Trade Prevention
+        let amount_cents = (amount * 100.0).round() as u64;
+        let fingerprint = (asset_str.clone(), action, time, amount_cents);
+
+        {
+            let recent = self.client.state.trade_state.recent_trades.read().await;
+            if let Some((existing_id, created_at)) = recent.get(&fingerprint) {
+                if created_at.elapsed() < Duration::from_secs(2) {
+                    return Err(PocketError::General(format!(
+                        "Duplicate trade blocked (original ID: {})", existing_id
+                    )));
+                }
+            }
+        }
+
         if let Some(handle) = self.client.get_handle::<TradesApiModule>().await {
-            handle
-                .trade(asset_str, action, amount, time)
-                .await
-                .map(|d| (d.id, d))
+            let deal = handle
+                .trade(asset_str.clone(), action, amount, time)
+                .await?;
+
+            // Store for deduplication
+            {
+                let mut recent = self.client.state.trade_state.recent_trades.write().await;
+                recent.insert(fingerprint, (deal.id, std::time::Instant::now()));
+                // Cleanup old entries (>5 seconds)
+                recent.retain(|_, (_, t)| t.elapsed() < Duration::from_secs(5));
+            }
+
+            Ok((deal.id, deal))
         } else {
             Err(BinaryOptionsError::General("TradesApiModule not found".into()).into())
         }

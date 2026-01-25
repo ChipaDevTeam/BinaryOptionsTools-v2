@@ -14,6 +14,7 @@ use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, error, info, warn};
+use rand::Rng;
 
 /// A lightweight handler is a function that can process messages without being tied to a specific module.
 /// It can be used for quick, non-blocking operations that don't require a full module lifecycle
@@ -261,39 +262,6 @@ impl<S: AppState> Client<S> {
 
 // --- The Background Worker ---
 /// Implementation of the `ClientRunner` for managing WebSocket client connections and session lifecycle.
-///
-/// # Type Parameters
-/// - `S`: The application state type, which must implement the `AppState` trait.
-///
-/// # Methods
-///
-/// ## `new`
-/// Constructs a new `ClientRunner` instance.
-///
-/// ### Arguments
-/// - `connector`: An `Arc` to a type implementing the `Connector` trait, responsible for establishing connections.
-/// - `state`: An `Arc` to the application state.
-/// - `router`: An `Arc` to the message `Router`.
-/// - `to_ws_sender`: An asynchronous sender for outgoing WebSocket messages.
-/// - `to_ws_receiver`: An asynchronous receiver for outgoing WebSocket messages.
-/// - `runner_command_rx`: An asynchronous receiver for runner commands (e.g., disconnect, shutdown).
-/// - `connection_callback`: Callbacks to execute on connect and reconnect events.
-///
-/// ## `run`
-/// Asynchronously runs the main client loop, managing connection cycles, message routing, and command handling.
-///
-/// - Continuously attempts to connect or reconnect to the WebSocket server until a shutdown is requested.
-/// - On successful connection, executes the appropriate connection callback (`on_connect` or `on_reconnect`).
-/// - Spawns writer and reader tasks for handling outgoing and incoming WebSocket messages.
-/// - Listens for runner commands (e.g., disconnect, shutdown) and manages session state accordingly.
-/// - Handles unexpected connection loss and retries connection as needed.
-/// - Cleans up resources and tasks on disconnect or shutdown.
-///
-/// # Behavior
-/// - Uses a hard connect or reconnect based on the internal state.
-/// - Retries connection attempts with a delay on failure.
-/// - Ensures proper cleanup of tasks and state on disconnect or shutdown.
-/// - Prints status messages for key events and errors.
 pub struct ClientRunner<S: AppState> {
     /// Notify the client of connection status changes.
     pub(crate) signal: Signals,
@@ -309,25 +277,13 @@ pub struct ClientRunner<S: AppState> {
     pub(crate) to_ws_sender: AsyncSender<Message>,
     pub(crate) to_ws_receiver: AsyncReceiver<Message>,
     pub(crate) runner_command_rx: AsyncReceiver<RunnerCommand>,
+
+    // Track reconnection attempts for exponential backoff
+    pub(crate) reconnect_attempts: u32,
 }
 
 impl<S: AppState> ClientRunner<S> {
     /// Main client runner loop that manages WebSocket connections and message processing.
-    ///
-    /// # Middleware Integration Points
-    ///
-    /// This method integrates middleware at four key points:
-    ///
-    /// 1. **Connection Establishment** (`on_connect`): Called after successful connection
-    /// 2. **Message Sending** (`on_send`): Called before each message is sent to WebSocket
-    /// 3. **Message Receiving** (`on_receive`): Called for each incoming message (in Router::route)
-    /// 4. **Disconnection** (`on_disconnect`): Called on manual disconnect, shutdown, or connection loss
-    ///
-    /// # Connection Lifecycle
-    ///
-    /// - **Connection**: Middleware `on_connect` is called after successful WebSocket connection
-    /// - **Active Session**: Middleware `on_send`/`on_receive` called for each message
-    /// - **Disconnection**: Middleware `on_disconnect` called before cleanup
     pub async fn run(&mut self) {
         // TODO: Add a way to disconnect and keep the connection closed intill specified otherwhise
         // The outermost loop runs until a shutdown is commanded.
@@ -351,10 +307,20 @@ impl<S: AppState> ClientRunner<S> {
             };
 
             let ws_stream = match stream_result {
-                Ok(stream) => stream,
+                Ok(stream) => {
+                    self.reconnect_attempts = 0; // Reset attempts on success
+                    stream
+                },
                 Err(e) => {
-                    warn!(target: "Runner", "Connection failed: {e}. Retrying in 5s...");
-                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    self.reconnect_attempts += 1;
+                    // Exponential backoff: 5, 10, 20, 40... capped at 300s
+                    let delay_secs = std::cmp::min(5 * 2u64.pow(self.reconnect_attempts.min(10)), 300);
+                    // Add jitter
+                    let jitter = rand::rng().random_range(0.8..1.2);
+                    let delay = std::time::Duration::from_secs_f64(delay_secs as f64 * jitter);
+
+                    warn!(target: "Runner", "Connection failed (attempt {}): {e}. Retrying in {:?}...", self.reconnect_attempts, delay);
+                    tokio::time::sleep(delay).await;
                     // On failure, the next attempt is a reconnect, not a hard connect.
                     self.is_hard_disconnect = false;
                     continue; // Restart the connection cycle.

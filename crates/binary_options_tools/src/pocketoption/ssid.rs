@@ -7,12 +7,23 @@ use serde_json::Value;
 
 use super::regions::Regions;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SessionData {
     session_id: String,
     ip_address: String,
     user_agent: String,
     last_activity: u64,
+}
+
+impl fmt::Debug for SessionData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SessionData")
+            .field("session_id", &"REDACTED")
+            .field("ip_address", &self.ip_address)
+            .field("user_agent", &self.user_agent)
+            .field("last_activity", &self.last_activity)
+            .finish()
+    }
 }
 
 fn deserialize_uid<'de, D>(deserializer: D) -> Result<u32, D::Error>
@@ -32,7 +43,7 @@ where
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Demo {
     #[serde(alias = "sessionToken")]
@@ -53,7 +64,22 @@ pub struct Demo {
     pub extra: HashMap<String, Value>,
 }
 
-#[derive(Debug, Serialize, Clone)]
+impl fmt::Debug for Demo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Demo")
+            .field("session", &"REDACTED")
+            .field("is_demo", &self.is_demo)
+            .field("uid", &self.uid)
+            .field("platform", &self.platform)
+            .field("current_url", &self.current_url)
+            .field("is_fast_history", &self.is_fast_history)
+            .field("is_optimized", &self.is_optimized)
+            .field("extra", &self.extra)
+            .finish()
+    }
+}
+
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Real {
     pub session: SessionData,
@@ -67,11 +93,35 @@ pub struct Real {
     pub extra: HashMap<String, Value>,
 }
 
-#[derive(Debug, Serialize, Clone)]
+impl fmt::Debug for Real {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Real")
+            .field("session", &self.session)
+            .field("is_demo", &self.is_demo)
+            .field("uid", &self.uid)
+            .field("platform", &self.platform)
+            .field("raw", &"REDACTED")
+            .field("is_fast_history", &self.is_fast_history)
+            .field("is_optimized", &self.is_optimized)
+            .field("extra", &self.extra)
+            .finish()
+    }
+}
+
+#[derive(Serialize, Clone)]
 #[serde(untagged)]
 pub enum Ssid {
     Demo(Demo),
     Real(Real),
+}
+
+impl fmt::Debug for Ssid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Demo(d) => f.debug_tuple("Demo").field(d).finish(),
+            Self::Real(r) => f.debug_tuple("Real").field(r).finish(),
+        }
+    }
 }
 
 impl Ssid {
