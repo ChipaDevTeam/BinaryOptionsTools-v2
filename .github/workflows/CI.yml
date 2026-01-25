@@ -381,7 +381,7 @@ jobs:
       name: Release
       runs-on: ubuntu-latest
       timeout-minutes: 60
-      if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
+      if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
       needs: [linux, musllinux, windows, macos, sdist]
       permissions:
         id-token: write
@@ -400,13 +400,11 @@ jobs:
             subject-path: 'wheels-*/*'
   
         - name: Publish to PyPI
-          if: ${{ startsWith(github.ref, 'refs/tags/') }}
+          if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
           uses: PyO3/maturin-action@v1
-          env:
-            MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-          with:
+          with: # use PyPI Trusted Publishing (OIDC)
             command: upload
-            args: --non-interactive --skip-existing wheels-*/* wasm-wheels/*
+            args: --non-interactive --skip-existing wheels-*/*
   
         - name: Upload to GitHub Release
           uses: softprops/action-gh-release@v2
@@ -414,5 +412,4 @@ jobs:
             # This pattern catches all wheels and the sdist from all artifact folders
             files: |
               wheels-*/*
-              wasm-wheels/*
             prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
