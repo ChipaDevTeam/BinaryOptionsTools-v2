@@ -117,7 +117,7 @@ pip install ./BinaryOptionsToolsV2-0.2.2-cp38-abi3-win_amd64.whl
 pip install /BinaryOptionsToolsV2-0.2.2-cp38-abi3-macosx_10_12_x86_64.whl
 
 # Linux X64
-pip install BinaryOptionsToolsV2-0.2.2-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pip install BinaryOptionsToolsV2-0.2.2-cp38-abi3-manylinux_2_28_x86_64.whl
 ```
 
 **Requirements**:
