@@ -288,60 +288,70 @@ jobs:
           pytest ../tests
 
   emscripten:
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      matrix:
-        platform:
-          - runner: ubuntu-22.04
-            target: wasm32-unknown-emscripten
     steps:
       - uses: actions/checkout@v4
-      - run: pip install pyodide-build
+
+      - name: Set up Python for Pyodide tools
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Get Emscripten and Python version info
         shell: bash
         run: |
-          echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
-          echo PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2) >> $GITHUB_ENV
+          pip install pyodide-build
+          echo "EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version)" >> $GITHUB_ENV
+          echo "PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2)" >> $GITHUB_ENV
           pip uninstall -y pyodide-build
-      - uses: mymindstorm/setup-emsdk@v12
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
         with:
           version: ${{ env.EMSCRIPTEN_VERSION }}
-          actions-cache-folder: emsdk-cache
-          no-cache: true
-      - uses: actions/setup-python@v5
+          cache-key: emscripten-${{ runner.os }}-${{ env.EMSCRIPTEN_VERSION }}-${{ github.ref_name }}
+
+      - name: Setup Python for Build
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - run: pip install pyodide-build
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.platform.target }}
+          target: wasm32-unknown-emscripten
           args: --release --out dist
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           rust-toolchain: nightly
           working-directory: BinaryOptionsToolsV2
+
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.platform.target }}
+          target: wasm32-unknown-emscripten
           args: --release --out dist -i python3.13t
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           rust-toolchain: nightly
           working-directory: BinaryOptionsToolsV2
+
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wasm-wheels
           path: BinaryOptionsToolsV2/dist
-      - uses: actions/setup-node@v6
+
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
+
       - name: pytest
         working-directory: BinaryOptionsToolsV2
         run: |
           set -e
+          pip install pyodide-build
           pyodide venv .venv
           source .venv/bin/activate
           pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
