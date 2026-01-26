@@ -25,7 +25,6 @@ impl fmt::Debug for SessionData {
             .finish()
     }
 }
-}
 
 fn deserialize_uid<'de, D>(deserializer: D) -> Result<u32, D::Error>
 where

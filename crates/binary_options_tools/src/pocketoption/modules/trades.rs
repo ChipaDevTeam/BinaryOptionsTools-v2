@@ -8,7 +8,7 @@ use binary_options_tools_core_pre::{
 };
 use serde::Deserialize;
 use tokio::{select, sync::oneshot};
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::pocketoption::{
