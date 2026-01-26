@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock as SyncRwLock},
+    time::Instant,
 };
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -13,7 +14,7 @@ use binary_options_tools_core_pre::{
 };
 
 use crate::pocketoption::types::ServerTimeState;
-use crate::pocketoption::types::{Assets, Deal, Outgoing, PendingOrder, SubscriptionEvent};
+use crate::pocketoption::types::{Assets, Deal, Outgoing, PendingOrder, SubscriptionEvent, OpenOrder, Action};
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     ssid::Ssid,
@@ -129,6 +130,16 @@ impl AppState for State {
         // Clear any temporary data associated with the state
         let mut balance = self.balance.write().await;
         *balance = None; // Clear balance
+
+        // Clear stale trade state (but keep closed deals for history)
+        self.trade_state.clear_opened_deals().await;
+
+        // Mark subscriptions as requiring re-subscription
+        self.active_subscriptions.write().await.clear();
+
+        // Clear raw validators
+        self.clear_raw_validators();
+
         // Note: We don't clear server time as it's useful to maintain
         // time synchronization across reconnections
     }
@@ -278,6 +289,12 @@ pub struct TradeState {
     pub closed_deals: RwLock<HashMap<Uuid, Deal>>,
     /// A map of pending deals, keyed by their UUID.
     pub pending_deals: RwLock<HashMap<Uuid, PendingOrder>>,
+    /// A map of market orders sent but not yet confirmed by the server.
+    /// Key: Request UUID. Value: (OpenOrder, Timestamp sent)
+    pub pending_market_orders: RwLock<HashMap<Uuid, (OpenOrder, Instant)>>,
+    /// Cache of recent trades to prevent duplicates.
+    /// Key: (Asset, Action, Time, Amount*100). Value: (Trade ID, Timestamp)
+    pub recent_trades: RwLock<HashMap<(String, Action, u32, u64), (Uuid, Instant)>>,
 }
 
 impl TradeState {

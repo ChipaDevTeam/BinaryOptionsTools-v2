@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -13,6 +14,7 @@ use binary_options_tools_core_pre::{
     traits::{ApiModule, Rule},
 };
 use serde::Deserialize;
+use tokio::sync::oneshot;
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -28,7 +30,7 @@ const SUCCESS_CLOSE_ORDER: &str = r#"451-["successcloseOrder","#;
 
 #[derive(Debug)]
 pub enum Command {
-    CheckResult(Uuid),
+    CheckResult(Uuid, oneshot::Sender<PocketResult<Deal>>),
 }
 
 #[derive(Debug)]
@@ -54,28 +56,20 @@ struct CloseOrder {
 #[derive(Clone)]
 pub struct DealsHandle {
     sender: AsyncSender<Command>,
-    receiver: AsyncReceiver<CommandResponse>,
+    _receiver: AsyncReceiver<CommandResponse>,
 }
 
 impl DealsHandle {
     pub async fn check_result(&self, trade_id: Uuid) -> PocketResult<Deal> {
+        let (tx, rx) = oneshot::channel();
         self.sender
-            .send(Command::CheckResult(trade_id))
+            .send(Command::CheckResult(trade_id, tx))
             .await
             .map_err(CoreError::from)?;
-        loop {
-            match self.receiver.recv().await {
-                Ok(CommandResponse::CheckResult(deal)) => {
-                    if trade_id == deal.id {
-                        return Ok(*deal);
-                    } else {
-                        // If the request ID does not match, continue waiting for the correct response
-                        continue;
-                    }
-                }
-                Ok(CommandResponse::DealNotFound(id)) => return Err(PocketError::DealNotFound(id)),
-                Err(e) => return Err(CoreError::from(e).into()),
-            }
+
+        match rx.await {
+            Ok(result) => result,
+            Err(_) => Err(CoreError::Other("DealsApiModule responder dropped".into()).into()),
         }
     }
 
@@ -84,38 +78,20 @@ impl DealsHandle {
         trade_id: Uuid,
         timeout: Duration,
     ) -> PocketResult<Deal> {
+        let (tx, rx) = oneshot::channel();
         self.sender
-            .send(Command::CheckResult(trade_id))
+            .send(Command::CheckResult(trade_id, tx))
             .await
             .map_err(CoreError::from)?;
 
-        let timeout_future = tokio::time::sleep(timeout);
-        tokio::pin!(timeout_future);
-
-        loop {
-            tokio::select! {
-                result = self.receiver.recv() => {
-                    match result {
-                        Ok(CommandResponse::CheckResult(deal)) => {
-                            if trade_id == deal.id {
-                                return Ok(*deal);
-                            } else {
-                                // If the request ID does not match, continue waiting for the correct response
-                                continue;
-                            }
-                        },
-                        Ok(CommandResponse::DealNotFound(id)) => return Err(PocketError::DealNotFound(id)),
-                        Err(e) => return Err(CoreError::from(e).into()),
-                    }
-                }
-                _ = &mut timeout_future => {
-                    return Err(PocketError::Timeout {
-                        task: "check_result".to_string(),
-                        context: format!("Waiting for trade '{trade_id}' result"),
-                        duration: timeout,
-                    });
-                }
-            }
+        match tokio::time::timeout(timeout, rx).await {
+            Ok(Ok(result)) => result,
+            Ok(Err(_)) => Err(CoreError::Other("DealsApiModule responder dropped".into()).into()),
+            Err(_) => Err(PocketError::Timeout {
+                task: "check_result".to_string(),
+                context: format!("Waiting for trade '{trade_id}' result"),
+                duration: timeout,
+            }),
         }
     }
 }
@@ -126,8 +102,9 @@ pub struct DealsApiModule {
     state: Arc<State>,
     ws_receiver: AsyncReceiver<Arc<Message>>,
     command_receiver: AsyncReceiver<Command>,
-    command_responder: AsyncSender<CommandResponse>,
-    waitlist: Vec<Uuid>,
+    _command_responder: AsyncSender<CommandResponse>,
+    // Map of Trade ID -> List of waiters expecting the result
+    waiting_requests: HashMap<Uuid, Vec<oneshot::Sender<PocketResult<Deal>>>>,
 }
 
 #[async_trait]
@@ -147,8 +124,8 @@ impl ApiModule<State> for DealsApiModule {
             state,
             ws_receiver,
             command_receiver,
-            command_responder,
-            waitlist: Vec::new(),
+            _command_responder: command_responder,
+            waiting_requests: HashMap::new(),
         }
     }
 
@@ -156,18 +133,10 @@ impl ApiModule<State> for DealsApiModule {
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
     ) -> Self::Handle {
-        DealsHandle { sender, receiver }
+        DealsHandle { sender, _receiver: receiver }
     }
 
     async fn run(&mut self) -> binary_options_tools_core_pre::error::CoreResult<()> {
-        // TODO: Implement the run loop.
-        // 1. Use tokio::select! to listen on both `ws_receiver` and `command_receiver`.
-        // 2. For WebSocket messages:
-        //    - Deserialize into `UpdateOpenedDeals`, `UpdateClosedDeals`, or `SuccessCloseOrder`.
-        //    - Call the appropriate methods on `self.state.trade_state` to update the state.
-        // 3. For `CheckResult` commands:
-        //    - Implement the logic described in README.md to wait for the deal to close.
-        //    - Send the result back via `command_responder`.
         let mut expected = ExpectedMessage::None;
         loop {
             tokio::select! {
@@ -199,17 +168,17 @@ impl ApiModule<State> for DealsApiModule {
                                     // Handle UpdateClosedDeals
                                     match serde_json::from_slice::<Vec<Deal>>(data) {
                                         Ok(deals) => {
-                                            self.state.trade_state.update_closed_deals(deals).await;
-                                            // Check if some trades of the waitlist are now closed
-                                            let mut remove = Vec::new();
-                                            for id in &self.waitlist {
-                                                if let Some(deal) = self.state.trade_state.get_closed_deal(*id).await {
+                                            self.state.trade_state.update_closed_deals(deals.clone()).await;
+
+                                            // Check if some trades of the waiting_requests are now closed
+                                            for deal in deals {
+                                                if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
                                                     info!("Trade closed: {:?}", deal);
-                                                    self.command_responder.send(CommandResponse::CheckResult(Box::new(deal))).await?;
-                                                    remove.push(*id);
+                                                    for tx in waiters {
+                                                        let _ = tx.send(Ok(deal.clone()));
+                                                    }
                                                 }
                                             }
-                                            self.waitlist.retain(|id| !remove.contains(id));
                                         },
                                         Err(e) => return Err(CoreError::from(e)),
                                     }
@@ -218,18 +187,17 @@ impl ApiModule<State> for DealsApiModule {
                                     // Handle SuccessCloseOrder
                                     match serde_json::from_slice::<CloseOrder>(data) {
                                         Ok(close_order) => {
-                                            self.state.trade_state.update_closed_deals(close_order.deals).await;
-                                            // Check if some trades of the waitlist are now closed
-                                            let mut remove = Vec::new();
-                                            for id in &self.waitlist {
-                                                if let Some(deal) = self.state.trade_state.get_closed_deal(*id).await {
+                                            self.state.trade_state.update_closed_deals(close_order.deals.clone()).await;
+
+                                            // Check if some trades of the waiting_requests are now closed
+                                            for deal in close_order.deals {
+                                                if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
                                                     info!("Trade closed: {:?}", deal);
-                                                    self.command_responder.send(CommandResponse::CheckResult(Box::new(deal))).await?;
-                                                    remove.push(*id);
+                                                    for tx in waiters {
+                                                        let _ = tx.send(Ok(deal.clone()));
+                                                    }
                                                 }
                                             }
-                                            self.waitlist.retain(|id| !remove.contains(id));
-
                                         },
                                         Err(e) => return Err(CoreError::from(e)),
                                     }
@@ -256,19 +224,17 @@ impl ApiModule<State> for DealsApiModule {
                 }
                 Ok(cmd) = self.command_receiver.recv() => {
                     match cmd {
-                        Command::CheckResult(trade_id) => {
+                        Command::CheckResult(trade_id, responder) => {
                             if self.state.trade_state.contains_opened_deal(trade_id).await {
                                 // If the deal is still opened, add it to the waitlist
-                                self.waitlist.push(trade_id);
+                                self.waiting_requests.entry(trade_id).or_default().push(responder);
                             } else if let Some(deal) = self.state.trade_state.get_closed_deal(trade_id).await {
                                 // If the deal is already closed, send the result immediately
-                                self.command_responder.send(CommandResponse::CheckResult(Box::new(deal))).await?;
+                                let _ = responder.send(Ok(deal));
                             } else {
                                 // If the deal is not found, send a DealNotFound response
-                                self.command_responder.send(CommandResponse::DealNotFound(trade_id)).await?;
+                                let _ = responder.send(Err(PocketError::DealNotFound(trade_id)));
                             }
-                            // Implement logic to check the result of a trade
-                            // For example, wait for the deal to close and return the result
                         }
                     }
                 }

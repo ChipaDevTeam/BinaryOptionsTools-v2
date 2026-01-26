@@ -422,6 +422,7 @@ impl<S: AppState> ClientBuilder<S> {
             to_ws_receiver: to_ws_rx,
             runner_command_rx: runner_cmd_rx,
             connection_callback,
+            reconnect_attempts: 0,
         };
 
         Ok((client, runner))
