@@ -82,109 +82,13 @@ pub struct RawStreamIterator {
 }
 
 #[pyclass]
-pub struct RawHandlerRust {
-    handler: Arc<Mutex<binary_options_tools::pocketoption::modules::raw::RawHandler>>,
+pub struct RawHandle {
+    handle: binary_options_tools::pocketoption::modules::raw::RawHandle,
 }
 
-#[pymethods]
-impl RawHandlerRust {
-    /// Send a text message through this handler
-    pub fn send_text<'py>(&self, py: Python<'py>, message: String) -> PyResult<Bound<'py, PyAny>> {
-        let handler = self.handler.clone();
-        future_into_py(py, async move {
-            handler
-                .lock()
-                .await
-                .send_text(message)
-                .await
-                .map_err(BinaryErrorPy::from)?;
-            Ok(())
-        })
-    }
-
-    /// Send a binary message through this handler
-    pub fn send_binary<'py>(&self, py: Python<'py>, data: Vec<u8>) -> PyResult<Bound<'py, PyAny>> {
-        let handler = self.handler.clone();
-        future_into_py(py, async move {
-            handler
-                .lock()
-                .await
-                .send_binary(data)
-                .await
-                .map_err(BinaryErrorPy::from)?;
-            Ok(())
-        })
-    }
-
-    /// Send a message and wait for the next matching response
-    pub fn send_and_wait<'py>(
-        &self,
-        py: Python<'py>,
-        message: String,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        let handler = self.handler.clone();
-        future_into_py(py, async move {
-            let outgoing =
-                binary_options_tools::pocketoption::modules::raw::Outgoing::Text(message);
-            let response = handler
-                .lock()
-                .await
-                .send_and_wait(outgoing)
-                .await
-                .map_err(BinaryErrorPy::from)?;
-            let msg_str = response.to_text().unwrap_or_default().to_string();
-            Python::attach(|py| msg_str.into_py_any(py))
-        })
-    }
-
-    /// Wait for the next matching message
-    pub fn wait_next<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let handler = self.handler.clone();
-        future_into_py(py, async move {
-            let response = handler
-                .lock()
-                .await
-                .wait_next()
-                .await
-                .map_err(BinaryErrorPy::from)?;
-            let msg_str = response.to_text().unwrap_or_default().to_string();
-            Python::attach(|py| msg_str.into_py_any(py))
-        })
-    }
-
-    /// Subscribe to messages matching this handler's validator
-    pub fn subscribe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let handler = self.handler.clone();
-        future_into_py(py, async move {
-            let receiver = {
-                let handler_guard = handler.lock().await;
-                handler_guard.subscribe()
-            };
-
-            // Create a boxed stream that yields String values
-            let boxed_stream = async_stream::stream! {
-                while let Ok(msg) = receiver.recv().await {
-                    let msg_str = msg.to_text().unwrap_or_default().to_string();
-                    yield Ok(msg_str);
-                }
-            }
-            .boxed()
-            .fuse();
-
-            let stream = Arc::new(Mutex::new(boxed_stream));
-            Python::attach(|py| RawStreamIterator { stream }.into_py_any(py))
-        })
-    }
-
-    /// Get the handler's unique ID
-    pub fn id(&self, py: Python<'_>) -> PyResult<String> {
-        let runtime = get_runtime(py)?;
-        let handler = self.handler.clone();
-        runtime.block_on(async move {
-            let handler_guard = handler.lock().await;
-            Ok(handler_guard.id().to_string())
-        })
-    }
+#[pyclass]
+pub struct RawHandler {
+    handler: Arc<Mutex<binary_options_tools::pocketoption::modules::raw::RawHandler>>,
 }
 
 #[pymethods]
@@ -745,7 +649,7 @@ impl RawPocketOption {
                 .await
                 .map_err(BinaryErrorPy::from)?;
             Python::attach(|py| {
-                RawHandlerRust {
+                RawHandler {
                     handler: Arc::new(Mutex::new(handler)),
                 }
                 .into_py_any(py)

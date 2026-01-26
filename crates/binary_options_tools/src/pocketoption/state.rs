@@ -258,25 +258,18 @@ impl State {
     pub fn add_raw_validator(&self, id: Uuid, validator: Validator) {
         self.raw_validators
             .write()
-            .expect("Failed to acquire write lock")
+            .unwrap()
             .insert(id, Arc::new(validator));
     }
 
     /// Removes a validator by ID. Returns whether it existed.
     pub fn remove_raw_validator(&self, id: &Uuid) -> bool {
-        self.raw_validators
-            .write()
-            .expect("Failed to acquire write lock")
-            .remove(id)
-            .is_some()
+        self.raw_validators.write().unwrap().remove(id).is_some()
     }
 
     /// Removes all the validators
     pub fn clear_raw_validators(&self) {
-        self.raw_validators
-            .write()
-            .expect("Failed to acquire write lock")
-            .clear();
+        self.raw_validators.write().unwrap().clear();
     }
 }
 
@@ -310,7 +303,6 @@ impl TradeState {
 
     /// Adds or updates deals in the opened_deals map.
     pub async fn update_opened_deals(&self, deals: Vec<Deal>) {
-        // TODO: Implement the logic to update the opened deals map.
         self.opened_deals
             .write()
             .await
@@ -319,12 +311,15 @@ impl TradeState {
 
     /// Moves deals from opened to closed and adds new closed deals.
     pub async fn update_closed_deals(&self, deals: Vec<Deal>) {
-        // TODO: Implement the logic to update opened and closed deal maps.
-        let ids = deals.iter().map(|deal| deal.id).collect::<Vec<_>>();
+        let ids: Vec<_> = deals.iter().map(|deal| deal.id).collect();
+
+        // Remove these deals from opened_deals
         self.opened_deals
             .write()
             .await
             .retain(|id, _| !ids.contains(id));
+
+        // Add them to closed_deals
         self.closed_deals
             .write()
             .await
