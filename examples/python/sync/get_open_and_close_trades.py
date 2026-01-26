@@ -7,6 +7,7 @@ from BinaryOptionsToolsV2.pocketoption import PocketOption
 def main(ssid: str):
     # The api automatically detects if the 'ssid' is for real or demo account
     api = PocketOption(ssid)
+    time.sleep(5)  # Wait for connection to establish
     _ = api.buy(asset="EURUSD_otc", amount=1.0, time=60, check_win=False)
     _ = api.sell(asset="EURUSD_otc", amount=1.0, time=60, check_win=False)
     # This is the same as setting checkw_win to true on the api.buy and api.sell functions

@@ -1,5 +1,6 @@
 from BinaryOptionsToolsV2.pocketoption import PocketOption
 from BinaryOptionsToolsV2.tracing import start_logs
+import time
 
 
 # Main part of the code
@@ -10,6 +11,7 @@ def main(ssid: str):
     )  # If false then the logs will only be written to the log files
     # The api automatically detects if the 'ssid' is for real or demo account
     api = PocketOption(ssid)
+    time.sleep(5)  # Wait for connection to establish
     (buy_id, _) = api.buy(asset="EURUSD_otc", amount=1.0, time=300, check_win=False)
     (sell_id, _) = api.sell(asset="EURUSD_otc", amount=1.0, time=300, check_win=False)
     print(buy_id, sell_id)

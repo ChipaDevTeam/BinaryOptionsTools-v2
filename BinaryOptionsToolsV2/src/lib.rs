@@ -10,7 +10,7 @@ mod validator;
 
 // use config::PyConfig;
 use logs::{LogBuilder, Logger, StreamLogsIterator, StreamLogsLayer, start_tracing};
-use pocketoption::{RawPocketOption, RawStreamIterator, StreamIterator};
+use pocketoption::{RawPocketOption, RawStreamIterator, StreamIterator, RawHandle, RawHandler};
 use pyo3::prelude::*;
 use validator::RawValidator;
 

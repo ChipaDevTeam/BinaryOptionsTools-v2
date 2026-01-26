@@ -3,16 +3,14 @@ requires = ["maturin>=1.7,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "BinaryOptionsToolsV2"
-description = "A library to connect to PocketOption using python with async and sync support."
+name = "binaryoptionstoolsv2"
+description = "Python bindings for binary-options-tools. High-performance library for PocketOption trading automation with async/sync support, real-time data streaming, and WebSocket API access."
 authors = [
-    {name = "ChipaDevTeam", email = "your-email@example.com"}
+    {name = "ChipaDevTeam"},
+    {name = "Rick-29"}
 ]
 license = { file = "LICENSE" }
 readme = "Readme.md"
-homepage = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
-repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
-documentation = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
 requires-python = ">=3.8"
 keywords = ["binary options", "trading", "pocketoption", "finance", "async"]
 classifiers = [
@@ -36,8 +34,12 @@ classifiers = [
 dynamic = ["version"]
 
 [project.urls]
+Homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+Documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html"
+Repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
 "Bug Reports" = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues"
-"Source" = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+"Source Code" = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+Discord = "https://discord.com/invite/chipa-1261483112991555665"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
