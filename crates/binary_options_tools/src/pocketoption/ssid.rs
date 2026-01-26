@@ -19,11 +19,12 @@ impl fmt::Debug for SessionData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SessionData")
             .field("session_id", &"REDACTED")
-            .field("ip_address", &self.ip_address)
+            .field("ip_address", &"REDACTED") // Consider partial redaction like self.ip_address.chars().take(3).collect::<String>() + ".***.***"
             .field("user_agent", &self.user_agent)
             .field("last_activity", &self.last_activity)
             .finish()
     }
+}
 }
 
 fn deserialize_uid<'de, D>(deserializer: D) -> Result<u32, D::Error>
