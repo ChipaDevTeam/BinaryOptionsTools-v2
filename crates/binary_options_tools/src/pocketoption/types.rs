@@ -13,6 +13,15 @@ use uuid::Uuid;
 
 use crate::pocketoption::error::{PocketError, PocketResult};
 use crate::pocketoption::utils::float_time;
+
+// 🚨 CRITICAL AUDIT NOTE:
+// Financial values (amount, price, profit) are currently represented as `f64`.
+// This can lead to floating-point precision errors in financial calculations.
+// While the upstream PocketOption API uses JSON numbers (which are often treated as floats),
+// best practice would be to use `rust_decimal::Decimal`.
+// Migration to `Decimal` is recommended for future versions but requires updating
+// the Python bindings and verifying JSON serialization compatibility.
+
 /// Server time management structure for synchronizing with PocketOption servers
 ///
 /// This structure maintains the relationship between server time and local time,
@@ -371,9 +380,9 @@ impl Asset {
     /// Validates if the asset can be used for trading
     /// It checks if the asset is active.
     /// The error thrown allows users to understand why the asset is not valid for trading.
-    /// 
+    ///
     /// Note: Time validation has been removed to allow trading at any expiration time.
-    pub fn validate(&self, _time: u32) -> PocketResult<()> {
+    pub fn validate(&self, time: u32) -> PocketResult<()> {
         if !self.is_active {
             return Err(PocketError::InvalidAsset("Asset is not active".into()));
         }
@@ -464,7 +473,7 @@ impl<'de> Deserialize<'de> for Assets {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum Action {
     Call, // Buy

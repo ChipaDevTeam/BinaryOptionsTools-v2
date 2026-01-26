@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock as SyncRwLock},
+    time::Instant,
 };
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -13,7 +14,7 @@ use binary_options_tools_core_pre::{
 };
 
 use crate::pocketoption::types::ServerTimeState;
-use crate::pocketoption::types::{Assets, Deal, Outgoing, PendingOrder, SubscriptionEvent};
+use crate::pocketoption::types::{Assets, Deal, Outgoing, PendingOrder, SubscriptionEvent, OpenOrder, Action};
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     ssid::Ssid,
@@ -129,6 +130,16 @@ impl AppState for State {
         // Clear any temporary data associated with the state
         let mut balance = self.balance.write().await;
         *balance = None; // Clear balance
+
+        // Clear stale trade state (but keep closed deals for history)
+        self.trade_state.clear_opened_deals().await;
+
+        // Mark subscriptions as requiring re-subscription
+        self.active_subscriptions.write().await.clear();
+
+        // Clear raw validators
+        self.clear_raw_validators();
+
         // Note: We don't clear server time as it's useful to maintain
         // time synchronization across reconnections
     }
@@ -247,25 +258,18 @@ impl State {
     pub fn add_raw_validator(&self, id: Uuid, validator: Validator) {
         self.raw_validators
             .write()
-            .expect("Failed to acquire write lock")
+            .unwrap()
             .insert(id, Arc::new(validator));
     }
 
     /// Removes a validator by ID. Returns whether it existed.
     pub fn remove_raw_validator(&self, id: &Uuid) -> bool {
-        self.raw_validators
-            .write()
-            .expect("Failed to acquire write lock")
-            .remove(id)
-            .is_some()
+        self.raw_validators.write().unwrap().remove(id).is_some()
     }
 
     /// Removes all the validators
     pub fn clear_raw_validators(&self) {
-        self.raw_validators
-            .write()
-            .expect("Failed to acquire write lock")
-            .clear();
+        self.raw_validators.write().unwrap().clear();
     }
 }
 
@@ -278,6 +282,12 @@ pub struct TradeState {
     pub closed_deals: RwLock<HashMap<Uuid, Deal>>,
     /// A map of pending deals, keyed by their UUID.
     pub pending_deals: RwLock<HashMap<Uuid, PendingOrder>>,
+    /// A map of market orders sent but not yet confirmed by the server.
+    /// Key: Request UUID. Value: (OpenOrder, Timestamp sent)
+    pub pending_market_orders: RwLock<HashMap<Uuid, (OpenOrder, Instant)>>,
+    /// Cache of recent trades to prevent duplicates.
+    /// Key: (Asset, Action, Time, Amount*100). Value: (Trade ID, Timestamp)
+    pub recent_trades: RwLock<HashMap<(String, Action, u32, u64), (Uuid, Instant)>>,
 }
 
 impl TradeState {
@@ -293,7 +303,6 @@ impl TradeState {
 
     /// Adds or updates deals in the opened_deals map.
     pub async fn update_opened_deals(&self, deals: Vec<Deal>) {
-        // TODO: Implement the logic to update the opened deals map.
         self.opened_deals
             .write()
             .await
@@ -302,12 +311,15 @@ impl TradeState {
 
     /// Moves deals from opened to closed and adds new closed deals.
     pub async fn update_closed_deals(&self, deals: Vec<Deal>) {
-        // TODO: Implement the logic to update opened and closed deal maps.
-        let ids = deals.iter().map(|deal| deal.id).collect::<Vec<_>>();
+        let ids: Vec<_> = deals.iter().map(|deal| deal.id).collect();
+
+        // Remove these deals from opened_deals
         self.opened_deals
             .write()
             .await
             .retain(|id, _| !ids.contains(id));
+
+        // Add them to closed_deals
         self.closed_deals
             .write()
             .await

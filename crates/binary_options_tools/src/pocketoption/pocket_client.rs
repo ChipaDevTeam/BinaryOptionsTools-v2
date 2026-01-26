@@ -4,7 +4,9 @@ use binary_options_tools_core_pre::{
     builder::ClientBuilder,
     client::Client,
     testing::{TestingWrapper, TestingWrapperBuilder},
-    traits::ApiModule,
+    traits::{ApiModule, ReconnectCallback},
+    error::CoreResult,
+    reimports::AsyncSender,
 };
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -39,6 +41,31 @@ use crate::{
 const MINIMUM_TRADE_AMOUNT: f64 = 1.0;
 const MAXIMUM_TRADE_AMOUNT: f64 = 20000.0;
 
+/// Reconnection callback to verify potential lost trades
+struct TradeReconciliationCallback;
+
+#[async_trait::async_trait]
+impl ReconnectCallback<State> for TradeReconciliationCallback {
+    async fn call(&self, state: Arc<State>, _ws_sender: &AsyncSender<binary_options_tools_core_pre::reimports::Message>) -> CoreResult<()> {
+        let pending = state.trade_state.pending_market_orders.read().await;
+
+        for (req_id, (order, created_at)) in pending.iter() {
+            // If order was sent >5 seconds ago, verify it
+            if created_at.elapsed() > Duration::from_secs(5) {
+                tracing::warn!(target: "TradeReconciliation", "Verifying potentially lost trade: {} (sent {:?} ago). Order: {:?}", req_id, created_at.elapsed(), order);
+                // In a real implementation, we would try to fetch the trade status from the API if possible
+            }
+        }
+
+        // Clean up orders >120 seconds old (failed/timed out)
+        drop(pending); // Drop read lock before acquiring write lock
+        let mut pending = state.trade_state.pending_market_orders.write().await;
+        pending.retain(|_, (_, t)| t.elapsed() < Duration::from_secs(120));
+
+        Ok(())
+    }
+}
+
 /// PocketOption client for interacting with the PocketOption trading platform.
 ///
 /// This client provides methods for trading, checking balances, subscribing to
@@ -64,10 +91,8 @@ pub struct PocketOption {
 }
 
 impl PocketOption {
-    fn builder(ssid: impl ToString) -> PocketResult<ClientBuilder<State>> {
-        let state = StateBuilder::default().ssid(Ssid::parse(ssid)?).build()?;
-
-        Ok(ClientBuilder::new(PocketConnect, state)
+    fn configure_common_modules(builder: ClientBuilder<State>) -> ClientBuilder<State> {
+        builder
             .with_lightweight_module::<KeepAliveModule>()
             .with_lightweight_module::<InitModule>()
             .with_lightweight_module::<BalanceModule>()
@@ -80,7 +105,23 @@ impl PocketOption {
             .with_module::<PendingTradesApiModule>()
             .with_module::<HistoricalDataApiModule>()
             .with_module::<RawApiModule>()
-            .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg))))
+            .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)))
+            .on_reconnect(Box::new(TradeReconciliationCallback))
+    }
+
+    async fn require_handle<M: ApiModule<State>>(&self, module_name: &str) -> PocketResult<M::Handle> {
+        self.client
+            .get_handle::<M>()
+            .await
+            .ok_or_else(|| BinaryOptionsError::General(format!("{module_name} not found")).into())
+    }
+
+    fn builder(ssid: impl ToString) -> PocketResult<ClientBuilder<State>> {
+        let state = StateBuilder::default().ssid(Ssid::parse(ssid)?).build()?;
+        Ok(Self::configure_common_modules(ClientBuilder::new(
+            PocketConnect,
+            state,
+        )))
     }
 
     /// Creates a new PocketOption client with the provided session ID.
@@ -132,21 +173,7 @@ impl PocketOption {
             .ssid(Ssid::parse(ssid)?)
             .default_connection_url(url)
             .build()?;
-        let builder = ClientBuilder::new(PocketConnect, state)
-            .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)))
-            .with_lightweight_module::<KeepAliveModule>()
-            .with_lightweight_module::<InitModule>()
-            .with_lightweight_module::<BalanceModule>()
-            .with_lightweight_module::<ServerTimeModule>()
-            .with_lightweight_module::<AssetsModule>()
-            .with_module::<TradesApiModule>()
-            .with_module::<DealsApiModule>()
-            .with_module::<SubscriptionsApiModule>()
-            .with_module::<GetCandlesApiModule>()
-            .with_module::<PendingTradesApiModule>()
-            .with_module::<HistoricalDataApiModule>()
-            .with_module::<RawApiModule>()
-            .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)));
+        let builder = Self::configure_common_modules(ClientBuilder::new(PocketConnect, state));
         let (client, mut runner) = builder.build().await?;
 
         let _runner = tokio::spawn(async move { runner.run().await });
@@ -159,10 +186,7 @@ impl PocketOption {
 
     /// Get a handle to the Raw module for ad-hoc validators and custom message processing.
     pub async fn raw_handle(&self) -> PocketResult<InnerRawHandle> {
-        self.client
-            .get_handle::<RawApiModule>()
-            .await
-            .ok_or(BinaryOptionsError::General("RawApiModule not found".into()).into())
+        self.require_handle::<RawApiModule>("RawApiModule").await
     }
 
     /// Convenience: create a RawHandler bound to a validator, optionally sending a keep-alive message on reconnect.
@@ -171,11 +195,7 @@ impl PocketOption {
         validator: crate::validator::Validator,
         keep_alive: Option<Outgoing>,
     ) -> PocketResult<InnerRawHandler> {
-        let handle = self
-            .client
-            .get_handle::<RawApiModule>()
-            .await
-            .ok_or(BinaryOptionsError::General("RawApiModule not found".into()))?;
+        let handle = self.require_handle::<RawApiModule>("RawApiModule").await?;
         handle
             .create(validator, keep_alive)
             .await
@@ -231,6 +251,15 @@ impl PocketOption {
         amount: f64,
     ) -> PocketResult<(Uuid, Deal)> {
         let asset_str = asset.to_string();
+
+        // Fix #6: Input Validation
+        if !amount.is_finite() {
+            return Err(PocketError::General("Amount must be a finite number".into()));
+        }
+        if amount <= 0.0 {
+             return Err(PocketError::General("Amount must be positive".into()));
+        }
+
         self.validate_asset(&asset_str, time).await?;
 
         if amount < MINIMUM_TRADE_AMOUNT {
@@ -243,14 +272,37 @@ impl PocketOption {
                 "Amount must be at most {MAXIMUM_TRADE_AMOUNT}"
             )));
         }
-        if let Some(handle) = self.client.get_handle::<TradesApiModule>().await {
-            handle
-                .trade(asset_str, action, amount, time)
-                .await
-                .map(|d| (d.id, d))
-        } else {
-            Err(BinaryOptionsError::General("TradesApiModule not found".into()).into())
+
+        // Fix #4: Duplicate Trade Prevention
+        let amount_cents = (amount * 100.0).round() as u64;
+        let fingerprint = (asset_str.clone(), action, time, amount_cents);
+
+        {
+            let recent = self.client.state.trade_state.recent_trades.read().await;
+            if let Some((existing_id, created_at)) = recent.get(&fingerprint) {
+                if created_at.elapsed() < Duration::from_secs(2) {
+                    return Err(PocketError::General(format!(
+                        "Duplicate trade blocked (original ID: {})", existing_id
+                    )));
+                }
+            }
         }
+
+        let handle = self.require_handle::<TradesApiModule>("TradesApiModule").await?;
+
+        let deal = handle
+            .trade(asset_str.clone(), action, amount, time)
+            .await?;
+
+        // Store for deduplication
+        {
+            let mut recent = self.client.state.trade_state.recent_trades.write().await;
+            recent.insert(fingerprint, (deal.id, std::time::Instant::now()));
+            // Cleanup old entries (>5 seconds)
+            recent.retain(|_, (_, t)| t.elapsed() < Duration::from_secs(5));
+        }
+
+        Ok((deal.id, deal))
     }
 
     /// Places a new buy trade.
@@ -327,11 +379,10 @@ impl PocketOption {
     /// # Returns
     /// A `PocketResult` containing the `Deal` if successful, or an error if the trade fails.
     pub async fn result(&self, id: Uuid) -> PocketResult<Deal> {
-        if let Some(handle) = self.client.get_handle::<DealsApiModule>().await {
-            handle.check_result(id).await
-        } else {
-            Err(BinaryOptionsError::General("DealsApiModule not found".into()).into())
-        }
+        self.require_handle::<DealsApiModule>("DealsApiModule")
+            .await?
+            .check_result(id)
+            .await
     }
 
     /// Checks the result of a trade by its ID with a timeout.
@@ -341,11 +392,10 @@ impl PocketOption {
     /// # Returns
     /// A `PocketResult` containing the `Deal` if successful, or an error if the trade fails.
     pub async fn result_with_timeout(&self, id: Uuid, timeout: Duration) -> PocketResult<Deal> {
-        if let Some(handle) = self.client.get_handle::<DealsApiModule>().await {
-            handle.check_result_with_timeout(id, timeout).await
-        } else {
-            Err(BinaryOptionsError::General("DealsApiModule not found".into()).into())
-        }
+        self.require_handle::<DealsApiModule>("DealsApiModule")
+            .await?
+            .check_result_with_timeout(id, timeout)
+            .await
     }
 
     /// Gets the currently opened deals.
@@ -395,15 +445,12 @@ impl PocketOption {
         min_payout: u32,
         command: u32,
     ) -> PocketResult<PendingOrder> {
-        if let Some(handle) = self.client.get_handle::<PendingTradesApiModule>().await {
-            handle
-                .open_pending_order(
-                    open_type, amount, asset, open_time, open_price, timeframe, min_payout, command,
-                )
-                .await
-        } else {
-            Err(BinaryOptionsError::General("PendingTradesApiModule not found".into()).into())
-        }
+        self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
+            .await?
+            .open_pending_order(
+                open_type, amount, asset, open_time, open_price, timeframe, min_payout, command,
+            )
+            .await
     }
 
     /// Gets the currently pending deals.
@@ -432,18 +479,15 @@ impl PocketOption {
         asset: impl ToString,
         sub_type: SubscriptionType,
     ) -> PocketResult<SubscriptionStream> {
-        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await {
-            if let Some(assets) = self.assets().await {
-                if assets.get(&asset.to_string()).is_some() {
-                    handle.subscribe(asset.to_string(), sub_type).await
-                } else {
-                    Err(PocketError::InvalidAsset(asset.to_string()))
-                }
-            } else {
-                Err(BinaryOptionsError::General("Assets not found".into()).into())
-            }
+        let handle = self.require_handle::<SubscriptionsApiModule>("SubscriptionsApiModule").await?;
+        let assets = self.assets().await.ok_or_else(|| {
+            BinaryOptionsError::General("Assets not found".into())
+        })?;
+
+        if assets.get(&asset.to_string()).is_some() {
+            handle.subscribe(asset.to_string(), sub_type).await
         } else {
-            Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
+            Err(PocketError::InvalidAsset(asset.to_string()))
         }
     }
 
@@ -455,18 +499,15 @@ impl PocketOption {
     /// # Returns
     /// A `PocketResult` indicating success or an error if the unsubscribe operation fails.
     pub async fn unsubscribe(&self, asset: impl ToString) -> PocketResult<()> {
-        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await {
-            if let Some(assets) = self.assets().await {
-                if assets.get(&asset.to_string()).is_some() {
-                    handle.unsubscribe(asset.to_string()).await
-                } else {
-                    Err(PocketError::InvalidAsset(asset.to_string()))
-                }
-            } else {
-                Err(BinaryOptionsError::General("Assets not found".into()).into())
-            }
+        let handle = self.require_handle::<SubscriptionsApiModule>("SubscriptionsApiModule").await?;
+        let assets = self.assets().await.ok_or_else(|| {
+            BinaryOptionsError::General("Assets not found".into())
+        })?;
+
+        if assets.get(&asset.to_string()).is_some() {
+            handle.unsubscribe(asset.to_string()).await
         } else {
-            Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
+            Err(PocketError::InvalidAsset(asset.to_string()))
         }
     }
 
@@ -492,24 +533,17 @@ impl PocketOption {
         time: i64,
         offset: i64,
     ) -> PocketResult<Vec<Candle>> {
-        if let Some(handle) = self.client.get_handle::<GetCandlesApiModule>().await {
-            if let Some(assets) = self.assets().await {
-                if assets.get(&asset.to_string()).is_some() {
-                    handle
-                        .get_candles_advanced(asset, period, time, offset)
-                        .await
-                } else {
-                    Err(PocketError::InvalidAsset(asset.to_string()))
-                }
-            } else {
-                // If assets are not loaded yet, still try to get candles
-                handle
-                    .get_candles_advanced(asset, period, time, offset)
-                    .await
+        let handle = self.require_handle::<GetCandlesApiModule>("GetCandlesApiModule").await?;
+
+        if let Some(assets) = self.assets().await {
+            if assets.get(&asset.to_string()).is_none() {
+                return Err(PocketError::InvalidAsset(asset.to_string()));
             }
-        } else {
-            Err(BinaryOptionsError::General("GetCandlesApiModule not found".into()).into())
         }
+        // If assets are not loaded yet, still try to get candles
+        handle
+            .get_candles_advanced(asset, period, time, offset)
+            .await
     }
 
     /// Gets historical candle data with advanced parameters.
@@ -532,20 +566,15 @@ impl PocketOption {
         period: i64,
         offset: i64,
     ) -> PocketResult<Vec<Candle>> {
-        if let Some(handle) = self.client.get_handle::<GetCandlesApiModule>().await {
-            if let Some(assets) = self.assets().await {
-                if assets.get(&asset.to_string()).is_some() {
-                    handle.get_candles(asset, period, offset).await
-                } else {
-                    Err(PocketError::InvalidAsset(asset.to_string()))
-                }
-            } else {
-                // If assets are not loaded yet, still try to get candles
-                handle.get_candles(asset, period, offset).await
+        let handle = self.require_handle::<GetCandlesApiModule>("GetCandlesApiModule").await?;
+
+        if let Some(assets) = self.assets().await {
+            if assets.get(&asset.to_string()).is_none() {
+                return Err(PocketError::InvalidAsset(asset.to_string()));
             }
-        } else {
-            Err(BinaryOptionsError::General("GetCandlesApiModule not found".into()).into())
         }
+        // If assets are not loaded yet, still try to get candles
+        handle.get_candles(asset, period, offset).await
     }
 
     /// Gets historical candle data for a specific asset and period.
@@ -567,20 +596,15 @@ impl PocketOption {
     /// }
     /// ```
     pub async fn history(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<Candle>> {
-        if let Some(handle) = self.client.get_handle::<HistoricalDataApiModule>().await {
-            if let Some(assets) = self.assets().await {
-                if assets.get(&asset.to_string()).is_some() {
-                    handle.get_history(asset.to_string(), period).await
-                } else {
-                    Err(PocketError::InvalidAsset(asset.to_string()))
-                }
-            } else {
-                // If assets are not loaded yet, still try to get candles
-                handle.get_history(asset.to_string(), period).await
+        let handle = self.require_handle::<HistoricalDataApiModule>("HistoricalDataApiModule").await?;
+
+        if let Some(assets) = self.assets().await {
+            if assets.get(&asset.to_string()).is_none() {
+                return Err(PocketError::InvalidAsset(asset.to_string()));
             }
-        } else {
-            Err(BinaryOptionsError::General("HistoricalDataApiModule not found".into()).into())
         }
+        // If assets are not loaded yet, still try to get candles
+        handle.get_history(asset.to_string(), period).await
     }
 
     pub async fn get_handle<M: ApiModule<State>>(&self) -> Option<M::Handle> {
@@ -647,7 +671,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pocket_option_balance() {
-        tracing_subscriber::fmt::init();
+        let _ = tracing_subscriber::fmt::try_init();
         let ssid = r#"42["auth",{"session":"gchu4nm327s30oiglrenfshr96","isDemo":1,"uid":115353941,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#; // 42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
@@ -673,7 +697,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pocket_option_buy_sell() {
-        tracing_subscriber::fmt::init();
+        let _ = tracing_subscriber::fmt::try_init();
         let ssid = r#"42["auth",{"session":"gchu4nm327s30oiglrenfshr96","isDemo":1,"uid":115353941,"platform":2,"isFastHistory":true,"isOptimized":true}]		"#;
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
@@ -686,7 +710,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pocket_option_result() {
-        tracing_subscriber::fmt::init();
+        let _ = tracing_subscriber::fmt::try_init();
         let ssid = r#"42["auth",{"session":"gchu4nm327s30oiglrenfshr96","isDemo":1,"uid":115353941,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#;
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages

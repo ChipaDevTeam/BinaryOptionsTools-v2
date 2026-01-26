@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{collections::{HashMap, VecDeque}, fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
 use binary_options_tools_core_pre::{
@@ -7,7 +7,7 @@ use binary_options_tools_core_pre::{
     traits::{ApiModule, Rule},
 };
 use serde::Deserialize;
-use tokio::select;
+use tokio::{select, sync::oneshot};
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -27,10 +27,12 @@ pub enum Command {
         amount: f64,
         time: u32,
         req_id: Uuid,
+        responder: oneshot::Sender<PocketResult<Deal>>,
     },
 }
 
 /// CommandResponse enum for the `TradesApiModule`.
+/// Kept for trait compatibility but mostly unused in the new oneshot pattern.
 #[derive(Debug)]
 pub enum CommandResponse {
     /// Response for an `OpenOrder` command.
@@ -52,7 +54,8 @@ enum ServerResponse {
 #[derive(Clone)]
 pub struct TradesHandle {
     sender: AsyncSender<Command>,
-    receiver: AsyncReceiver<CommandResponse>,
+    // Receiver is no longer needed in the handle as we use oneshot channels per request
+    _receiver: AsyncReceiver<CommandResponse>,
 }
 
 impl TradesHandle {
@@ -64,11 +67,9 @@ impl TradesHandle {
         amount: f64,
         time: u32,
     ) -> PocketResult<Deal> {
-        // let order = OpenOrder::new(amount, asset, action, time, demo)
-        // Implement logic to create an OpenOrder and send the command.
-        // 1. Send `Command::OpenOrder`.
-        // 2. Await and return `CommandResponse::OpenOrder`.
         let id = Uuid::new_v4(); // Generate a unique request ID for this order
+        let (tx, rx) = oneshot::channel();
+
         self.sender
             .send(Command::OpenOrder {
                 asset,
@@ -76,28 +77,15 @@ impl TradesHandle {
                 amount,
                 time,
                 req_id: id,
+                responder: tx,
             })
             .await
             .map_err(CoreError::from)?;
-        loop {
-            match self.receiver.recv().await {
-                Ok(CommandResponse::Success { req_id, deal }) => {
-                    if req_id == id {
-                        return Ok(*deal);
-                    } else {
-                        // If the request ID does not match, continue waiting for the correct response
-                        continue;
-                    }
-                }
-                Ok(CommandResponse::Error(fail)) => {
-                    return Err(PocketError::FailOpenOrder {
-                        error: fail.error,
-                        amount: fail.amount,
-                        asset: fail.asset,
-                    });
-                }
-                Err(e) => return Err(CoreError::from(e).into()),
-            }
+
+        // Wait for the specific response for this trade
+        match rx.await {
+            Ok(result) => result,
+            Err(_) => Err(CoreError::Other("TradesApiModule responder dropped".into()).into()),
         }
     }
 
@@ -112,13 +100,30 @@ impl TradesHandle {
     }
 }
 
+/// Internal struct to track pending orders
+struct PendingOrderTracker {
+    asset: String,
+    amount: f64,
+    responder: oneshot::Sender<PocketResult<Deal>>,
+}
+
 /// The API module for handling all trade-related operations.
 pub struct TradesApiModule {
     state: Arc<State>,
     command_receiver: AsyncReceiver<Command>,
-    command_responder: AsyncSender<CommandResponse>,
+    _command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
+    pending_orders: HashMap<Uuid, PendingOrderTracker>,
+    // Secondary index for matching failures (which lack UUID)
+    // Map of (Asset, Amount) -> Queue of UUIDs (FIFO)
+    failure_matching: HashMap<(String, String), VecDeque<Uuid>>, // using String for amount key to avoid float keys
+}
+
+impl TradesApiModule {
+    fn float_key(f: f64) -> String {
+        format!("{:.2}", f)
+    }
 }
 
 #[async_trait]
@@ -137,9 +142,11 @@ impl ApiModule<State> for TradesApiModule {
         Self {
             state: shared_state,
             command_receiver,
-            command_responder,
+            _command_responder: command_responder,
             message_receiver,
             to_ws_sender,
+            pending_orders: HashMap::new(),
+            failure_matching: HashMap::new(),
         }
     }
 
@@ -147,26 +154,44 @@ impl ApiModule<State> for TradesApiModule {
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
     ) -> Self::Handle {
-        TradesHandle { sender, receiver }
+        TradesHandle { sender, _receiver: receiver }
     }
 
     async fn run(&mut self) -> CoreResult<()> {
-        // TODO: Implement the main run loop.
-        // This loop should handle both incoming commands from the handle
-        // and incoming WebSocket messages for trade responses.
-        //
         loop {
             select! {
               Ok(cmd) = self.command_receiver.recv() => {
                   match cmd {
-                      Command::OpenOrder { asset, action, amount, time, req_id } => {
-                      // Create OpenOrder and send to WebSocket.
-                      let order = OpenOrder::new(amount, asset, action, time, self.state.is_demo() as u32, req_id);
-                      self.to_ws_sender.send(Message::text(order.to_string())).await?;
+                      Command::OpenOrder { asset, action, amount, time, req_id, responder } => {
+                          // Register pending order
+                          let tracker = PendingOrderTracker {
+                              asset: asset.clone(),
+                              amount,
+                              responder,
+                          };
+                          self.pending_orders.insert(req_id, tracker);
+
+                          // Add to failure matching queue
+                          let key = (asset.clone(), Self::float_key(amount));
+                          self.failure_matching.entry(key).or_default().push_back(req_id);
+
+                          // Create OpenOrder and send to WebSocket.
+                          // We need the asset string for error handling cleanup if send fails, so we clone it or use the tracker's copy
+                          let asset_for_error = asset.clone();
+                          let order = OpenOrder::new(amount, asset, action, time, self.state.is_demo() as u32, req_id);
+                          if let Err(e) = self.to_ws_sender.send(Message::text(order.to_string())).await {
+                              // If sending fails, we should notify the responder immediately
+                              if let Some(tracker) = self.pending_orders.remove(&req_id) {
+                                  let _ = tracker.responder.send(Err(CoreError::from(e).into()));
+                              }
+                              // Clean up failure queue
+                              let key = (asset_for_error, Self::float_key(amount));
+                              if let Some(queue) = self.failure_matching.get_mut(&key) {
+                                  queue.retain(|&id| id != req_id);
+                              }
+                          }
                       }
                   }
-                // Handle OpenOrder: send to websocket.
-                // Handle CheckResult: check state, maybe wait for update.
               },
               Ok(msg) = self.message_receiver.recv() => {
                   if let Message::Binary(data) = &*msg {
@@ -174,28 +199,53 @@ impl ApiModule<State> for TradesApiModule {
                       if let Ok(response) = serde_json::from_slice::<ServerResponse>(data) {
                           match response {
                               ServerResponse::Success(deal) => {
-                                  // Handle successopenOrder.
-                                  // Send CommandResponse::Success to command_responder.
                                   self.state.trade_state.add_opened_deal(*deal.clone()).await;
                                   info!(target: "TradesApiModule", "Trade opened: {}", deal.id);
-                                  self.command_responder.send(CommandResponse::Success {
-                                      req_id: deal.request_id.unwrap_or_default(), // A request should always have a request_id, only for when returning updateOpenedDeals or updateClosedDeals it can not have any
-                                      deal,
-                                  }).await?;
+
+                                  let req_id = deal.request_id.unwrap_or_default();
+
+                                  // Find and remove the pending order
+                                  if let Some(tracker) = self.pending_orders.remove(&req_id) {
+                                      let _ = tracker.responder.send(Ok(*deal.clone()));
+
+                                      // Clean up failure matching queue
+                                      let key = (tracker.asset, Self::float_key(tracker.amount));
+                                      if let Some(queue) = self.failure_matching.get_mut(&key) {
+                                          queue.retain(|&id| id != req_id);
+                                      }
+                                  } else {
+                                      warn!(target: "TradesApiModule", "Received success for unknown request ID: {}", req_id);
+                                  }
                               }
                               ServerResponse::Fail(fail) => {
                                   // Handle failopenOrder.
-                                  // Send CommandResponse::Error to command_responder.
-                                  self.command_responder.send(CommandResponse::Error(fail)).await?;
+                                  // Strategy: Match based on asset and amount (FIFO) since req_id is missing
+                                  let key = (fail.asset.clone(), Self::float_key(fail.amount));
+
+                                  let found_req_id = if let Some(queue) = self.failure_matching.get_mut(&key) {
+                                      queue.pop_front()
+                                  } else {
+                                      None
+                                  };
+
+                                  if let Some(req_id) = found_req_id {
+                                      if let Some(tracker) = self.pending_orders.remove(&req_id) {
+                                          let _ = tracker.responder.send(Err(PocketError::FailOpenOrder {
+                                              error: fail.error.clone(),
+                                              amount: fail.amount,
+                                              asset: fail.asset.clone(),
+                                          }));
+                                      }
+                                  } else {
+                                       warn!(target: "TradesApiModule", "Received failure for unknown order: {} {}", fail.asset, fail.amount);
+                                  }
                               }
                           }
                       } else {
                           // Handle other messages or errors.
-                          warn!(target: "TradesApiModule", "Received unrecognized message: {:?}", msg);
+                          // warn!(target: "TradesApiModule", "Received unrecognized message: {:?}", msg);
                       }
                   }
-                // Handle successopenOrder/failopenOrder.
-                // Find the corresponding pending request and send response via command_responder.
               }
             }
         }
