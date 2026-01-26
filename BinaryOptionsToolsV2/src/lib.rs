@@ -14,8 +14,6 @@ use pocketoption::{RawPocketOption, RawStreamIterator, StreamIterator, RawHandle
 use pyo3::prelude::*;
 use validator::RawValidator;
 
-use crate::pocketoption::RawHandlerRust;
-
 #[pymodule(name = "BinaryOptionsToolsV2")]
 fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<StreamLogsIterator>()?;
@@ -26,7 +24,8 @@ fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<StreamIterator>()?;
     m.add_class::<RawStreamIterator>()?;
     m.add_class::<RawValidator>()?;
-    m.add_class::<RawHandlerRust>()?;
+    m.add_class::<RawHandle>()?;
+    m.add_class::<RawHandler>()?;
     // m.add_class::<PyConfig>()?;
 
     m.add_function(wrap_pyfunction!(start_tracing, m)?)?;
