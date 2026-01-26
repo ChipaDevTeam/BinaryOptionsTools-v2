@@ -63,11 +63,11 @@ pub fn start_tracing(
         );
 
     if terminal {
-        subscriber
+        let _ = subscriber
             .with(fmt::Layer::default().with_filter(level))
-            .init();
+            .try_init();
     } else {
-        subscriber.init()
+        let _ = subscriber.try_init();
     }
 
     Ok(())
@@ -265,7 +265,8 @@ mod tests {
 
     #[test]
     fn test_start_tracing() {
-        start_tracing(".".to_string(), "DEBUG".to_string(), true, vec![]).unwrap();
+        start_tracing(".".to_string(), "DEBUG".to_string(), true, vec![])
+            .expect("Failed to start tracing in test");
 
         info!("Test")
     }
@@ -289,7 +290,8 @@ mod tests {
     #[tokio::test]
     async fn test_start_tracing_stream() {
         let (layer, receiver) = create_logs_iterator_test("ERROR".to_string());
-        start_tracing(".".to_string(), "DEBUG".to_string(), false, vec![layer]).unwrap();
+        start_tracing(".".to_string(), "DEBUG".to_string(), false, vec![layer])
+            .expect("Failed to initialize tracing for test");
 
         async fn log() {
             let mut num = 0;
@@ -301,13 +303,18 @@ mod tests {
                 info!(num, "Test info");
                 warn!(num, "Test warning");
                 error!(num, "Test error");
+                if num > 10 {
+                    break;
+                }
             }
         }
 
         async fn reciever_fn(reciever: StreamLogsIterator) {
             let mut stream = reciever.stream.lock().await;
 
-            while let Some(Ok(message)) = stream.next().await {
+            while let Ok(Some(Ok(message))) =
+                tokio::time::timeout(Duration::from_secs(15), stream.next()).await
+            {
                 let text = match message {
                     Message::Text(text) => text.to_string(),
                     Message::Binary(data) => String::from_utf8_lossy(&data).to_string(),

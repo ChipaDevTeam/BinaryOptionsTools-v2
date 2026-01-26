@@ -1,7 +1,8 @@
 # Import necessary modules
-from BinaryOptionsToolsV2.tracing import Logger, LogBuilder
-from datetime import timedelta
 import asyncio
+from datetime import timedelta
+
+from BinaryOptionsToolsV2.tracing import LogBuilder, Logger
 
 
 async def main():

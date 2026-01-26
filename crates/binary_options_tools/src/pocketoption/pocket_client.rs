@@ -9,6 +9,7 @@ use binary_options_tools_core_pre::{
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+use crate::pocketoption::types::Outgoing;
 use crate::{
     error::BinaryOptionsError,
     pocketoption::{
@@ -20,17 +21,17 @@ use crate::{
             balance::BalanceModule,
             deals::DealsApiModule,
             get_candles::GetCandlesApiModule,
+            historical_data::HistoricalDataApiModule,
             keep_alive::{InitModule, KeepAliveModule},
-            raw::{
-                Outgoing, RawApiModule, RawHandle as InnerRawHandle, RawHandler as InnerRawHandler,
-            },
+            pending_trades::PendingTradesApiModule,
+            raw::{RawApiModule, RawHandle as InnerRawHandle, RawHandler as InnerRawHandler},
             server_time::ServerTimeModule,
             subscriptions::{SubscriptionStream, SubscriptionsApiModule},
             trades::TradesApiModule,
         },
         ssid::Ssid,
         state::{State, StateBuilder},
-        types::{Action, Assets, Deal},
+        types::{Action, Assets, Deal, PendingOrder},
     },
     utils::print_handler,
 };
@@ -76,6 +77,8 @@ impl PocketOption {
             .with_module::<DealsApiModule>()
             .with_module::<SubscriptionsApiModule>()
             .with_module::<GetCandlesApiModule>()
+            .with_module::<PendingTradesApiModule>()
+            .with_module::<HistoricalDataApiModule>()
             .with_module::<RawApiModule>()
             .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg))))
     }
@@ -140,6 +143,8 @@ impl PocketOption {
             .with_module::<DealsApiModule>()
             .with_module::<SubscriptionsApiModule>()
             .with_module::<GetCandlesApiModule>()
+            .with_module::<PendingTradesApiModule>()
+            .with_module::<HistoricalDataApiModule>()
             .with_module::<RawApiModule>()
             .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)));
         let (client, mut runner) = builder.build().await?;
@@ -198,6 +203,17 @@ impl PocketOption {
         state.ssid.demo()
     }
 
+    /// Validates if an asset is active and supports the given timeframe without cloning the entire assets map.
+    pub async fn validate_asset(&self, asset: &str, time: u32) -> PocketResult<()> {
+        let state = &self.client.state;
+        let assets = state.assets.read().await;
+        if let Some(assets) = assets.as_ref() {
+            assets.validate(asset, time)
+        } else {
+            Err(PocketError::General("Assets not loaded".to_string()))
+        }
+    }
+
     /// Executes a trade on the specified asset.
     /// # Arguments
     /// * `asset` - The asset to trade.
@@ -214,28 +230,26 @@ impl PocketOption {
         time: u32,
         amount: f64,
     ) -> PocketResult<(Uuid, Deal)> {
-        if let Some(assets) = self.assets().await {
-            assets.validate(&asset.to_string(), time)?;
-            if amount < MINIMUM_TRADE_AMOUNT {
-                return Err(PocketError::General(format!(
-                    "Amount must be at least {MINIMUM_TRADE_AMOUNT}"
-                )));
-            }
-            if amount > MAXIMUM_TRADE_AMOUNT {
-                return Err(PocketError::General(format!(
-                    "Amount must be at most {MAXIMUM_TRADE_AMOUNT}"
-                )));
-            }
-            if let Some(handle) = self.client.get_handle::<TradesApiModule>().await {
-                handle
-                    .trade(asset.to_string(), action, amount, time)
-                    .await
-                    .map(|d| (d.id, d))
-            } else {
-                Err(BinaryOptionsError::General("TradesApiModule not found".into()).into())
-            }
+        let asset_str = asset.to_string();
+        self.validate_asset(&asset_str, time).await?;
+
+        if amount < MINIMUM_TRADE_AMOUNT {
+            return Err(PocketError::General(format!(
+                "Amount must be at least {MINIMUM_TRADE_AMOUNT}"
+            )));
+        }
+        if amount > MAXIMUM_TRADE_AMOUNT {
+            return Err(PocketError::General(format!(
+                "Amount must be at most {MAXIMUM_TRADE_AMOUNT}"
+            )));
+        }
+        if let Some(handle) = self.client.get_handle::<TradesApiModule>().await {
+            handle
+                .trade(asset_str, action, amount, time)
+                .await
+                .map(|d| (d.id, d))
         } else {
-            Err(PocketError::General("Assets not loaded".to_string()))
+            Err(BinaryOptionsError::General("TradesApiModule not found".into()).into())
         }
     }
 
@@ -289,6 +303,24 @@ impl PocketOption {
         None
     }
 
+    /// Waits for the assets to be loaded from the server.
+    /// # Arguments
+    /// * `timeout` - The maximum time to wait for assets to be loaded.
+    /// # Returns
+    /// `Ok(())` if assets are loaded, or an error if the timeout is reached.
+    pub async fn wait_for_assets(&self, timeout: Duration) -> PocketResult<()> {
+        let start = std::time::Instant::now();
+        loop {
+            if self.assets().await.is_some() {
+                return Ok(());
+            }
+            if start.elapsed() > timeout {
+                return Err(PocketError::General("Timeout waiting for assets".to_string()));
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+
     /// Checks the result of a trade by its ID.
     /// # Arguments
     /// * `id` - The ID of the trade to check.
@@ -340,19 +372,75 @@ impl PocketOption {
         self.client.state.trade_state.get_closed_deal(deal_id).await
     }
 
+    /// Opens a pending order.
+    /// # Arguments
+    /// * `open_type` - The type of the pending order.
+    /// * `amount` - The amount to trade.
+    /// * `asset` - The asset to trade.
+    /// * `open_time` - The time to open the trade.
+    /// * `open_price` - The price to open the trade at.
+    /// * `timeframe` - The duration of the trade.
+    /// * `min_payout` - The minimum payout percentage.
+    /// * `command` - The trade direction (0 for Call, 1 for Put).
+    /// # Returns
+    /// A `PocketResult` containing the `PendingOrder` if successful, or an error if the trade fails.
+    pub async fn open_pending_order(
+        &self,
+        open_type: u32,
+        amount: f64,
+        asset: String,
+        open_time: u32,
+        open_price: f64,
+        timeframe: u32,
+        min_payout: u32,
+        command: u32,
+    ) -> PocketResult<PendingOrder> {
+        if let Some(handle) = self.client.get_handle::<PendingTradesApiModule>().await {
+            handle
+                .open_pending_order(
+                    open_type, amount, asset, open_time, open_price, timeframe, min_payout, command,
+                )
+                .await
+        } else {
+            Err(BinaryOptionsError::General("PendingTradesApiModule not found".into()).into())
+        }
+    }
+
+    /// Gets the currently pending deals.
+    /// # Returns
+    /// A `HashMap` containing the pending deals, keyed by their UUID.
+    pub async fn get_pending_deals(&self) -> HashMap<Uuid, PendingOrder> {
+        self.client.state.trade_state.get_pending_deals().await
+    }
+
+    /// Gets a specific pending deal by its ID.
+    /// # Arguments
+    /// * `deal_id` - The ID of the pending deal to retrieve.
+    /// # Returns
+    /// An `Option` containing the `PendingOrder` if found, or `None` otherwise.
+    pub async fn get_pending_deal(&self, deal_id: Uuid) -> Option<PendingOrder> {
+        self.client
+            .state
+            .trade_state
+            .get_pending_deal(deal_id)
+            .await
+    }
+
     /// Subscribes to a specific asset's updates.
     pub async fn subscribe(
         &self,
         asset: impl ToString,
         sub_type: SubscriptionType,
     ) -> PocketResult<SubscriptionStream> {
-        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await
-            && let Some(assets) = self.assets().await
-        {
-            if assets.get(&asset.to_string()).is_some() {
-                handle.subscribe(asset.to_string(), sub_type).await
+        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await {
+            if let Some(assets) = self.assets().await {
+                if assets.get(&asset.to_string()).is_some() {
+                    handle.subscribe(asset.to_string(), sub_type).await
+                } else {
+                    Err(PocketError::InvalidAsset(asset.to_string()))
+                }
             } else {
-                Err(PocketError::InvalidAsset(asset.to_string()))
+                Err(BinaryOptionsError::General("Assets not found".into()).into())
             }
         } else {
             Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
@@ -367,13 +455,15 @@ impl PocketOption {
     /// # Returns
     /// A `PocketResult` indicating success or an error if the unsubscribe operation fails.
     pub async fn unsubscribe(&self, asset: impl ToString) -> PocketResult<()> {
-        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await
-            && let Some(assets) = self.assets().await
-        {
-            if assets.get(&asset.to_string()).is_some() {
-                handle.unsubscribe(asset.to_string()).await
+        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await {
+            if let Some(assets) = self.assets().await {
+                if assets.get(&asset.to_string()).is_some() {
+                    handle.unsubscribe(asset.to_string()).await
+                } else {
+                    Err(PocketError::InvalidAsset(asset.to_string()))
+                }
             } else {
-                Err(PocketError::InvalidAsset(asset.to_string()))
+                Err(BinaryOptionsError::General("Assets not found".into()).into())
             }
         } else {
             Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
@@ -464,20 +554,32 @@ impl PocketOption {
     /// * `period` - The time period for each candle in seconds.
     /// # Returns
     /// A `PocketResult` containing a vector of `Candle` if successful, or an error if the request fails.
+    /// # Example
+    /// ```
+    /// use binary_options_tools::pocketoption::PocketOption;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> binary_options_tools_core_pre::error::CoreResult<()> {
+    ///     let pocket_option = PocketOption::new("your_session_id").await?;
+    ///     let history = pocket_option.history("EURUSD_otc", 5).await?;
+    ///     println!("Received {} candles from history", history.len());
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn history(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<Candle>> {
-        if let Some(handle) = self.client.get_handle::<SubscriptionsApiModule>().await {
+        if let Some(handle) = self.client.get_handle::<HistoricalDataApiModule>().await {
             if let Some(assets) = self.assets().await {
                 if assets.get(&asset.to_string()).is_some() {
-                    handle.history(asset.to_string(), period).await
+                    handle.get_history(asset.to_string(), period).await
                 } else {
                     Err(PocketError::InvalidAsset(asset.to_string()))
                 }
             } else {
                 // If assets are not loaded yet, still try to get candles
-                handle.history(asset.to_string(), period).await
+                handle.get_history(asset.to_string(), period).await
             }
         } else {
-            Err(BinaryOptionsError::General("SubscriptionsApiModule not found".into()).into())
+            Err(BinaryOptionsError::General("HistoricalDataApiModule not found".into()).into())
         }
     }
 
@@ -535,7 +637,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pocket_option_tester() {
-        tracing_subscriber::fmt::init();
+        let _ = tracing_subscriber::fmt::try_init();
         let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"a0e4f10b17cd7a8125bece49f1364c28\";s:10:\"ip_address\";s:13:\"186.41.20.143\";s:10:\"user_agent\";s:101:\"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36\";s:13:\"last_activity\";i:1752283410;}0f18b73ad560f70cd3e02eb7b3242f9f","isDemo":0,"uid":79165265,"platform":3,"isFastHistory":true,"isOptimized":true}]	"#; // 42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	
         let mut tester = PocketOption::new_testing_wrapper(ssid).await.unwrap();
         tester.start().await.unwrap();
@@ -556,7 +658,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pocket_option_server_time() {
-        tracing_subscriber::fmt::init();
+        let _ = tracing_subscriber::fmt::try_init();
         let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"\";s:10:\"ip_address\";s:15:\"191.113.139.200\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/119.\";s:13:\"last_activity\";i:1751681442;}e2cf2ff21c927851dbb4a781aa81a10e","isDemo":0,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]"#; // 42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
@@ -601,7 +703,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pocket_option_subscription() {
-        tracing_subscriber::fmt::init();
+        let _ = tracing_subscriber::fmt::try_init();
         let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"a0e4f10b17cd7a8125bece49f1364c28\";s:10:\"ip_address\";s:13:\"186.41.20.143\";s:10:\"user_agent\";s:101:\"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36\";s:13:\"last_activity\";i:1752283410;}0f18b73ad560f70cd3e02eb7b3242f9f","isDemo":0,"uid":79165265,"platform":3,"isFastHistory":true,"isOptimized":true}]	"#;
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
@@ -628,7 +730,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pocket_option_get_candles() {
-        tracing_subscriber::fmt::init();
+        let _ = tracing_subscriber::fmt::try_init();
         let ssid = r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"a1b0c4986eb221b5530428dbbdb6b796\";s:10:\"ip_address\";s:14:\"191.113.147.46\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 OPR/120.\";s:13:\"last_activity\";i:1754424804;}e3c483184de3f99e5f806db7d92c1cac","isDemo":0,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#;
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages
@@ -651,7 +753,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pocket_option_history() {
-        tracing_subscriber::fmt::init();
+        let _ = tracing_subscriber::fmt::try_init();
         let ssid = r#"42["auth",{"session":"g011qsjgsbgnqcfaj54rkllk6m","isDemo":1,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#;
         let api = PocketOption::new(ssid).await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await; // Wait for the client to connect and process messages

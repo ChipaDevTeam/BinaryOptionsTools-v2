@@ -38,10 +38,12 @@ The core library is written in Rust for performance and safety, and it serves as
   - Manual reconnection support
 
 ## TODO Features
+- Additional trading platforms (Expert Options, etc.)
+
+## Implemented Features
 - Historical candle data retrieval
 - Closed deals management and history
 - Pending trades support
-- Additional trading platforms (Expert Options, etc.)
 
 ## Installation
 

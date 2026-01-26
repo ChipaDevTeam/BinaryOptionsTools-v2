@@ -6,14 +6,14 @@ as well as specific classes for Pocket Option trading.
 """
 
 __all__ = [
-    "asyncronous",
-    "syncronous",
+    "asynchronous",
+    "synchronous",
     "PocketOptionAsync",
     "PocketOption",
     "RawHandler",
     "RawHandlerSync",
 ]
 
-from . import asyncronous, syncronous
-from .asyncronous import PocketOptionAsync, RawHandler
-from .syncronous import PocketOption, RawHandlerSync
+from . import asynchronous, synchronous
+from .asynchronous import PocketOptionAsync, RawHandler
+from .synchronous import PocketOption, RawHandlerSync

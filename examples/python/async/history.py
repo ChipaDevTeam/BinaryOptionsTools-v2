@@ -1,7 +1,8 @@
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
 
 import pandas as pd
-import asyncio
+
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
 
 # Main part of the code

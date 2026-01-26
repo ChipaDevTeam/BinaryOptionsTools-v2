@@ -1,7 +1,6 @@
-from BinaryOptionsToolsV2.BinaryOptionsToolsV2.pocketoption.syncronous import (
-    PocketOption,
-)
 import time
+
+from BinaryOptionsToolsV2 import PocketOption
 
 
 def main(ssid):

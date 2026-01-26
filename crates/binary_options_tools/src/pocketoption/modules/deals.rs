@@ -13,7 +13,7 @@ use binary_options_tools_core_pre::{
     traits::{ApiModule, Rule},
 };
 use serde::Deserialize;
-use tracing::info;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::pocketoption::{
@@ -172,7 +172,7 @@ impl ApiModule<State> for DealsApiModule {
         loop {
             tokio::select! {
                 Ok(msg) = self.ws_receiver.recv() => {
-                    info!("Received message: {:?}", msg);
+                    tracing::debug!("Received message: {:?}", msg);
                     match msg.as_ref() {
                         Message::Text(text) => {
                             if text.starts_with(UPDATE_OPENED_DEALS) {
@@ -234,7 +234,19 @@ impl ApiModule<State> for DealsApiModule {
                                         Err(e) => return Err(CoreError::from(e)),
                                     }
                                 },
-                                _ => {}
+                                ExpectedMessage::None => {
+                                    let payload_preview = if data.len() > 64 {
+                                        format!(
+                                            "Payload ({} bytes, truncated): {:?}",
+                                            data.len(),
+                                            &data[..64]
+                                        )
+                                    } else {
+                                        format!("Payload ({} bytes): {:?}", data.len(), data)
+                                    };
+                                    warn!(target: "DealsApiModule", "Received unexpected binary message when no header was seen. {}", payload_preview);
+                                }
+
                             }
                             expected = ExpectedMessage::None;
                         },

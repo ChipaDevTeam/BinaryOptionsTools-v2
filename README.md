@@ -7,6 +7,7 @@ A high-performance, cross-platform library for binary options trading automation
 ## Overview
 
 BinaryOptionsTools v2 is a complete rewrite of the original library, featuring:
+
 - **Rust Core**: Built with Rust for maximum performance and memory safety
 - **Python Bindings**: Easy-to-use Python API via PyO3
 - **WebSocket Support**: Real-time market data streaming and trade execution
@@ -18,27 +19,55 @@ BinaryOptionsTools v2 is a complete rewrite of the original library, featuring:
 
 Currently supporting **PocketOption** (Quick Trading Mode) with both real and demo accounts.
 
+## Current Status
+
+**Available Features**:
+
+- Authentication and secure connection
+- Buy/Sell trading operations
+- Balance retrieval
+- Server time synchronization
+- Symbol subscriptions with different types (real-time, time-aligned, chunked)
+- Trade result checking
+- Opened deals management
+- Asset information and validation
+- Automatic reconnection handling
+- Historical candle data (`get_candles`, `get_candles_advanced`)
+- Advanced validators
+
+**Temporarily Unavailable Features**:
+
+- Trade history (`history`)
+- Payout information retrieval
+- Deal end time queries
+
+We're working to restore all functionality with improved stability and performance.
+
 ## Features
 
 ### Trading Operations
+
 - **Trade Execution**: Place buy/sell orders on any available asset
 - **Trade Monitoring**: Check trade results with configurable timeouts
 - **Balance Management**: Real-time account balance retrieval
-- **Open/Closed Deals**: Access detailed trade history and active positions
+- **Open/Closed Deals**: Access active positions and closed deals
 
 ### Market Data
+
 - **Real-time Candle Streaming**: Subscribe to live price data with multiple timeframes (1s, 5s, 15s, 30s, 60s, 300s)
 - **Historical Candles**: Fetch historical OHLC data for backtesting and analysis
 - **Time-Aligned Subscriptions**: Get perfectly aligned candle data for strategy execution
 - **Payout Information**: Retrieve current payout percentages for all assets
 
 ### Connection Management
+
 - **Automatic Reconnection**: Built-in connection recovery with exponential backoff
 - **Connection Control**: Manual connect/disconnect/reconnect methods
 - **Subscription Management**: Unsubscribe from specific assets or handlers
 - **WebSocket Health Monitoring**: Automatic ping/pong keepalive
 
 ### Advanced Features
+
 - **Raw Handler API**: Low-level WebSocket access for custom protocol implementations
 - **Message Validation**: Built-in validator system for response filtering
 - **Async/Sync Support**: Both asynchronous and synchronous Python APIs
@@ -88,9 +117,12 @@ pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/down
 pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.1/BinaryOptionsToolsV2-0.2.1-cp38-abi3-macosx_11_0_arm64.whl"
 ```
 
-**Requirements**: Python 3.8 or higher
+**Requirements**:
+- **OS**: Windows, Linux, macOS
+- **Python**: 3.8 - 3.12
 
-#### Building from Source:
+#### Building from Source
+
 ```bash
 # Clone the repository
 git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git
@@ -106,6 +138,7 @@ maturin develop --release
 ### Rust
 
 Add to your `Cargo.toml`:
+
 ```toml
 [dependencies]
 binary_options_tools = { path = "crates/binary_options_tools" }
@@ -121,7 +154,8 @@ import asyncio
 
 async def main():
     # Initialize client with SSID
-    client = PocketOptionAsync(ssid="your_ssid_here")
+    client = PocketOptionAsync(ssid="your-session-id")
+    await client.connect() # Wait for connection to be established
     
     # Get account balance
     balance = await client.balance()
@@ -130,14 +164,15 @@ async def main():
     # Place a trade
     asset = "EURUSD_otc"
     amount = 1.0  # $1
-    action = "call"  # or "put"
     duration = 60  # 60 seconds
     
-    order_id = await client.trade(asset, action, amount, duration)
-    print(f"Order placed: {order_id}")
+    # The `buy` function is used for "call" trades. For "put" trades, use the `sell` method.
+    trade_id, deal = await client.buy(asset, amount, duration)
+    # trade_id, deal = await client.sell(asset, amount, duration)
+    print(f"Trade placed: {deal}")
     
     # Check if trade won
-    result = await client.check_win(order_id)
+    result = await client.check_win(trade_id)
     print(f"Trade result: {result}")
     
     # Disconnect
@@ -150,13 +185,18 @@ asyncio.run(main())
 
 ```python
 from BinaryOptionsToolsV2 import PocketOption
+import time
 
 # Initialize client
-client = PocketOption(ssid="your_ssid_here")
+client = PocketOption(ssid="your-session-id")
+client.connect() # Wait for connection to be established
 
 # Place trade (blocking)
-order_id = client.trade("EURUSD_otc", "call", 1.0, 60)
-result = client.check_win(order_id)
+# The `buy` function is used for "call" trades. For "put" trades, use the `sell` method.
+trade_id, deal = client.buy("EURUSD_otc", 1.0, 60)
+# trade_id, deal = client.sell("EURUSD_otc", 1.0, 60)
+print(f"Trade placed: {deal}")
+result = client.check_win(trade_id)
 print(f"Trade result: {result}")
 
 # Disconnect
@@ -268,23 +308,25 @@ pytest tests/
 ## Roadmap
 
 ### Planned Features
-- [ ] Pending order support
+
 - [ ] Expert Options platform integration
 - [ ] JavaScript/TypeScript native bindings
 - [ ] WebAssembly support for browser usage
-- [ ] Advanced order types (stop-loss, take-profit)
+- [ ] Advanced order types (stop-loss, take-profit) - Only available for Forex accounts, not Quick Trading (QT) accounts
 - [ ] Historical data export tools
 - [ ] Strategy backtesting framework
 
 ### Platform Support
-- [x] PocketOption (Quick Trading)
-- [ ] PocketOption (Pending Orders)
+
+- [x] PocketOption Quick Trading
+- [x] PocketOption Pending Orders (BETA)
 - [ ] Expert Options
 - [ ] IQ Option (planned)
 
 ## Contributing
 
 Contributions are welcome! Please ensure:
+
 1. Code follows Rust and Python best practices
 2. All tests pass (`cargo test` and `pytest`)
 3. New features include documentation and examples
@@ -298,7 +340,8 @@ Contributions are welcome! Please ensure:
 
 See the full [LICENSE](LICENSE) file for complete terms and conditions.
 
-### Key Points:
+### Key Points
+
 - ✅ **Free** for personal use, learning, and private trading
 - ✅ **Open source** - modify and distribute for personal use
 - ⚠️ **Commercial use requires permission** - Contact us first
@@ -313,12 +356,14 @@ See the full [LICENSE](LICENSE) file for complete terms and conditions.
 ## Disclaimer
 
 **IMPORTANT**: This software is provided "AS IS" without any warranty. The authors and ChipaDevTeam are NOT responsible for:
+
 - Any financial losses incurred from using this software
 - Any trading decisions made using this software  
 - Any bugs, errors, or issues in the software
 - Any consequences of using this software for trading
 
 **Risk Warning**: Binary options trading carries significant financial risk. This software is for educational and personal use only. You should:
+
 - Never risk more than you can afford to lose
 - Understand the risks involved in binary options trading
 - Comply with all applicable laws and regulations in your jurisdiction

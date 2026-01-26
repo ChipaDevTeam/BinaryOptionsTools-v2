@@ -3,6 +3,7 @@
 Complete guide to trading binary options using BinaryOptionsToolsUni across all supported languages.
 
 ## Table of Contents
+
 - [Getting Started](#getting-started)
 - [Trading Basics](#trading-basics)
 - [Advanced Trading Strategies](#advanced-trading-strategies)
@@ -67,6 +68,7 @@ async def first_trade():
 
 asyncio.run(first_trade())
 ```
+
 </details>
 
 <details>
@@ -110,6 +112,7 @@ suspend fun firstTrade() = coroutineScope {
     client.shutdown()
 }
 ```
+
 </details>
 
 ---
@@ -119,6 +122,7 @@ suspend fun firstTrade() = coroutineScope {
 ### Trade Types
 
 #### Call (Buy) Trade
+
 Predict that the price will go **UP** at expiration.
 
 ```python
@@ -126,6 +130,7 @@ trade = await client.buy("EURUSD_otc", 60, 1.0)
 ```
 
 #### Put (Sell) Trade
+
 Predict that the price will go **DOWN** at expiration.
 
 ```python
@@ -427,6 +432,7 @@ async def batch_trade(client, signals):
 **Problem**: Can't connect to PocketOption servers.
 
 **Solutions**:
+
 - Verify your SSID is correct and not expired
 - Check internet connection
 - Try reconnecting: `await client.reconnect()`
@@ -437,6 +443,7 @@ async def batch_trade(client, signals):
 **Problem**: Trade placement fails.
 
 **Solutions**:
+
 - Check if market is open (avoid weekends for non-OTC assets)
 - Verify asset name is correct (e.g., "EURUSD_otc")
 - Ensure sufficient balance
@@ -447,6 +454,7 @@ async def batch_trade(client, signals):
 **Problem**: Can't get trade result.
 
 **Solutions**:
+
 - Wait longer - trade may not have expired yet
 - Use `result_with_timeout()` instead of `result()`
 - Check trade ID is correct
@@ -457,6 +465,7 @@ async def batch_trade(client, signals):
 **Problem**: API calls are very slow.
 
 **Solutions**:
+
 - Ensure 2-second initialization wait after creating client
 - Don't create multiple clients - reuse one client
 - Check network latency

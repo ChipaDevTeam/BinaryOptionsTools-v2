@@ -9,7 +9,7 @@ authors = [
     {name = "ChipaDevTeam"},
     {name = "Rick-29"}
 ]
-license = {text = "BSD"}
+license = { file = "LICENSE" }
 readme = "Readme.md"
 requires-python = ">=3.8"
 keywords = ["binary options", "trading", "pocketoption", "finance", "async"]

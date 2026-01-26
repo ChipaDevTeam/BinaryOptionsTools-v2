@@ -8,6 +8,7 @@ Python bindings for BinaryOptionsTools - A powerful library for automated binary
 ## Current Status
 
 **Available Features**:
+
 - Authentication and secure connection
 - Buy/Sell trading operations
 - Balance retrieval
@@ -17,37 +18,44 @@ Python bindings for BinaryOptionsTools - A powerful library for automated binary
 - Opened deals management
 - Asset information and validation
 - Automatic reconnection handling
+- Historical candle data (`get_candles`, `get_candles_advanced`)
+- Advanced validators
 
 **Temporarily Unavailable Features** (returning "work in progress" errors):
-- Historical candle data (`get_candles`, `get_candles_advanced`)
+
 - Trade history (`history`)
 - Closed deals management
 - Payout information retrieval
 - Raw message sending
-- Advanced validators
 - Deal end time queries
 
 We're actively working to restore all functionality with improved stability and performance.
 
 ## How to install
+
 Install it with PyPi using the following command:
+
 ```bash
-pip install binaryoptionstoolsv2==0.1.6a3
+pip install binaryoptionstoolsv2
 ```
 
 ## Supported OS
+
 Currently, only support for Windows is available.
 
 ## Supported Python versions
+
 Currently, only Python 3.9 to 3.12 is supported.
 
 ## Compile from source (Not recommended)
-* Make sure you have `rust` and `cargo` installed (Check here)
 
-* Install [`maturin`](https://www.maturin.rs/installation) in order to compile the library
+- Make sure you have `rust` and `cargo` installed (Check here)
 
-* Once the source is downloaded (using `git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git`) execute the following commands:
+- Install [`maturin`](https://www.maturin.rs/installation) in order to compile the library
+
+- Once the source is downloaded (using `git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git`) execute the following commands:
 To create the `.whl` file
+
 ```bash
 // Inside the root folder
 cd BinaryOptionsToolsV2
@@ -58,6 +66,7 @@ pip install path/to/file.whl
 ```
 
 To install the library in a local virtual environment
+
 ```bash
 // Inside the root folder
 cd BinaryOptionsToolsV2
@@ -69,42 +78,44 @@ maturin develop
 ```
 
 ## Docs
-Comprehensive Documentation for BinaryOptionsToolsV2 
 
-1. `__init__.py` 
+Comprehensive Documentation for BinaryOptionsToolsV2
 
-This file initializes the Python module and organizes the imports for both synchronous and asynchronous functionality. 
+1. `__init__.py`
 
-Key Details 
+This file initializes the Python module and organizes the imports for both synchronous and asynchronous functionality.
 
-- **Imports `BinaryOptionsToolsV2`**: Imports all elements and documentation from the Rust module. 
-- **Includes Submodules**: Imports and exposes `pocketoption` and `tracing` modules for user convenience. 
+Key Details
 
-Purpose 
+- **Imports `BinaryOptionsToolsV2`**: Imports all elements and documentation from the Rust module.
+- **Includes Submodules**: Imports and exposes `pocketoption` and `tracing` modules for user convenience.
 
-Serves as the entry point for the package, exposing all essential components of the library. 
+Purpose
+
+Serves as the entry point for the package, exposing all essential components of the library.
 
 ### Inside the `pocketoption` folder there are 2 main files
-2. `asynchronous.py` 
 
-This file implements the `PocketOptionAsync` class, which provides an asynchronous interface to interact with Pocket Option. 
+1. `asynchronous.py`
 
-Key Features of PocketOptionAsync 
+This file implements the `PocketOptionAsync` class, which provides an asynchronous interface to interact with Pocket Option.
 
-- **Trade Operations**: 
-  - `buy()`: Places a buy trade asynchronously. 
-  - `sell()`: Places a sell trade asynchronously. 
-  - `check_win()`: Checks the outcome of a trade ('win', 'draw', or 'loss'). 
-- **Market Data**: 
-  - ~~`get_candles()`: Fetches historical candle data.~~ (Work in Progress)
+Key Features of PocketOptionAsync
+
+- **Trade Operations**:
+  - `buy()`: Places a buy trade asynchronously.
+  - `sell()`: Places a sell trade asynchronously.
+  - `check_win()`: Checks the outcome of a trade ('win', 'draw', or 'loss').
+- **Market Data**:
+  - `get_candles()`: Fetches historical candle data.
   - ~~`history()`: Retrieves recent data for a specific asset.~~ (Work in Progress)
-- **Account Management**: 
-  - `balance()`: Returns the current account balance. 
-  - `opened_deals()`: Lists all open trades. 
+- **Account Management**:
+  - `balance()`: Returns the current account balance.
+  - `opened_deals()`: Lists all open trades.
   - ~~`closed_deals()`: Lists all closed trades.~~ (Work in Progress)
   - ~~`payout()`: Returns payout percentages.~~ (Work in Progress)
-- **Real-Time Data**: 
-  - `subscribe_symbol()`: Provides an asynchronous iterator for real-time candle updates. 
+- **Real-Time Data**:
+  - `subscribe_symbol()`: Provides an asynchronous iterator for real-time candle updates.
   - `subscribe_symbol_timed()`: Provides an asynchronous iterator for timed real-time candle updates.
   - `subscribe_symbol_chunked()`: Provides an asynchronous iterator for chunked real-time candle updates.
 - **Server Information**:
@@ -113,11 +124,11 @@ Key Features of PocketOptionAsync
   - `reconnect()`: Manually reconnect to the server.
   - `shutdown()`: Properly close the connection.
 
-Helper Class - `AsyncSubscription` 
+Helper Class - `AsyncSubscription`
 
-Facilitates asynchronous iteration over live data streams, enabling non-blocking operations. 
+Facilitates asynchronous iteration over live data streams, enabling non-blocking operations.
 
-Example Usage 
+Example Usage
 
 ```python
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync 
@@ -148,28 +159,28 @@ async def main():
         break  # Just print one candle for demo
  
 asyncio.run(main()) 
-``` 
+```
 
-3. `synchronous.py` 
+1. `synchronous.py`
 
-This file implements the `PocketOption` class, a synchronous wrapper around the asynchronous interface provided by `PocketOptionAsync`. 
+This file implements the `PocketOption` class, a synchronous wrapper around the asynchronous interface provided by `PocketOptionAsync`.
 
-Key Features of PocketOption 
+Key Features of PocketOption
 
-- **Trade Operations**: 
-  - `buy()`: Places a buy trade using synchronous execution. 
-  - `sell()`: Places a sell trade. 
-  - `check_win()`: Checks the trade outcome synchronously. 
-- **Market Data**: 
-  - ~~`get_candles()`: Fetches historical candle data.~~ (Work in Progress)
+- **Trade Operations**:
+  - `buy()`: Places a buy trade using synchronous execution.
+  - `sell()`: Places a sell trade.
+  - `check_win()`: Checks the trade outcome synchronously.
+- **Market Data**:
+  - `get_candles()`: Fetches historical candle data.
   - ~~`history()`: Retrieves recent data for a specific asset.~~ (Work in Progress)
-- **Account Management**: 
-  - `balance()`: Retrieves account balance. 
-  - `opened_deals()`: Lists all open trades. 
+- **Account Management**:
+  - `balance()`: Retrieves account balance.
+  - `opened_deals()`: Lists all open trades.
   - ~~`closed_deals()`: Lists all closed trades.~~ (Work in Progress)
   - ~~`payout()`: Returns payout percentages.~~ (Work in Progress)
-- **Real-Time Data**: 
-  - `subscribe_symbol()`: Provides a synchronous iterator for live data updates. 
+- **Real-Time Data**:
+  - `subscribe_symbol()`: Provides a synchronous iterator for live data updates.
   - `subscribe_symbol_timed()`: Provides a synchronous iterator for timed real-time candle updates.
   - `subscribe_symbol_chunked()`: Provides a synchronous iterator for chunked real-time candle updates.
 - **Server Information**:
@@ -178,11 +189,11 @@ Key Features of PocketOption
   - `reconnect()`: Manually reconnect to the server.
   - `shutdown()`: Properly close the connection.
 
-Helper Class - `SyncSubscription` 
+Helper Class - `SyncSubscription`
 
-Allows synchronous iteration over real-time data streams for compatibility with simpler scripts. 
+Allows synchronous iteration over real-time data streams for compatibility with simpler scripts.
 
-Example Usage 
+Example Usage
 
 ```python
 from BinaryOptionsToolsV2.pocketoption import PocketOption 
@@ -213,13 +224,13 @@ for candle in stream:
     break  # Just print one candle for demo
 ```
 
-4. Differences Between PocketOption and PocketOptionAsync 
+1. Differences Between PocketOption and PocketOptionAsync
 
-| Feature                | PocketOption (Synchronous) | PocketOptionAsync (Asynchronous) | 
-|------------------------|----------------------------|----------------------------------| 
-| **Execution Type**     | Blocking                  | Non-blocking                    | 
-| **Use Case**           | Simpler scripts           | High-frequency or real-time tasks | 
-| **Performance**        | Slower for concurrent tasks | Scales well with concurrent operations | 
+| Feature                | PocketOption (Synchronous) | PocketOptionAsync (Asynchronous) |
+|------------------------|----------------------------|----------------------------------|
+| **Execution Type**     | Blocking                  | Non-blocking                    |
+| **Use Case**           | Simpler scripts           | High-frequency or real-time tasks |
+| **Performance**        | Slower for concurrent tasks | Scales well with concurrent operations |
 
 ### Tracing
 

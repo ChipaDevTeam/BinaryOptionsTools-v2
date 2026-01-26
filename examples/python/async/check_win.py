@@ -1,7 +1,6 @@
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-
-
 import asyncio
+
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
 
 # Main part of the code

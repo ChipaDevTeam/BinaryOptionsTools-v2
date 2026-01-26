@@ -10,9 +10,16 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     ssid::Ssid,
 };
+use crate::utils::init_crypto_provider;
 use serde_json::Value;
 use tokio::net::TcpStream;
 use url::Url;
+
+const IP_API_URL: &str = "http://ip-api.com/json/";
+const IPIFY_URL: &str = "https://i.pn/json/";
+const EARTH_RADIUS_KM: f64 = 6371.0;
+const POCKET_OPTION_ORIGIN: &str = "https://pocketoption.com";
+const WEBSOCKET_VERSION: &str = "13";
 
 pub fn get_index() -> PocketResult<u64> {
     let mut rng = rng();
@@ -25,7 +32,7 @@ pub fn get_index() -> PocketResult<u64> {
 }
 
 pub async fn get_user_location(ip_address: &str) -> PocketResult<(f64, f64)> {
-    let response = reqwest::get(format!("http://ip-api.com/json/{ip_address}")).await?;
+    let response = reqwest::get(format!("{IP_API_URL}{ip_address}")).await?;
     let json: Value = response.json().await?;
 
     let lat = json["lat"].as_f64().unwrap();
@@ -36,8 +43,6 @@ pub async fn get_user_location(ip_address: &str) -> PocketResult<(f64, f64)> {
 
 pub fn calculate_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
     // Haversine formula to calculate distance between two coordinates
-    const R: f64 = 6371.0; // Radius of Earth in kilometers
-
     let dlat = (lat2 - lat1).to_radians();
     let dlon = (lon2 - lon1).to_radians();
 
@@ -47,24 +52,36 @@ pub fn calculate_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
     let a = dlat.sin().powi(2) + lat1.cos() * lat2.cos() * dlon.sin().powi(2);
     let c = 2.0 * a.sqrt().asin();
 
-    R * c
+    EARTH_RADIUS_KM * c
 }
 
 pub async fn get_public_ip() -> PocketResult<String> {
-    let response = reqwest::get("https://api.ipify.org?format=json").await?;
+    let response = reqwest::get(IPIFY_URL).await?;
     let json: serde_json::Value = response.json().await?;
-    Ok(json["ip"].as_str().unwrap().to_string())
+    match json["ip"].as_str() {
+        Some(ip) => Ok(ip.to_string()),
+        None => Err(PocketError::General(format!(
+            "Failed to retrieve public IP from {}. Response: {:?}",
+            IPIFY_URL, json
+        ))),
+    }
 }
 
 pub async fn try_connect(
     ssid: Ssid,
     url: String,
 ) -> ConnectorResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
-    let tls_connector: native_tls::TlsConnector = native_tls::TlsConnector::builder()
-        .build()
-        .map_err(|e| ConnectorError::Tls(e.to_string()))?;
+    init_crypto_provider();
+    let mut root_store = rustls::RootCertStore::empty();
+    let certs_result = rustls_native_certs::load_native_certs();
+    for cert in certs_result.certs {
+        root_store.add(cert).ok();
+    }
+    let tls_config = rustls::ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
 
-    let connector = Connector::NativeTls(tls_connector);
+    let connector = Connector::Rustls(std::sync::Arc::new(tls_config));
 
     let user_agent = ssid.user_agent();
     let t_url = Url::parse(&url).map_err(|e| ConnectorError::UrlParsing(e.to_string()))?;
@@ -73,13 +90,13 @@ pub async fn try_connect(
         .ok_or(ConnectorError::UrlParsing("Host not found".into()))?;
     let request = Request::builder()
         .uri(t_url.to_string())
-        .header("Origin", "https://pocketoption.com")
+        .header("Origin", POCKET_OPTION_ORIGIN)
         .header("Cache-Control", "no-cache")
         .header("User-Agent", user_agent)
         .header("Upgrade", "websocket")
         .header("Connection", "upgrade")
         .header("Sec-Websocket-Key", generate_key())
-        .header("Sec-Websocket-Version", "13")
+        .header("Sec-Websocket-Version", WEBSOCKET_VERSION)
         .header("Host", host)
         .body(())
         .map_err(|e| ConnectorError::HttpRequestBuild(e.to_string()))?;

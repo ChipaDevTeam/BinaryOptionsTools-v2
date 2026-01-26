@@ -84,7 +84,13 @@ pub trait ApiModule<S: AppState>: Send + 'static {
     /// when a reconnection happens, such as reinitializing state or resending messages.
     /// It allows for custom behavior to be defined that can be executed in the context of the
     /// module, providing flexibility and extensibility to the module's functionality.
-    fn callback(&self) -> CoreResult<Option<Box<dyn ReconnectCallback<S>>>> {
+    fn callback(
+        _shared_state: Arc<S>,
+        _command_receiver: AsyncReceiver<Self::Command>,
+        _command_responder: AsyncSender<Self::CommandResponse>,
+        _message_receiver: AsyncReceiver<Arc<Message>>,
+        _to_ws_sender: AsyncSender<Message>,
+    ) -> CoreResult<Option<Box<dyn ReconnectCallback<S>>>> {
         // Default implementation does nothing.
         // This is useful for modules that do not require a callback.
         Ok(None)

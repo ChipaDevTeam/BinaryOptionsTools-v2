@@ -1,10 +1,9 @@
 # Import necessary modules
-from BinaryOptionsToolsV2.tracing import Logger, LogBuilder
+import time
 from datetime import timedelta
-
 from multiprocessing import Process
 
-import time
+from BinaryOptionsToolsV2.tracing import LogBuilder, Logger
 
 
 def main():
@@ -50,7 +49,7 @@ def main():
     # Demonstrate sync usage
     def log_sync():
         """
-        Syncronous logging function demonstrating sync usage.
+        synchronouslogging function demonstrating sync usage.
         """
         logger.debug("This is a synchronous debug message")
         time.sleep(5)  # Simulate some work

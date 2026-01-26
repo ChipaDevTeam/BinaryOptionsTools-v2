@@ -1,6 +1,7 @@
-from BinaryOptionsToolsV2.pocketoption import PocketOption
 from datetime import timedelta
 import time
+
+from BinaryOptionsToolsV2.pocketoption import PocketOption
 
 
 # Main part of the code

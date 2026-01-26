@@ -1,7 +1,8 @@
-from BinaryOptionsToolsV2.pocketoption import PocketOption
+import time
 
 import pandas as pd
-import time
+
+from BinaryOptionsToolsV2.pocketoption import PocketOption
 
 
 # Main part of the code

@@ -1,8 +1,7 @@
 # from BinaryOptionsToolsV2 import PyConfig
-from typing import Dict, Any, List
-from dataclasses import dataclass
-
 import json
+from dataclasses import dataclass, field
+from typing import Any, Dict, List
 
 
 class PyConfig:
@@ -63,8 +62,6 @@ class Config:
     """
     Python wrapper around PyConfig that provides additional functionality
     for configuration management.
-
-    Warning: This version of the `PocketOption` and `PocketOptionAsync` classes doesn't use `Config`
     """
 
     max_allowed_loops: int = 100
@@ -72,7 +69,7 @@ class Config:
     reconnect_time: int = 5
     connection_initialization_timeout_secs: int = 30
     timeout_secs: int = 30
-    urls: List[str] = None
+    urls: List[str] = field(default_factory=list)
 
     # Extra duration, used by functions like `check_win`
     extra_duration: int = 5

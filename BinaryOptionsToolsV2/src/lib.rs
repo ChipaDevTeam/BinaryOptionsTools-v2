@@ -16,8 +16,7 @@ use validator::RawValidator;
 
 use crate::pocketoption::RawHandlerRust;
 
-#[pymodule]
-#[pyo3(name = "BinaryOptionsToolsV2")]
+#[pymodule(name = "BinaryOptionsToolsV2")]
 fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<StreamLogsIterator>()?;
     m.add_class::<StreamLogsLayer>()?;

@@ -11,15 +11,15 @@ use core::fmt;
 use futures_util::stream::unfold;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 use tokio::select;
-use tokio::sync::RwLock;
+
 use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::pocketoption::candle::{BaseCandle, SubscriptionType};
 use crate::pocketoption::error::PocketError;
-use crate::pocketoption::types::{MultiPatternRule, StreamData as RawCandle};
+use crate::pocketoption::types::{MultiPatternRule, StreamData as RawCandle, SubscriptionEvent};
 use crate::pocketoption::{
     candle::Candle, // Assuming this exists in your types
     error::PocketResult,
@@ -93,7 +93,7 @@ pub enum CommandResponse {
     /// Successful subscription with stream receiver
     SubscriptionSuccess {
         command_id: Uuid,
-        stream_receiver: AsyncReceiver<StreamData>,
+        stream_receiver: AsyncReceiver<SubscriptionEvent>,
     },
     /// Subscription failed
     SubscriptionFailed {
@@ -111,38 +111,39 @@ pub enum CommandResponse {
     },
     /// Returns the number of active subscriptions
     SubscriptionCount(u32),
+    /// History failed
+    HistoryFailed {
+        command_id: Uuid,
+        error: Box<PocketError>,
+    },
 }
 
 /// Represents the data sent through the subscription stream.
 pub struct SubscriptionStream {
-    receiver: AsyncReceiver<StreamData>,
-    sender: AsyncSender<Command>,
+    receiver: AsyncReceiver<SubscriptionEvent>,
+    sender: Option<AsyncSender<Command>>,
+    command_receiver: AsyncReceiver<CommandResponse>,
     asset: String,
     sub_type: SubscriptionType,
 }
 
-/// Data sent through the subscription stream
-#[derive(Debug, Clone)]
-pub enum StreamData {
-    /// New candle data
-    Update {
-        asset: String,
-        price: f64,
-        timestamp: f64,
-    },
-    /// Subscription terminated (stream should end)
-    Terminated { reason: String },
-    /// Unsubscribe signal (stream should end gracefully)
-    Unsubscribe,
-}
-
 /// Callback for when there is a disconnection
-struct SubscriptionCallback {
-    /// Active subscriptions mapped by subscription symbol
-    active_subscriptions: Arc<RwLock<HashMap<String, AsyncSender<StreamData>>>>,
+struct SubscriptionCallback;
+
+#[async_trait]
+impl ReconnectCallback<State> for SubscriptionCallback {
+    async fn call(&self, state: Arc<State>, ws_sender: &AsyncSender<Message>) -> CoreResult<()> {
+        tokio::time::sleep(Duration::from_secs(2)).await; // FIXME: This is a temporary delay, it may need to be fine tuned
+        // Resubscribe to all active subscriptions
+        for symbol in state.active_subscriptions.read().await.keys() {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            // Resubscribe to each active subscription
+            send_subscribe_message(ws_sender, symbol, 1).await?;
+        }
+        Ok(())
+    }
 }
 
-/// Handle for interacting with the `SubscriptionsApiModule`.
 #[derive(Clone)]
 pub struct SubscriptionsHandle {
     sender: AsyncSender<Command>,
@@ -190,7 +191,8 @@ impl SubscriptionsHandle {
                     if command_id == id {
                         return Ok(SubscriptionStream {
                             receiver: stream_receiver,
-                            sender: self.sender.clone(),
+                            sender: Some(self.sender.clone()),
+                            command_receiver: self.receiver.clone(),
                             asset,
                             sub_type,
                         });
@@ -285,6 +287,11 @@ impl SubscriptionsHandle {
     }
 
     /// Gets the history for an asset with its period
+    ///
+    /// **Constraint:**
+    /// Only one outstanding history call per `(asset, period)` is supported.
+    /// Duplicate requests will be rejected with `HistoryFailed`.
+    ///
     /// # Arguments
     /// * `asset` - The asset symbol
     /// * `period` - The period in minutes
@@ -311,6 +318,12 @@ impl SubscriptionsHandle {
                         continue;
                     }
                 }
+                Ok(CommandResponse::HistoryFailed { command_id, error }) => {
+                    if command_id == id {
+                        return Err(*error);
+                    }
+                    continue;
+                }
                 Ok(_) => continue,
                 Err(e) => return Err(CoreError::from(e).into()),
             }
@@ -320,28 +333,11 @@ impl SubscriptionsHandle {
 
 /// The API module for handling subscription operations.
 pub struct SubscriptionsApiModule {
+    state: Arc<State>,
     command_receiver: AsyncReceiver<Command>,
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
-
-    /// Active subscriptions mapped by subscription symbol
-    active_subscriptions: Arc<RwLock<HashMap<String, AsyncSender<StreamData>>>>,
-    histories: Arc<RwLock<Vec<(String, u32, Uuid)>>>,
-}
-
-#[async_trait]
-impl ReconnectCallback<State> for SubscriptionCallback {
-    async fn call(&self, _: Arc<State>, ws_sender: &AsyncSender<Message>) -> CoreResult<()> {
-        tokio::time::sleep(Duration::from_secs(2)).await; // FIXME: This is a temporary delay, it may need to be fine tuned
-        // Resubscribe to all active subscriptions
-        for symbol in self.active_subscriptions.read().await.keys() {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            // Resubscribe to each active subscription
-            send_subscribe_message(ws_sender, symbol, 1).await?;
-        }
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -351,19 +347,18 @@ impl ApiModule<State> for SubscriptionsApiModule {
     type Handle = SubscriptionsHandle;
 
     fn new(
-        _: Arc<State>,
+        state: Arc<State>,
         command_receiver: AsyncReceiver<Self::Command>,
         command_responder: AsyncSender<Self::CommandResponse>,
         message_receiver: AsyncReceiver<Arc<Message>>,
         to_ws_sender: AsyncSender<Message>,
     ) -> Self {
         Self {
+            state,
             command_receiver,
             command_responder,
             message_receiver,
             to_ws_sender,
-            active_subscriptions: Arc::new(RwLock::new(HashMap::new())),
-            histories: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
@@ -444,12 +439,31 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             }
                         },
                         Command::SubscriptionCount => {
-                            let count = self.active_subscriptions.read().await.len() as u32;
+                            let count = self.state.active_subscriptions.read().await.len() as u32;
                             self.command_responder.send(CommandResponse::SubscriptionCount(count)).await?;
                         },
                         Command::History { asset, period, command_id } => {
-                            self.send_subscribe_message(&asset, period).await?;
-                            self.histories.write().await.push((asset, period, command_id));
+                            // Enforce single request
+                            let is_duplicate = self.state.histories.read().await.iter().any(|(a, p, _)| a == &asset && *p == period);
+                            if is_duplicate {
+                                if let Err(e) = self.command_responder.send(CommandResponse::HistoryFailed {
+                                    command_id,
+                                    error: Box::new(PocketError::General(format!("Duplicate history request for asset: {}, period: {}", asset, period))),
+                                }).await {
+                                     warn!(target: "SubscriptionsApiModule", "Failed to send history failed response: {}", e);
+                                }
+                            } else {
+                                if let Err(e) = self.send_subscribe_message(&asset, period).await {
+                                     if let Err(e2) = self.command_responder.send(CommandResponse::HistoryFailed {
+                                         command_id,
+                                         error: Box::new(e.into()),
+                                     }).await {
+                                         warn!(target: "SubscriptionsApiModule", "Failed to send history failed response: {}", e2);
+                                     }
+                                } else {
+                                    self.state.histories.write().await.push((asset, period, command_id));
+                                }
+                            }
                         }
                     }
                 },
@@ -471,7 +485,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                 },
                                 Ok(ServerResponse::History(data)) => {
                                     let mut id = None;
-                                    self.histories.write().await.retain(|(asset, period, c_id)| {
+                                    self.state.histories.write().await.retain(|(asset, period, c_id)| {
                                         if asset == &data.asset && *period == data.period {
                                             id = Some(*c_id);
                                             false
@@ -505,13 +519,14 @@ impl ApiModule<State> for SubscriptionsApiModule {
         }
     }
 
-    fn callback(&self) -> CoreResult<Option<Box<dyn ReconnectCallback<State>>>> {
-        // Default implementation does nothing.
-        // This is useful for modules that do not require a callback.
-
-        Ok(Some(Box::new(SubscriptionCallback {
-            active_subscriptions: self.active_subscriptions.clone(),
-        })))
+    fn callback(
+        _shared_state: Arc<State>,
+        _command_receiver: AsyncReceiver<Self::Command>,
+        _command_responder: AsyncSender<Self::CommandResponse>,
+        _message_receiver: AsyncReceiver<Arc<Message>>,
+        _to_ws_sender: AsyncSender<Message>,
+    ) -> CoreResult<Option<Box<dyn ReconnectCallback<State>>>> {
+        Ok(Some(Box::new(SubscriptionCallback)))
     }
 
     fn rule(_: Arc<State>) -> Box<dyn Rule + Send + Sync> {
@@ -533,7 +548,7 @@ impl SubscriptionsApiModule {
     /// # Returns
     /// * `bool` - True if limit reached
     async fn is_max_subscriptions_reached(&self) -> bool {
-        self.active_subscriptions.read().await.len() >= MAX_SUBSCRIPTIONS
+        self.state.active_subscriptions.read().await.len() >= MAX_SUBSCRIPTIONS
     }
 
     /// Add a new subscription.
@@ -548,19 +563,26 @@ impl SubscriptionsApiModule {
     async fn add_subscription(
         &mut self,
         asset: String,
-        stream_sender: AsyncSender<StreamData>,
+        stream_sender: AsyncSender<SubscriptionEvent>,
     ) -> PocketResult<()> {
         if self.is_max_subscriptions_reached().await {
             return Err(SubscriptionError::MaxSubscriptionsReached.into());
         }
 
         // Check if subscription already exists
-        if self.active_subscriptions.read().await.contains_key(&asset) {
+        if self
+            .state
+            .active_subscriptions
+            .read()
+            .await
+            .contains_key(&asset)
+        {
             return Err(SubscriptionError::SubscriptionAlreadyExists.into());
         }
 
         // Add to active subscriptions
-        self.active_subscriptions
+        self.state
+            .active_subscriptions
             .write()
             .await
             .insert(asset, stream_sender);
@@ -579,8 +601,8 @@ impl SubscriptionsApiModule {
         // 1. Remove from active_subscriptions
         // 2. Remove from asset_to_subscription
         // 3. Return removed subscription info
-        if let Some(stream_sender) = self.active_subscriptions.write().await.remove(asset) {
-            stream_sender.send(StreamData::Terminated { reason: "Unsubscribed from main module".to_string() })
+        if let Some(stream_sender) = self.state.active_subscriptions.write().await.remove(asset) {
+            stream_sender.send(SubscriptionEvent::Terminated { reason: "Unsubscribed from main module".to_string() })
                 .await.inspect_err(|e| warn!(target: "SubscriptionsApiModule", "Failed to send termination signal: {}", e))?;
             return Ok(true);
         }
@@ -590,7 +612,7 @@ impl SubscriptionsApiModule {
 
     async fn resend_connection_messages(&self) -> CoreResult<()> {
         // Resend connection messages to re-establish subscriptions
-        for symbol in self.active_subscriptions.read().await.keys() {
+        for symbol in self.state.active_subscriptions.read().await.keys() {
             // Send subscription message for each active asset
             self.send_subscribe_message(symbol, 1).await?;
         }
@@ -621,9 +643,9 @@ impl SubscriptionsApiModule {
         // 1. Find subscription by asset
         // 2. Send StreamData::Candle to stream
         // 3. Handle send errors (stream might be closed)
-        if let Some(stream_sender) = self.active_subscriptions.read().await.get(asset) {
+        if let Some(stream_sender) = self.state.active_subscriptions.read().await.get(asset) {
             stream_sender
-                .send(StreamData::Update {
+                .send(SubscriptionEvent::Update {
                     asset: asset.to_string(),
                     price,
                     timestamp,
@@ -643,26 +665,48 @@ impl SubscriptionStream {
     }
 
     /// Unsubscribe from the stream
-    pub async fn unsubscribe(self) -> PocketResult<()> {
+    pub async fn unsubscribe(mut self) -> PocketResult<()> {
         // Send unsubscribe command through the main handle
         let command_id = Uuid::new_v4();
-        self.sender
-            .send(Command::Unsubscribe {
-                asset: self.asset.clone(),
-                command_id,
-            })
-            .await
-            .map_err(CoreError::from)?;
+        if let Some(sender) = self.sender.take() {
+            sender
+                .send(Command::Unsubscribe {
+                    asset: self.asset.clone(),
+                    command_id,
+                })
+                .await
+                .map_err(CoreError::from)?;
+        } else {
+            return Ok(());
+        }
 
-        // We don't need to wait for response since we're consuming self
-        Ok(())
+        // Wait for response
+        loop {
+            match self.command_receiver.recv().await {
+                Ok(CommandResponse::UnsubscriptionSuccess { command_id: id }) => {
+                    if id == command_id {
+                        return Ok(());
+                    }
+                }
+                Ok(CommandResponse::UnsubscriptionFailed {
+                    command_id: id,
+                    error,
+                }) => {
+                    if id == command_id {
+                        return Err(*error);
+                    }
+                }
+                Ok(_) => continue,
+                Err(e) => return Err(CoreError::from(e).into()),
+            }
+        }
     }
 
     /// Receive the next candle from the stream
     pub async fn receive(&mut self) -> PocketResult<Candle> {
         loop {
             match self.receiver.recv().await {
-                Ok(StreamData::Update {
+                Ok(crate::pocketoption::types::SubscriptionEvent::Update {
                     asset,
                     price,
                     timestamp,
@@ -676,11 +720,8 @@ impl SubscriptionStream {
                     }
                     // Continue if asset doesn't match (shouldn't happen but safety check)
                 }
-                Ok(StreamData::Terminated { reason }) => {
+                Ok(crate::pocketoption::types::SubscriptionEvent::Terminated { reason }) => {
                     return Err(PocketError::General(format!("Stream terminated: {reason}")));
-                }
-                Ok(StreamData::Unsubscribe) => {
-                    return Err(PocketError::General("Stream unsubscribed".to_string()));
                 }
                 Err(e) => {
                     return Err(CoreError::from(e).into());
@@ -742,6 +783,7 @@ impl Clone for SubscriptionStream {
         Self {
             receiver: self.receiver.clone(),
             sender: self.sender.clone(),
+            command_receiver: self.command_receiver.clone(),
             asset: self.asset.clone(),
             sub_type: self.sub_type.clone(),
         }
@@ -785,15 +827,16 @@ impl Drop for SubscriptionStream {
         // This will notify the main module to remove this subscription
         // We don't need to wait for response since we're consuming self
         // and it will be dropped anyway
-        let _ = self
-            .sender
-            .as_sync()
-            .send(Command::Unsubscribe {
-                asset: self.asset.clone(),
-                command_id: Uuid::new_v4(),
-            })
-            .inspect_err(|e| {
-                warn!(target: "SubscriptionStream", "Failed to send unsubscribe command: {}", e);
-            });
+        if let Some(sender) = &self.sender {
+            let _ = sender
+                .as_sync()
+                .send(Command::Unsubscribe {
+                    asset: self.asset.clone(),
+                    command_id: Uuid::new_v4(),
+                })
+                .inspect_err(|e| {
+                    warn!(target: "SubscriptionStream", "Failed to send unsubscribe command: {}", e);
+                });
+        }
     }
 }

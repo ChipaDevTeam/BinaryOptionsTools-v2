@@ -7,10 +7,13 @@ use std::{
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use binary_options_tools_core_pre::traits::AppState;
+use binary_options_tools_core_pre::{
+    reimports::{AsyncSender, Message},
+    traits::AppState,
+};
 
 use crate::pocketoption::types::ServerTimeState;
-use crate::pocketoption::types::{Assets, Deal};
+use crate::pocketoption::types::{Assets, Deal, Outgoing, PendingOrder, SubscriptionEvent};
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     ssid::Ssid,
@@ -44,7 +47,15 @@ pub struct State {
     /// Holds the state for all trading-related data.
     pub trade_state: Arc<TradeState>,
     /// Holds the current validators for the raw module keyed by ID
-    pub raw_validators: SyncRwLock<HashMap<Uuid, Validator>>,
+    pub raw_validators: SyncRwLock<HashMap<Uuid, Arc<Validator>>>,
+    /// Active subscriptions mapped by subscription symbol
+    pub active_subscriptions: RwLock<HashMap<String, AsyncSender<SubscriptionEvent>>>,
+    /// Active history requests
+    pub histories: RwLock<Vec<(String, u32, Uuid)>>,
+    /// Sinks for raw module
+    pub raw_sinks: RwLock<HashMap<Uuid, Arc<AsyncSender<Arc<Message>>>>>,
+    /// Keep alive messages for raw module
+    pub raw_keep_alive: Arc<RwLock<HashMap<Uuid, Outgoing>>>,
 }
 
 /// Builder pattern for creating State instances
@@ -104,6 +115,10 @@ impl StateBuilder {
             assets: RwLock::new(None),
             trade_state: Arc::new(TradeState::default()),
             raw_validators: SyncRwLock::new(HashMap::new()),
+            active_subscriptions: RwLock::new(HashMap::new()),
+            histories: RwLock::new(Vec::new()),
+            raw_sinks: RwLock::new(HashMap::new()),
+            raw_keep_alive: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 }
@@ -180,7 +195,16 @@ impl State {
     /// Current server time as DateTime<Utc>
     pub async fn get_server_datetime(&self) -> DateTime<Utc> {
         let timestamp = self.get_server_time().await;
-        DateTime::from_timestamp(timestamp as i64, 0).unwrap_or_else(Utc::now)
+        match DateTime::from_timestamp(timestamp as i64, 0) {
+            Some(dt) => dt,
+            None => {
+                tracing::warn!(
+                    "Failed to convert server timestamp {} to DateTime<Utc>. Defaulting to Utc::now().",
+                    timestamp
+                );
+                Utc::now()
+            }
+        }
     }
 
     /// Convert local time to server time
@@ -224,7 +248,7 @@ impl State {
         self.raw_validators
             .write()
             .expect("Failed to acquire write lock")
-            .insert(id, validator);
+            .insert(id, Arc::new(validator));
     }
 
     /// Removes a validator by ID. Returns whether it existed.
@@ -252,12 +276,19 @@ pub struct TradeState {
     pub opened_deals: RwLock<HashMap<Uuid, Deal>>,
     /// A map of recently closed deals, keyed by their UUID.
     pub closed_deals: RwLock<HashMap<Uuid, Deal>>,
+    /// A map of pending deals, keyed by their UUID.
+    pub pending_deals: RwLock<HashMap<Uuid, PendingOrder>>,
 }
 
 impl TradeState {
     /// Adds a new opened deal.
     pub async fn add_opened_deal(&self, deal: Deal) {
         self.opened_deals.write().await.insert(deal.id, deal);
+    }
+
+    /// Adds a new pending deal.
+    pub async fn add_pending_deal(&self, deal: PendingOrder) {
+        self.pending_deals.write().await.insert(deal.ticket, deal);
     }
 
     /// Adds or updates deals in the opened_deals map.
@@ -321,5 +352,20 @@ impl TradeState {
     /// Retrieves a closed deal by its ID.
     pub async fn get_closed_deal(&self, deal_id: Uuid) -> Option<Deal> {
         self.closed_deals.read().await.get(&deal_id).cloned()
+    }
+
+    /// Retrieves a pending deal by its ID.
+    pub async fn get_pending_deal(&self, deal_id: Uuid) -> Option<PendingOrder> {
+        self.pending_deals.read().await.get(&deal_id).cloned()
+    }
+
+    /// Retrieves all pending deals.
+    pub async fn get_pending_deals(&self) -> HashMap<Uuid, PendingOrder> {
+        self.pending_deals.read().await.clone()
+    }
+
+    /// Removes a pending deal by its ID.
+    pub async fn remove_pending_deal(&self, deal_id: &Uuid) -> Option<PendingOrder> {
+        self.pending_deals.write().await.remove(deal_id)
     }
 }

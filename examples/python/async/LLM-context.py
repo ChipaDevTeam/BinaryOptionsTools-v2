@@ -3,10 +3,9 @@
 
 # start of the check win function - this is the function that checks the win of a trade
 
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-
-
 import asyncio
+
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
 
 # Main part of the code
@@ -34,12 +33,12 @@ if __name__ == "__main__":
 # end of the check win function - this is the function that checks the win of a trade
 
 
+import asyncio
+from datetime import timedelta
+
 # start of the raw iterator - this is the function that creates a raw iterator for the price stream
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 from BinaryOptionsToolsV2.validator import Validator
-from datetime import timedelta
-
-import asyncio
 
 
 async def main(ssid: str):
@@ -76,11 +75,11 @@ if __name__ == "__main__":
 
 # start of the raw order - this is the function that creates a raw order for the price stream
 
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-from BinaryOptionsToolsV2.validator import Validator
+import asyncio
 from datetime import timedelta
 
-import asyncio
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+from BinaryOptionsToolsV2.validator import Validator
 
 
 async def main(ssid: str):
@@ -133,10 +132,10 @@ if __name__ == "__main__":
 # end of the raw order - this is the function that creates a raw order for the price stream
 
 
+import asyncio
+
 # start of the get balance - this is the function that gets the balance of the account
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-
-import asyncio
 
 
 # Main part of the code
@@ -159,10 +158,11 @@ if __name__ == "__main__":
 # start of the get candles - this is the function that gets the candles of the account
 
 
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
 
 import pandas as pd
-import asyncio
+
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
 
 # Main part of the code
@@ -189,10 +189,10 @@ if __name__ == "__main__":
 # end of the get candles - this is the function that gets the candles of the account
 
 
+import asyncio
+
 # start of the get open and close trades - this is the function that gets the open and close trades of the account
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-
-import asyncio
 
 
 # Main part of the code
@@ -222,9 +222,9 @@ if __name__ == "__main__":
 
 # Start of the history - this is the function that gets the history of the candles
 
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-
 import asyncio
+
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
 
 # Main part of the code
@@ -252,11 +252,12 @@ if __name__ == "__main__":
 # end of the history - this is the function that gets the history of the candles
 
 
+import asyncio
+from datetime import timedelta
+
 # start of the logging system - this is the function that creates a logging system for the price stream
 # Import necessary modules
-from BinaryOptionsToolsV2.tracing import Logger, LogBuilder
-from datetime import timedelta
-import asyncio
+from BinaryOptionsToolsV2.tracing import LogBuilder, Logger
 
 
 async def main():
@@ -339,10 +340,10 @@ if __name__ == "__main__":
 
 # start of the logs - this is the function that creates a logging system for the price stream
 
-from BinaryOptionsToolsV2.tracing import start_logs
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-
 import asyncio
+
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+from BinaryOptionsToolsV2.tracing import start_logs
 
 
 # Main part of the code
@@ -374,10 +375,10 @@ if __name__ == "__main__":
 # end of the logs - this is the function that creates a logging system for the price stream
 
 
+import asyncio
+
 # start of the payout - this is the function that gets the payout of the account
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-
-import asyncio
 
 
 # Main part of the code
@@ -408,8 +409,9 @@ if __name__ == "__main__":
 
 # start of the raw message - this is the function that creates a raw message for the price stream
 
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 import asyncio
+
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
 
 async def main(ssid: str):
@@ -454,10 +456,10 @@ if __name__ == "__main__":
 # end of the raw message - this is the function that creates a raw message for the price stream
 
 
+import asyncio
+
 # start of the subscribe symbol - this is the function that subscribes to a symbol and gets the candles in real time
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-
-import asyncio
 
 
 # Main part of the code
@@ -477,10 +479,10 @@ if __name__ == "__main__":
 # end of the subscribe symbol - this is the function that subscribes to a symbol and gets the candles in real time
 
 
+import asyncio
+
 # start of the subscribe symbol chuncked - this is the function that subscribes to a symbol and gets the candles in real time
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-
-import asyncio
 
 
 # Main part of the code
@@ -502,12 +504,12 @@ if __name__ == "__main__":
 # end of the subscribe symbol chuncked - this is the function that subscribes to a symbol and gets the candles in real time
 
 
+import asyncio
+from datetime import timedelta
+
 # start of the subscribe symbol timed - this is the function that subscribes to a symbol and gets the candles in real time
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 from BinaryOptionsToolsV2.tracing import start_logs
-from datetime import timedelta
-
-import asyncio
 
 
 # Main part of the code
@@ -532,9 +534,9 @@ if __name__ == "__main__":
 
 # Start of the trade - this is the function that creates a trade for the price stream
 
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-
 import asyncio
+
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
 
 # Main part of the code

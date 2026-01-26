@@ -1,8 +1,8 @@
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-from BinaryOptionsToolsV2.validator import Validator
+import asyncio
 from datetime import timedelta
 
-import asyncio
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+from BinaryOptionsToolsV2.validator import Validator
 
 
 async def main(ssid: str):

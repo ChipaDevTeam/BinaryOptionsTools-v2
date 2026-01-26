@@ -24,7 +24,7 @@ pub enum BinaryOptionsToolsError {
     WebsocketConnectionError(#[from] TungsteniteError),
     #[error("Failed to send message to websocket sender, {0}")]
     MessageSendingError(#[from] async_channel::SendError<Message>),
-    #[error("Failed to send message using asyncronous channel, {0}")]
+    #[error("Failed to send message using asynchronous channel, {0}")]
     GeneralMessageSendingError(String),
     #[error(
         "Failed to reconnect '{0}' times, maximum allowed number of reconnections was reached, breaking"

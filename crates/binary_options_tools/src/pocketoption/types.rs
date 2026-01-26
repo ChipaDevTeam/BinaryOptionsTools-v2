@@ -230,6 +230,21 @@ impl Rule for TwoStepRule {
 }
 
 /// More advanced implementation of the TwoStepRule that allows for multipple patterns
+///
+/// **Message Routing with `MultiPatternRule`:**
+/// This rule is designed to process Socket.IO messages that follow a common pattern
+/// for event-based communication. It expects incoming `Message::Text` to be a JSON
+/// array where the first element is a string representing the logical event name.
+///
+/// - **Patterns:** The `patterns` provided to `MultiPatternRule::new` should be the
+///   *exact logical event names* (e.g., `"updateHistory"`, `"successOpenOrder"`).
+/// - **Framing:** Do *not* include any numeric prefixes (like `42` or `451-`) or other
+///   Socket.IO framing characters in the patterns. These will be automatically handled
+///   by the rule's parsing logic.
+/// - **Behavior:** When a `Message::Text` containing a matching event name is received,
+///   the rule internally flags `valid` as true. The *next* `Message::Binary` received
+///   after this flag is set will be considered part of the two-step message and allowed
+///   to pass through (by returning `true` from `call`). All other messages will be filtered.
 pub struct MultiPatternRule {
     valid: AtomicBool,
     patterns: Vec<String>,
@@ -250,13 +265,20 @@ impl MultiPatternRule {
 
 impl Rule for MultiPatternRule {
     fn call(&self, msg: &Message) -> bool {
-        // tracing::info!("Called with message: {:?}", msg);
         match msg {
             Message::Text(text) => {
-                for pattern in &self.patterns {
-                    if text.starts_with(pattern) {
-                        self.valid.store(true, Ordering::SeqCst);
-                        return false;
+                if let Some(start) = text.find('[') {
+                    if let Ok(value) = serde_json::from_str::<Value>(&text[start..]) {
+                        if let Some(arr) = value.as_array() {
+                            if let Some(event_name) = arr.get(0).and_then(|v| v.as_str()) {
+                                for pattern in &self.patterns {
+                                    if event_name == pattern {
+                                        self.valid.store(true, Ordering::SeqCst);
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 false
@@ -370,39 +392,39 @@ impl<'de> Deserialize<'de> for Asset {
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[allow(unused)]
-        struct AssetRaw {
-            id: i32,
-            symbol: String,
-            name: String,
-            asset_type: AssetType,
-            in1: i32,
-            payout: i32,
-            in3: i32,
-            in4: i32,
-            in5: i32,
-            otc: i32,
-            in7: i32,
-            in8: i32,
-            arr: Vec<String>,
-            in9: i64,
-            valid: bool,
-            times: Vec<CandleLength>,
-            in10: i32,
-            in11: i32,
-            in12: i64,
-        }
+        #[allow(dead_code)] // Allow dead code because many fields are unused but kept for wire compatibility
+        struct AssetRawTuple(
+            i32,             // 0: id (used)
+            String,          // 1: symbol (used)
+            String,          // 2: name (used)
+            AssetType,       // 3: asset_type (used)
+            (),              // 4: unused
+            i32,             // 5: payout (used)
+            (),              // 6: unused
+            (),              // 7: unused
+            (),              // 8: unused
+            i32,             // 9: is_otc (used, 1 for true, 0 for false)
+            (),              // 10: unused
+            (),              // 11: unused
+            (),              // 12: unused (previously Vec<String>)
+            (),              // 13: unused (previously i64)
+            bool,            // 14: is_active (used)
+            Vec<CandleLength>, // 15: allowed_candles (used)
+            (),              // 16: unused
+            (),              // 17: unused
+            (),              // 18: unused (previously i64)
+        );
 
-        let raw: AssetRaw = AssetRaw::deserialize(deserializer)?;
+        let raw: AssetRawTuple = AssetRawTuple::deserialize(deserializer)?;
         Ok(Asset {
-            id: raw.id,
-            symbol: raw.symbol,
-            name: raw.name,
-            is_otc: raw.otc == 1,
-            is_active: raw.valid,
-            payout: raw.payout,
-            allowed_candles: raw.times,
-            asset_type: raw.asset_type,
+            id: raw.0,
+            symbol: raw.1,
+            name: raw.2,
+            asset_type: raw.3,
+            payout: raw.5,
+            is_otc: raw.9 == 1,
+            is_active: raw.14,
+            allowed_candles: raw.15,
         })
     }
 }
@@ -557,6 +579,83 @@ impl fmt::Display for OpenOrder {
         let data = serde_json::to_string(&self).map_err(|_| fmt::Error)?;
         write!(f, "42[\"openOrder\",{data}]")
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingOrder {
+    pub ticket: Uuid,
+    pub open_type: u32,
+    pub amount: f64,
+    pub symbol: String,
+    pub open_time: String,
+    pub open_price: f64,
+    pub timeframe: u32,
+    pub min_payout: u32,
+    pub command: u32,
+    pub date_created: String,
+    pub id: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenPendingOrder {
+    open_type: u32,
+    amount: f64,
+    asset: String,
+    open_time: u32,
+    open_price: f64,
+    timeframe: u32,
+    min_payout: u32,
+    command: u32,
+}
+
+impl OpenPendingOrder {
+    pub fn new(
+        open_type: u32,
+        amount: f64,
+        asset: String,
+        open_time: u32,
+        open_price: f64,
+        timeframe: u32,
+        min_payout: u32,
+        command: u32,
+    ) -> Self {
+        Self {
+            open_type,
+            amount,
+            asset,
+            open_time,
+            open_price,
+            timeframe,
+            min_payout,
+            command,
+        }
+    }
+}
+
+impl fmt::Display for OpenPendingOrder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let data = serde_json::to_string(&self).map_err(|_| fmt::Error)?;
+        write!(f, "42[\"openPendingOrder\",{data}]")
+    }
+}
+#[derive(Debug, Clone)]
+pub enum SubscriptionEvent {
+    Update {
+        asset: String,
+        price: f64,
+        timestamp: f64,
+    },
+    Terminated {
+        reason: String,
+    },
+}
+
+#[derive(Clone, Debug)]
+pub enum Outgoing {
+    Text(String),
+    Binary(Vec<u8>),
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use pyo3::{
-    Bound, PyResult, pyclass, pymethods, Py, PyAny,
+    Bound, Py, PyAny, PyResult, pyclass, pymethods,
     types::{PyAnyMethods, PyList},
 };
 use regex::Regex;
@@ -35,6 +35,23 @@ pub struct PyCustom {
 
 #[pyclass]
 #[derive(Clone)]
+/// `RawValidator` provides a flexible way to filter WebSocket messages
+/// within the Python API. It encapsulates various validation strategies,
+/// including regular expressions, substring checks, and custom Python
+/// callables.
+///
+/// This class is designed to be used with `RawHandler` to define which
+/// incoming messages should be processed.
+///
+/// # Python Custom Validator Behavior
+/// When using the `RawValidator.custom()` constructor:
+/// - The provided Python callable (`func`) must accept exactly one string
+///   argument, which will be the incoming WebSocket message data.
+/// - The callable should return a boolean value (`True` or `False`).
+/// - If the callable raises an exception, or if its return value cannot
+///   be interpreted as a boolean, the validation will silently fail and
+///   be treated as `False`. No Python exception will be propagated back
+///   to the calling Python code at the point of validation.
 pub enum RawValidator {
     None(),
     Regex(RegexValidator),
@@ -155,18 +172,55 @@ impl RawValidator {
     }
 
     #[staticmethod]
+    /// Creates a custom validator using a Python callable.
+    ///
+    /// The `func` callable will be invoked with the incoming WebSocket message
+    /// as a single string argument. It must return `True` to validate the message
+    /// or `False` otherwise.
+    ///
+    /// **Behavior on Error/Invalid Return:**
+    /// If `func` raises an exception or returns a non-boolean value,
+    /// the validation will silently fail and be treated as `False`.
+    /// No exception will be propagated.
+    ///
+    /// # Arguments
+    /// * `func` - A Python callable that accepts one string argument and returns a boolean.
     pub fn custom(func: Py<PyAny>) -> Self {
         Self::Custom(PyCustom {
             custom: Arc::new(func),
         })
     }
 
-    pub fn check(&self, _msg: String) -> bool {
-        // TODO: Restore validation logic when the new API supports it
-        // For now, return true as a placeholder
-        true
-        // let raw = RawWebsocketMessage::from(msg);
-        // self.validate(&raw)
+    pub fn check(&self, msg: String) -> bool {
+        let validator: CrateValidator = self.clone().into();
+        validator.call(&msg)
+    }
+}
+
+impl RawValidator {
+    fn call(&self, data: &str) -> bool {
+        match self {
+            RawValidator::None() => true,
+            RawValidator::Regex(validator) => validator.regex.is_match(data),
+            RawValidator::StartsWith(prefix) => data.starts_with(prefix),
+            RawValidator::EndsWith(suffix) => data.ends_with(suffix),
+            RawValidator::Contains(substring) => data.contains(substring),
+            RawValidator::All(validators) => validators.0.iter().all(|v| v.call(data)),
+            RawValidator::Any(validators) => validators.0.iter().any(|v| v.call(data)),
+            RawValidator::Not(validator) => !validator.0.call(data),
+            RawValidator::Custom(py_custom) => Python::attach(|py| {
+                let func = py_custom.custom.as_ref();
+                match func.call1(py, (data,)) {
+                    Ok(result) => {
+                        match result.extract::<bool>(py) {
+                            Ok(b) => b,
+                            Err(_) => false, // If we can't extract a bool, return false
+                        }
+                    }
+                    Err(_) => false, // If the function call fails, return false
+                }
+            }),
+        }
     }
 }
 

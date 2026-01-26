@@ -38,7 +38,7 @@ pub struct Candle {
     // pub is_closed: bool,
 }
 
-#[derive(Default, Clone, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct BaseCandle {
     pub timestamp: f64,
     pub open: f64,
@@ -455,9 +455,10 @@ impl TryFrom<(BaseCandle, String)> for Candle {
     fn try_from(value: (BaseCandle, String)) -> Result<Self, Self::Error> {
         let (base_candle, symbol) = value;
         let volume = match base_candle.volume {
-            Some(v) => Some(Decimal::from_f64(v).ok_or(BinaryOptionsError::General(
-                "Couldn't parse volume".into(),
-            ))?),
+            Some(v) => Some(
+                Decimal::from_f64(v)
+                    .ok_or(BinaryOptionsError::General("Couldn't parse volume".into()))?,
+            ),
             None => None,
         };
         Ok(Candle {
@@ -469,9 +470,8 @@ impl TryFrom<(BaseCandle, String)> for Candle {
                 .ok_or(BinaryOptionsError::General("Couldn't parse high".into()))?,
             low: Decimal::from_f64(base_candle.low)
                 .ok_or(BinaryOptionsError::General("Couldn't parse low".into()))?,
-            close: Decimal::from_f64(base_candle.close).ok_or(BinaryOptionsError::General(
-                "Couldn't parse close".into(),
-            ))?,
+            close: Decimal::from_f64(base_candle.close)
+                .ok_or(BinaryOptionsError::General("Couldn't parse close".into()))?,
             volume,
         })
     }

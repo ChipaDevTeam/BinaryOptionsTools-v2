@@ -1,9 +1,9 @@
 import json
-from BinaryOptionsToolsV2 import start_tracing
-from BinaryOptionsToolsV2 import Logger as RustLogger
-from BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
-
 from datetime import timedelta
+
+from .BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
+from .BinaryOptionsToolsV2 import Logger as RustLogger
+from .BinaryOptionsToolsV2 import start_tracing
 
 
 class LogSubscription:
@@ -118,7 +118,7 @@ class LogBuilder:
             timeout (None | timedelta): Optional timeout for the iterator.
 
         Returns:
-            StreamLogsIterator: A new StreamLogsIterator instance that supports both asyncronous and syncronous iterators.
+            StreamLogsIterator: A new StreamLogsIterator instance that supports both asynchronous and synchronousiterators.
         """
         return LogSubscription(self.builder.create_logs_iterator(level, timeout))
 

@@ -1,5 +1,6 @@
-from BinaryOptionsToolsV2.pocketoption import PocketOption
 import time
+
+from BinaryOptionsToolsV2.pocketoption import PocketOption
 
 
 def main(ssid: str):

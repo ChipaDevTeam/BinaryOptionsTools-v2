@@ -207,7 +207,7 @@ pub struct GetCandlesApiModule {
     ws_sender: AsyncSender<Message>,
     command_receiver: AsyncReceiver<Command>,
     command_responder: AsyncSender<CommandResponse>,
-    pending_requests: std::collections::HashMap<String, (Uuid, String)>, // index -> (req_id, asset)
+    pending_requests: std::collections::HashMap<u64, (Uuid, String)>, // index -> (req_id, asset)
 }
 
 #[async_trait]
@@ -248,7 +248,7 @@ impl ApiModule<State> for GetCandlesApiModule {
                         match serde_json::from_slice::<LoadHistoryPeriodResult>(data) {
                             Ok(result) => {
                                 // Find the pending request by index
-                                if let Some((req_id, asset)) = self.pending_requests.remove(&result.asset) {
+                                if let Some((req_id, asset)) = self.pending_requests.remove(&result.index) {
                                     let candles: Vec<Candle> = result.data
                                         .into_iter()
                                         .map(|candle_data| {
@@ -280,13 +280,13 @@ impl ApiModule<State> for GetCandlesApiModule {
                             match LoadHistoryPeriod::new(&asset, time, period, offset) {
                                 Ok(load_history) => {
                                     // Store the request mapping
-                                    self.pending_requests.insert(load_history.asset.clone(), (req_id, asset));
+                                    self.pending_requests.insert(load_history.index, (req_id, asset));
 
                                     // Send the WebSocket message
                                     let message = Message::text(load_history.to_string());
                                     if let Err(e) = self.ws_sender.send(message).await {
                                         // Remove the pending request on error
-                                        self.pending_requests.remove(&load_history.asset);
+                                        self.pending_requests.remove(&load_history.index);
 
                                         if let Err(resp_err) = self.command_responder.send(CommandResponse::Error {
                                             req_id,

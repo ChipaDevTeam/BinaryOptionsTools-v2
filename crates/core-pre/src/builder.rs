@@ -178,14 +178,13 @@ impl<S: AppState> ClientBuilder<S> {
                         .insert(TypeId::of::<M>(), Box::new(handle));
                 });
 
-                let m_temp = M::new(
+                match M::callback(
                     state.clone(),
                     cmd_rx.clone(),
                     cmd_ret_tx.clone(),
                     msg_rx.clone(),
                     to_ws_tx.clone(),
-                );
-                match m_temp.callback() {
+                ) {
                     Ok(Some(callback)) => {
                         reconnect_callback_stack.add_layer(callback);
                     }

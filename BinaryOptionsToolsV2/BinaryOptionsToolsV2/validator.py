@@ -24,7 +24,7 @@ class Validator:
 
     def __init__(self):
         """Creates a default validator that accepts all messages."""
-        from BinaryOptionsToolsV2 import RawValidator
+        from .BinaryOptionsToolsV2 import RawValidator
 
         self._validator = RawValidator()
 
@@ -47,7 +47,7 @@ class Validator:
             assert validator.check("abc") == False
             ```
         """
-        from BinaryOptionsToolsV2 import RawValidator
+        from .BinaryOptionsToolsV2 import RawValidator
 
         v = Validator()
         v._validator = RawValidator.regex(pattern)
@@ -64,7 +64,7 @@ class Validator:
         Returns:
             Validator that matches messages starting with prefix
         """
-        from BinaryOptionsToolsV2 import RawValidator
+        from .BinaryOptionsToolsV2 import RawValidator
 
         v = Validator()
         v._validator = RawValidator.starts_with(prefix)
@@ -81,7 +81,7 @@ class Validator:
         Returns:
             Validator that matches messages ending with suffix
         """
-        from BinaryOptionsToolsV2 import RawValidator
+        from .BinaryOptionsToolsV2 import RawValidator
 
         v = Validator()
         v._validator = RawValidator.ends_with(suffix)
@@ -98,7 +98,7 @@ class Validator:
         Returns:
             Validator that matches messages containing substring
         """
-        from BinaryOptionsToolsV2 import RawValidator
+        from .BinaryOptionsToolsV2 import RawValidator
 
         v = Validator()
         v._validator = RawValidator.contains(substring)
@@ -123,7 +123,7 @@ class Validator:
             assert v.check("error occurred") == False
             ```
         """
-        from BinaryOptionsToolsV2 import RawValidator
+        from .BinaryOptionsToolsV2 import RawValidator
 
         v = Validator()
         v._validator = RawValidator.ne(validator._validator)
@@ -151,10 +151,10 @@ class Validator:
             assert v.check("Hello Beautiful") == False
             ```
         """
-        from BinaryOptionsToolsV2 import RawValidator
+        from .BinaryOptionsToolsV2 import RawValidator
 
         v = Validator()
-        v._validator = RawValidator.all([v._validator for v in validators])
+        v._validator = RawValidator.all([item._validator for item in validators])
         return v
 
     @staticmethod
@@ -180,10 +180,10 @@ class Validator:
             assert v.check("in progress") == False
             ```
         """
-        from BinaryOptionsToolsV2 import RawValidator
+        from .BinaryOptionsToolsV2 import RawValidator
 
         v = Validator()
-        v._validator = RawValidator.any([v._validator for v in validators])
+        v._validator = RawValidator.any([item._validator for item in validators])
         return v
 
     @staticmethod
@@ -249,7 +249,7 @@ class Validator:
                 print("This will never be reached")
             ```
         """
-        from BinaryOptionsToolsV2 import RawValidator
+        from .BinaryOptionsToolsV2 import RawValidator
 
         v = Validator()
         v._validator = RawValidator.custom(func)
