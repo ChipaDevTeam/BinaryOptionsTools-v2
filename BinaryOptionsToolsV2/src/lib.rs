@@ -26,8 +26,6 @@ fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<RawValidator>()?;
     m.add_class::<RawHandle>()?;
     m.add_class::<RawHandler>()?;
-    m.add_class::<RawHandle>()?;
-    m.add_class::<RawHandler>()?;
 
     m.add_function(wrap_pyfunction!(start_tracing, m)?)?;
     Ok(())
