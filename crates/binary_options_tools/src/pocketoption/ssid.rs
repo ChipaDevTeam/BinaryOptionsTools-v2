@@ -129,6 +129,13 @@ impl Ssid {
         let data_str = data.to_string();
         let trimmed = data_str.trim();
 
+        // Handle case where SSID is double-encoded or passed as a JSON string
+        if trimmed.starts_with('"') && trimmed.ends_with('"') {
+            if let Ok(unquoted) = serde_json::from_str::<String>(trimmed) {
+                return Self::parse(unquoted);
+            }
+        }
+
         let prefix = "42[\"auth\",";
 
         let parsed = if let Some(stripped) = trimmed.strip_prefix(prefix) {
