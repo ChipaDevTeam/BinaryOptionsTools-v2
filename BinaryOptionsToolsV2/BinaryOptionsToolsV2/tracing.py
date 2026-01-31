@@ -49,8 +49,11 @@ def start_logs(
     if layers is None:
         layers = []
 
-    os.makedirs(path, exist_ok=True)
-    start_tracing(path, level, terminal, layers)
+    try:
+        os.makedirs(path, exist_ok=True)
+        start_tracing(path, level, terminal, layers)
+    except Exception as e:
+        print(f"Error starting logs: {e}")
 
 
 class Logger:
