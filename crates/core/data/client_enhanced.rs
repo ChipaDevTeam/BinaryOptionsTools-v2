@@ -268,6 +268,15 @@ where
                         );
                         sleep(delay).await;
 
+                        // Explicitly abort any existing background tasks before reconnecting
+                        // This prevents old sender tasks from "stealing" messages during/after reconnection
+                        {
+                            let mut tasks = inner.background_tasks.lock().await;
+                            for task in tasks.drain(..) {
+                                task.abort();
+                            }
+                        }
+
                         match inner.connect().await {
                             Ok(_) => {
                                 info!("Reconnected successfully");
@@ -515,6 +524,15 @@ where
         &self,
         websocket: WebSocketStream<MaybeTlsStream<TcpStream>>,
     ) -> BinaryOptionsResult<()> {
+        // Explicitly abort any existing background tasks before spawning new handlers
+        // This ensures a clean state and prevents message "stealing" by old tasks
+        {
+            let mut tasks = self.background_tasks.lock().await;
+            for task in tasks.drain(..) {
+                task.abort();
+            }
+        }
+
         let (write, read) = websocket.split();
 
         // Start message sender task
@@ -525,7 +543,6 @@ where
 
         // Store tasks for cleanup
         let mut tasks = self.background_tasks.lock().await;
-        tasks.retain(|t| !t.is_finished());
         tasks.push(sender_task);
         tasks.push(receiver_task);
 
