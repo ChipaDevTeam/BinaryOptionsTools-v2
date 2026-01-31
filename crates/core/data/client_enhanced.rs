@@ -310,6 +310,12 @@ where
             }));
         }
 
+        // Check if connection dropped while we were setting up the supervisor
+        if !self.is_connected().await && self.inner.auto_reconnect {
+            debug!("Connection dropped during supervisor setup, triggering reconnect");
+            self.inner.reconnect_notify.notify_one();
+        }
+
         Ok(())
     }
 
