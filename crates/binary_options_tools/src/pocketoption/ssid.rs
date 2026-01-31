@@ -155,11 +155,7 @@ impl Ssid {
         };
 
         let ssid: Demo = serde_json::from_str(parsed)
-            .map_err(|e| {
-                // Log the problematic input for debugging
-                eprintln!("Failed to parse SSID. Input (parsed): '{}'", parsed);
-                CoreError::SsidParsing(format!("JSON parsing error: {e}"))
-            })?;
+            .map_err(|e| CoreError::SsidParsing(format!("JSON parsing error: {e}")))?;
 
         let is_demo_url = ssid
             .current_url

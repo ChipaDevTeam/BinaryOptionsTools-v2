@@ -72,7 +72,7 @@ If using API tokens, update the release workflow to use:
 
 1. Go to your GitHub repository
 2. Click "Releases" → "Create a new release"
-3. Choose or create a new tag (e.g., `v0.1.9`)
+3. Choose or create a new tag (e.g., `v0.2.3`)
 4. Fill in release title and description
 5. Click "Publish release"
 6. The release workflow will automatically trigger and publish to PyPI
@@ -80,8 +80,8 @@ If using API tokens, update the release workflow to use:
 ### Method 2: Git Tags
 
 ```bash
-git tag v0.1.9
-git push origin v0.1.9
+git tag v0.2.3
+git push origin v0.2.3
 ```
 
 ### Method 3: Manual Trigger
@@ -163,7 +163,7 @@ Remember to update the version in `BinaryOptionsToolsV2/Cargo.toml` before each 
 
 ```toml
 [package]
-version = "0.1.9"  # Increment this
+version = "0.2.3"  # Increment this
 ```
 
 ## Security Notes

@@ -18,6 +18,10 @@ pub struct _Config<T: DataHandler, Transfer: MessageTransfer, U: InnerConfig> {
     #[config(extra(iterator(dtype = "Url", add_fn = "insert")))]
     pub default_connection_url: HashSet<Url>,
     pub reconnect_time: u64,
+    #[serde(default = "default_reconnect_base_delay")]
+    pub reconnect_base_delay: u64,
+    #[serde(default = "default_max_reconnect_attempts")]
+    pub max_reconnect_attempts: u32,
     #[serde(skip)]
     #[config(extra(iterator(dtype = "Callback<T, Transfer, U>")))]
     pub callbacks: Vec<Callback<T, Transfer, U>>,
@@ -27,6 +31,14 @@ pub struct _Config<T: DataHandler, Transfer: MessageTransfer, U: InnerConfig> {
     pub extra: U,
     // #[serde(skip)]
     // pub callbacks: Arc<Vec<Arc<dyn Callback>>>
+}
+
+fn default_reconnect_base_delay() -> u64 {
+    1
+}
+
+fn default_max_reconnect_attempts() -> u32 {
+    10
 }
 
 impl<T: DataHandler, Transfer: MessageTransfer, U: InnerConfig> _Config<T, Transfer, U> {
@@ -40,6 +52,8 @@ impl<T: DataHandler, Transfer: MessageTransfer, U: InnerConfig> _Config<T, Trans
             sleep_interval: SLEEP_INTERVAL,
             default_connection_url: HashSet::new(),
             reconnect_time: RECONNECT_CALLBACK,
+            reconnect_base_delay: 1,
+            max_reconnect_attempts: 10,
             callbacks,
             timeout: Duration::from_secs(TIMEOUT_TIME),
             connection_initialization_timeout: initialization_timeout,

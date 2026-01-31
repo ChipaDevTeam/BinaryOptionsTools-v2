@@ -257,7 +257,7 @@ where
                     let sleep_interval = config.get_sleep_interval()?;
                     let max_loops = config.get_max_allowed_loops()?;
                     warn!(
-                        "Error reconnecting... trying again in {sleep_interval} seconds (try {loops} of {max_loops}"
+                        "Error reconnecting... trying again in {sleep_interval} seconds (try {loops} of {max_loops})"
                     );
                     sleep(Duration::from_secs(config.get_sleep_interval()?)).await;
                     if *loops >= max_loops {
@@ -277,7 +277,7 @@ where
                     let sleep_interval = config.get_sleep_interval()?;
                     let max_loops = config.get_max_allowed_loops()?;
                     warn!(
-                        "Error reconnecting... trying again in {sleep_interval} seconds (try {loops} of {max_loops}"
+                        "Error reconnecting... trying again in {sleep_interval} seconds (try {loops} of {max_loops})"
                     );
                     sleep(Duration::from_secs(config.get_sleep_interval()?)).await;
                     if *loops >= max_loops {

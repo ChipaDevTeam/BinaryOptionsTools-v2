@@ -1,4 +1,5 @@
 use pyo3::prelude::*;
+use pyo3::exceptions::PyValueError;
 use binary_options_tools::config::Config;
 use std::time::Duration;
 use url::Url;
@@ -78,11 +79,26 @@ impl PyConfig {
     }
 
     #[setter]
-    fn set_urls(&mut self, value: Vec<String>) {
-        self.inner.urls = value
-            .into_iter()
-            .filter_map(|u| Url::parse(&u).ok())
-            .collect();
+    fn set_urls(&mut self, value: Vec<String>) -> PyResult<()> {
+        let mut parsed_urls = Vec::new();
+        let mut errors = Vec::new();
+
+        for url_str in value {
+            match Url::parse(&url_str) {
+                Ok(url) => parsed_urls.push(url),
+                Err(_) => errors.push(url_str),
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(PyValueError::new_err(format!(
+                "Invalid URLs provided: {}",
+                errors.join(", ")
+            )));
+        }
+
+        self.inner.urls = parsed_urls;
         self.url_cache = self.inner.urls.iter().map(|u| u.to_string()).collect();
+        Ok(())
     }
 }

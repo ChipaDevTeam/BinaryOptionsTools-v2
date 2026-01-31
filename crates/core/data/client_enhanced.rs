@@ -229,7 +229,6 @@ where
         if task_lock.is_none() {
             let inner = self.inner.clone();
             *task_lock = Some(tokio::spawn(async move {
-                let mut attempts = 0;
                 loop {
                     inner.reconnect_notify.notified().await;
                     
@@ -237,37 +236,44 @@ where
                         break;
                     }
 
-                    info!("Connection lost, attempting to reconnect...");
-                    
-                    // Exponential backoff with jitter
-                    attempts += 1;
-                    let base_delay = inner.config.reconnect_time;
-                    let delay_secs = std::cmp::min(
-                        base_delay.saturating_mul(2u64.saturating_pow(attempts.min(10))),
-                        300
-                    );
-                    
-                    use rand::Rng;
-                    let jitter = rand::rng().random_range(0.8..1.2);
-                    let delay = Duration::from_secs_f64(delay_secs as f64 * jitter);
-                    
-                    debug!("Reconnection attempt {}, sleeping for {:?}", attempts, delay);
-                    sleep(delay).await;
+                    let mut attempts = 0;
+                    while attempts < inner.config.max_reconnect_attempts {
+                        attempts += 1;
+                        info!("Connection lost, attempt {}/{} to reconnect...", attempts, inner.config.max_reconnect_attempts);
+                        
+                        // Exponential backoff with jitter
+                        let base_delay = inner.config.reconnect_base_delay;
+                        let delay_secs = std::cmp::min(
+                            base_delay.saturating_mul(2u64.saturating_pow(attempts.saturating_sub(1).min(10))),
+                            300
+                        );
+                        
+                        use rand::Rng;
+                        let jitter = rand::rng().random_range(0.8..1.2);
+                        let delay = Duration::from_secs_f64(delay_secs as f64 * jitter);
+                        
+                        debug!("Reconnection attempt {}, sleeping for {:?}", attempts, delay);
+                        sleep(delay).await;
 
-                    match inner.connect().await {
-                        Ok(_) => {
-                            info!("Reconnected successfully");
-                            attempts = 0;
-                            // Restart keep-alive if needed
-                            if let Some(keep_alive_manager) = inner.keep_alive.lock().await.as_mut() {
-                                keep_alive_manager.start(inner.message_sender.clone()).await;
+                        match inner.connect().await {
+                            Ok(_) => {
+                                info!("Reconnected successfully");
+                                // Restart keep-alive if needed
+                                if let Some(keep_alive_manager) = inner.keep_alive.lock().await.as_mut() {
+                                    keep_alive_manager.start(inner.message_sender.clone()).await;
+                                }
+                                break;
+                            }
+                            Err(e) => {
+                                error!("Reconnect failed (attempt {}): {}", attempts, e);
+                                // No need to notify_one() here as we are in a loop
                             }
                         }
-                        Err(e) => {
-                            error!("Reconnect failed (attempt {}): {}", attempts, e);
-                            // Trigger notify again to retry
-                            inner.reconnect_notify.notify_one();
-                        }
+                    }
+
+                    if attempts >= inner.config.max_reconnect_attempts {
+                        error!("Max reconnection attempts reached ({}). Stopping auto-reconnect.", inner.config.max_reconnect_attempts);
+                        break;
                     }
                 }
             }));
@@ -557,6 +563,8 @@ where
         let connection_state = self.connection_state.clone();
         let event_manager = self.event_manager.clone();
         let data = self.data.clone();
+        let reconnect_notify = self.reconnect_notify.clone();
+        let message_sender = self.message_sender.clone();
 
         let task = tokio::spawn(async move {
             while let Some(message_result) = read.next().await {
@@ -609,12 +617,12 @@ where
                                         serde_json::json!({"reason": "close_frame"}),
                                     ))
                                     .await?;
-                                self.reconnect_notify.notify_one();
+                                reconnect_notify.notify_one();
                                 break;
                             }
                             Message::Ping(ping_data) => {
                                 debug!("Received ping");
-                                if let Err(e) = self.message_sender.try_send(Message::Pong(ping_data)) {
+                                if let Err(e) = message_sender.try_send(Message::Pong(ping_data)) {
                                     error!("Failed to queue pong: {}", e);
                                 }
                             }
@@ -634,7 +642,7 @@ where
                                 serde_json::json!({"error": e.to_string()}),
                             ))
                             .await?;
-                        self.reconnect_notify.notify_one();
+                        reconnect_notify.notify_one();
                         break;
                     }
                 }

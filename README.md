@@ -105,13 +105,13 @@ We're working to restore all functionality with improved stability and performan
 #### Using pip (Prebuilt Wheels):
 ```bash
 # Windows
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.1/BinaryOptionsToolsV2-0.2.1-cp38-abi3-win_amd64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.3/BinaryOptionsToolsV2-0.2.3-cp38-abi3-win_amd64.whl"
 
 # Linux
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.1/BinaryOptionsToolsV2-0.2.0-cp38-abi3-manylinux_2_34_x86_64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.3/BinaryOptionsToolsV2-0.2.3-cp38-abi3-manylinux_2_34_x86_64.whl"
 
 # Mac
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.1/BinaryOptionsToolsV2-0.2.1-cp38-abi3-macosx_11_0_arm64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.3/BinaryOptionsToolsV2-0.2.3-cp38-abi3-macosx_11_0_arm64.whl"
 ```
 
 **Requirements**:

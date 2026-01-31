@@ -138,9 +138,6 @@ async def main():
     # Initialize the client
     client = PocketOptionAsync(ssid="your-session-id")
     
-    # IMPORTANT: Wait for connection to establish
-    await asyncio.sleep(5)
-    
     # Get account balance
     balance = await client.balance() 
     print(f"Account Balance: ${balance}")
@@ -201,9 +198,6 @@ import time
 
 # Initialize the client
 client = PocketOption(ssid="your-session-id")
-
-# IMPORTANT: Wait for connection to establish
-time.sleep(5)
 
 # Get account balance
 balance = client.balance() 
@@ -268,9 +262,6 @@ def main():
     # Initialize client
     client = PocketOption(ssid="your-session-id")
     
-    # IMPORTANT: Wait for connection
-    time.sleep(5)
-    
     # Get balance
     balance = client.balance()
     print(f"Current Balance: ${balance}")
@@ -302,9 +293,6 @@ async def main():
     # Initialize client
     client = PocketOptionAsync(ssid="your-session-id")
     
-    # IMPORTANT: Wait for connection
-    await asyncio.sleep(5)
-    
     # Get balance
     balance = await client.balance()
     print(f"Current Balance: ${balance}")
@@ -334,7 +322,6 @@ import time
 
 def main():
     client = PocketOption(ssid="your-session-id")
-    time.sleep(5)  # Wait for connection
     
     # Subscribe to real-time candle data
     stream = client.subscribe_symbol("EURUSD_otc")
@@ -360,7 +347,6 @@ import asyncio
 
 async def main():
     client = PocketOptionAsync(ssid="your-session-id")
-    await asyncio.sleep(5)  # Wait for connection
     
     # Subscribe to real-time candle data
     async for candle in client.subscribe_symbol("EURUSD_otc"):
@@ -383,7 +369,6 @@ import time
 
 def main():
     client = PocketOption(ssid="your-session-id")
-    time.sleep(5)  # Wait for connection
     
     # Get all opened deals
     opened_deals = client.opened_deals()
@@ -408,8 +393,6 @@ if __name__ == "__main__":
 
 The client automatically establishes a connection during initialization. You can also manually manage the connection using `connect()`, `disconnect()`, and `reconnect()` methods.
 
-If your old client had `time.sleep(5)` or similar to ensure it connects, you can likely remove it.
-
 ```python
 # Asynchronous
 client = PocketOptionAsync(ssid="your-session-id")
@@ -418,6 +401,14 @@ client = PocketOptionAsync(ssid="your-session-id")
 # Manual control
 await client.disconnect()
 await client.connect()
+
+# Synchronous
+client_sync = PocketOption(ssid="your-session-id")
+# Connection is already established here
+
+# Manual control
+client_sync.disconnect()
+client_sync.connect()
 ```
 
 ### Getting Your SSID

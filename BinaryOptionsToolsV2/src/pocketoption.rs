@@ -110,7 +110,10 @@ impl RawPocketOption {
     #[staticmethod]
     pub fn create<'py>(ssid: String, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         future_into_py(py, async move {
-            let client = PocketOption::new(ssid).await.map_err(BinaryErrorPy::from)?;
+            let client = tokio::time::timeout(Duration::from_secs(10), PocketOption::new(ssid))
+                .await
+                .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
+                .map_err(BinaryErrorPy::from)?;
             Ok(RawPocketOption { client })
         })
     }
@@ -135,9 +138,11 @@ impl RawPocketOption {
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
         future_into_py(py, async move {
-            let client = PocketOption::new_with_url(ssid, url)
-                .await
-                .map_err(BinaryErrorPy::from)?;
+            let client =
+                tokio::time::timeout(Duration::from_secs(10), PocketOption::new_with_url(ssid, url))
+                    .await
+                    .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
+                    .map_err(BinaryErrorPy::from)?;
             Ok(RawPocketOption { client })
         })
     }
@@ -165,9 +170,13 @@ impl RawPocketOption {
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
         future_into_py(py, async move {
-            let client = PocketOption::new_with_config(ssid, config.inner)
-                .await
-                .map_err(BinaryErrorPy::from)?;
+            let client = tokio::time::timeout(
+                Duration::from_secs(10),
+                PocketOption::new_with_config(ssid, config.inner),
+            )
+            .await
+            .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
+            .map_err(BinaryErrorPy::from)?;
             Ok(RawPocketOption { client })
         })
     }
