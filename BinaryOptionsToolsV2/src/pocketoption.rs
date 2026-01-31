@@ -152,8 +152,9 @@ impl RawPocketOption {
     pub fn new_with_config(py: Python<'_>, ssid: String, config: PyConfig) -> PyResult<Self> {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
+            let timeout = config.inner.connection_initialization_timeout;
             let client = tokio::time::timeout(
-                Duration::from_secs(10),
+                timeout,
                 PocketOption::new_with_config(ssid, config.inner),
             )
             .await
@@ -170,8 +171,9 @@ impl RawPocketOption {
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
         future_into_py(py, async move {
+            let timeout = config.inner.connection_initialization_timeout;
             let client = tokio::time::timeout(
-                Duration::from_secs(10),
+                timeout,
                 PocketOption::new_with_config(ssid, config.inner),
             )
             .await

@@ -226,12 +226,17 @@ where
 
         // Start reconnection supervisor
         let mut task_lock = self.inner.reconnect_task.lock().await;
-        if task_lock.is_none() {
+        let should_spawn = match &*task_lock {
+            None => true,
+            Some(handle) => handle.is_finished(),
+        };
+
+        if should_spawn {
             let inner = self.inner.clone();
             *task_lock = Some(tokio::spawn(async move {
                 loop {
                     inner.reconnect_notify.notified().await;
-                    
+
                     if !inner.auto_reconnect {
                         break;
                     }
@@ -239,27 +244,37 @@ where
                     let mut attempts = 0;
                     while attempts < inner.config.max_reconnect_attempts {
                         attempts += 1;
-                        info!("Connection lost, attempt {}/{} to reconnect...", attempts, inner.config.max_reconnect_attempts);
-                        
+                        info!(
+                            "Connection lost, attempt {}/{} to reconnect...",
+                            attempts, inner.config.max_reconnect_attempts
+                        );
+
                         // Exponential backoff with jitter
                         let base_delay = inner.config.reconnect_base_delay;
                         let delay_secs = std::cmp::min(
-                            base_delay.saturating_mul(2u64.saturating_pow(attempts.saturating_sub(1).min(10))),
-                            300
+                            base_delay.saturating_mul(
+                                2u64.saturating_pow(attempts.saturating_sub(1).min(10)),
+                            ),
+                            300,
                         );
-                        
+
                         use rand::Rng;
                         let jitter = rand::rng().random_range(0.8..1.2);
                         let delay = Duration::from_secs_f64(delay_secs as f64 * jitter);
-                        
-                        debug!("Reconnection attempt {}, sleeping for {:?}", attempts, delay);
+
+                        debug!(
+                            "Reconnection attempt {}, sleeping for {:?}",
+                            attempts, delay
+                        );
                         sleep(delay).await;
 
                         match inner.connect().await {
                             Ok(_) => {
                                 info!("Reconnected successfully");
                                 // Restart keep-alive if needed
-                                if let Some(keep_alive_manager) = inner.keep_alive.lock().await.as_mut() {
+                                if let Some(keep_alive_manager) =
+                                    inner.keep_alive.lock().await.as_mut()
+                                {
                                     keep_alive_manager.start(inner.message_sender.clone()).await;
                                 }
                                 break;
@@ -272,10 +287,17 @@ where
                     }
 
                     if attempts >= inner.config.max_reconnect_attempts {
-                        error!("Max reconnection attempts reached ({}). Stopping auto-reconnect.", inner.config.max_reconnect_attempts);
+                        error!(
+                            "Max reconnection attempts reached ({}). Stopping auto-reconnect.",
+                            inner.config.max_reconnect_attempts
+                        );
                         break;
                     }
                 }
+
+                // Clear the task handle when exiting
+                let mut lock = inner.reconnect_task.lock().await;
+                *lock = None;
             }));
         }
 
