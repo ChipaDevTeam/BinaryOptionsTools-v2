@@ -57,6 +57,8 @@ pub struct State {
     pub raw_sinks: RwLock<HashMap<Uuid, Arc<AsyncSender<Arc<Message>>>>>,
     /// Keep alive messages for raw module
     pub raw_keep_alive: Arc<RwLock<HashMap<Uuid, Outgoing>>>,
+    /// List of fallback WebSocket URLs
+    pub urls: Vec<String>,
 }
 
 /// Builder pattern for creating State instances
@@ -68,6 +70,7 @@ pub struct StateBuilder {
     ssid: Option<Ssid>,
     default_connection_url: Option<String>,
     default_symbol: Option<String>,
+    urls: Vec<String>,
 }
 
 impl StateBuilder {
@@ -98,6 +101,12 @@ impl StateBuilder {
         self
     }
 
+    /// Set the fallback WebSocket URLs
+    pub fn urls(mut self, urls: Vec<String>) -> Self {
+        self.urls = urls;
+        self
+    }
+
     /// Build the final State instance
     ///
     /// # Returns
@@ -120,6 +129,7 @@ impl StateBuilder {
             histories: RwLock::new(Vec::new()),
             raw_sinks: RwLock::new(HashMap::new()),
             raw_keep_alive: Arc::new(RwLock::new(HashMap::new())),
+            urls: self.urls,
         })
     }
 }

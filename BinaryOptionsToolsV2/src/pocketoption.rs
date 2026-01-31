@@ -20,6 +20,7 @@ use pyo3_async_runtimes::tokio::future_into_py;
 use tungstenite;
 use uuid::Uuid;
 
+use crate::config::PyConfig;
 use crate::error::BinaryErrorPy;
 use crate::runtime::get_runtime;
 use crate::stream::next_stream;
@@ -98,8 +99,19 @@ impl RawPocketOption {
     pub fn new(ssid: String, py: Python<'_>) -> PyResult<Self> {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
-            let client = PocketOption::new(ssid).await.map_err(BinaryErrorPy::from)?;
+            let client = tokio::time::timeout(Duration::from_secs(10), PocketOption::new(ssid))
+                .await
+                .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
+                .map_err(BinaryErrorPy::from)?;
             Ok(Self { client })
+        })
+    }
+
+    #[staticmethod]
+    pub fn create<'py>(ssid: String, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        future_into_py(py, async move {
+            let client = PocketOption::new(ssid).await.map_err(BinaryErrorPy::from)?;
+            Ok(RawPocketOption { client })
         })
     }
 
@@ -108,10 +120,55 @@ impl RawPocketOption {
     pub fn new_with_url(py: Python<'_>, ssid: String, url: String) -> PyResult<Self> {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
+            let client = tokio::time::timeout(Duration::from_secs(10), PocketOption::new_with_url(ssid, url))
+                .await
+                .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
+                .map_err(BinaryErrorPy::from)?;
+            Ok(Self { client })
+        })
+    }
+
+    #[staticmethod]
+    pub fn create_with_url<'py>(
+        ssid: String,
+        url: String,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        future_into_py(py, async move {
             let client = PocketOption::new_with_url(ssid, url)
                 .await
                 .map_err(BinaryErrorPy::from)?;
+            Ok(RawPocketOption { client })
+        })
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (ssid, config))]
+    pub fn new_with_config(py: Python<'_>, ssid: String, config: PyConfig) -> PyResult<Self> {
+        let runtime = get_runtime(py)?;
+        runtime.block_on(async move {
+            let client = tokio::time::timeout(
+                Duration::from_secs(10),
+                PocketOption::new_with_config(ssid, config.inner),
+            )
+            .await
+            .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
+                .map_err(BinaryErrorPy::from)?;
             Ok(Self { client })
+        })
+    }
+
+    #[staticmethod]
+    pub fn create_with_config<'py>(
+        ssid: String,
+        config: PyConfig,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        future_into_py(py, async move {
+            let client = PocketOption::new_with_config(ssid, config.inner)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Ok(RawPocketOption { client })
         })
     }
 
@@ -734,7 +791,7 @@ impl RawHandle {
                 .create(crate_validator, keep_alive)
                 .await
                 .map_err(BinaryErrorPy::from)?;
-            Python::with_gil(|py| RawHandler { handler: Arc::new(Mutex::new(handler)) }.into_py_any(py))
+            Python::attach(|py| RawHandler { handler: Arc::new(Mutex::new(handler)) }.into_py_any(py))
         })
     }
 

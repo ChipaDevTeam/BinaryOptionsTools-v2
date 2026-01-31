@@ -57,10 +57,20 @@ impl Connector<State> for PocketConnect {
         let url = state.default_connection_url.clone();
         if let Some(url) = url {
             info!(target: "PocketConnect", "Connecting to PocketOption at {}", url);
-            return try_connect(creds, url)
-                .await
-                .map_err(|e| ConnectorError::Custom(e.to_string()));
+            match try_connect(creds.clone(), url.clone()).await {
+                Ok(stream) => return Ok(stream),
+                Err(e) => warn!(target: "PocketConnect", "Failed to connect to default URL {}: {}", url, e),
+            }
         }
+
+        // Use fallback URLs from state if available
+        if !state.urls.is_empty() {
+            info!(target: "PocketConnect", "Trying fallback URLs from config...");
+            if let Ok(stream) = self.connect_multiple(state.urls.clone(), creds.clone()).await {
+                return Ok(stream);
+            }
+        }
+
         let urls = creds
             .servers()
             .await

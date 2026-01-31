@@ -27,6 +27,7 @@
 //! ```
 pub mod expertoptions;
 pub mod pocketoption;
+pub mod config;
 
 pub mod reimports;
 pub mod traits;

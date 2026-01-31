@@ -2,8 +2,8 @@ import asyncio
 import json
 from datetime import timedelta
 
-from BinaryOptionsToolsV2.config import Config
-from BinaryOptionsToolsV2.validator import Validator
+from ..config import Config
+from ..validator import Validator
 
 from .asynchronous import PocketOptionAsync
 

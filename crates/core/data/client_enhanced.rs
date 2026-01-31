@@ -14,7 +14,7 @@ use futures_util::{
 use tokio::{
     net::TcpStream,
     select,
-    sync::{Mutex, RwLock},
+    sync::{Mutex, RwLock, Notify},
     task::JoinHandle,
     time::{interval, sleep, timeout},
 };
@@ -68,8 +68,12 @@ where
     data: Data<T, Transfer>,
     /// Message sender for outgoing messages
     message_sender: Sender<Message>,
+    /// Message receiver for outgoing messages
+    message_receiver: Receiver<Message>,
     /// Configuration
     config: Config<T, Transfer, U>,
+    /// Reconnect notification
+    reconnect_notify: Arc<Notify>,
     /// Connection state and statistics
     connection_state: Arc<RwLock<ConnectionState>>,
     /// Background tasks
@@ -82,6 +86,8 @@ where
     auto_reconnect: bool,
     /// Connection URLs to try
     connection_urls: Vec<Url>,
+    /// Reconnection supervisor task
+    reconnect_task: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
 /// Connection state tracking similar to Python implementation
@@ -216,7 +222,58 @@ where
 
     /// Connect with persistent connection and keep-alive (like Python)
     pub async fn connect_persistent(&self) -> BinaryOptionsResult<()> {
-        self.inner.connect_persistent().await
+        self.inner.connect_persistent().await?;
+
+        // Start reconnection supervisor
+        let mut task_lock = self.inner.reconnect_task.lock().await;
+        if task_lock.is_none() {
+            let inner = self.inner.clone();
+            *task_lock = Some(tokio::spawn(async move {
+                let mut attempts = 0;
+                loop {
+                    inner.reconnect_notify.notified().await;
+                    
+                    if !inner.auto_reconnect {
+                        break;
+                    }
+
+                    info!("Connection lost, attempting to reconnect...");
+                    
+                    // Exponential backoff with jitter
+                    attempts += 1;
+                    let base_delay = inner.config.reconnect_time;
+                    let delay_secs = std::cmp::min(
+                        base_delay.saturating_mul(2u64.saturating_pow(attempts.min(10))),
+                        300
+                    );
+                    
+                    use rand::Rng;
+                    let jitter = rand::rng().random_range(0.8..1.2);
+                    let delay = Duration::from_secs_f64(delay_secs as f64 * jitter);
+                    
+                    debug!("Reconnection attempt {}, sleeping for {:?}", attempts, delay);
+                    sleep(delay).await;
+
+                    match inner.connect().await {
+                        Ok(_) => {
+                            info!("Reconnected successfully");
+                            attempts = 0;
+                            // Restart keep-alive if needed
+                            if let Some(keep_alive_manager) = inner.keep_alive.lock().await.as_mut() {
+                                keep_alive_manager.start(inner.message_sender.clone()).await;
+                            }
+                        }
+                        Err(e) => {
+                            error!("Reconnect failed (attempt {}): {}", attempts, e);
+                            // Trigger notify again to retry
+                            inner.reconnect_notify.notify_one();
+                        }
+                    }
+                }
+            }));
+        }
+
+        Ok(())
     }
 
     /// Disconnect gracefully
@@ -306,6 +363,9 @@ where
         // Create message channel
         let (message_sender, message_receiver) = bounded(MAX_CHANNEL_CAPACITY);
 
+        // Create reconnect notify
+        let reconnect_notify = Arc::new(Notify::new());
+
         // Create connection state
         let connection_state = Arc::new(RwLock::new(ConnectionState::default()));
 
@@ -323,13 +383,16 @@ where
             event_manager,
             data,
             message_sender,
+            message_receiver,
             config,
+            reconnect_notify,
             connection_state,
             background_tasks: Arc::new(Mutex::new(Vec::new())),
             keep_alive,
             message_batcher,
             auto_reconnect,
             connection_urls,
+            reconnect_task: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -434,6 +497,7 @@ where
 
         // Store tasks for cleanup
         let mut tasks = self.background_tasks.lock().await;
+        tasks.retain(|t| !t.is_finished());
         tasks.push(sender_task);
         tasks.push(receiver_task);
 
@@ -445,18 +509,41 @@ where
         &self,
         mut write: SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
     ) -> BinaryOptionsResult<JoinHandle<BinaryOptionsResult<()>>> {
-        let message_receiver = self.message_sender.clone(); // This should be the receiver end
+        let message_receiver = self.message_receiver.clone();
         let connection_state = self.connection_state.clone();
         let event_manager = self.event_manager.clone();
 
         let task = tokio::spawn(async move {
-            // Note: This is a simplified version - we'd need to properly handle the receiver
-            // For now, let's create a mock message loop
-            loop {
-                sleep(Duration::from_secs(1)).await;
-                // In real implementation, we'd receive from message_receiver and send to websocket
-                // This would be similar to Python's sender_loop
+            while let Ok(message) = message_receiver.recv().await {
+                match write.send(message.clone()).await {
+                    Ok(_) => {
+                        // Update stats
+                        /*
+                        // Note: We already update stats in send_message, but that's when it's queued.
+                        // Maybe we want to track actual sent messages here?
+                        // For now, let's just log debug
+                        */
+                        debug!("Message sent to WebSocket");
+                    }
+                    Err(e) => {
+                        error!("Failed to send message to WebSocket: {}", e);
+                        event_manager
+                            .emit(Event::new(
+                                EventType::Error,
+                                serde_json::json!({
+                                    "error": "Failed to send message",
+                                    "details": e.to_string()
+                                }),
+                            ))
+                            .await?;
+                        
+                        // If we can't write, the connection is likely dead.
+                        // The receiver task should handle the close/error, but we can also break here.
+                        break;
+                    }
+                }
             }
+            Ok(())
         });
 
         Ok(task)
@@ -522,10 +609,14 @@ where
                                         serde_json::json!({"reason": "close_frame"}),
                                     ))
                                     .await?;
+                                self.reconnect_notify.notify_one();
                                 break;
                             }
-                            Message::Ping(_) => {
+                            Message::Ping(ping_data) => {
                                 debug!("Received ping");
+                                if let Err(e) = self.message_sender.try_send(Message::Pong(ping_data)) {
+                                    error!("Failed to queue pong: {}", e);
+                                }
                             }
                             Message::Pong(_) => {
                                 debug!("Received pong");
@@ -543,6 +634,7 @@ where
                                 serde_json::json!({"error": e.to_string()}),
                             ))
                             .await?;
+                        self.reconnect_notify.notify_one();
                         break;
                     }
                 }
@@ -714,6 +806,11 @@ where
         // Stop keep-alive manager
         if let Some(keep_alive_manager) = self.keep_alive.lock().await.as_mut() {
             keep_alive_manager.stop().await;
+        }
+
+        // Stop reconnection supervisor
+        if let Some(task) = self.reconnect_task.lock().await.take() {
+            task.abort();
         }
 
         // Cancel all background tasks

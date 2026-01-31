@@ -6,6 +6,7 @@ from BinaryOptionsToolsV2 import PocketOption
 # Mock SSID (won't connect effectively but allows object creation)
 SSID = r'42["auth",{"session":"mock_session","isDemo":1,"uid":12345,"platform":1}]'
 
+
 async def trade_task(api, asset, amount, time, task_id):
     print(f"Task {task_id}: Starting trade...")
     try:
@@ -14,6 +15,7 @@ async def trade_task(api, asset, amount, time, task_id):
         print(f"Task {task_id}: Trade completed: {result}")
     except Exception as e:
         print(f"Task {task_id}: Trade failed: {e}")
+
 
 async def main():
     # This test assumes we can mock the connection or at least instantiate the client
@@ -33,6 +35,7 @@ async def main():
     await asyncio.gather(task1, task2)
 
     await api.disconnect()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

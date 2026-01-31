@@ -34,9 +34,6 @@ Currently supporting **PocketOption** (Quick Trading Mode) with both real and de
 - Automatic reconnection handling
 - Historical candle data (`get_candles`, `get_candles_advanced`)
 - Advanced validators
-
-**Temporarily Unavailable Features**:
-
 - Trade history (`history`)
 - Payout information retrieval
 - Deal end time queries
@@ -155,7 +152,7 @@ import asyncio
 async def main():
     # Initialize client with SSID
     client = PocketOptionAsync(ssid="your-session-id")
-    await client.connect() # Wait for connection to be established
+    # Connection is established automatically during initialization
     
     # Get account balance
     balance = await client.balance()
@@ -189,7 +186,7 @@ import time
 
 # Initialize client
 client = PocketOption(ssid="your-session-id")
-client.connect() # Wait for connection to be established
+# Connection is established automatically during initialization
 
 # Place trade (blocking)
 # The `buy` function is used for "call" trades. For "put" trades, use the `sell` method.

@@ -1,9 +1,15 @@
 import json
+import os
 from datetime import timedelta
 
-from .BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
-from .BinaryOptionsToolsV2 import Logger as RustLogger
-from .BinaryOptionsToolsV2 import start_tracing
+try:
+    from BinaryOptionsToolsV2.BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
+    from BinaryOptionsToolsV2.BinaryOptionsToolsV2 import Logger as RustLogger
+    from BinaryOptionsToolsV2.BinaryOptionsToolsV2 import start_tracing
+except ImportError:
+    from BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
+    from BinaryOptionsToolsV2 import Logger as RustLogger
+    from BinaryOptionsToolsV2 import start_tracing
 
 
 class LogSubscription:
@@ -42,10 +48,9 @@ def start_logs(
     """
     if layers is None:
         layers = []
-    try:
-        start_tracing(path, level, terminal, layers)
-    except Exception as e:
-        print(f"Error starting logs, {e}")
+
+    os.makedirs(path, exist_ok=True)
+    start_tracing(path, level, terminal, layers)
 
 
 class Logger:

@@ -406,16 +406,18 @@ if __name__ == "__main__":
 
 ### Connection Initialization
 
-**Always wait 5 seconds after creating the client** to allow the connection to establish properly. The library connects to the WebSocket in a separate thread/task, so the code continues immediately. Without the wait, API calls will fail.
+The client automatically establishes a connection during initialization. You can also manually manage the connection using `connect()`, `disconnect()`, and `reconnect()` methods.
+
+If your old client had `time.sleep(5)` or similar to ensure it connects, you can likely remove it.
 
 ```python
-# Synchronous
-client = PocketOption(ssid="your-session-id")
-time.sleep(5)  # Critical!
-
 # Asynchronous
 client = PocketOptionAsync(ssid="your-session-id")
-await asyncio.sleep(5)  # Critical!
+# Connection is already established here
+
+# Manual control
+await client.disconnect()
+await client.connect()
 ```
 
 ### Getting Your SSID

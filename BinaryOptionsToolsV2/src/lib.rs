@@ -8,7 +8,7 @@ mod runtime;
 mod stream;
 mod validator;
 
-// use config::PyConfig;
+use config::PyConfig;
 use logs::{LogBuilder, Logger, StreamLogsIterator, StreamLogsLayer, start_tracing};
 use pocketoption::{RawPocketOption, RawStreamIterator, StreamIterator, RawHandle, RawHandler};
 use pyo3::prelude::*;
@@ -16,6 +16,7 @@ use validator::RawValidator;
 
 #[pymodule(name = "BinaryOptionsToolsV2")]
 fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyConfig>()?;
     m.add_class::<StreamLogsIterator>()?;
     m.add_class::<StreamLogsLayer>()?;
     m.add_class::<RawPocketOption>()?;
