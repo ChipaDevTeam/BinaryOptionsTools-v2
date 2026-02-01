@@ -1,60 +1,17 @@
-# from BinaryOptionsToolsV2 import PyConfig
 import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
 
-class PyConfig:
-    """
-    Temporary Python replacement for the Rust PyConfig class.
-    This class mimics the behavior of the Rust PyConfig until it's available.
+def _get_pyconfig():
+    try:
+        from .BinaryOptionsToolsV2 import PyConfig
 
-    This acts as an advanced dictionary with attribute access and provides
-    the same interface that the Rust PyConfig would have.
+        return PyConfig
+    except ImportError:
+        import BinaryOptionsToolsV2
 
-    Attributes:
-        max_allowed_loops (int): Maximum number of allowed loops
-        sleep_interval (int): Sleep interval in milliseconds
-        reconnect_time (int): Reconnection time in seconds
-        connection_initialization_timeout_secs (int): Connection timeout in seconds
-        timeout_secs (int): General timeout in seconds
-        urls (List[str]): List of WebSocket URLs
-    """
-
-    def __init__(self):
-        self.max_allowed_loops: int = 100
-        self.sleep_interval: int = 100
-        self.reconnect_time: int = 5
-        self.connection_initialization_timeout_secs: int = 30
-        self.timeout_secs: int = 30
-        self.urls: List[str] = []
-
-    def __repr__(self) -> str:
-        return (
-            f"PyConfig(max_allowed_loops={self.max_allowed_loops}, "
-            f"sleep_interval={self.sleep_interval}, "
-            f"reconnect_time={self.reconnect_time}, "
-            f"connection_initialization_timeout_secs={self.connection_initialization_timeout_secs}, "
-            f"timeout_secs={self.timeout_secs}, "
-            f"urls={self.urls})"
-        )
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert PyConfig to dictionary"""
-        return {
-            "max_allowed_loops": self.max_allowed_loops,
-            "sleep_interval": self.sleep_interval,
-            "reconnect_time": self.reconnect_time,
-            "connection_initialization_timeout_secs": self.connection_initialization_timeout_secs,
-            "timeout_secs": self.timeout_secs,
-            "urls": self.urls.copy(),
-        }
-
-    def update_from_dict(self, data: Dict[str, Any]) -> None:
-        """Update PyConfig from dictionary"""
-        for key, value in data.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
+        return getattr(BinaryOptionsToolsV2, "PyConfig")
 
 
 @dataclass
@@ -90,13 +47,13 @@ class Config:
             )
 
     @property
-    def pyconfig(self) -> PyConfig:
+    def pyconfig(self) -> Any:
         """
         Returns the PyConfig instance for use in Rust code.
         Once this is accessed, the configuration becomes locked.
         """
         if self._pyconfig is None:
-            self._pyconfig = PyConfig()
+            self._pyconfig = _get_pyconfig()()
             self._update_pyconfig()
         self._locked = True
         return self._pyconfig
@@ -109,7 +66,7 @@ class Config:
             )
 
         if self._pyconfig is None:
-            self._pyconfig = PyConfig()
+            self._pyconfig = _get_pyconfig()()
 
         self._pyconfig.max_allowed_loops = self.max_allowed_loops
         self._pyconfig.sleep_interval = self.sleep_interval
@@ -118,7 +75,7 @@ class Config:
             self.connection_initialization_timeout_secs
         )
         self._pyconfig.timeout_secs = self.timeout_secs
-        self._pyconfig.urls = self.urls.copy()
+        self._pyconfig.urls = self.urls
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "Config":

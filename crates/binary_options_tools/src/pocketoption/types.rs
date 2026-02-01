@@ -214,9 +214,11 @@ impl TwoStepRule {
 
 impl Rule for TwoStepRule {
     fn call(&self, msg: &Message) -> bool {
+        tracing::debug!(target: "TwoStepRule", "Checking message against pattern '{}': {:?}", self.pattern, msg);
         match msg {
             Message::Text(text) => {
                 if text.starts_with(&self.pattern) {
+                    tracing::debug!(target: "TwoStepRule", "Pattern matched! Next binary message will be accepted.");
                     self.valid.store(true, Ordering::SeqCst);
                 }
                 false

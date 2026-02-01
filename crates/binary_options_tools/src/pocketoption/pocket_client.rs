@@ -12,6 +12,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::pocketoption::types::Outgoing;
+use crate::config::Config;
 use crate::{
     error::BinaryOptionsError,
     pocketoption::{
@@ -88,6 +89,7 @@ impl ReconnectCallback<State> for TradeReconciliationCallback {
 pub struct PocketOption {
     client: Client<State>,
     _runner: Arc<tokio::task::JoinHandle<()>>,
+    pub config: Config,
 }
 
 impl PocketOption {
@@ -145,16 +147,7 @@ impl PocketOption {
     /// }
     /// ```
     pub async fn new(ssid: impl ToString) -> PocketResult<Self> {
-        let builder = Self::builder(ssid)?;
-        let (client, mut runner) = builder.build().await?;
-
-        let _runner = tokio::spawn(async move { runner.run().await });
-        client.wait_connected().await;
-
-        Ok(Self {
-            client,
-            _runner: Arc::new(_runner),
-        })
+        Self::new_with_config(ssid, Config::default()).await
     }
 
     /// Creates a new PocketOption client with a custom WebSocket URL.
@@ -169,10 +162,19 @@ impl PocketOption {
     /// # Returns
     /// A `PocketResult` containing the initialized `PocketOption` client.
     pub async fn new_with_url(ssid: impl ToString, url: String) -> PocketResult<Self> {
+        let mut config = Config::default();
+        if let Ok(parsed_url) = url::Url::parse(&url) {
+            config.urls.push(parsed_url);
+        }
+        
+        // We still use the state builder for the initial connection URL
+        // because ClientRunner uses the state's URL.
+        // The config.urls are fallbacks or for future use.
         let state = StateBuilder::default()
             .ssid(Ssid::parse(ssid)?)
             .default_connection_url(url)
             .build()?;
+            
         let builder = Self::configure_common_modules(ClientBuilder::new(PocketConnect, state));
         let (client, mut runner) = builder.build().await?;
 
@@ -181,6 +183,49 @@ impl PocketOption {
         Ok(Self {
             client,
             _runner: Arc::new(_runner),
+            config,
+        })
+    }
+
+    /// Creates a new PocketOption client with the provided configuration.
+    pub async fn new_with_config(ssid: impl ToString, config: Config) -> PocketResult<Self> {
+        let mut builder = StateBuilder::default().ssid(Ssid::parse(ssid)?);
+
+        // Use the first URL from config as default if available
+        if let Some(url) = config.urls.first() {
+            builder = builder.default_connection_url(url.to_string());
+        }
+
+        // Pass all URLs as fallbacks
+        builder = builder.urls(config.urls.iter().map(|u| u.to_string()).collect());
+
+        let state = builder.build()?;
+        let client_builder = Self::configure_common_modules(ClientBuilder::new(PocketConnect, state))
+            .with_max_allowed_loops(config.max_allowed_loops)
+            .with_reconnect_delay(config.reconnect_time);
+
+        let (client, mut runner): (Client<State>, binary_options_tools_core_pre::client::ClientRunner<State>) = client_builder.build().await?;
+
+        let _runner = tokio::spawn(async move { runner.run().await });
+
+        match tokio::time::timeout(
+            config.connection_initialization_timeout,
+            client.wait_connected(),
+        )
+        .await
+        {
+            Ok(_) => {}
+            Err(_) => {
+                return Err(PocketError::General(
+                    "Connection initialization timed out".into(),
+                ));
+            }
+        }
+
+        Ok(Self {
+            client,
+            _runner: Arc::new(_runner),
+            config,
         })
     }
 

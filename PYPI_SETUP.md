@@ -13,7 +13,7 @@ Trusted publishing is the modern, secure way to publish to PyPI without storing 
 
 ### Step 1: Configure PyPI Trusted Publishing
 
-1. Go to your PyPI account settings: https://pypi.org/manage/account/
+1. Go to your PyPI account settings: <https://pypi.org/manage/account/>
 2. Navigate to "Publishing" tab
 3. Click "Add a new pending publisher"
 4. Fill in the details:
@@ -37,7 +37,7 @@ If you prefer using API tokens instead of trusted publishing:
 
 ### Step 1: Generate API Token
 
-1. Go to PyPI Account Settings: https://pypi.org/manage/account/
+1. Go to PyPI Account Settings: <https://pypi.org/manage/account/>
 2. Scroll to "API tokens" section
 3. Click "Add API token"
 4. Give it a name (e.g., "GitHub Actions")
@@ -72,7 +72,7 @@ If using API tokens, update the release workflow to use:
 
 1. Go to your GitHub repository
 2. Click "Releases" → "Create a new release"
-3. Choose or create a new tag (e.g., `v0.1.9`)
+3. Choose or create a new tag (e.g., `v0.2.3`)
 4. Fill in release title and description
 5. Click "Publish release"
 6. The release workflow will automatically trigger and publish to PyPI
@@ -80,8 +80,8 @@ If using API tokens, update the release workflow to use:
 ### Method 2: Git Tags
 
 ```bash
-git tag v0.1.9
-git push origin v0.1.9
+git tag v0.2.3
+git push origin v0.2.3
 ```
 
 ### Method 3: Manual Trigger
@@ -97,6 +97,7 @@ git push origin v0.1.9
 
 1. Set up Test PyPI the same way as PyPI
 2. Create a test workflow pointing to Test PyPI:
+
    ```yaml
    - name: Publish to Test PyPI
      uses: pypa/gh-action-pypi-publish@release/v1
@@ -118,6 +119,7 @@ python -c "import BinaryOptionsToolsV2; print('Success!')"
 The current setup builds wheels for:
 
 ### Linux
+
 - x86_64 (Intel/AMD 64-bit)
 - x86 (Intel/AMD 32-bit)
 - aarch64 (ARM 64-bit)
@@ -126,16 +128,19 @@ The current setup builds wheels for:
 - ppc64le (PowerPC 64-bit Little Endian)
 
 ### Linux (musl libc)
+
 - x86_64
 - x86
 - aarch64
 - armv7
 
 ### Windows
+
 - x64 (Intel/AMD 64-bit)
 - x86 (Intel/AMD 32-bit)
 
 ### macOS
+
 - x86_64 (Intel)
 - aarch64 (Apple Silicon)
 
@@ -158,7 +163,7 @@ Remember to update the version in `BinaryOptionsToolsV2/Cargo.toml` before each 
 
 ```toml
 [package]
-version = "0.1.9"  # Increment this
+version = "0.2.3"  # Increment this
 ```
 
 ## Security Notes

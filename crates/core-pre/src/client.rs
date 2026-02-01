@@ -280,6 +280,9 @@ pub struct ClientRunner<S: AppState> {
 
     // Track reconnection attempts for exponential backoff
     pub(crate) reconnect_attempts: u32,
+
+    pub(crate) max_allowed_loops: u32,
+    pub(crate) reconnect_delay: std::time::Duration,
 }
 
 impl<S: AppState> ClientRunner<S> {
@@ -313,13 +316,29 @@ impl<S: AppState> ClientRunner<S> {
                 },
                 Err(e) => {
                     self.reconnect_attempts += 1;
-                    // Exponential backoff: 5, 10, 20, 40... capped at 300s
-                    let delay_secs = std::cmp::min(5 * 2u64.pow(self.reconnect_attempts.min(10)), 300);
+
+                    if self.max_allowed_loops > 0 && self.reconnect_attempts >= self.max_allowed_loops {
+                        error!(target: "Runner", "Maximum reconnection attempts ({}) reached. Shutting down.", self.max_allowed_loops);
+                        self.shutdown_requested = true;
+                        break;
+                    }
+
+                    // Use configured reconnect_delay with exponential backoff if it's > 0, else use a default
+                    let base_delay = if self.reconnect_delay.as_secs() > 0 {
+                        self.reconnect_delay.as_secs()
+                    } else {
+                        5
+                    };
+
+                    let delay_secs = std::cmp::min(base_delay.saturating_mul(2u64.saturating_pow(self.reconnect_attempts.min(10))), 300);
                     // Add jitter
                     let jitter = rand::rng().random_range(0.8..1.2);
                     let delay = std::time::Duration::from_secs_f64(delay_secs as f64 * jitter);
 
-                    warn!(target: "Runner", "Connection failed (attempt {}): {e}. Retrying in {:?}...", self.reconnect_attempts, delay);
+                    warn!(target: "Runner", "Connection failed (attempt {}/{}): {e}. Retrying in {:?}...",
+                        self.reconnect_attempts,
+                        if self.max_allowed_loops > 0 { self.max_allowed_loops.to_string() } else { "∞".to_string() },
+                        delay);
                     tokio::time::sleep(delay).await;
                     // On failure, the next attempt is a reconnect, not a hard connect.
                     self.is_hard_disconnect = false;

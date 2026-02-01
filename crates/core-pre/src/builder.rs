@@ -43,6 +43,9 @@ pub struct ClientBuilder<S: AppState> {
     lightweight_factories: Vec<LightweightHandlersFn<S>>,
     // Middleware stack for WebSocket message processing
     middleware_stack: MiddlewareStack<S>,
+
+    max_allowed_loops: u32,
+    reconnect_delay: Duration,
 }
 
 impl<S: AppState> ClientBuilder<S> {
@@ -60,6 +63,8 @@ impl<S: AppState> ClientBuilder<S> {
             module_factories: Vec::new(),
             lightweight_factories: Vec::new(),
             middleware_stack: MiddlewareStack::new(),
+            max_allowed_loops: 0,
+            reconnect_delay: Duration::from_secs(5),
         }
     }
 
@@ -367,6 +372,19 @@ impl<S: AppState> ClientBuilder<S> {
         self
     }
 
+    /// Sets the maximum number of reconnection attempts.
+    /// 0 means infinite attempts.
+    pub fn with_max_allowed_loops(mut self, max_allowed_loops: u32) -> Self {
+        self.max_allowed_loops = max_allowed_loops;
+        self
+    }
+
+    /// Sets the base delay for reconnection attempts.
+    pub fn with_reconnect_delay(mut self, reconnect_delay: Duration) -> Self {
+        self.reconnect_delay = reconnect_delay;
+        self
+    }
+
     /// Assembles and returns the final `Client` handle and its `ClientRunner`.
     pub async fn build(self) -> CoreResult<(Client<S>, ClientRunner<S>)> {
         let (runner_cmd_tx, runner_cmd_rx) = bounded_async(8);
@@ -423,6 +441,8 @@ impl<S: AppState> ClientBuilder<S> {
             runner_command_rx: runner_cmd_rx,
             connection_callback,
             reconnect_attempts: 0,
+            max_allowed_loops: self.max_allowed_loops,
+            reconnect_delay: self.reconnect_delay,
         };
 
         Ok((client, runner))

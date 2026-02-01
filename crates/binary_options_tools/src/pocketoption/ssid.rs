@@ -129,6 +129,21 @@ impl Ssid {
         let data_str = data.to_string();
         let trimmed = data_str.trim();
 
+        // Handle case where SSID is double-encoded or passed as a JSON string
+        // We try this first because "invalid type: string" error suggests it's being parsed as a string
+        if let Ok(unquoted) = serde_json::from_str::<String>(trimmed) {
+            return Self::parse(unquoted);
+        }
+
+        // Handle raw quotes that might be invalid JSON string (e.g. "42["auth",...]")
+        if trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len() >= 2 {
+            let unquoted = &trimmed[1..trimmed.len()-1];
+            // If stripping quotes reveals the prefix, use it
+            if unquoted.starts_with("42[") {
+                return Self::parse(unquoted);
+            }
+        }
+
         let prefix = "42[\"auth\",";
 
         let parsed = if let Some(stripped) = trimmed.strip_prefix(prefix) {

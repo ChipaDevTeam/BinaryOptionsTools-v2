@@ -1,60 +1,104 @@
-// use pyo3::prelude::*;
-// use std::collections::HashSet;
-// use std::time::Duration;
-// use url::Url;
+use pyo3::prelude::*;
+use pyo3::exceptions::PyValueError;
+use binary_options_tools::config::Config;
+use std::time::Duration;
+use url::Url;
 
-// use crate::error::BinaryResultPy;
+#[pyclass]
+#[derive(Clone, Default)]
+pub struct PyConfig {
+    pub inner: Config,
+    pub(crate) url_cache: Vec<String>,
+}
 
-// #[pyclass]
-// #[derive(Clone, Default)]
-// pub struct PyConfig {
-//     #[pyo3(get, set)]
-//     pub max_allowed_loops: u32,
-//     #[pyo3(get, set)]
-//     pub sleep_interval: u64,
-//     #[pyo3(get, set)]
-//     pub reconnect_time: u64,
-//     #[pyo3(get, set)]
-//     pub connection_initialization_timeout_secs: u64,
-//     #[pyo3(get, set)]
-//     pub timeout_secs: u64,
-//     #[pyo3(get, set)]
-//     pub urls: Vec<String>,
-// }
+#[pymethods]
+impl PyConfig {
+    #[new]
+    pub fn new() -> Self {
+        let inner = Config::default();
+        let url_cache = inner.urls.iter().map(|u| u.to_string()).collect();
+        Self {
+            inner,
+            url_cache,
+        }
+    }
 
-// #[pymethods]
-// impl PyConfig {
-//     #[new]
-//     pub fn new() -> Self {
-//         Self {
-//             max_allowed_loops: 100,
-//             sleep_interval: 100,
-//             reconnect_time: 5,
-//             connection_initialization_timeout_secs: 30,
-//             timeout_secs: 30,
-//             urls: Vec::new(),
-//         }
-//     }
+    #[getter]
+    fn max_allowed_loops(&self) -> u32 {
+        self.inner.max_allowed_loops
+    }
 
-// }
+    #[setter]
+    fn set_max_allowed_loops(&mut self, value: u32) {
+        self.inner.max_allowed_loops = value;
+    }
 
-// impl PyConfig {
-//     // TODO: Restore config builder when the new API supports it
-//     // pub fn build(&self) -> BinaryResultPy<ConfigBuilder<PocketData, WebSocketMessage, ()>> {
-//     //     let urls: Result<Vec<Url>, url::ParseError> = self
-//     //         .urls
-//     //         .iter()
-//     //         .map(|url| Url::parse(url))
-//     //         .collect();
+    #[getter]
+    fn sleep_interval(&self) -> u64 {
+        self.inner.sleep_interval.as_millis() as u64
+    }
 
-//     //     let config = ConfigBuilder::new()
-//     //     .max_allowed_loops(self.max_allowed_loops)
-//     //     .sleep_interval(self.sleep_interval)
-//     //     .reconnect_time(self.reconnect_time)
-//     //     .timeout(Duration::from_secs(self.timeout_secs))
-//     //     .default_connection_url(HashSet::from_iter(urls.map_err(|e| {
-//     //         BinaryOptionsToolsError::from(e)
-//     //     })?));
-//     //     Ok(config)
-//     // }
-// }
+    #[setter]
+    fn set_sleep_interval(&mut self, value: u64) {
+        self.inner.sleep_interval = Duration::from_millis(value);
+    }
+
+    #[getter]
+    fn reconnect_time(&self) -> u64 {
+        self.inner.reconnect_time.as_secs()
+    }
+
+    #[setter]
+    fn set_reconnect_time(&mut self, value: u64) {
+        self.inner.reconnect_time = Duration::from_secs(value);
+    }
+
+    #[getter]
+    fn connection_initialization_timeout_secs(&self) -> u64 {
+        self.inner.connection_initialization_timeout.as_secs()
+    }
+
+    #[setter]
+    fn set_connection_initialization_timeout_secs(&mut self, value: u64) {
+        self.inner.connection_initialization_timeout = Duration::from_secs(value);
+    }
+
+    #[getter]
+    fn timeout_secs(&self) -> u64 {
+        self.inner.timeout.as_secs()
+    }
+
+    #[setter]
+    fn set_timeout_secs(&mut self, value: u64) {
+        self.inner.timeout = Duration::from_secs(value);
+    }
+
+    #[getter]
+    fn urls(&self) -> Vec<String> {
+        self.url_cache.clone()
+    }
+
+    #[setter]
+    fn set_urls(&mut self, value: Vec<String>) -> PyResult<()> {
+        let mut parsed_urls = Vec::new();
+        let mut errors = Vec::new();
+
+        for url_str in value {
+            match Url::parse(&url_str) {
+                Ok(url) => parsed_urls.push(url),
+                Err(_) => errors.push(url_str),
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(PyValueError::new_err(format!(
+                "Invalid URLs provided: {}",
+                errors.join(", ")
+            )));
+        }
+
+        self.inner.urls = parsed_urls;
+        self.url_cache = self.inner.urls.iter().map(|u| u.to_string()).collect();
+        Ok(())
+    }
+}

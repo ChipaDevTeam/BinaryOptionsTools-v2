@@ -58,7 +58,7 @@ pub fn calculate_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 pub async fn get_public_ip() -> PocketResult<String> {
     let response = reqwest::get(IPIFY_URL).await?;
     let json: serde_json::Value = response.json().await?;
-    match json["ip"].as_str() {
+    match json["ip"].as_str().or(json["query"].as_str()) {
         Some(ip) => Ok(ip.to_string()),
         None => Err(PocketError::General(format!(
             "Failed to retrieve public IP from {}. Response: {:?}",

@@ -395,8 +395,6 @@ client = PocketOption(
 
 **Important**: The `Config` class exists in the Python codebase.
 
-**Note:** Configuration parameters are currently ignored by the underlying Rust client. This feature will be enabled in a future release.
-
 ```python
 # This code will have effect:
 from BinaryOptionsToolsV2 import Config
@@ -739,6 +737,6 @@ if payout < 80:
 
 ## Version Information
 
-This documentation is for **BinaryOptionsToolsV2 v0.2.1+**
+This documentation is for **BinaryOptionsToolsV2 v0.2.3+**
 
 For changelog and version history, see the [GitHub Releases](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases).

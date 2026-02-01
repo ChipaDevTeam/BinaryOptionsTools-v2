@@ -3,9 +3,8 @@ import json
 import sys
 from datetime import timedelta
 
-from BinaryOptionsToolsV2 import Logger, RawPocketOption
-from BinaryOptionsToolsV2.config import Config
-from BinaryOptionsToolsV2.validator import Validator
+from ..config import Config
+from ..validator import Validator
 
 
 class AsyncSubscription:
@@ -178,6 +177,12 @@ class PocketOptionAsync:
             - Custom URLs provided in the `url` parameter take precedence over URLs in the configuration
             - Invalid configuration values will raise appropriate exceptions
         """
+        try:
+            from ..BinaryOptionsToolsV2 import RawPocketOption
+        except ImportError:
+            from BinaryOptionsToolsV2 import RawPocketOption
+        from ..tracing import Logger
+
         if config is not None:
             if isinstance(config, dict):
                 self.config = Config.from_dict(config)
@@ -191,15 +196,13 @@ class PocketOptionAsync:
                 )
 
             if url is not None:
-                self.client = RawPocketOption.new_with_url(ssid, url)
-            else:
-                self.client = RawPocketOption(ssid)
+                self.config.urls.insert(0, url)
+            self.client = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
         else:
             self.config = Config()
             if url is not None:
-                self.client = RawPocketOption.new_with_url(ssid, url)
-            else:
-                self.client = RawPocketOption(ssid)
+                self.config.urls.insert(0, url)
+            self.client = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
         self.logger = Logger()
 
     async def buy(
