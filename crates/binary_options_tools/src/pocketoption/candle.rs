@@ -43,11 +43,30 @@ pub struct BaseCandle {
     pub timestamp: f64,
     pub open: f64,
     pub close: f64,
-    pub low: f64,
     pub high: f64,
+    pub low: f64,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub volume: Option<f64>,
 }
+
+#[derive(serde::Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum HistoryItem {
+    Tick([f64; 2]),                                    // [timestamp, price]
+    TickWithNull([f64; 2], Option<serde_json::Value>), // [timestamp, price, null]
+}
+
+impl HistoryItem {
+    pub fn to_tick(&self) -> (f64, f64) {
+        match self {
+            HistoryItem::Tick([t, p]) => (*t, *p),
+            HistoryItem::TickWithNull([t, p], _) => (*t, *p),
+        }
+    }
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
+pub struct CandleItem(pub f64, pub f64, pub f64, pub f64, pub f64, pub f64); // timestamp, open, close, high, low, volume
 
 impl Candle {
     /// Create a new candle with initial price
@@ -282,6 +301,71 @@ impl BaseCandle {
     }
 }
 
+pub fn compile_candles_from_ticks(ticks: &[HistoryItem], period: u32, symbol: &str) -> Vec<Candle> {
+    if ticks.is_empty() {
+        return Vec::new();
+    }
+
+    let mut candles = Vec::new();
+    let period_secs = period as f64;
+
+    // Sort ticks by timestamp just in case
+    let mut sorted_ticks: Vec<(f64, f64)> = ticks.iter().map(|t| t.to_tick()).collect();
+    sorted_ticks.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut current_candle: Option<BaseCandle> = None;
+    let mut current_boundary_idx: Option<u64> = None;
+
+    for (timestamp, price) in sorted_ticks {
+        let boundary_idx = (timestamp / period_secs).floor() as u64;
+        let boundary = boundary_idx as f64 * period_secs;
+
+        if let Some(mut candle) = current_candle.take() {
+            if Some(boundary_idx) == current_boundary_idx {
+                // Same candle
+                candle.high = candle.high.max(price);
+                candle.low = candle.low.min(price);
+                candle.close = price;
+                current_candle = Some(candle);
+            } else {
+                // New candle, push old one
+                if let Ok(c) = Candle::try_from((candle, symbol.to_string())) {
+                    candles.push(c);
+                }
+                // Start new candle
+                current_boundary_idx = Some(boundary_idx);
+                current_candle = Some(BaseCandle {
+                    timestamp: boundary,
+                    open: price,
+                    high: price,
+                    low: price,
+                    close: price,
+                    volume: None,
+                });
+            }
+        } else {
+            // First tick
+            current_boundary_idx = Some(boundary_idx);
+            current_candle = Some(BaseCandle {
+                timestamp: boundary,
+                open: price,
+                high: price,
+                low: price,
+                close: price,
+                volume: None,
+            });
+        }
+    }
+
+    if let Some(candle) = current_candle {
+        if let Ok(c) = Candle::try_from((candle, symbol.to_string())) {
+            candles.push(c);
+        }
+    }
+
+    candles
+}
+
 impl SubscriptionType {
     pub fn none() -> Self {
         SubscriptionType::None
@@ -483,8 +567,13 @@ mod tests {
 
     #[test]
     fn test_parse_base_candles() {
+        // Format: [timestamp, open, close, high, low]
         let data = r#"[1754529180,0.92124,0.92155,0.92162,0.92124]"#;
         let candle: BaseCandle = serde_json::from_str(data).unwrap();
         assert_eq!(candle.timestamp, 1754529180.0);
+        assert_eq!(candle.open, 0.92124);
+        assert_eq!(candle.close, 0.92155);
+        assert_eq!(candle.high, 0.92162);
+        assert_eq!(candle.low, 0.92124);
     }
 }

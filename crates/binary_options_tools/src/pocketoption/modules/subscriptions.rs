@@ -17,7 +17,9 @@ use tokio::select;
 use tracing::{debug, warn};
 use uuid::Uuid;
 
-use crate::pocketoption::candle::{BaseCandle, SubscriptionType};
+use crate::pocketoption::candle::{
+    compile_candles_from_ticks, BaseCandle, HistoryItem, SubscriptionType,
+};
 use crate::pocketoption::error::PocketError;
 use crate::pocketoption::types::{MultiPatternRule, StreamData as RawCandle, SubscriptionEvent};
 use crate::pocketoption::{
@@ -37,8 +39,10 @@ pub struct ChangeSymbol {
 pub struct History {
     pub asset: String,
     pub period: u32,
-    pub candles: Vec<BaseCandle>,
-    pub history: Vec<Vec<f64>>,
+    #[serde(default)]
+    pub candles: Option<Vec<BaseCandle>>,
+    #[serde(default)]
+    pub history: Option<Vec<HistoryItem>>,
 }
 
 #[derive(Deserialize)]
@@ -494,7 +498,18 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                         }
                                     });
                                     if let Some(command_id) = id {
-                                        let candles = data.candles.into_iter().map(|c| Candle::try_from((c, data.asset.clone()))).collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Other(e.to_string()))?;
+                                        let symbol = data.asset.clone();
+                                        let candles = if let Some(candles) = data.candles {
+                                            candles.into_iter()
+                                                .map(|c| Candle::try_from((c, symbol.clone())))
+                                                .collect::<Result<Vec<_>, _>>()
+                                                .map_err(|e| CoreError::Other(e.to_string()))?
+                                        } else if let Some(history) = data.history {
+                                            compile_candles_from_ticks(&history, data.period, &symbol)
+                                        } else {
+                                            Vec::new()
+                                        };
+
                                         if let Err(e) = self.command_responder.send(CommandResponse::History {
                                             command_id,
                                             data: candles
@@ -536,8 +551,9 @@ impl ApiModule<State> for SubscriptionsApiModule {
         // - Subscription confirmations
         // - Subscription errors
         Box::new(MultiPatternRule::new(vec![
-            r#"451-["updateStream",{"#,
-            r#"451-["updateHistoryNewFast","#,
+            "updateStream",
+            "updateHistoryNewFast",
+            "updateHistoryNew",
         ]))
     }
 }

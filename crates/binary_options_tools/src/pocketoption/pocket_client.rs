@@ -622,25 +622,13 @@ impl PocketOption {
         handle.get_candles(asset, period, offset).await
     }
 
-    /// Gets historical candle data for a specific asset and period.
+    /// Gets historical tick data (timestamp, price) for a specific asset and period.
     /// # Arguments
     /// * `asset` - The asset to get historical data for.
-    /// * `period` - The time period for each candle in seconds.
+    /// * `period` - The time period for each tick in seconds.
     /// # Returns
-    /// A `PocketResult` containing a vector of `Candle` if successful, or an error if the request fails.
-    /// # Example
-    /// ```
-    /// use binary_options_tools::pocketoption::PocketOption;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> binary_options_tools_core_pre::error::CoreResult<()> {
-    ///     let pocket_option = PocketOption::new("your_session_id").await?;
-    ///     let history = pocket_option.history("EURUSD_otc", 5).await?;
-    ///     println!("Received {} candles from history", history.len());
-    ///     Ok(())
-    /// }
-    /// ```
-    pub async fn history(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<Candle>> {
+    /// A `PocketResult` containing a vector of `(timestamp, price)` if successful, or an error if the request fails.
+    pub async fn ticks(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<(f64, f64)>> {
         let handle = self.require_handle::<HistoricalDataApiModule>("HistoricalDataApiModule").await?;
 
         if let Some(assets) = self.assets().await {
@@ -648,8 +636,30 @@ impl PocketOption {
                 return Err(PocketError::InvalidAsset(asset.to_string()));
             }
         }
-        // If assets are not loaded yet, still try to get candles
-        handle.get_history(asset.to_string(), period).await
+        handle.ticks(asset.to_string(), period).await
+    }
+
+    /// Gets historical candle data for a specific asset and period.
+    /// # Arguments
+    /// * `asset` - The asset to get historical data for.
+    /// * `period` - The time period for each candle in seconds.
+    /// # Returns
+    /// A `PocketResult` containing a vector of `Candle` if successful, or an error if the request fails.
+    pub async fn candles(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<Candle>> {
+        let handle = self.require_handle::<HistoricalDataApiModule>("HistoricalDataApiModule").await?;
+
+        if let Some(assets) = self.assets().await {
+            if assets.get(&asset.to_string()).is_none() {
+                return Err(PocketError::InvalidAsset(asset.to_string()));
+            }
+        }
+        handle.candles(asset.to_string(), period).await
+    }
+
+    /// Gets historical candle data for a specific asset and period.
+    /// Deprecated: use `candles()` instead.
+    pub async fn history(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<Candle>> {
+        self.candles(asset, period).await
     }
 
     pub async fn get_handle<M: ApiModule<State>>(&self) -> Option<M::Handle> {
