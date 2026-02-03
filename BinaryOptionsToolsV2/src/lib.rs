@@ -10,9 +10,9 @@ mod stream;
 mod validator;
 
 use config::PyConfig;
-use framework::{PyBot, PyStrategy, PyContext, PyVirtualMarket};
-use logs::{LogBuilder, Logger, StreamLogsIterator, StreamLogsLayer, start_tracing};
-use pocketoption::{RawPocketOption, RawStreamIterator, StreamIterator, RawHandle, RawHandler};
+use framework::{PyBot, PyContext, PyStrategy, PyVirtualMarket};
+use logs::{start_tracing, LogBuilder, Logger, StreamLogsIterator, StreamLogsLayer};
+use pocketoption::{RawHandle, RawHandler, RawPocketOption, RawStreamIterator, StreamIterator};
 use pyo3::prelude::*;
 use validator::RawValidator;
 

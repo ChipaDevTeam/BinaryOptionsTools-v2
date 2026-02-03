@@ -1,20 +1,20 @@
 use std::{fs::OpenOptions, io::Write, sync::Arc};
 
-use binary_options_tools::stream::{Message, RecieverStream, stream_logs_layer};
+use binary_options_tools::stream::{stream_logs_layer, Message, RecieverStream};
 use chrono::Duration;
 use futures_util::{
-    StreamExt,
     stream::{BoxStream, Fuse},
+    StreamExt,
 };
-use pyo3::{Bound, Py, PyAny, PyResult, Python, pyclass, pyfunction, pymethods};
+use pyo3::{pyclass, pyfunction, pymethods, Bound, Py, PyAny, PyResult, Python};
 use pyo3_async_runtimes::tokio::future_into_py;
 use tokio::sync::Mutex;
-use tracing::{Level, debug, instrument, level_filters::LevelFilter, warn};
+use tracing::{debug, instrument, level_filters::LevelFilter, warn, Level};
 use tracing_subscriber::{
-    Layer, Registry,
     fmt::{self, MakeWriter},
     layer::SubscriberExt,
     util::SubscriberInitExt,
+    Layer, Registry,
 };
 
 use crate::{error::BinaryErrorPy, runtime::get_runtime, stream::next_stream};
