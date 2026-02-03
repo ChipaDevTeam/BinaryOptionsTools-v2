@@ -12,7 +12,7 @@ async def main(ssid: str):
     await asyncio.sleep(5)
 
     # Candles are returned in the format of a list of dictionaries
-    candles = await api.history("EURUSD_otc", 3600)
+    candles = await api.history("EURUSD_otc", 5)
     print(f"Raw Candles: {candles}")
     candles_pd = pd.DataFrame.from_dict(candles)
     print(f"Candles: {candles_pd}")
