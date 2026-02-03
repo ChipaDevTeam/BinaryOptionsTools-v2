@@ -57,7 +57,7 @@ asyncio.run(main())
 
 ```gradle
 dependencies {
-    implementation 'com.chipadevteam:binaryoptionstoolsuni:0.1.0'
+    implementation 'com.chipadevteam:binaryoptionstoolsuni:0.2.3'
 }
 ```
 
@@ -82,7 +82,7 @@ Add to `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2", from: "0.1.0")
+    .package(url: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2", from: "0.2.3")
 ]
 ```
 
@@ -367,7 +367,7 @@ cp -r out/go/* your-project/
 ```bash
 # Build Ruby gem
 gem build binaryoptionstoolsuni.gemspec
-gem install binaryoptionstoolsuni-0.1.0.gem
+gem install binaryoptionstoolsuni-0.2.3.gem
 ```
 
 </details>
@@ -575,7 +575,7 @@ We welcome contributions! See [CONTRIBUTING.md](../../CONTRIBUTING.md) for guide
 
 ## 🗺️ Roadmap
 
-### Current (v0.1.0)
+### Current (v0.2.3)
 
 - ✅ Multi-language bindings (6 languages)
 - ✅ Basic trading operations
@@ -614,6 +614,6 @@ Special thanks to all contributors and the community!
 
 ---
 
-**Version**: 0.1.0  
+**Version**: 0.2.3
 **Last Updated**: November 2025  
 **Platform**: PocketOption (Quick Trading)

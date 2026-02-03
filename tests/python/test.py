@@ -33,10 +33,9 @@ async def main(ssid):
         if "time" in item:
             print(item["time"], item.get("open"))
         elif "timestamp" in item:
-             print(item["timestamp"], item.get("open"))
+            print(item["timestamp"], item.get("open"))
         else:
             print("Received item:", item)
-
 
 if __name__ == "__main__":
     ssid = input("Write your ssid: ")

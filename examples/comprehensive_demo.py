@@ -15,7 +15,7 @@ async def main():
     Comprehensive demo covering all BinaryOptionsToolsV2 methods.
 
     Prerequisites:
-    - Set PO_SSID environment variable to your session ID.
+    - Set POCKET_OPTION_SSID environment variable to your session ID.
     """
 
     # 1. Configuration

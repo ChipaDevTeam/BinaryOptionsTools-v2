@@ -7,7 +7,6 @@ use binary_options_tools::framework::{Bot, Context, Strategy};
 use binary_options_tools::pocketoption::candle::Candle;
 use binary_options_tools::pocketoption::error::PocketResult;
 use pyo3::prelude::*;
-use pyo3::IntoPyObjectExt;
 use std::sync::Arc;
 
 #[pyclass(subclass)]
@@ -36,7 +35,7 @@ pub struct StrategyWrapper {
 #[async_trait]
 impl Strategy for StrategyWrapper {
     async fn on_start(&self, ctx: &Context) -> PocketResult<()> {
-        let inner = self.inner.clone();
+        let inner = Python::attach(|py| self.inner.clone_ref(py));
         let client = ctx.client.clone();
         let market = ctx.market.clone();
 
@@ -68,9 +67,9 @@ impl Strategy for StrategyWrapper {
     }
 
     async fn on_candle(&self, ctx: &Context, asset: &str, candle: &Candle) -> PocketResult<()> {
-        let candle_json = serde_json::to_string(candle).unwrap_or_default();
+        let candle_json = serde_json::to_string(candle).map_err(|e| binary_options_tools::pocketoption::error::PocketError::General(e.to_string()))?;
         let asset = asset.to_string();
-        let inner = self.inner.clone();
+        let inner = Python::attach(|py| self.inner.clone_ref(py));
         let client = ctx.client.clone();
         let market = ctx.market.clone();
 
