@@ -8,7 +8,7 @@ use binary_options_tools_core_pre::{
     traits::{ApiModule, Rule},
 };
 use core::fmt;
-use futures_util::stream::unfold;
+use futures_util::{future::join_all, stream::unfold};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -65,6 +65,7 @@ impl fmt::Display for ChangeSymbol {
 /// Maximum number of concurrent subscriptions allowed
 const MAX_SUBSCRIPTIONS: usize = 4;
 const MAX_CHANNEL_CAPACITY: usize = 64;
+const RECONNECT_INITIAL_DELAY: Duration = Duration::from_secs(2);
 
 #[derive(Debug, thiserror::Error)]
 pub enum SubscriptionError {
@@ -137,13 +138,23 @@ struct SubscriptionCallback;
 #[async_trait]
 impl ReconnectCallback<State> for SubscriptionCallback {
     async fn call(&self, state: Arc<State>, ws_sender: &AsyncSender<Message>) -> CoreResult<()> {
-        tokio::time::sleep(Duration::from_secs(2)).await; // FIXME: This is a temporary delay, it may need to be fine tuned
+        tokio::time::sleep(RECONNECT_INITIAL_DELAY).await;
         // Resubscribe to all active subscriptions
-        for symbol in state.active_subscriptions.read().await.keys() {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            // Resubscribe to each active subscription
-            send_subscribe_message(ws_sender, symbol, 1).await?;
+        let symbols: Vec<String> = state.active_subscriptions.read().await.keys().cloned().collect();
+
+        // Send subscription messages concurrently
+        let futures = symbols.into_iter().map(|symbol| {
+            let ws_sender = ws_sender.clone();
+            async move { send_subscribe_message(&ws_sender, &symbol, 1).await }
+        });
+
+        let results = join_all(futures).await;
+
+        // Check for errors
+        for result in results {
+            result?;
         }
+
         Ok(())
     }
 }

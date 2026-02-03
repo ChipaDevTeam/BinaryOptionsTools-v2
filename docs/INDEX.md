@@ -210,7 +210,7 @@ See [LICENSE](../../LICENSE) for details.
 - **Main Repository**: [GitHub](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2)
 - **Discord Community**: [Join us](https://discord.gg/p7YyFqSmAz)
 - **Full Documentation**: [Website](https://chipadevteam.github.io/BinaryOptionsTools-v2/)
-- **Python API**: [PYTHON_API_REFERENCE.md](../../PYTHON_API_REFERENCE.md)
+- **Python API**: [PYTHON_API_REFERENCE.md](PYTHON_API_REFERENCE.md)
 
 ## ⚡ Quick Examples
 

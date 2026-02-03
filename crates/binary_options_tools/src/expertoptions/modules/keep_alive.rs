@@ -8,7 +8,7 @@ use binary_options_tools_core_pre::{
 use serde_json::Value;
 use tracing::warn;
 
-use crate::expertoptions::{Action, state::State};
+use crate::expertoptions::{state::State, Action};
 
 pub struct PongModule {
     ws_sender: AsyncSender<Message>,

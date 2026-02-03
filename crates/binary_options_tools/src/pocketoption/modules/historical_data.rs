@@ -89,6 +89,17 @@ pub struct HistoricalDataHandle {
 
 impl HistoricalDataHandle {
     /// Retrieves historical tick data (timestamp, price) for a specific asset and period.
+    ///
+    /// # Expected Data Format
+    /// The response is expected to contain a list of ticks, where each tick is a tuple of `(timestamp, price)`.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let ticks = handle.ticks("EURUSD_otc".to_string(), 60).await?;
+    /// for (timestamp, price) in ticks {
+    ///     println!("Time: {}, Price: {}", timestamp, price);
+    /// }
+    /// ```
     pub async fn ticks(&self, asset: String, period: u32) -> PocketResult<Vec<(f64, f64)>> {
         let _guard = self.call_lock.lock().await;
 
@@ -142,6 +153,18 @@ impl HistoricalDataHandle {
     }
 
     /// Retrieves historical candle data for a specific asset and period.
+    ///
+    /// # Expected Data Format
+    /// The response is expected to contain a list of `Candle` objects.
+    /// The server response typically includes OHLC data which is parsed into `Candle` structs.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let candles = handle.candles("EURUSD_otc".to_string(), 60).await?;
+    /// for candle in candles {
+    ///     println!("Time: {}, Open: {}, Close: {}", candle.timestamp, candle.open, candle.close);
+    /// }
+    /// ```
     pub async fn candles(&self, asset: String, period: u32) -> PocketResult<Vec<Candle>> {
         let _guard = self.call_lock.lock().await;
 
@@ -316,7 +339,15 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                         }
                                         RequestType::Ticks => {
                                             // Convert candles back to ticks (not ideal but better than nothing)
-                                            let ticks = candles.iter().map(|c| (c.timestamp, c.close.to_f64().unwrap_or(0.0))).collect();
+                                            let ticks = candles.iter().filter_map(|c| {
+                                                match c.close.to_f64() {
+                                                    Some(price) => Some((c.timestamp, price)),
+                                                    None => {
+                                                        warn!(target: "HistoricalDataApiModule", "Failed to convert close price to f64 for timestamp {}", c.timestamp);
+                                                        None
+                                                    }
+                                                }
+                                            }).collect();
                                             self.command_responder.send(CommandResponse::Ticks {
                                                 req_id,
                                                 ticks,
@@ -339,9 +370,14 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                         continue;
                                     }
 
-                                    let (req_id, _, _, req_type) = self.pending_request.take().unwrap();
+                                    let (req_id, _, _, req_type) = if let Some(req) = self.pending_request.take() {
+                                        req
+                                    } else {
+                                        warn!(target: "HistoricalDataApiModule", "Pending request missing when expected.");
+                                        continue;
+                                    };
                                     let symbol = history_response.asset;
-                                    
+
                                     // Extract ticks first if available
                                     let mut ticks = Vec::new();
                                     if let Some(history_items) = history_response.history.as_ref() {
@@ -455,13 +491,12 @@ impl ApiModule<State> for HistoricalDataApiModule {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::pocketoption::ssid::Ssid;
     use crate::pocketoption::state::StateBuilder;
-    use binary_options_tools_core_pre::reimports::{Message, bounded_async};
+    use binary_options_tools_core_pre::reimports::{bounded_async, Message};
     use binary_options_tools_core_pre::traits::ApiModule;
     use std::sync::Arc;
     use uuid::Uuid;
@@ -648,6 +683,329 @@ mod tests {
                     candles[0].close,
                     rust_decimal::Decimal::from_str_exact("0.59514").unwrap()
                 );
+            }
+            _ => panic!("Expected Candles response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_historical_data_mismatch_retry() {
+        // Setup channels
+        let (cmd_tx, cmd_rx) = bounded_async(10);
+        let (resp_tx, resp_rx) = bounded_async(10);
+        let (msg_tx, msg_rx) = bounded_async(10);
+        let (ws_tx, ws_rx) = bounded_async(10);
+
+        // Create shared state
+        let dummy_ssid_str =
+            r#"42["auth",{"session":"dummy_session","isDemo":1,"uid":123,"platform":2}]"#;
+        let ssid = Ssid::parse(dummy_ssid_str).expect("Failed to parse dummy SSID");
+
+        let state = Arc::new(
+            StateBuilder::default()
+                .ssid(ssid)
+                .build()
+                .expect("Failed to build state"),
+        );
+
+        // Initialize the module
+        let mut module =
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+
+        // Spawn the module loop
+        tokio::spawn(async move {
+            if let Err(e) = module.run().await {
+                eprintln!("Module run error: {:?}", e);
+            }
+        });
+
+        // 1. Send GetCandles command
+        let req_id = Uuid::new_v4();
+        let asset = "EURUSD_otc".to_string();
+        let period = 60;
+
+        cmd_tx
+            .send(Command::GetCandles {
+                asset: asset.clone(),
+                period,
+                req_id,
+            })
+            .await
+            .expect("Failed to send command");
+
+        // 2. Consume WS message
+        let _ = ws_rx.recv().await.expect("Failed to receive WS message");
+
+        // 3. Send MISMATCHING response (wrong asset)
+        let response_payload_mismatch = r#"{
+            "asset": "WRONG_ASSET",
+            "period": 60,
+            "history": []
+        }"#;
+        let msg_mismatch = Message::Text(response_payload_mismatch.to_string().into());
+        msg_tx
+            .send(Arc::new(msg_mismatch))
+            .await
+            .expect("Failed to send mismatch message");
+
+        // 4. Send CORRECT response
+        let response_payload_correct = r#"{
+            "asset": "EURUSD_otc",
+            "period": 60,
+            "history": []
+        }"#;
+        let msg_correct = Message::Text(response_payload_correct.to_string().into());
+        msg_tx
+            .send(Arc::new(msg_correct))
+            .await
+            .expect("Failed to send correct message");
+
+        // 5. Verify we get the response for the correct one
+        // The mismatch one should be ignored.
+        let response = timeout(Duration::from_secs(1), resp_rx.recv())
+            .await
+            .expect("Timed out waiting for response")
+            .expect("Failed to receive module response");
+
+        match response {
+            CommandResponse::Candles { req_id: r_id, .. } => {
+                assert_eq!(r_id, req_id);
+            }
+            _ => panic!("Expected Candles response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_historical_data_no_pending_request() {
+        // Setup channels
+        let (_cmd_tx, cmd_rx) = bounded_async(10);
+        let (resp_tx, resp_rx) = bounded_async(10);
+        let (msg_tx, msg_rx) = bounded_async(10);
+        let (ws_tx, _ws_rx) = bounded_async(10);
+
+        let dummy_ssid_str =
+            r#"42["auth",{"session":"dummy_session","isDemo":1,"uid":123,"platform":2}]"#;
+        let ssid = Ssid::parse(dummy_ssid_str).expect("Failed to parse dummy SSID");
+        let state = Arc::new(
+            StateBuilder::default()
+                .ssid(ssid)
+                .build()
+                .expect("Failed to build state"),
+        );
+
+        let mut module =
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+
+        tokio::spawn(async move {
+            let _ = module.run().await;
+        });
+
+        // 1. Send unsolicited response
+        let response_payload = r#"{
+            "asset": "EURUSD_otc",
+            "period": 60,
+            "history": []
+        }"#;
+        let msg = Message::Text(response_payload.to_string().into());
+        msg_tx
+            .send(Arc::new(msg))
+            .await
+            .expect("Failed to send message");
+
+        // 2. Verify NO response is sent
+        let result = timeout(Duration::from_millis(200), resp_rx.recv()).await;
+        assert!(
+            result.is_err(),
+            "Should not receive a response when no request was pending"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_requests() {
+        // Setup channels
+        let (cmd_tx, cmd_rx) = bounded_async(10);
+        let (resp_tx, resp_rx) = bounded_async(10);
+        let (msg_tx, msg_rx) = bounded_async(10);
+        let (ws_tx, ws_rx) = bounded_async(10);
+
+        // Create shared state
+        let dummy_ssid_str =
+            r#"42["auth",{"session":"dummy_session","isDemo":1,"uid":123,"platform":2}]"#;
+        let ssid = Ssid::parse(dummy_ssid_str).expect("Failed to parse dummy SSID");
+        let state = Arc::new(
+            StateBuilder::default()
+                .ssid(ssid)
+                .build()
+                .expect("Failed to build state"),
+        );
+
+        // Initialize the module
+        let mut module =
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+
+        // Spawn the module loop
+        tokio::spawn(async move {
+            if let Err(e) = module.run().await {
+                eprintln!("Module run error: {:?}", e);
+            }
+        });
+
+        // 1. Send First Request
+        let req_id1 = Uuid::new_v4();
+        cmd_tx
+            .send(Command::GetCandles {
+                asset: "ASSET1".to_string(),
+                period: 60,
+                req_id: req_id1,
+            })
+            .await
+            .expect("Failed to send command 1");
+
+        // Consume WS message 1
+        let _ = ws_rx.recv().await.expect("Failed to receive WS message 1");
+
+        // 2. Send Second Request (Concurrent)
+        let req_id2 = Uuid::new_v4();
+        cmd_tx
+            .send(Command::GetCandles {
+                asset: "ASSET2".to_string(),
+                period: 60,
+                req_id: req_id2,
+            })
+            .await
+            .expect("Failed to send command 2");
+
+        // Consume WS message 2
+        let _ = ws_rx.recv().await.expect("Failed to receive WS message 2");
+
+        // 3. Send Response for Request 2 (The one that should be pending now)
+        let response_payload2 = r#"{
+            "asset": "ASSET2",
+            "period": 60,
+            "history": []
+        }"#;
+        msg_tx
+            .send(Arc::new(Message::Text(
+                response_payload2.to_string().into(),
+            )))
+            .await
+            .expect("Failed to send message");
+
+        // 4. Verify Response for Request 2
+        let response = timeout(Duration::from_secs(1), resp_rx.recv())
+            .await
+            .expect("Timed out")
+            .expect("Failed to receive response");
+
+        match response {
+            CommandResponse::Candles { req_id, .. } => {
+                assert_eq!(
+                    req_id, req_id2,
+                    "Should receive response for the second request"
+                );
+            }
+            _ => panic!("Expected Candles response"),
+        }
+
+        // 5. Send Response for Request 1 (Should be ignored as it was overwritten)
+        let response_payload1 = r#"{
+            "asset": "ASSET1",
+            "period": 60,
+            "history": []
+        }"#;
+        msg_tx
+            .send(Arc::new(Message::Text(
+                response_payload1.to_string().into(),
+            )))
+            .await
+            .expect("Failed to send message");
+
+        // 6. Verify NO Response for Request 1
+        let result = timeout(Duration::from_millis(200), resp_rx.recv()).await;
+        assert!(
+            result.is_err(),
+            "Should not receive response for overwritten request"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_invalid_json_response() {
+        // Setup channels
+        let (cmd_tx, cmd_rx) = bounded_async(10);
+        let (resp_tx, resp_rx) = bounded_async(10);
+        let (msg_tx, msg_rx) = bounded_async(10);
+        let (ws_tx, ws_rx) = bounded_async(10);
+
+        // Create shared state
+        let dummy_ssid_str =
+            r#"42["auth",{"session":"dummy_session","isDemo":1,"uid":123,"platform":2}]"#;
+        let ssid = Ssid::parse(dummy_ssid_str).expect("Failed to parse dummy SSID");
+        let state = Arc::new(
+            StateBuilder::default()
+                .ssid(ssid)
+                .build()
+                .expect("Failed to build state"),
+        );
+
+        // Initialize the module
+        let mut module =
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+
+        // Spawn the module loop
+        tokio::spawn(async move {
+            if let Err(e) = module.run().await {
+                eprintln!("Module run error: {:?}", e);
+            }
+        });
+
+        // 1. Send Request
+        let req_id = Uuid::new_v4();
+        cmd_tx
+            .send(Command::GetCandles {
+                asset: "EURUSD_otc".to_string(),
+                period: 60,
+                req_id,
+            })
+            .await
+            .expect("Failed to send command");
+
+        // Consume WS message
+        let _ = ws_rx.recv().await.expect("Failed to receive WS message");
+
+        // 2. Send Invalid JSON Response
+        let invalid_payload = "INVALID_JSON_DATA";
+        msg_tx
+            .send(Arc::new(Message::Text(invalid_payload.to_string().into())))
+            .await
+            .expect("Failed to send message");
+
+        // 3. Verify NO Crash and NO Response (it should be ignored)
+        let result = timeout(Duration::from_millis(200), resp_rx.recv()).await;
+        assert!(
+            result.is_err(),
+            "Should not receive response for invalid JSON"
+        );
+
+        // 4. Send Valid Response afterwards to ensure module is still alive
+        let valid_payload = r#"{
+            "asset": "EURUSD_otc",
+            "period": 60,
+            "history": []
+        }"#;
+        msg_tx
+            .send(Arc::new(Message::Text(valid_payload.to_string().into())))
+            .await
+            .expect("Failed to send message");
+
+        // 5. Verify Response
+        let response = timeout(Duration::from_secs(1), resp_rx.recv())
+            .await
+            .expect("Timed out")
+            .expect("Failed to receive response");
+
+        match response {
+            CommandResponse::Candles { req_id: r_id, .. } => {
+                assert_eq!(r_id, req_id);
             }
             _ => panic!("Expected Candles response"),
         }

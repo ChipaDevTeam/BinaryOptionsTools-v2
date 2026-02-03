@@ -1,6 +1,4 @@
 import asyncio
-import os
-import sys
 from BinaryOptionsToolsV2 import PocketOption
 
 # Mock SSID (won't connect effectively but allows object creation)

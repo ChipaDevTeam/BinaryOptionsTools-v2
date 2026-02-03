@@ -5,6 +5,7 @@ Complete API reference for BinaryOptionsToolsUni with examples in all supported 
 > 📝 **Note**: This is a Markdown version. For the interactive version with language switchers, see [API_REFERENCE.html](API_REFERENCE.html)
 
 ## Table of Contents
+
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Trading Operations](#trading-operations)
@@ -20,11 +21,13 @@ Complete API reference for BinaryOptionsToolsUni with examples in all supported 
 ## Installation
 
 ### Python
+
 ```bash
 pip install binaryoptionstoolsuni
 ```
 
 ### Kotlin
+
 ```gradle
 dependencies {
     implementation 'com.chipadevteam:binaryoptionstoolsuni:0.1.0'
@@ -32,6 +35,7 @@ dependencies {
 ```
 
 ### Swift
+
 Add to `Package.swift`:
 ```swift
 dependencies: [
@@ -40,16 +44,19 @@ dependencies: [
 ```
 
 ### Go
+
 ```bash
 go get github.com/ChipaDevTeam/BinaryOptionsTools-v2/bindings/go
 ```
 
 ### Ruby
+
 ```bash
 gem install binaryoptionstoolsuni
 ```
 
 ### C#
+
 ```bash
 dotnet add package BinaryOptionsToolsUni
 ```
@@ -61,6 +68,7 @@ dotnet add package BinaryOptionsToolsUni
 ### Initialize Client
 
 #### Python
+
 ```python
 import asyncio
 from binaryoptionstoolsuni import PocketOption
@@ -78,6 +86,7 @@ asyncio.run(main())
 ```
 
 #### Kotlin
+
 ```kotlin
 import com.chipadevteam.binaryoptionstoolsuni.*
 import kotlinx.coroutines.*
@@ -94,6 +103,7 @@ suspend fun main() = coroutineScope {
 ```
 
 #### Swift
+
 ```swift
 import BinaryOptionsToolsUni
 
@@ -109,6 +119,7 @@ Task {
 ```
 
 #### Go
+
 ```go
 package main
 
@@ -130,6 +141,7 @@ func main() {
 ```
 
 #### Ruby
+
 ```ruby
 require 'binaryoptionstoolsuni'
 require 'async'
@@ -146,6 +158,7 @@ end
 ```
 
 #### C#
+
 ```csharp
 using BinaryOptionsToolsUni;
 
@@ -165,6 +178,7 @@ await client.ShutdownAsync();
 ### Place a Call (Buy) Trade
 
 #### Python
+
 ```python
 # Place a $1 call trade on EURUSD_otc for 60 seconds
 trade = await client.buy("EURUSD_otc", 60, 1.0)
@@ -174,6 +188,7 @@ print(f"Amount: ${trade.amount}")
 ```
 
 #### Kotlin
+
 ```kotlin
 // Place a $1 call trade on EURUSD_otc for 60 seconds
 val trade = client.buy("EURUSD_otc", 60u, 1.0)
@@ -183,6 +198,7 @@ println("Amount: $${trade.amount}")
 ```
 
 #### Swift
+
 ```swift
 // Place a $1 call trade on EURUSD_otc for 60 seconds
 let trade = try await client.buy(asset: "EURUSD_otc", time: 60, amount: 1.0)
@@ -192,6 +208,7 @@ print("Amount: $\(trade.amount)")
 ```
 
 #### Go
+
 ```go
 // Place a $1 call trade on EURUSD_otc for 60 seconds
 trade, _ := client.Buy("EURUSD_otc", 60, 1.0)
@@ -201,6 +218,7 @@ fmt.Printf("Amount: $%.2f\n", trade.Amount)
 ```
 
 #### Ruby
+
 ```ruby
 # Place a $1 call trade on EURUSD_otc for 60 seconds
 trade = client.buy('EURUSD_otc', 60, 1.0)
@@ -210,6 +228,7 @@ puts "Amount: $#{trade.amount}"
 ```
 
 #### C#
+
 ```csharp
 // Place a $1 call trade on EURUSD_otc for 60 seconds
 var trade = await client.BuyAsync("EURUSD_otc", 60, 1.0);
@@ -221,6 +240,7 @@ Console.WriteLine($"Amount: ${trade.Amount}");
 ### Place a Put (Sell) Trade
 
 #### Python
+
 ```python
 # Place a $1 put trade on EURUSD_otc for 60 seconds
 trade = await client.sell("EURUSD_otc", 60, 1.0)
@@ -228,6 +248,7 @@ print(f"Trade ID: {trade.id}")
 ```
 
 #### Kotlin
+
 ```kotlin
 // Place a $1 put trade on EURUSD_otc for 60 seconds
 val trade = client.sell("EURUSD_otc", 60u, 1.0)
@@ -235,6 +256,7 @@ println("Trade ID: ${trade.id}")
 ```
 
 #### Swift
+
 ```swift
 // Place a $1 put trade on EURUSD_otc for 60 seconds
 let trade = try await client.sell(asset: "EURUSD_otc", time: 60, amount: 1.0)
@@ -242,6 +264,7 @@ print("Trade ID: \(trade.id)")
 ```
 
 #### Go
+
 ```go
 // Place a $1 put trade on EURUSD_otc for 60 seconds
 trade, _ := client.Sell("EURUSD_otc", 60, 1.0)
@@ -249,6 +272,7 @@ fmt.Printf("Trade ID: %s\n", trade.Id)
 ```
 
 #### Ruby
+
 ```ruby
 # Place a $1 put trade on EURUSD_otc for 60 seconds
 trade = client.sell('EURUSD_otc', 60, 1.0)
@@ -256,6 +280,7 @@ puts "Trade ID: #{trade.id}"
 ```
 
 #### C#
+
 ```csharp
 // Place a $1 put trade on EURUSD_otc for 60 seconds
 var trade = await client.SellAsync("EURUSD_otc", 60, 1.0);
@@ -265,6 +290,7 @@ Console.WriteLine($"Trade ID: {trade.Id}");
 ### Check Trade Result
 
 #### Python
+
 ```python
 # Check if a trade won or lost
 result = await client.result(trade.id)
@@ -273,6 +299,7 @@ print(f"Profit: ${result.profit}")
 ```
 
 #### Kotlin
+
 ```kotlin
 // Check if a trade won or lost
 val result = client.result(trade.id)
@@ -281,6 +308,7 @@ println("Profit: $${result.profit}")
 ```
 
 #### Swift
+
 ```swift
 // Check if a trade won or lost
 let result = try await client.result(id: trade.id)
@@ -289,6 +317,7 @@ print("Profit: $\(result.profit)")
 ```
 
 #### Go
+
 ```go
 // Check if a trade won or lost
 result, _ := client.Result(trade.Id)
@@ -301,6 +330,7 @@ fmt.Printf("Profit: $%.2f\n", result.Profit)
 ```
 
 #### Ruby
+
 ```ruby
 # Check if a trade won or lost
 result = client.result(trade.id)
@@ -309,6 +339,7 @@ puts "Profit: $#{result.profit}"
 ```
 
 #### C#
+
 ```csharp
 // Check if a trade won or lost
 var result = await client.ResultAsync(trade.Id);
@@ -323,36 +354,42 @@ Console.WriteLine($"Profit: ${result.Profit}");
 ### Get Balance
 
 #### Python
+
 ```python
 balance = await client.balance()
 print(f"Current balance: ${balance:.2f}")
 ```
 
 #### Kotlin
+
 ```kotlin
 val balance = client.balance()
 println("Current balance: $${"%.2f".format(balance)}")
 ```
 
 #### Swift
+
 ```swift
 let balance = await client.balance()
 print("Current balance: $\(String(format: "%.2f", balance))")
 ```
 
 #### Go
+
 ```go
 balance := client.Balance()
 fmt.Printf("Current balance: $%.2f\n", balance)
 ```
 
 #### Ruby
+
 ```ruby
 balance = client.balance
 puts "Current balance: $#{'%.2f' % balance}"
 ```
 
 #### C#
+
 ```csharp
 var balance = await client.BalanceAsync();
 Console.WriteLine($"Current balance: ${balance:F2}");
@@ -361,6 +398,7 @@ Console.WriteLine($"Current balance: ${balance:F2}");
 ### Check if Demo Account
 
 #### Python
+
 ```python
 is_demo = client.is_demo()
 account_type = "Demo" if is_demo else "Real"
@@ -368,6 +406,7 @@ print(f"Account type: {account_type}")
 ```
 
 #### Kotlin
+
 ```kotlin
 val isDemo = client.isDemo()
 val accountType = if (isDemo) "Demo" else "Real"
@@ -375,6 +414,7 @@ println("Account type: $accountType")
 ```
 
 #### Swift
+
 ```swift
 let isDemo = client.isDemo()
 let accountType = isDemo ? "Demo" : "Real"
@@ -382,6 +422,7 @@ print("Account type: \(accountType)")
 ```
 
 #### Go
+
 ```go
 isDemo := client.IsDemo()
 accountType := "Real"
@@ -392,6 +433,7 @@ fmt.Printf("Account type: %s\n", accountType)
 ```
 
 #### Ruby
+
 ```ruby
 is_demo = client.is_demo?
 account_type = is_demo ? "Demo" : "Real"
@@ -399,6 +441,7 @@ puts "Account type: #{account_type}"
 ```
 
 #### C#
+
 ```csharp
 var isDemo = client.IsDemo();
 var accountType = isDemo ? "Demo" : "Real";
@@ -408,6 +451,7 @@ Console.WriteLine($"Account type: {accountType}");
 ### Get Open Deals
 
 #### Python
+
 ```python
 open_deals = await client.get_opened_deals()
 print(f"Open trades: {len(open_deals)}")
@@ -416,6 +460,7 @@ for deal in open_deals:
 ```
 
 #### Kotlin
+
 ```kotlin
 val openDeals = client.getOpenedDeals()
 println("Open trades: ${openDeals.size}")
@@ -425,6 +470,7 @@ openDeals.forEach { deal ->
 ```
 
 #### Swift
+
 ```swift
 let openDeals = await client.getOpenedDeals()
 print("Open trades: \(openDeals.count)")
@@ -434,6 +480,7 @@ for deal in openDeals {
 ```
 
 #### Go
+
 ```go
 openDeals := client.GetOpenedDeals()
 fmt.Printf("Open trades: %d\n", len(openDeals))
@@ -443,6 +490,7 @@ for _, deal := range openDeals {
 ```
 
 #### Ruby
+
 ```ruby
 open_deals = client.get_opened_deals
 puts "Open trades: #{open_deals.length}"
@@ -452,6 +500,7 @@ end
 ```
 
 #### C#
+
 ```csharp
 var openDeals = await client.GetOpenedDealsAsync();
 Console.WriteLine($"Open trades: {openDeals.Count}");
@@ -464,6 +513,7 @@ foreach (var deal in openDeals)
 ### Get Closed Deals
 
 #### Python
+
 ```python
 closed_deals = await client.get_closed_deals()
 print(f"Closed trades: {len(closed_deals)}")
@@ -473,6 +523,7 @@ for deal in closed_deals:
 ```
 
 #### Kotlin
+
 ```kotlin
 val closedDeals = client.getClosedDeals()
 println("Closed trades: ${closedDeals.size}")
@@ -483,6 +534,7 @@ closedDeals.forEach { deal ->
 ```
 
 #### Swift
+
 ```swift
 let closedDeals = await client.getClosedDeals()
 print("Closed trades: \(closedDeals.count)")
@@ -493,6 +545,7 @@ for deal in closedDeals {
 ```
 
 #### Go
+
 ```go
 closedDeals := client.GetClosedDeals()
 fmt.Printf("Closed trades: %d\n", len(closedDeals))
@@ -506,6 +559,7 @@ for _, deal := range closedDeals {
 ```
 
 #### Ruby
+
 ```ruby
 closed_deals = client.get_closed_deals
 puts "Closed trades: #{closed_deals.length}"
@@ -516,6 +570,7 @@ end
 ```
 
 #### C#
+
 ```csharp
 var closedDeals = await client.GetClosedDealsAsync();
 Console.WriteLine($"Closed trades: {closedDeals.Count}");
@@ -533,6 +588,7 @@ foreach (var deal in closedDeals)
 ### Get Historical Candles
 
 #### Python
+
 ```python
 # Get last 100 candles with 60-second period
 candles = await client.get_candles("EURUSD_otc", 60, 100)
@@ -542,6 +598,7 @@ for candle in candles[:5]:  # Show first 5
 ```
 
 #### Kotlin
+
 ```kotlin
 // Get last 100 candles with 60-second period
 val candles = client.getCandles("EURUSD_otc", 60, 100)
@@ -552,6 +609,7 @@ candles.take(5).forEach { candle ->
 ```
 
 #### Swift
+
 ```swift
 // Get last 100 candles with 60-second period
 let candles = try await client.getCandles(asset: "EURUSD_otc", period: 60, offset: 100)
@@ -562,6 +620,7 @@ for candle in candles.prefix(5) {
 ```
 
 #### Go
+
 ```go
 // Get last 100 candles with 60-second period
 candles, _ := client.GetCandles("EURUSD_otc", 60, 100)
@@ -573,6 +632,7 @@ for i, candle := range candles {
 ```
 
 #### Ruby
+
 ```ruby
 # Get last 100 candles with 60-second period
 candles = client.get_candles('EURUSD_otc', 60, 100)
@@ -583,6 +643,7 @@ end
 ```
 
 #### C#
+
 ```csharp
 // Get last 100 candles with 60-second period
 var candles = await client.GetCandlesAsync("EURUSD_otc", 60, 100);
@@ -596,36 +657,42 @@ foreach (var candle in candles.Take(5))
 ### Get Server Time
 
 #### Python
+
 ```python
 server_time = await client.server_time()
 print(f"Server timestamp: {server_time}")
 ```
 
 #### Kotlin
+
 ```kotlin
 val serverTime = client.serverTime()
 println("Server timestamp: $serverTime")
 ```
 
 #### Swift
+
 ```swift
 let serverTime = await client.serverTime()
 print("Server timestamp: \(serverTime)")
 ```
 
 #### Go
+
 ```go
 serverTime := client.ServerTime()
 fmt.Printf("Server timestamp: %d\n", serverTime)
 ```
 
 #### Ruby
+
 ```ruby
 server_time = client.server_time
 puts "Server timestamp: #{server_time}"
 ```
 
 #### C#
+
 ```csharp
 var serverTime = await client.ServerTimeAsync();
 Console.WriteLine($"Server timestamp: {serverTime}");
@@ -638,6 +705,7 @@ Console.WriteLine($"Server timestamp: {serverTime}");
 ### Subscribe to Asset
 
 #### Python
+
 ```python
 # Subscribe to 60-second candles
 subscription = await client.subscribe("EURUSD_otc", 60)
@@ -648,6 +716,7 @@ print("Subscribed to EURUSD_otc")
 ```
 
 #### Kotlin
+
 ```kotlin
 // Subscribe to 60-second candles
 val subscription = client.subscribe("EURUSD_otc", 60u)
@@ -657,6 +726,7 @@ println("Subscribed to EURUSD_otc")
 ```
 
 #### Swift
+
 ```swift
 // Subscribe to 60-second candles
 let subscription = try await client.subscribe(asset: "EURUSD_otc", durationSecs: 60)
@@ -666,6 +736,7 @@ print("Subscribed to EURUSD_otc")
 ```
 
 #### Go
+
 ```go
 // Subscribe to 60-second candles
 subscription, _ := client.Subscribe("EURUSD_otc", 60)
@@ -675,6 +746,7 @@ fmt.Println("Subscribed to EURUSD_otc")
 ```
 
 #### Ruby
+
 ```ruby
 # Subscribe to 60-second candles
 subscription = client.subscribe('EURUSD_otc', 60)
@@ -684,6 +756,7 @@ puts "Subscribed to EURUSD_otc"
 ```
 
 #### C#
+
 ```csharp
 // Subscribe to 60-second candles
 var subscription = await client.SubscribeAsync("EURUSD_otc", 60);
@@ -695,36 +768,42 @@ Console.WriteLine("Subscribed to EURUSD_otc");
 ### Unsubscribe from Asset
 
 #### Python
+
 ```python
 await client.unsubscribe("EURUSD_otc")
 print("Unsubscribed from EURUSD_otc")
 ```
 
 #### Kotlin
+
 ```kotlin
 client.unsubscribe("EURUSD_otc")
 println("Unsubscribed from EURUSD_otc")
 ```
 
 #### Swift
+
 ```swift
 try await client.unsubscribe(asset: "EURUSD_otc")
 print("Unsubscribed from EURUSD_otc")
 ```
 
 #### Go
+
 ```go
 client.Unsubscribe("EURUSD_otc")
 fmt.Println("Unsubscribed from EURUSD_otc")
 ```
 
 #### Ruby
+
 ```ruby
 client.unsubscribe('EURUSD_otc')
 puts "Unsubscribed from EURUSD_otc"
 ```
 
 #### C#
+
 ```csharp
 await client.UnsubscribeAsync("EURUSD_otc");
 Console.WriteLine("Unsubscribed from EURUSD_otc");
@@ -737,6 +816,7 @@ Console.WriteLine("Unsubscribed from EURUSD_otc");
 ### Reconnect
 
 #### Python
+
 ```python
 await client.reconnect()
 await asyncio.sleep(2)  # Wait for reconnection
@@ -744,6 +824,7 @@ print("Reconnected to server")
 ```
 
 #### Kotlin
+
 ```kotlin
 client.reconnect()
 delay(2000)
@@ -751,6 +832,7 @@ println("Reconnected to server")
 ```
 
 #### Swift
+
 ```swift
 try await client.reconnect()
 try await Task.sleep(nanoseconds: 2_000_000_000)
@@ -758,6 +840,7 @@ print("Reconnected to server")
 ```
 
 #### Go
+
 ```go
 client.Reconnect()
 time.Sleep(2 * time.Second)
@@ -765,6 +848,7 @@ fmt.Println("Reconnected to server")
 ```
 
 #### Ruby
+
 ```ruby
 client.reconnect
 sleep 2
@@ -772,6 +856,7 @@ puts "Reconnected to server"
 ```
 
 #### C#
+
 ```csharp
 await client.ReconnectAsync();
 await Task.Delay(2000);
@@ -781,36 +866,42 @@ Console.WriteLine("Reconnected to server");
 ### Shutdown
 
 #### Python
+
 ```python
 await client.shutdown()
 print("Client shut down gracefully")
 ```
 
 #### Kotlin
+
 ```kotlin
 client.shutdown()
 println("Client shut down gracefully")
 ```
 
 #### Swift
+
 ```swift
 try await client.shutdown()
 print("Client shut down gracefully")
 ```
 
 #### Go
+
 ```go
 client.Shutdown()
 fmt.Println("Client shut down gracefully")
 ```
 
 #### Ruby
+
 ```ruby
 client.shutdown
 puts "Client shut down gracefully"
 ```
 
 #### C#
+
 ```csharp
 await client.ShutdownAsync();
 Console.WriteLine("Client shut down gracefully");
@@ -821,6 +912,7 @@ Console.WriteLine("Client shut down gracefully");
 ## Error Handling
 
 ### Python
+
 ```python
 from binaryoptionstoolsuni import PocketOption, UniError
 
@@ -834,6 +926,7 @@ except Exception as e:
 ```
 
 ### Kotlin
+
 ```kotlin
 import com.chipadevteam.binaryoptionstoolsuni.*
 
@@ -848,6 +941,7 @@ try {
 ```
 
 ### Swift
+
 ```swift
 import BinaryOptionsToolsUni
 
@@ -862,6 +956,7 @@ do {
 ```
 
 ### Go
+
 ```go
 client, err := bot.PocketOptionInit("invalid_ssid")
 if err != nil {
@@ -873,6 +968,7 @@ balance := client.Balance()
 ```
 
 ### Ruby
+
 ```ruby
 begin
   client = BinaryOptionsToolsUni::PocketOption.init('invalid_ssid')
@@ -885,6 +981,7 @@ end
 ```
 
 ### C#
+
 ```csharp
 using BinaryOptionsToolsUni;
 

@@ -24,6 +24,7 @@ Visit [PocketOption](https://pocketoption.com), open DevTools (F12), find `ssid`
 ## Important
 
 Always wait 5 seconds after initialization:
+
 ```kotlin
 val client = PocketOption.new("your-session-id")
 delay(5000)  // Critical!

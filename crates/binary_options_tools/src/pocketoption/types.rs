@@ -405,25 +405,25 @@ impl<'de> Deserialize<'de> for Asset {
         #[derive(Deserialize)]
         #[allow(dead_code)] // Allow dead code because many fields are unused but kept for wire compatibility
         struct AssetRawTuple(
-            i32,             // 0: id (used)
-            String,          // 1: symbol (used)
-            String,          // 2: name (used)
-            AssetType,       // 3: asset_type (used)
-            (),              // 4: unused
-            i32,             // 5: payout (used)
-            (),              // 6: unused
-            (),              // 7: unused
-            (),              // 8: unused
-            i32,             // 9: is_otc (used, 1 for true, 0 for false)
-            (),              // 10: unused
-            (),              // 11: unused
-            (),              // 12: unused (previously Vec<String>)
-            (),              // 13: unused (previously i64)
-            bool,            // 14: is_active (used)
-            Vec<CandleLength>, // 15: allowed_candles (used)
-            (),              // 16: unused
-            (),              // 17: unused
-            (),              // 18: unused (previously i64)
+            i32,                     // 0: id (used)
+            String,                  // 1: symbol (used)
+            String,                  // 2: name (used)
+            AssetType,               // 3: asset_type (used)
+            serde::de::IgnoredAny,   // 4: unused
+            i32,                     // 5: payout (used)
+            serde::de::IgnoredAny,   // 6: unused
+            serde::de::IgnoredAny,   // 7: unused
+            serde::de::IgnoredAny,   // 8: unused
+            i32,                     // 9: is_otc (used, 1 for true, 0 for false)
+            serde::de::IgnoredAny,   // 10: unused
+            serde::de::IgnoredAny,   // 11: unused
+            serde::de::IgnoredAny,   // 12: unused (previously Vec<String>)
+            serde::de::IgnoredAny,   // 13: unused (previously i64)
+            bool,                    // 14: is_active (used)
+            Vec<CandleLength>,       // 15: allowed_candles (used)
+            serde::de::IgnoredAny,   // 16: unused
+            serde::de::IgnoredAny,   // 17: unused
+            serde::de::IgnoredAny,   // 18: unused (previously i64)
         );
 
         let raw: AssetRawTuple = AssetRawTuple::deserialize(deserializer)?;

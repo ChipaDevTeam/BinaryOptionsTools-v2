@@ -44,3 +44,7 @@ Discord = "https://discord.com/invite/chipa-1261483112991555665"
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "BinaryOptionsToolsV2"
+
+[tool.ruff]
+line-length = 120
+target-version = "py38"

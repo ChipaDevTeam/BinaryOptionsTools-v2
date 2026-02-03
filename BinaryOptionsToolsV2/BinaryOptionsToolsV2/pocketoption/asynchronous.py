@@ -7,6 +7,13 @@ from ..config import Config
 from ..validator import Validator
 
 
+if sys.version_info < (3, 10):
+
+    async def anext(iterator):
+        """Polyfill for anext for Python < 3.10"""
+        return await iterator.__anext__()
+
+
 class AsyncSubscription:
     def __init__(self, subscription):
         """Asynchronous Iterator over json objects"""
@@ -134,9 +141,7 @@ class RawHandler:
 
 # This file contains all the async code for the PocketOption Module
 class PocketOptionAsync:
-    def __init__(
-        self, ssid: str, url: str | None = None, config: Config | dict | str = None, **_
-    ):
+    def __init__(self, ssid: str, url: str | None = None, config: Config | dict | str = None, **_):
         """
         Initializes a new PocketOptionAsync instance.
 
@@ -191,9 +196,7 @@ class PocketOptionAsync:
             elif isinstance(config, Config):
                 self.config = config
             else:
-                raise ValueError(
-                    "Config must be either a Config object, dictionary, or JSON string"
-                )
+                raise ValueError("Config must be either a Config object, dictionary, or JSON string")
 
             if url is not None:
                 self.config.urls.insert(0, url)
@@ -205,9 +208,7 @@ class PocketOptionAsync:
             self.client = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
         self.logger = Logger()
 
-    async def buy(
-        self, asset: str, amount: float, time: int, check_win: bool = False
-    ) -> tuple[str, dict]:
+    async def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> tuple[str, dict]:
         """
         Places a buy (call) order for the specified asset.
 
@@ -239,9 +240,7 @@ class PocketOptionAsync:
             trade = json.loads(trade)
             return trade_id, trade
 
-    async def sell(
-        self, asset: str, amount: float, time: int, check_win: bool = False
-    ) -> tuple[str, dict]:
+    async def sell(self, asset: str, amount: float, time: int, check_win: bool = False) -> tuple[str, dict]:
         """
         Places a sell (put) order for the specified asset.
 
@@ -346,9 +345,7 @@ class PocketOptionAsync:
         #     "The get_candles method is not implemented in the PocketOptionAsync class. "
         # )
 
-    async def get_candles_advanced(
-        self, asset: str, period: int, offset: int, time: int
-    ) -> list[dict]:
+    async def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> list[dict]:
         """
         Retrieves historical candle data for an asset.
 
@@ -465,17 +462,11 @@ class PocketOptionAsync:
         """
         return AsyncSubscription(await self._subscribe_symbol_inner(asset))
 
-    async def subscribe_symbol_chuncked(
-        self, asset: str, chunck_size: int
-    ) -> AsyncSubscription:
+    async def subscribe_symbol_chuncked(self, asset: str, chunck_size: int) -> AsyncSubscription:
         """Returns an async iterator over the associated asset, it will return real time candles formed with the specified amount of raw candles and will return new candles while the 'PocketOptionAsync' class is loaded if the class is droped then the iterator will fail"""
-        return AsyncSubscription(
-            await self._subscribe_symbol_chuncked_inner(asset, chunck_size)
-        )
+        return AsyncSubscription(await self._subscribe_symbol_chuncked_inner(asset, chunck_size))
 
-    async def subscribe_symbol_timed(
-        self, asset: str, time: timedelta
-    ) -> AsyncSubscription:
+    async def subscribe_symbol_timed(self, asset: str, time: timedelta) -> AsyncSubscription:
         """
         Creates a timed real-time data subscription for an asset.
 
@@ -496,9 +487,7 @@ class PocketOptionAsync:
         """
         return AsyncSubscription(await self._subscribe_symbol_timed_inner(asset, time))
 
-    async def subscribe_symbol_time_aligned(
-        self, asset: str, time: timedelta
-    ) -> AsyncSubscription:
+    async def subscribe_symbol_time_aligned(self, asset: str, time: timedelta) -> AsyncSubscription:
         """
         Creates a time-aligned real-time data subscription for an asset.
 
@@ -517,9 +506,7 @@ class PocketOptionAsync:
                     print(f"Time-aligned update: {update}")
             ```
         """
-        return AsyncSubscription(
-            await self._subscribe_symbol_time_aligned_inner(asset, time)
-        )
+        return AsyncSubscription(await self._subscribe_symbol_time_aligned_inner(asset, time))
 
     async def get_server_time(self) -> int:
         """Returns the current server time as a UNIX timestamp"""
@@ -627,9 +614,7 @@ class PocketOptionAsync:
         """
         await self.client.unsubscribe(asset)
 
-    async def create_raw_handler(
-        self, validator: Validator, keep_alive: str | None = None
-    ) -> "RawHandler":
+    async def create_raw_handler(self, validator: Validator, keep_alive: str | None = None) -> "RawHandler":
         """
         Creates a raw handler for advanced WebSocket message handling.
 
@@ -655,9 +640,7 @@ class PocketOptionAsync:
                 print(message)
             ```
         """
-        rust_handler = await self.client.create_raw_handler(
-            validator.raw_validator, keep_alive
-        )
+        rust_handler = await self.client.create_raw_handler(validator.raw_validator, keep_alive)
         return RawHandler(rust_handler)
 
 

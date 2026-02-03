@@ -14,7 +14,9 @@ use binary_options_tools_core_pre::{
 };
 
 use crate::pocketoption::types::ServerTimeState;
-use crate::pocketoption::types::{Assets, Deal, Outgoing, PendingOrder, SubscriptionEvent, OpenOrder, Action};
+use crate::pocketoption::types::{
+    Action, Assets, Deal, OpenOrder, Outgoing, PendingOrder, SubscriptionEvent,
+};
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     ssid::Ssid,

@@ -1,6 +1,9 @@
 # Recursively ignore all target folders (Rust build artifacts)
 **/target/
 
+# Environment variables
+.env
+
 # Logs
 /examples/*.log
 *.log

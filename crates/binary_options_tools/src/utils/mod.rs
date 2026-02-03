@@ -14,7 +14,7 @@ static INIT: Once = Once::new();
 
 pub fn init_crypto_provider() {
     INIT.call_once(|| {
-        let _ = rustls::crypto::ring::default_provider().install_default();
+        rustls::crypto::ring::default_provider().install_default().ok();
     });
 }
 
@@ -38,7 +38,7 @@ pub fn init_crypto_provider() {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,ignore
 /// // Add as a lightweight handler to the client
 /// client.with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)));
 /// ```

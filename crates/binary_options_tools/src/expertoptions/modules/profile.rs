@@ -11,7 +11,7 @@ use binary_options_tools_core_pre::traits::{ApiModule, ReconnectCallback, Rule};
 use binary_options_tools_macros::ActionImpl;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tokio::select;
 use tracing::debug;
 

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use binary_options_tools_core_pre::error::CoreError;
 use binary_options_tools_core_pre::reimports::{
-    AsyncReceiver, AsyncSender, Message, bounded_async,
+    bounded_async, AsyncReceiver, AsyncSender, Message,
 };
 use binary_options_tools_core_pre::traits::{ApiModule, Rule};
 use tokio::select;

@@ -20,7 +20,7 @@ class LogSubscription:
         return self
 
     async def __anext__(self):
-        return json.loads(await anext(self.subscription))
+        return json.loads(await self.subscription.__anext__())
 
     def __iter__(self):
         return self
@@ -29,9 +29,7 @@ class LogSubscription:
         return json.loads(next(self.subscription))
 
 
-def start_logs(
-    path: str, level: str = "DEBUG", terminal: bool = True, layers: list = None
-):
+def start_logs(path: str, level: str = "DEBUG", terminal: bool = True, layers: list = None):
     """
     Initialize logging system for the application.
 
@@ -115,9 +113,7 @@ class LogBuilder:
     def __init__(self):
         self.builder = RustLogBuilder()
 
-    def create_logs_iterator(
-        self, level: str = "DEBUG", timeout: None | timedelta = None
-    ) -> LogSubscription:
+    def create_logs_iterator(self, level: str = "DEBUG", timeout: None | timedelta = None) -> LogSubscription:
         """
         Create a new logs iterator with the specified level and timeout.
 

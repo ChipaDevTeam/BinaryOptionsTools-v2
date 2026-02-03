@@ -42,9 +42,7 @@ class Config:
         if name.startswith("_") or not hasattr(self, "_locked") or not self._locked:
             super().__setattr__(name, value)
         else:
-            raise RuntimeError(
-                "Configuration is locked and cannot be modified after being used"
-            )
+            raise RuntimeError("Configuration is locked and cannot be modified after being used")
 
     @property
     def pyconfig(self) -> Any:
@@ -61,9 +59,7 @@ class Config:
     def _update_pyconfig(self):
         """Updates the internal PyConfig with current values"""
         if self._locked:
-            raise RuntimeError(
-                "Configuration is locked and cannot be modified after being used"
-            )
+            raise RuntimeError("Configuration is locked and cannot be modified after being used")
 
         if self._pyconfig is None:
             self._pyconfig = _get_pyconfig()()
@@ -71,9 +67,7 @@ class Config:
         self._pyconfig.max_allowed_loops = self.max_allowed_loops
         self._pyconfig.sleep_interval = self.sleep_interval
         self._pyconfig.reconnect_time = self.reconnect_time
-        self._pyconfig.connection_initialization_timeout_secs = (
-            self.connection_initialization_timeout_secs
-        )
+        self._pyconfig.connection_initialization_timeout_secs = self.connection_initialization_timeout_secs
         self._pyconfig.timeout_secs = self.timeout_secs
         self._pyconfig.urls = self.urls
 
@@ -88,9 +82,7 @@ class Config:
         Returns:
             Config instance
         """
-        return cls(
-            **{k: v for k, v in config_dict.items() if k in Config.__dataclass_fields__}
-        )
+        return cls(**{k: v for k, v in config_dict.items() if k in Config.__dataclass_fields__})
 
     @classmethod
     def from_json(cls, json_str: str) -> "Config":
@@ -138,9 +130,7 @@ class Config:
             config_dict: Dictionary containing new configuration values
         """
         if self._locked:
-            raise RuntimeError(
-                "Configuration is locked and cannot be modified after being used"
-            )
+            raise RuntimeError("Configuration is locked and cannot be modified after being used")
 
         for key, value in config_dict.items():
             if hasattr(self, key):

@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use binary_options_tools::{pocketoption::modules::raw::{
-    Outgoing as InnerOutgoing, RawHandler as InnerRawHandler,
-}, stream::Message};
 use crate::error::UniError;
 use binary_options_tools::error::BinaryOptionsError;
+use binary_options_tools::{
+    pocketoption::modules::raw::{Outgoing as InnerOutgoing, RawHandler as InnerRawHandler},
+    stream::Message,
+};
 
 /// Handler for advanced raw WebSocket message operations.
 ///

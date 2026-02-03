@@ -7,8 +7,8 @@ pub mod utils;
 pub use platforms::pocketoption::{
     client::PocketOption,
     raw_handler::RawHandler,
-    validator::Validator,
     types::{Action, Asset, Candle, Deal},
+    validator::Validator,
 };
 
 uniffi::setup_scaffolding!();

@@ -1,10 +1,10 @@
 use binary_options_tools_core_pre::connector::{ConnectorError, ConnectorResult};
 use binary_options_tools_core_pre::reimports::{
-    Connector, MaybeTlsStream, Request, WebSocketStream, connect_async_tls_with_config,
-    generate_key,
+    connect_async_tls_with_config, generate_key, Connector, MaybeTlsStream, Request,
+    WebSocketStream,
 };
 use chrono::{Duration, Utc};
-use rand::{Rng, rng};
+use rand::Rng;
 
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
@@ -22,9 +22,9 @@ const POCKET_OPTION_ORIGIN: &str = "https://pocketoption.com";
 const WEBSOCKET_VERSION: &str = "13";
 
 pub fn get_index() -> PocketResult<u64> {
-    let mut rng = rng();
-
-    let rand = rng.random_range(10..99);
+    let mut rng = rand::thread_rng();
+    
+    let rand = rng.gen_range(10..99);
     let time = (Utc::now() + Duration::hours(2)).timestamp();
     format!("{time}{rand}")
         .parse::<u64>()
@@ -73,8 +73,13 @@ pub async fn try_connect(
 ) -> ConnectorResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
     init_crypto_provider();
     let mut root_store = rustls::RootCertStore::empty();
-    let certs_result = rustls_native_certs::load_native_certs();
-    for cert in certs_result.certs {
+    let certs = rustls_native_certs::load_native_certs().certs;
+    if certs.is_empty() {
+        return Err(ConnectorError::Custom(
+            "Could not load any native certificates".to_string(),
+        ));
+    }
+    for cert in certs {
         root_store.add(cert).ok();
     }
     let tls_config = rustls::ClientConfig::builder()
