@@ -1,7 +1,7 @@
 import asyncio
 import json
 from datetime import timedelta
-from typing import Optional, Union, List, Dict
+from typing import Optional, Union, List, Dict, Tuple
 
 from ..config import Config
 from ..validator import Validator
@@ -216,7 +216,7 @@ class PocketOption:
     def __del__(self):
         self.loop.close()
 
-    def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> tuple[str, dict]:
+    def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
         Takes the asset, and amount to place a buy trade that will expire in time (in seconds).
         If check_win is True then the function will return a tuple containing the trade id and a dictionary containing the trade data and the result of the trade ("win", "draw", "loss)
@@ -224,7 +224,7 @@ class PocketOption:
         """
         return self.loop.run_until_complete(self._client.buy(asset, amount, time, check_win))
 
-    def sell(self, asset: str, amount: float, time: int, check_win: bool = False) -> tuple[str, dict]:
+    def sell(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
         Takes the asset, and amount to place a sell trade that will expire in time (in seconds).
         If check_win is True then the function will return a tuple containing the trade id and a dictionary containing the trade data and the result of the trade ("win", "draw", "loss)
@@ -236,7 +236,7 @@ class PocketOption:
         """Returns a dictionary containing the trade data and the result of the trade ("win", "draw", "loss)"""
         return self.loop.run_until_complete(self._client.check_win(id))
 
-    def get_candles(self, asset: str, period: int, offset: int) -> list[dict]:
+    def get_candles(self, asset: str, period: int, offset: int) -> List[Dict]:
         """
         Takes the asset you want to get the candles and return a list of raw candles in dictionary format
         Each candle contains:
@@ -248,7 +248,7 @@ class PocketOption:
         """
         return self.loop.run_until_complete(self._client.get_candles(asset, period, offset))
 
-    def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> list[dict]:
+    def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> List[Dict]:
         """
         Retrieves historical candle data for an asset.
 
@@ -259,7 +259,7 @@ class PocketOption:
             time (int): Time to fetch candles from
 
         Returns:
-            list[dict]: List of candles, each containing:
+            List[Dict]: List of candles, each containing:
                 - time: Candle timestamp
                 - open: Opening price
                 - high: Highest price
@@ -277,11 +277,11 @@ class PocketOption:
         "Returns the balance of the account"
         return self.loop.run_until_complete(self._client.balance())
 
-    def opened_deals(self) -> list[dict]:
+    def opened_deals(self) -> List[Dict]:
         "Returns a list of all the opened deals as dictionaries"
         return self.loop.run_until_complete(self._client.opened_deals())
 
-    def closed_deals(self) -> list[dict]:
+    def closed_deals(self) -> List[Dict]:
         "Returns a list of all the closed deals as dictionaries"
         return self.loop.run_until_complete(self._client.closed_deals())
 
@@ -293,7 +293,7 @@ class PocketOption:
         "Returns a dict of asset | payout for each asset, if 'asset' is not None then it will return the payout of the asset or a list of the payouts for each asset it was passed"
         return self.loop.run_until_complete(self._client.payout(asset))
 
-    def history(self, asset: str, period: int) -> list[dict]:
+    def history(self, asset: str, period: int) -> List[Dict]:
         "Returns a list of dictionaries containing the latest data available for the specified asset starting from 'period', the data is in the same format as the returned data of the 'get_candles' function."
         return self.loop.run_until_complete(self._client.history(asset, period))
 

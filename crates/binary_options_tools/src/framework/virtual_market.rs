@@ -1,22 +1,30 @@
-use std::collections::HashMap;
-use tokio::sync::Mutex;
-use async_trait::async_trait;
-use uuid::Uuid;
-use chrono::{Utc, DateTime};
-use crate::pocketoption::error::PocketResult;
-use crate::pocketoption::types::{Deal, Action};
 use crate::framework::market::Market;
+use crate::pocketoption::error::PocketResult;
+use crate::pocketoption::types::Deal;
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use uuid::Uuid;
 
-#[derive(Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct VirtualTrade {
-    pub id: Uuid,
-    pub asset: String,
-    pub action: Action,
-    pub amount: f64,
-    pub entry_price: f64,
-    pub entry_time: i64,
-    pub duration: u32,
-    pub payout_percent: i32,
+    id: Uuid,
+    asset: String,
+    action: Action,
+    amount: f64,
+    entry_price: f64,
+    entry_time: i64,
+    duration: u32,
+    payout_percent: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+enum Action {
+    Call,
+    Put,
 }
 
 pub struct VirtualMarket {
@@ -205,17 +213,16 @@ impl Market for VirtualMarket {
 
     async fn result(&self, trade_id: Uuid) -> PocketResult<Deal> {
         let trade = {
-            let open_trades = self.open_trades.lock().await;
+            let mut open_trades = self.open_trades.lock().await;
             open_trades
-                .get(&trade_id)
+                .remove(&trade_id)
                 .ok_or_else(|| {
                     crate::pocketoption::error::PocketError::General(format!(
                         "Trade {} not found",
                         trade_id
                     ))
                 })?
-                .clone() // Clone to drop the lock
-        }; // open_trades lock dropped here
+        };
 
         // Now acquire locks in correct order if needed, but we mainly need current_prices later.
         // The check for expiry depends on time, which is constant for the trade.
@@ -226,7 +233,9 @@ impl Market for VirtualMarket {
         let close_timestamp = DateTime::from_timestamp(expiry_time, 0).unwrap_or_default();
 
         if current_time < expiry_time {
-            // Trade still open
+            // Trade still open, re-insert
+            self.open_trades.lock().await.insert(trade_id, trade.clone());
+
             return Ok(Deal {
                 id: trade.id,
                 asset: trade.asset.clone(),
@@ -273,16 +282,22 @@ impl Market for VirtualMarket {
             .lock()
             .await
             .get(&trade.asset)
-            .unwrap_or(&trade.entry_price);
+            .ok_or_else(|| {
+                crate::pocketoption::error::PocketError::General(format!(
+                    "Price not found for asset: {}",
+                    trade.asset
+                ))
+            })?;
 
         let win = match trade.action {
             Action::Call => close_price > trade.entry_price,
             Action::Put => close_price < trade.entry_price,
         };
 
+        const EPSILON: f64 = 1e-9;
         let profit = if win {
             trade.amount * (1.0 + trade.payout_percent as f64 / 100.0)
-        } else if close_price == trade.entry_price {
+        } else if (close_price - trade.entry_price).abs() < EPSILON {
             trade.amount // Draw
         } else {
             0.0
@@ -292,8 +307,7 @@ impl Market for VirtualMarket {
             *balance += profit;
         }
 
-        // Finally remove from open_trades
-        self.open_trades.lock().await.remove(&trade_id);
+        // Trade is already removed from open_trades.
 
         let deal = Deal {
             id: trade.id,

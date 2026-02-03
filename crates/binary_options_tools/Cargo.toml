@@ -4,14 +4,14 @@ version = "0.1.9"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 description = "High-level library for binary options trading automation. Supports PocketOption and ExpertOption with real-time data streaming, WebSocket API access, and automated trading strategies."
-license-file = "../../LICENSE"
+license-file = "LICENSE"
 homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
 repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
 documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
 readme = "Readme.md"
 keywords = ["binary-options", "pocketoption", "trading", "expertoption", "automation"]
 categories = ["api-bindings", "asynchronous"]
-include = ["src/**/*", "data/**/*", "Cargo.toml", "Readme.md"]
+include = ["src/**/*", "data/**/*", "Cargo.toml", "Readme.md", "LICENSE"]
 
 [dependencies]
 anyhow = "1.0.98"
@@ -27,8 +27,8 @@ tokio = { version = "1.49.0", features = ["full"] }
 tokio-tungstenite = { version = "0.21.0", default-features = false, features = ["rustls-tls-webpki-roots", "connect", "handshake"] }
 url = "2.5.0"
 uuid = { version = "1.7.0", features = ["v4", "fast-rng", "serde"] }
-binary-options-tools-core-pre = { path = "../core-pre" }
-binary-options-tools-macros = { path = "../macros" }
+binary-options-tools-core-pre = { path = "../core-pre", version = "0.1.1" }
+binary-options-tools-macros = { path = "../macros", version = "0.1.4" }
 rand = "0.8.5"
 tracing = "0.1.40"
 rust_decimal = { version = "1.35.0", features = ["serde", "macros"] }
@@ -39,9 +39,6 @@ rustls-native-certs = "0.8.0"
 php_serde = "0.6.0"
 
 [dev-dependencies]
-dotenv = "0.15.0"
-serial_test = "3.0.0"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-tracing-test = "0.2"
 
 [workspace]

@@ -477,6 +477,14 @@ impl SubscriptionType {
         })
     }
 
+    pub fn period_secs(&self) -> Option<u32> {
+        match self {
+            SubscriptionType::Time { duration, .. } => Some(duration.as_secs() as u32),
+            SubscriptionType::TimeAligned { duration, .. } => Some(duration.as_secs() as u32),
+            _ => None,
+        }
+    }
+
     pub fn update(&mut self, new_candle: &BaseCandle) -> PocketResult<Option<BaseCandle>> {
         match self {
             SubscriptionType::None => Ok(Some(new_candle.clone())),
