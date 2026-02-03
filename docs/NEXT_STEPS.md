@@ -109,7 +109,7 @@ git push
 - Select source: `main` branch, `/docs` folder
 - Save
 
-1. **Access at:**
+2. **Access at:**
 
 ```
 https://chipadevteam.github.io/BinaryOptionsTools-v2/BinaryOptionsToolsUni/docs/API_REFERENCE.html

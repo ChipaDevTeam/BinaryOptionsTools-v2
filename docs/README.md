@@ -24,8 +24,8 @@ BinaryOptionsToolsUni provides native bindings for:
 ### Guides
 
 - **[Trading Guide](TRADING_GUIDE.md)** - Complete trading guide with strategies
-- **[Installation Guide](#installation)** - Language-specific installation
-- **[Examples](#examples)** - Code examples for each language
+- **[Installation Guide](../README.md#installation)** - Language-specific installation
+- **[Examples](../README.md#examples)** - Code examples for each language
 
 ---
 
@@ -147,7 +147,7 @@ Async do
 end
 ```
 
-### C #
+### C#
 
 ```bash
 dotnet add package BinaryOptionsToolsUni
@@ -253,7 +253,7 @@ try {
 
 ## 📂 Project Structure
 
-```
+```text
 BinaryOptionsToolsUni/
 ├── docs/                      # Documentation
 │   ├── README.md             # This file
@@ -518,7 +518,7 @@ cargo build --release
 
 ```bash
 # .env file
-POCKETOPTION_SSID=your_ssid_here
+POCKET_OPTION_SSID=your_ssid_here
 DEMO_MODE=true
 MAX_TRADE_SIZE=10.0
 ```
@@ -528,7 +528,7 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-ssid = os.getenv("POCKETOPTION_SSID")
+ssid = os.getenv("POCKET_OPTION_SSID")
 ```
 
 ---
