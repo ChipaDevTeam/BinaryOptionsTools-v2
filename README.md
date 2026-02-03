@@ -151,10 +151,9 @@ import os
 
 async def main():
     # Initialize client with SSID from environment variable
-    ssid = os.getenv("PO_SSID")
+    ssid = os.getenv("POCKET_OPTION_SSID")
     if not ssid:
-        raise ValueError("Please set PO_SSID environment variable")
-        
+        raise ValueError("Please set POCKET_OPTION_SSID environment variable")
     client = PocketOptionAsync(ssid=ssid)
     # Connection is established automatically during initialization
     
