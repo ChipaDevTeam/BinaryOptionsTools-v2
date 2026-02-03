@@ -24,7 +24,7 @@ async def main():
         # We need a valid-ish ssid or a way to mock the client entirely.
         # Since RawPocketOption.create calls the server, we might need a dummy mode.
         pass
-    except:
+    except Exception:
         pass
 
     # 3. Load historical data from a file
