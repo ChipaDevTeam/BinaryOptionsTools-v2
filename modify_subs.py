@@ -155,5 +155,6 @@ if start_line != -1 and end_line != -1:
     print("Successfully modified file")
 else:
     print("Failed to locate lines for history block replacement")
+    sys.exit(1)
     # debug
     # print(new_content[start_idx:start_idx500])
