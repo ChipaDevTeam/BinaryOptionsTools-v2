@@ -92,7 +92,7 @@ impl PyContext {
                 .map_err(BinaryErrorPy::from)?;
             let deal = serde_json::to_string(&res.1).map_err(BinaryErrorPy::from)?;
             let result = vec![res.0.to_string(), deal];
-            Python::attach(|py| Ok(result.into_bound_py_any(py)?.unbind()))
+            Ok(result)
         })
     }
 
