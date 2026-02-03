@@ -5,7 +5,6 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -56,6 +55,12 @@ impl VirtualMarket {
 #[async_trait]
 impl Market for VirtualMarket {
     async fn buy(&self, asset: &str, amount: f64, time: u32) -> PocketResult<(Uuid, Deal)> {
+        if !amount.is_finite() || amount <= 0.0 {
+            return Err(crate::pocketoption::error::PocketError::General(
+                "Amount must be a positive, finite number".into(),
+            ));
+        }
+
         // Acquire locks in order: balance -> current_prices -> payouts -> open_trades
         let mut balance = self.balance.lock().await;
         if *balance < amount {
@@ -132,6 +137,12 @@ impl Market for VirtualMarket {
     }
 
     async fn sell(&self, asset: &str, amount: f64, time: u32) -> PocketResult<(Uuid, Deal)> {
+        if !amount.is_finite() || amount <= 0.0 {
+            return Err(crate::pocketoption::error::PocketError::General(
+                "Amount must be a positive, finite number".into(),
+            ));
+        }
+
         // Acquire locks in order: balance -> current_prices -> payouts -> open_trades
         let mut balance = self.balance.lock().await;
         if *balance < amount {
@@ -212,30 +223,36 @@ impl Market for VirtualMarket {
     }
 
     async fn result(&self, trade_id: Uuid) -> PocketResult<Deal> {
-        let trade = {
+        let (trade, current_time, expiry_time) = {
             let mut open_trades = self.open_trades.lock().await;
-            open_trades
-                .remove(&trade_id)
+            let trade = open_trades
+                .get(&trade_id)
                 .ok_or_else(|| {
                     crate::pocketoption::error::PocketError::General(format!(
                         "Trade {} not found",
                         trade_id
                     ))
                 })?
+                .clone();
+
+            let current_time = Utc::now().timestamp();
+            let expiry_time = trade.entry_time + trade.duration as i64;
+
+            if current_time >= expiry_time {
+                open_trades.remove(&trade_id);
+            }
+
+            (trade, current_time, expiry_time)
         };
 
         // Now acquire locks in correct order if needed, but we mainly need current_prices later.
         // The check for expiry depends on time, which is constant for the trade.
 
-        let current_time = Utc::now().timestamp();
-        let expiry_time = trade.entry_time + trade.duration as i64;
         let entry_timestamp = DateTime::from_timestamp(trade.entry_time, 0).unwrap_or_default();
         let close_timestamp = DateTime::from_timestamp(expiry_time, 0).unwrap_or_default();
 
         if current_time < expiry_time {
-            // Trade still open, re-insert
-            self.open_trades.lock().await.insert(trade_id, trade.clone());
-
+            // Trade still open; leave it in open_trades
             return Ok(Deal {
                 id: trade.id,
                 asset: trade.asset.clone(),

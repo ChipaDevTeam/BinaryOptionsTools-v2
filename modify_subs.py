@@ -14,8 +14,8 @@ with open(file_path, "r") as f:
 # };
 # It handles whitespace variations.
 
-pattern_period = re.compile(r'let period = match sub_type \{\s+SubscriptionType::TimeAligned \{ duration, \.\. \} => duration\.as_secs\(\) as u32,\s+_ => 1,\s+\};', re.DOTALL)
-pattern_period2 = re.compile(r'let period = match sub_type \{\s+SubscriptionType::TimeAligned \{ duration, \.\. \} => \{\s+duration\.as_secs\(\) as u32\s+\}\s+_ => 1,\s+\};', re.DOTALL)
+pattern_period = re.compile(r'let period = match sub_type \{\sSubscriptionType::TimeAligned \{ duration, \.\. \} => duration\.as_secs\(\) as u32,\s_ => 1,\s\};', re.DOTALL)
+pattern_period2 = re.compile(r'let period = match sub_type \{\sSubscriptionType::TimeAligned \{ duration, \.\. \} => \{\sduration\.as_secs\(\) as u32\s\}\s_ => 1,\s\};', re.DOTALL)
 
 # Check occurrences
 matches = pattern_period.findall(content)
@@ -29,7 +29,7 @@ new_content = pattern_period2.sub('let period = sub_type.period_secs().unwrap_or
 # Replace History handling
 # We need to find the block handling ServerResponse::History
 
-history_pattern = re.compile(r'Ok\(ServerResponse::History\(data\)\) => \{.+?if let Some\(command_id\) = id \{.+?let symbol = data\.asset\.clone\(\);.+?let candles = if let Some\(candles\) = data\.candles \{.+?\}\s*else if let Some\(history\) = data\.history \{.+?\}\s*else \{.+?\};\s+if let Err\(e\) = self\.command_responder\.send\(CommandResponse::History \{.+?\}\)\.await \{.+?\}\s*\}\s*\}', re.DOTALL | re.MULTILINE)
+history_pattern = re.compile(r'Ok\(ServerResponse::History\(data\)\) => \{.?if let Some\(command_id\) = id \{.?let symbol = data\.asset\.clone\(\);.?let candles = if let Some\(candles\) = data\.candles \{.?\}\s*else if let Some\(history\) = data\.history \{.?\}\s*else \{.?\};\sif let Err\(e\) = self\.command_responder\.send\(CommandResponse::History \{.?\}\)\.await \{.?\}\s*\}\s*\}', re.DOTALL | re.MULTILINE)
 
 # I will construct the regex carefully or search for specific substring to replace.
 # The original code segment:
@@ -131,14 +131,12 @@ if start_line != -1:
     # Look for the end of the block
     for i in range(start_line, len(lines)):
         if 'warn!(target: "SubscriptionsApiModule", "Failed to send history response: {}", e);' in lines[i]:
-            # The block ends a few lines after this (closing braces)
-            if lines[i+1].strip() == "}" and lines[i+2].strip() == "}": # Approximate
-                 end_line = i + 2
-                 break
-            # Or maybe just i+1
-            if lines[i+1].strip() == "}":
-                 end_line = i + 1
-                 break
+            if i + 2 < len(lines) and lines[i+1].strip() == "}" and lines[i+2].strip() == "}":
+                end_line = i + 2
+                break
+            elif i + 1 < len(lines) and lines[i+1].strip() == "}":
+                end_line = i + 1
+                break
 
 if start_line != -1 and end_line != -1:
     print(f"Replacing lines {start_line} to {end_line}")
@@ -149,7 +147,7 @@ if start_line != -1 and end_line != -1:
     new_lines_str = new_history_block
 
     # Replace the lines
-    lines[start_line:end_line+1] = new_lines_str.split('\n')
+    lines[start_line:end_line1] = new_lines_str.split('\n')
 
     final_content = '\n'.join(lines)
     with open(file_path, "w") as f:
@@ -158,4 +156,4 @@ if start_line != -1 and end_line != -1:
 else:
     print("Failed to locate lines for history block replacement")
     # debug
-    # print(new_content[start_idx:start_idx+500])
+    # print(new_content[start_idx:start_idx500])

@@ -399,8 +399,9 @@ pub fn compile_candles_from_ticks(ticks: &[HistoryItem], period: u32, symbol: &s
                 current_candle = Some(candle);
             } else {
                 // New candle, push old one
-                if let Ok(c) = Candle::try_from((candle, symbol.to_string())) {
-                    candles.push(c);
+        match Candle::try_from((candle, symbol.to_string())) {
+            Ok(c) => candles.push(c),
+            Err(e) => warn!("Failed to convert final candle for {}: {}", symbol, e),
                 }
                 // Start new candle
                 current_boundary_idx = Some(boundary_idx);
@@ -428,8 +429,9 @@ pub fn compile_candles_from_ticks(ticks: &[HistoryItem], period: u32, symbol: &s
     }
 
     if let Some(candle) = current_candle {
-        if let Ok(c) = Candle::try_from((candle, symbol.to_string())) {
-            candles.push(c);
+        match Candle::try_from((candle, symbol.to_string())) {
+            Ok(c) => candles.push(c),
+            Err(e) => warn!("Failed to convert final candle for {}: {}", symbol, e),
         }
     }
 
