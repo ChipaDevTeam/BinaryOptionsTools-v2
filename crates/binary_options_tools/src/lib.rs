@@ -26,15 +26,14 @@
 //! // Apply timeouts to async operations
 //! ```
 pub mod config;
+pub mod error;
 pub mod expertoptions;
+pub mod framework;
 pub mod pocketoption;
-
 pub mod reimports;
 pub mod traits;
 pub mod utils;
 pub mod validator;
-
-pub mod error;
 pub mod stream {
     pub use binary_options_tools_core_pre::reimports::*;
     pub use binary_options_tools_core_pre::utils::stream::RecieverStream;

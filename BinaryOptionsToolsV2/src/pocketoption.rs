@@ -69,7 +69,7 @@ async fn send_raw_message_and_wait(
 #[pyclass]
 #[derive(Clone)]
 pub struct RawPocketOption {
-    client: PocketOption,
+    pub(crate) client: PocketOption,
 }
 
 #[pyclass]

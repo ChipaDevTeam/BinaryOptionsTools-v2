@@ -71,23 +71,31 @@ impl ReconnectCallback<State> for TradeReconciliationCallback {
     }
 }
 
-/// PocketOption client for interacting with the PocketOption trading platform.
-///
-/// This client provides methods for trading, checking balances, subscribing to
+use crate::framework::market::Market;
+
+#[async_trait::async_trait]
+impl Market for PocketOption {
+    async fn buy(&self, asset: &str, amount: f64, time: u32) -> PocketResult<(Uuid, Deal)> {
+        self.buy(asset, time, amount).await
+    }
+
+    async fn sell(&self, asset: &str, amount: f64, time: u32) -> PocketResult<(Uuid, Deal)> {
+        self.sell(asset, time, amount).await
+    }
+
+    async fn balance(&self) -> f64 {
+        self.balance().await
+    }
+
+    async fn result(&self, trade_id: Uuid) -> PocketResult<Deal> {
+        self.result(trade_id).await
+    }
+}
+
+/// A high-level client for interacting with PocketOption.
+/// It provides methods for executing trades, retrieving balance, subscribing to
 /// asset updates, and managing the connection to the PocketOption platform.
-///
-/// # Example
-/// ```no_run
-/// use binary_options_tools::pocketoption::PocketOption;
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let pocket_option = PocketOption::new("your_session_id").await?;
-///     let balance = pocket_option.balance().await;
-///     println!("Current balance: {}", balance);
-///     Ok(())
-/// }
-/// ```
+
 #[derive(Clone)]
 
 pub struct PocketOption {
@@ -277,6 +285,37 @@ impl PocketOption {
     pub fn is_demo(&self) -> bool {
         let state = &self.client.state;
         state.ssid.demo()
+    }
+
+    /// Subscribes to an asset's stream and prepends historical data.
+    ///
+    /// This is a QoL helper for bot developers who need to "warm up" their indicators.
+    pub async fn subscribe_with_history(
+        &self,
+        asset: impl Into<String>,
+        sub_type: SubscriptionType,
+    ) -> PocketResult<impl futures_util::Stream<Item = PocketResult<Candle>> + 'static> {
+        let asset_str = asset.into();
+        
+        // Determine the period for history based on subscription type
+        let period = match &sub_type {
+            SubscriptionType::Time { duration, .. } => duration.as_secs() as u32,
+            SubscriptionType::TimeAligned { duration, .. } => duration.as_secs() as u32,
+            _ => 60, // Default to 1 minute if not specified
+        };
+
+        // 1. Fetch history
+        let history = self.history(asset_str.clone(), period).await.unwrap_or_default();
+        
+        // 2. Subscribe to live stream
+        let subscription = self.subscribe(asset_str, sub_type).await?;
+        let live_stream = subscription.to_stream();
+
+        // 3. Chain history and live stream
+        use futures_util::stream::{iter, StreamExt};
+        let history_stream = iter(history.into_iter().map(Ok));
+        
+        Ok(history_stream.chain(live_stream))
     }
 
     /// Validates if an asset is active and supports the given timeframe without cloning the entire assets map.
