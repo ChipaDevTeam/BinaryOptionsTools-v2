@@ -147,8 +147,8 @@ if start_line != -1 and end_line != -1:
     new_lines_str = new_history_block
 
     # Replace the lines
-    lines[start_line:end_line1] = new_lines_str.split('\n')
-
+    end_line_inclusive = end_line + 1
+    lines[start_line:end_line_inclusive] = new_lines_str.split('\n')
     final_content = '\n'.join(lines)
     with open(file_path, "w") as f:
         f.write(final_content)
