@@ -6,7 +6,6 @@ use chrono::Utc;
 use crate::pocketoption::error::PocketResult;
 use crate::pocketoption::types::{Deal, Action};
 use crate::framework::market::Market;
-use serde_json::Value;
 
 struct VirtualTrade {
     pub id: Uuid,
