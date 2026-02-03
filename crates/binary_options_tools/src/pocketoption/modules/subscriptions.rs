@@ -149,10 +149,7 @@ impl ReconnectCallback<State> for SubscriptionCallback {
         // Send subscription messages concurrently
         let futures = subscriptions.into_iter().map(|(symbol, (_, sub_type))| {
             let ws_sender = ws_sender.clone();
-            let period = match sub_type {
-                SubscriptionType::TimeAligned { duration, .. } => duration.as_secs() as u32,
-                _ => 1,
-            };
+            let period = sub_type.period_secs().unwrap_or(1);
             async move { send_subscribe_message(&ws_sender, &symbol, period).await }
         });
 
@@ -425,12 +422,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                 continue;
                             } else {
                                 // Create stream channel
-                                let period = match sub_type {
-                                    SubscriptionType::TimeAligned { duration, .. } => {
-                                        duration.as_secs() as u32
-                                    }
-                                    _ => 1,
-                                };
+                                let period = sub_type.period_secs().unwrap_or(1);
                                 self.send_subscribe_message(&asset, period).await?;
                                 let (stream_sender, stream_receiver) =
                                     bounded_async(MAX_CHANNEL_CAPACITY);
@@ -531,22 +523,34 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                     });
                                     if let Some(command_id) = id {
                                         let symbol = data.asset.clone();
-                                        let candles = if let Some(candles) = data.candles {
+                                        let candles_res = if let Some(candles) = data.candles {
                                             candles.into_iter()
                                                 .map(|c| Candle::try_from((c, symbol.clone())))
                                                 .collect::<Result<Vec<_>, _>>()
-                                                .map_err(|e| CoreError::Other(e.to_string()))?
+                                                .map_err(|e| PocketError::General(e.to_string()))
                                         } else if let Some(history) = data.history {
-                                            compile_candles_from_ticks(&history, data.period, &symbol)
+                                            Ok(compile_candles_from_ticks(&history, data.period, &symbol))
                                         } else {
-                                            Vec::new()
+                                            Ok(Vec::new())
                                         };
 
-                                        if let Err(e) = self.command_responder.send(CommandResponse::History {
-                                            command_id,
-                                            data: candles
-                                        }).await {
-                                            warn!(target: "SubscriptionsApiModule", "Failed to send history response: {}", e);
+                                        match candles_res {
+                                            Ok(candles) => {
+                                                if let Err(e) = self.command_responder.send(CommandResponse::History {
+                                                    command_id,
+                                                    data: candles
+                                                }).await {
+                                                    warn!(target: "SubscriptionsApiModule", "Failed to send history response: {}", e);
+                                                }
+                                            }
+                                            Err(e) => {
+                                                if let Err(e) = self.command_responder.send(CommandResponse::HistoryFailed {
+                                                    command_id,
+                                                    error: Box::new(e)
+                                                }).await {
+                                                    warn!(target: "SubscriptionsApiModule", "Failed to send history failed response: {}", e);
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -663,10 +667,7 @@ impl SubscriptionsApiModule {
         // Resend connection messages to re-establish subscriptions
         let subscriptions = self.state.active_subscriptions.read().await.clone();
         for (symbol, (_, sub_type)) in subscriptions {
-            let period = match sub_type {
-                SubscriptionType::TimeAligned { duration, .. } => duration.as_secs() as u32,
-                _ => 1,
-            };
+            let period = sub_type.period_secs().unwrap_or(1);
             // Send subscription message for each active asset
             self.send_subscribe_message(&symbol, period).await?;
         }

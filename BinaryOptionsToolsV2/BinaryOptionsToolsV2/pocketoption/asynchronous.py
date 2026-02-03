@@ -2,7 +2,7 @@ import asyncio
 import json
 import sys
 from datetime import timedelta
-from typing import Optional, Union, List, Dict
+from typing import Optional, Union, List, Dict, Tuple
 
 from ..config import Config
 from ..validator import Validator
@@ -209,7 +209,7 @@ class PocketOptionAsync:
             self.client = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
         self.logger = Logger()
 
-    async def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> tuple[str, dict]:
+    async def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
         Places a buy (call) order for the specified asset.
 
@@ -220,7 +220,7 @@ class PocketOptionAsync:
             check_win (bool): If True, waits for trade result. Defaults to True.
 
         Returns:
-            tuple[str, dict]: Tuple containing (trade_id, trade_details)
+            Tuple[str, Dict]: Tuple containing (trade_id, trade_details)
             trade_details includes:
                 - asset: Trading asset
                 - amount: Trade amount
@@ -241,7 +241,7 @@ class PocketOptionAsync:
             trade = json.loads(trade)
             return trade_id, trade
 
-    async def sell(self, asset: str, amount: float, time: int, check_win: bool = False) -> tuple[str, dict]:
+    async def sell(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
         Places a sell (put) order for the specified asset.
 
@@ -252,7 +252,7 @@ class PocketOptionAsync:
             check_win (bool): If True, waits for trade result. Defaults to True.
 
         Returns:
-            tuple[str, dict]: Tuple containing (trade_id, trade_details)
+            Tuple[str, Dict]: Tuple containing (trade_id, trade_details)
             trade_details includes:
                 - asset: Trading asset
                 - amount: Trade amount
@@ -319,7 +319,7 @@ class PocketOptionAsync:
 
         return await _timeout(check(id), duration)
 
-    async def get_candles(self, asset: str, period: int, offset: int) -> list[dict]:
+    async def get_candles(self, asset: str, period: int, offset: int) -> List[Dict]:
         """
         Retrieves historical candle data for an asset.
 
@@ -329,7 +329,7 @@ class PocketOptionAsync:
             period (int): Historical period in seconds to fetch
 
         Returns:
-            list[dict]: List of candles, each containing:
+            List[Dict]: List of candles, each containing:
                 - time: Candle timestamp
                 - open: Opening price
                 - high: Highest price
@@ -346,7 +346,7 @@ class PocketOptionAsync:
         #     "The get_candles method is not implemented in the PocketOptionAsync class. "
         # )
 
-    async def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> list[dict]:
+    async def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> List[Dict]:
         """
         Retrieves historical candle data for an asset.
 
@@ -357,7 +357,7 @@ class PocketOptionAsync:
             time (int): Time to fetch candles from
 
         Returns:
-            list[dict]: List of candles, each containing:
+            List[Dict]: List of candles, each containing:
                 - time: Candle timestamp
                 - open: Opening price
                 - high: Highest price
@@ -386,14 +386,14 @@ class PocketOptionAsync:
         """
         return await self.client.balance()
 
-    async def opened_deals(self) -> list[dict]:
+    async def opened_deals(self) -> List[Dict]:
         "Returns a list of all the opened deals as dictionaries"
         return json.loads(await self.client.opened_deals())
         # raise NotImplementedError(
         #     "The opened_deals method is not implemented in the PocketOptionAsync class. "
         # )
 
-    async def closed_deals(self) -> list[dict]:
+    async def closed_deals(self) -> List[Dict]:
         "Returns a list of all the closed deals as dictionaries"
         return json.loads(await self.client.closed_deals())
         # raise NotImplementedError(
@@ -428,7 +428,7 @@ class PocketOptionAsync:
             return [payout.get(ast) for ast in asset]
         return payout
 
-    async def history(self, asset: str, period: int) -> list[dict]:
+    async def history(self, asset: str, period: int) -> List[Dict]:
         "Returns a list of dictionaries containing the latest data available for the specified asset starting from 'period', the data is in the same format as the returned data of the 'get_candles' function."
         return json.loads(await self.client.history(asset, period))
 

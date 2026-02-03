@@ -67,7 +67,7 @@ impl Strategy for StrategyWrapper {
     }
 
     async fn on_candle(&self, ctx: &Context, asset: &str, candle: &Candle) -> PocketResult<()> {
-        let candle_json = serde_json::to_string(candle).unwrap_or_default();
+        let candle_json = serde_json::to_string(candle).map_err(|e| binary_options_tools::pocketoption::error::PocketError::General(e.to_string()))?;
         let asset = asset.to_string();
         let inner = Python::attach(|py| self.inner.clone_ref(py));
         let client = ctx.client.clone();

@@ -47,13 +47,15 @@ DOTENV_TEMPLATE = """POCKET_OPTION_SSID=your_ssid_here
 def init_project(name):
     if os.path.exists(name):
         print(f"Error: Directory {name} already exists.")
-        return
+        sys.exit(1)
 
     os.makedirs(name)
     with open(os.path.join(name, "bot.py"), "w") as f:
         f.write(TEMPLATE)
 
-    with open(os.path.join(name, ".env"), "w") as f:
+    env_path = os.path.join(name, ".env")
+    fd = os.open(env_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
         f.write(DOTENV_TEMPLATE)
 
     print(f"Project {name} initialized successfully!")
