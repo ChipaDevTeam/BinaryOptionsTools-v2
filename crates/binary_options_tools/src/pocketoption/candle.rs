@@ -315,7 +315,7 @@ impl Candle {
 }
 
 /// Represents the type of subscription for candle data.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum SubscriptionType {
     None,
     Chunk {

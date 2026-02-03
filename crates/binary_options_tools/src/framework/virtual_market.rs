@@ -2,11 +2,12 @@ use std::collections::HashMap;
 use tokio::sync::Mutex;
 use async_trait::async_trait;
 use uuid::Uuid;
-use chrono::Utc;
+use chrono::{Utc, DateTime};
 use crate::pocketoption::error::PocketResult;
 use crate::pocketoption::types::{Deal, Action};
 use crate::framework::market::Market;
 
+#[derive(Clone)]
 struct VirtualTrade {
     pub id: Uuid,
     pub asset: String,
