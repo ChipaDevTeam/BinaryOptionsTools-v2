@@ -35,8 +35,12 @@ pub async fn get_user_location(ip_address: &str) -> PocketResult<(f64, f64)> {
     let response = reqwest::get(format!("{IP_API_URL}{ip_address}")).await?;
     let json: Value = response.json().await?;
 
-    let lat = json["lat"].as_f64().unwrap();
-    let lon = json["lon"].as_f64().unwrap();
+    let lat = json["lat"]
+        .as_f64()
+        .ok_or_else(|| PocketError::General("Missing latitude in IP API response".into()))?;
+    let lon = json["lon"]
+        .as_f64()
+        .ok_or_else(|| PocketError::General("Missing longitude in IP API response".into()))?;
 
     Ok((lat, lon))
 }

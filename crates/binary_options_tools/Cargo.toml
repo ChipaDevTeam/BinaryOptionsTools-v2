@@ -2,6 +2,15 @@
 name = "binary_options_tools"
 version = "0.1.9"
 edition = "2021"
+authors = ["ChipaDevTeam"]
+description = "High-level library for binary options trading automation. Supports PocketOption and ExpertOption with real-time data streaming, WebSocket API access, and automated trading strategies."
+license-file = "../../LICENSE"
+homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+readme = "Readme.md"
+keywords = ["binary-options", "pocketoption", "trading", "expertoption", "automation"]
+categories = ["api-bindings", "asynchronous"]
 
 [dependencies]
 anyhow = "1.0.98"

@@ -168,9 +168,114 @@ impl Market for VirtualMarket {
         *self.balance.lock().await
     }
 
-    async fn result(&self, _trade_id: Uuid) -> PocketResult<Deal> {
-        // This is tricky because we need to know the price at expiry.
-        // For a simple paper trader, we might need a background task that checks expiry.
-        Err(crate::pocketoption::error::PocketError::General("Not implemented for virtual market yet".into()))
+    async fn result(&self, trade_id: Uuid) -> PocketResult<Deal> {
+        let mut open_trades = self.open_trades.lock().await;
+        let trade = open_trades.get(&trade_id).ok_or_else(|| {
+            crate::pocketoption::error::PocketError::General(format!("Trade {} not found", trade_id))
+        })?;
+
+        let current_time = Utc::now().timestamp();
+        let expiry_time = trade.entry_time + trade.duration as i64;
+
+        if current_time < expiry_time {
+            // Trade still open
+            return Ok(Deal {
+                id: trade.id,
+                asset: trade.asset.clone(),
+                amount: trade.amount,
+                open_price: trade.entry_price,
+                close_price: 0.0,
+                open_timestamp: Utc::now(), // Simplified
+                close_timestamp: Utc::now() + chrono::Duration::seconds(trade.duration as i64),
+                profit: 0.0,
+                percent_profit: trade.payout_percent,
+                percent_loss: 100,
+                command: match trade.action {
+                    Action::Call => 0,
+                    Action::Put => 1,
+                },
+                uid: 0,
+                request_id: Some(trade.id),
+                open_time: Utc::now().to_rfc3339(),
+                close_time: (Utc::now() + chrono::Duration::seconds(trade.duration as i64)).to_rfc3339(),
+                refund_time: None,
+                refund_timestamp: None,
+                is_demo: 1,
+                copy_ticket: "".to_string(),
+                open_ms: 0,
+                close_ms: None,
+                option_type: 100,
+                is_rollover: None,
+                is_copy_signal: None,
+                is_ai: None,
+                currency: "USD".to_string(),
+                amount_usd: Some(trade.amount),
+                amount_usd2: Some(trade.amount),
+            });
+        }
+
+        // Trade closed
+        let close_price = *self
+            .current_prices
+            .lock()
+            .await
+            .get(&trade.asset)
+            .unwrap_or(&trade.entry_price);
+
+        let win = match trade.action {
+            Action::Call => close_price > trade.entry_price,
+            Action::Put => close_price < trade.entry_price,
+        };
+
+        let profit = if win {
+            trade.amount * (1.0 + trade.payout_percent as f64 / 100.0)
+        } else if close_price == trade.entry_price {
+            trade.amount // Draw
+        } else {
+            0.0
+        };
+
+        if profit > 0.0 {
+            let mut balance = self.balance.lock().await;
+            *balance += profit;
+        }
+
+        let deal = Deal {
+            id: trade.id,
+            asset: trade.asset.clone(),
+            amount: trade.amount,
+            open_price: trade.entry_price,
+            close_price,
+            open_timestamp: Utc::now(), // Should use entry_time
+            close_timestamp: Utc::now(), // Should use expiry_time
+            profit,
+            percent_profit: trade.payout_percent,
+            percent_loss: 100,
+            command: match trade.action {
+                Action::Call => 0,
+                Action::Put => 1,
+            },
+            uid: 0,
+            request_id: Some(trade.id),
+            open_time: Utc::now().to_rfc3339(),
+            close_time: Utc::now().to_rfc3339(),
+            refund_time: None,
+            refund_timestamp: None,
+            is_demo: 1,
+            copy_ticket: "".to_string(),
+            open_ms: 0,
+            close_ms: None,
+            option_type: 100,
+            is_rollover: None,
+            is_copy_signal: None,
+            is_ai: None,
+            currency: "USD".to_string(),
+            amount_usd: Some(trade.amount),
+            amount_usd2: Some(trade.amount),
+        };
+
+        open_trades.remove(&trade_id);
+
+        Ok(deal)
     }
 }

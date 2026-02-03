@@ -41,13 +41,12 @@ impl Strategy for StrategyWrapper {
                 client: Some(ctx.client.clone()),
                 market: ctx.market.clone(),
             };
-            let _ = self
-                .inner
+            self.inner
                 .call_method1(py, "on_start", (py_ctx,))
                 .map_err(|e| {
-                    eprintln!("Error in Python on_start: {:?}", e);
-                });
-        });
+                    binary_options_tools::pocketoption::error::PocketError::General(format!("Python on_start error: {}", e))
+                })
+        }).map(|_| ())?;
         Ok(())
     }
 
@@ -59,13 +58,12 @@ impl Strategy for StrategyWrapper {
                 client: Some(ctx.client.clone()),
                 market: ctx.market.clone(),
             };
-            let _ = self
-                .inner
+            self.inner
                 .call_method1(py, "on_candle", (py_ctx, asset, candle_json))
                 .map_err(|e| {
-                    eprintln!("Error in Python on_candle: {:?}", e);
-                });
-        });
+                    binary_options_tools::pocketoption::error::PocketError::General(format!("Python on_candle error: {}", e))
+                })
+        }).map(|_| ())?;
         Ok(())
     }
 }
@@ -154,16 +152,16 @@ impl PyBot {
         Self { inner: Some(bot) }
     }
 
-    pub fn add_asset(&mut self, asset: String, period: u32) {
+    pub fn add_asset(&mut self, asset: String, period: u32) -> PyResult<()> {
         if let Some(bot) = &mut self.inner {
-            bot.add_asset(
-                asset,
-                binary_options_tools::pocketoption::candle::SubscriptionType::time_aligned(
-                    std::time::Duration::from_secs(period as u64),
-                )
-                .unwrap(),
-            );
+            let subscription = binary_options_tools::pocketoption::candle::SubscriptionType::time_aligned(
+                std::time::Duration::from_secs(period as u64),
+            )
+            .map_err(BinaryErrorPy::from)?;
+            
+            bot.add_asset(asset, subscription);
         }
+        Ok(())
     }
 
     pub fn run<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
