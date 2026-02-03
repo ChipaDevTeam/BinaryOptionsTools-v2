@@ -14,6 +14,7 @@ load_dotenv()
 
 console = Console()
 
+
 class DashboardStrategy(PyStrategy):
     def __init__(self):
         super().__init__()
@@ -27,7 +28,7 @@ class DashboardStrategy(PyStrategy):
     def on_candle(self, ctx, asset, candle_json):
         candle = json.loads(candle_json)
         self.last_candles[asset] = candle
-        
+
         # Random simulation of balance check
         asyncio.create_task(self.update_balance(ctx))
 
@@ -39,12 +40,9 @@ class DashboardStrategy(PyStrategy):
         layout.split_column(
             Layout(name="header", size=3),
             Layout(name="main"),
-            Layout(name="footer", size=3)
+            Layout(name="footer", size=3),
         )
-        layout["main"].split_row(
-            Layout(name="market"),
-            Layout(name="trades")
-        )
+        layout["main"].split_row(Layout(name="market"), Layout(name="trades"))
         return layout
 
     def generate_table(self):
@@ -61,13 +59,14 @@ class DashboardStrategy(PyStrategy):
                 f"{candle['close']:.5f}",
                 f"{candle['high']:.5f}",
                 f"{candle['low']:.5f}",
-                datetime.fromtimestamp(candle['timestamp']).strftime("%H:%M:%S")
+                datetime.fromtimestamp(candle["timestamp"]).strftime("%H:%M:%S"),
             )
         return table
 
+
 async def main():
     # start_tracing("warn") # Keep tracing quiet for dashboard
-    
+
     ssid = os.getenv("POCKET_OPTION_SSID")
     if not ssid:
         print("Set POCKET_OPTION_SSID in .env")
@@ -80,21 +79,30 @@ async def main():
     bot.add_asset("GBPUSD_otc", 60)
 
     layout = strategy.make_layout()
-    
+
     with Live(layout, refresh_per_second=4, screen=True):
-        layout["header"].update(Panel(f"BinaryOptionsTools Bot Dashboard | Balance: ${strategy.balance:.2f}"))
+        layout["header"].update(
+            Panel(
+                f"BinaryOptionsTools Bot Dashboard | Balance: ${strategy.balance:.2f}"
+            )
+        )
         layout["footer"].update(Panel("Press Ctrl+C to exit"))
-        
+
         # Start bot in background
         bot_task = asyncio.create_task(bot.run())
-        
+
         try:
             while True:
                 layout["main"]["market"].update(strategy.generate_table())
-                layout["header"].update(Panel(f"BinaryOptionsTools Bot Dashboard | Balance: ${strategy.balance:.2f} | Uptime: {datetime.now() - strategy.start_time}"))
+                layout["header"].update(
+                    Panel(
+                        f"BinaryOptionsTools Bot Dashboard | Balance: ${strategy.balance:.2f} | Uptime: {datetime.now() - strategy.start_time}"
+                    )
+                )
                 await asyncio.sleep(0.5)
         except asyncio.CancelledError:
             pass
+
 
 if __name__ == "__main__":
     try:

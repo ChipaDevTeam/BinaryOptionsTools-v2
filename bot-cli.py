@@ -42,6 +42,7 @@ if __name__ == "__main__":
 DOTENV_TEMPLATE = """POCKET_OPTION_SSID=your_ssid_here
 """
 
+
 def init_project(name):
     if os.path.exists(name):
         print(f"Error: Directory {name} already exists.")
@@ -50,15 +51,16 @@ def init_project(name):
     os.makedirs(name)
     with open(os.path.join(name, "bot.py"), "w") as f:
         f.write(TEMPLATE)
-    
+
     with open(os.path.join(name, ".env"), "w") as f:
         f.write(DOTENV_TEMPLATE)
-    
+
     print(f"Project {name} initialized successfully!")
     print(f"Next steps:")
     print(f"  1. cd {name}")
     print(f"  2. Edit .env and add your POCKET_OPTION_SSID")
     print(f"  3. Run your bot: python bot.py")
+
 
 def main():
     parser = argparse.ArgumentParser(description="BinaryOptionsTools Bot CLI")
@@ -73,6 +75,7 @@ def main():
         init_project(args.name)
     else:
         parser.print_help()
+
 
 if __name__ == "__main__":
     main()
