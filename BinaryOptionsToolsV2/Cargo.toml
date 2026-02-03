@@ -40,4 +40,4 @@ url = "2.5.7"
 regex = "1.12.2"
 async-stream = "0.3.6"
 async-trait = "0.1.86"
-tungstenite = "0.28.0"
+tungstenite = { version = "0.28.0", default-features = false, features = ["rustls", "handshake"] }
