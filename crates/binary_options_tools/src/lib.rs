@@ -25,16 +25,15 @@
 //! // Serialize and deserialize data with the provided macros
 //! // Apply timeouts to async operations
 //! ```
-pub mod expertoptions;
-pub mod pocketoption;
 pub mod config;
-
+pub mod error;
+pub mod expertoptions;
+pub mod framework;
+pub mod pocketoption;
 pub mod reimports;
 pub mod traits;
 pub mod utils;
 pub mod validator;
-
-pub mod error;
 pub mod stream {
     pub use binary_options_tools_core_pre::reimports::*;
     pub use binary_options_tools_core_pre::utils::stream::RecieverStream;
@@ -54,7 +53,6 @@ mod tests {
     struct Test {
         name: String,
     }
-    use tracing_test::traced_test; // Add this import.
 
     #[test]
     fn test_deserialize_macro() {
@@ -69,8 +67,8 @@ mod tests {
     struct Tester;
 
     #[tokio::test]
-    #[traced_test]
     async fn test_timeout_macro() -> anyhow::Result<()> {
+        let _ = tracing_subscriber::fmt::try_init();
         #[timeout(1, tracing(level = "info", skip(_tester)))]
         async fn this_is_a_test(_tester: Tester) -> anyhow::Result<()> {
             debug!("Test");

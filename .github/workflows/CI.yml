@@ -78,10 +78,10 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
-          pip install pytest
+          pip install pytest pytest-asyncio
           mkdir test_run
           cd test_run
-          pytest ../tests
+          pytest ../../tests
       - name: pytest
         if: ${{ !startsWith(matrix.platform.target, 'x86') && matrix.platform.target != 'ppc64' }}
         uses: uraimo/run-on-arch-action@v2
@@ -92,14 +92,14 @@ jobs:
           install: |
             apt-get update
             apt-get install -y --no-install-recommends python3 python3-pip
-            pip3 install -U pip pytest
+            pip3 install -U pip pytest pytest-asyncio
           run: |
             set -e
             cd BinaryOptionsToolsV2
             pip3 install BinaryOptionsToolsV2 --find-links dist --force-reinstall
             mkdir test_run
             cd test_run
-            pytest ../tests
+            pytest ../../tests
 
   musllinux:
     runs-on: ${{ matrix.platform.runner }}
@@ -164,10 +164,10 @@ jobs:
             python3 -m virtualenv .venv
             source .venv/bin/activate
             pip install BinaryOptionsToolsV2 --no-index --find-links dist --force-reinstall
-            pip install pytest
+            pip install pytest pytest-asyncio
             mkdir test_run
             cd test_run
-            pytest ../tests
+            pytest ../../tests
       - name: pytest
         if: ${{ !startsWith(matrix.platform.target, 'x86') }}
         uses: uraimo/run-on-arch-action@v2
@@ -182,11 +182,11 @@ jobs:
             cd BinaryOptionsToolsV2
             python3 -m virtualenv .venv
             source .venv/bin/activate
-            pip install pytest
+            pip install pytest pytest-asyncio
             pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
             mkdir test_run
             cd test_run
-            pytest ../tests
+            pytest ../../tests
 
   windows:
     runs-on: ${{ matrix.platform.runner }}
@@ -214,13 +214,13 @@ jobs:
           working-directory: BinaryOptionsToolsV2
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.13t
+          python-version: 3.13
           architecture: ${{ matrix.platform.target }}
-      - name: Build free-threaded wheels
+      - name: Build wheels (3.13)
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.13t
+          args: --release --out dist -i python3.13
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           working-directory: BinaryOptionsToolsV2
       - name: Upload wheels
@@ -237,10 +237,10 @@ jobs:
           python3 -m venv .venv
           source .venv/Scripts/activate
           pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
-          pip install pytest
+          pip install pytest pytest-asyncio
           mkdir test_run
           cd test_run
-          pytest ../tests
+          pytest ../../tests
 
   macos:
     runs-on: ${{ matrix.platform.runner }}
@@ -282,84 +282,10 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
-          pip install pytest
+          pip install pytest pytest-asyncio
           mkdir test_run
           cd test_run
-          pytest ../tests
-
-  # emscripten:
-  #   runs-on: ubuntu-22.04
-  #   timeout-minutes: 60
-  #   strategy:
-  #     fail-fast: false
-  #   steps:
-  #     - uses: actions/checkout@v4
-
-  #     - name: Set up Python for Pyodide tools
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: '3.12'
-
-  #     - name: Get Emscripten and Python version info
-  #       shell: bash
-  #       run: |
-  #         pip install pyodide-build
-  #         echo "EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version)" >> $GITHUB_ENV
-  #         echo "PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2)" >> $GITHUB_ENV
-  #         pip uninstall -y pyodide-build
-
-  #     - name: Setup Emscripten
-  #       uses: mymindstorm/setup-emsdk@v14
-  #       with:
-  #         version: ${{ env.EMSCRIPTEN_VERSION }}
-  #         cache-key: emscripten-${{ runner.os }}-${{ env.EMSCRIPTEN_VERSION }}-${{ github.ref_name }}
-
-  #     - name: Setup Python for Build
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: ${{ env.PYTHON_VERSION }}
-
-  #     - name: Build wheels
-  #       uses: PyO3/maturin-action@v1
-  #       with:
-  #         target: wasm32-unknown-emscripten
-  #         args: --release --out dist
-  #         sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-  #         rust-toolchain: nightly
-  #         working-directory: BinaryOptionsToolsV2
-
-  #     - name: Build free-threaded wheels
-  #       uses: PyO3/maturin-action@v1
-  #       with:
-  #         target: wasm32-unknown-emscripten
-  #         args: --release --out dist -i python3.13t
-  #         sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-  #         rust-toolchain: nightly
-  #         working-directory: BinaryOptionsToolsV2
-
-  #     - name: Upload wheels
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: wasm-wheels
-  #         path: BinaryOptionsToolsV2/dist
-
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: '20'
-
-  #     - name: pytest
-  #       working-directory: BinaryOptionsToolsV2
-  #       run: |
-  #         set -e
-  #         pip install pyodide-build
-  #         pyodide venv .venv
-  #         source .venv/bin/activate
-  #         pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
-  #         pip install pytest
-  #         mkdir test_run
-  #         cd test_run
-  #         python -m pytest ../tests
-
+          pytest ../../tests
   sdist:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -401,16 +327,6 @@ jobs:
           uses: actions/attest-build-provenance@v2
           with:
             subject-path: 'wheels/wheels-*/*'
-        
-        # commented for six's fork
-        # - name: Publish to PyPI
-        #   if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        #   uses: PyO3/maturin-action@v1
-        #   env:
-        #     MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        #   with:
-        #     command: upload
-        #     args: --non-interactive --skip-existing wheels/wheels-*/*
   
         - name: Create GitHub Release
           if: ${{ startsWith(github.ref, 'refs/tags/') }}

@@ -1,5 +1,4 @@
 import importlib
-import sys
 
 # Import the Rust module and re-export its attributes
 try:
@@ -12,12 +11,10 @@ except (ImportError, ValueError):
         _rust_module = None
 
 if _rust_module:
-    globals().update(
-        {k: v for k, v in _rust_module.__dict__.items() if not k.startswith("_")}
-    )
+    globals().update({k: v for k, v in _rust_module.__dict__.items() if not k.startswith("_")})
 
 from . import tracing, validator
-from .pocketoption import *
+from .pocketoption import *  # noqa: F403
 
 __core_all__ = getattr(_rust_module, "__all__", []) if _rust_module else []
 from .pocketoption import __all__ as __pocket_all__

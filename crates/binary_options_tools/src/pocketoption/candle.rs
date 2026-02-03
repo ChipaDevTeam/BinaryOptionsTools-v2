@@ -2,8 +2,9 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use rust_decimal::{
-    Decimal, dec,
+    dec,
     prelude::{FromPrimitive, ToPrimitive},
+    Decimal,
 };
 use serde::{Deserialize, Serialize};
 use tracing::warn;
@@ -38,16 +39,93 @@ pub struct Candle {
     // pub is_closed: bool,
 }
 
-#[derive(Debug, Default, Clone, Deserialize)]
+#[derive(Debug, Default, Clone)]
+/// Base candle structure matching the server's data format.
+///
+/// The field order matches the server's JSON array format: `[timestamp, open, close, high, low]`.
+///
+/// # Example JSON
+/// ```json
+/// [1754529180, 0.92124, 0.92155, 0.92162, 0.92124]
+/// ```
 pub struct BaseCandle {
     pub timestamp: f64,
     pub open: f64,
     pub close: f64,
-    pub low: f64,
     pub high: f64,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub low: f64,
     pub volume: Option<f64>,
 }
+
+impl<'de> Deserialize<'de> for BaseCandle {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct BaseCandleVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for BaseCandleVisitor {
+            type Value = BaseCandle;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a sequence of 5 or 6 floats")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let timestamp = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
+                let open = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
+                let close = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(2, &self))?;
+                let high = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(3, &self))?;
+                let low = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(4, &self))?;
+                let volume: Option<Option<f64>> = seq.next_element()?;
+                let volume = volume.flatten();
+
+                Ok(BaseCandle {
+                    timestamp,
+                    open,
+                    close,
+                    high,
+                    low,
+                    volume,
+                })
+            }
+        }
+
+        deserializer.deserialize_seq(BaseCandleVisitor)
+    }
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum HistoryItem {
+    Tick([f64; 2]),                                    // [timestamp, price]
+    TickWithNull([f64; 2], Option<serde_json::Value>), // [timestamp, price, null]
+}
+
+impl HistoryItem {
+    pub fn to_tick(&self) -> (f64, f64) {
+        match self {
+            HistoryItem::Tick([t, p]) => (*t, *p),
+            HistoryItem::TickWithNull([t, p], _) => (*t, *p),
+        }
+    }
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
+pub struct CandleItem(pub f64, pub f64, pub f64, pub f64, pub f64, pub f64); // timestamp, open, close, high, low, volume
 
 impl Candle {
     /// Create a new candle with initial price
@@ -237,7 +315,7 @@ impl Candle {
 }
 
 /// Represents the type of subscription for candle data.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum SubscriptionType {
     None,
     Chunk {
@@ -282,6 +360,84 @@ impl BaseCandle {
     }
 }
 
+/// Compiles raw tick data into candles based on the specified period.
+///
+/// # Arguments
+/// * `ticks` - Slice of history items (ticks)
+/// * `period` - Time period in seconds for each candle. Must be greater than 0.
+/// * `symbol` - Trading symbol
+///
+/// # Returns
+/// Vector of compiled Candles. Returns an empty vector if:
+/// * `ticks` is empty
+/// * `period` is 0 (to avoid division by zero)
+pub fn compile_candles_from_ticks(ticks: &[HistoryItem], period: u32, symbol: &str) -> Vec<Candle> {
+    if ticks.is_empty() || period == 0 {
+        return Vec::new();
+    }
+
+    let mut candles = Vec::new();
+    let period_secs = period as f64;
+
+    // Sort ticks by timestamp just in case
+    let mut sorted_ticks: Vec<(f64, f64)> = ticks.iter().map(|t| t.to_tick()).collect();
+    sorted_ticks.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut current_candle: Option<BaseCandle> = None;
+    let mut current_boundary_idx: Option<u64> = None;
+
+    for (timestamp, price) in sorted_ticks {
+        let boundary_idx = (timestamp / period_secs).floor() as u64;
+        let boundary = boundary_idx as f64 * period_secs;
+
+        if let Some(mut candle) = current_candle.take() {
+            if Some(boundary_idx) == current_boundary_idx {
+                // Same candle
+                candle.high = candle.high.max(price);
+                candle.low = candle.low.min(price);
+                candle.close = price;
+                current_candle = Some(candle);
+            } else {
+                // New candle, push old one
+        match Candle::try_from((candle, symbol.to_string())) {
+            Ok(c) => candles.push(c),
+            Err(e) => warn!("Failed to convert final candle for {}: {}", symbol, e),
+                }
+                // Start new candle
+                current_boundary_idx = Some(boundary_idx);
+                current_candle = Some(BaseCandle {
+                    timestamp: boundary,
+                    open: price,
+                    high: price,
+                    low: price,
+                    close: price,
+                    volume: None,
+                });
+            }
+        } else {
+            // First tick
+            current_boundary_idx = Some(boundary_idx);
+            current_candle = Some(BaseCandle {
+                timestamp: boundary,
+                open: price,
+                high: price,
+                low: price,
+                close: price,
+                volume: None,
+            });
+        }
+    }
+
+    if let Some(candle) = current_candle {
+        match Candle::try_from((candle, symbol.to_string())) {
+            Ok(c) => candles.push(c),
+            Err(e) => warn!("Failed to convert final candle for {}: {}", symbol, e),
+        }
+    }
+
+    candles
+}
+
 impl SubscriptionType {
     pub fn none() -> Self {
         SubscriptionType::None
@@ -303,6 +459,9 @@ impl SubscriptionType {
         }
     }
 
+    /// Creates a time-aligned subscription.
+    ///
+    /// Completed candle timestamps are set to the boundary start time (the beginning of the aggregation window).
     pub fn time_aligned(duration: Duration) -> PocketResult<Self> {
         if !(24 * 60 * 60 % duration.as_secs() == 0) {
             warn!(
@@ -318,6 +477,14 @@ impl SubscriptionType {
             candle: BaseCandle::default(),
             next_boundary: None,
         })
+    }
+
+    pub fn period_secs(&self) -> Option<u32> {
+        match self {
+            SubscriptionType::Time { duration, .. } => Some(duration.as_secs() as u32),
+            SubscriptionType::TimeAligned { duration, .. } => Some(duration.as_secs() as u32),
+            _ => None,
+        }
     }
 
     pub fn update(&mut self, new_candle: &BaseCandle) -> PocketResult<Option<BaseCandle>> {
@@ -415,7 +582,8 @@ impl SubscriptionType {
                 } else {
                     // The new candle's timestamp is at or after the boundary.
                     // The current aggregation window is now complete.
-                    candle.timestamp = boundary;
+                    // Set timestamp to the start of the period (boundary - duration)
+                    candle.timestamp = boundary - duration.as_secs_f64();
                     // 1. Clone the completed candle to return it later.
                     let completed_candle = candle.clone();
 
@@ -483,8 +651,62 @@ mod tests {
 
     #[test]
     fn test_parse_base_candles() {
+        // Format: [timestamp, open, close, high, low]
         let data = r#"[1754529180,0.92124,0.92155,0.92162,0.92124]"#;
         let candle: BaseCandle = serde_json::from_str(data).unwrap();
         assert_eq!(candle.timestamp, 1754529180.0);
+        assert_eq!(candle.open, 0.92124);
+        assert_eq!(candle.close, 0.92155);
+        assert_eq!(candle.high, 0.92162);
+        assert_eq!(candle.low, 0.92124);
+        assert_eq!(candle.volume, None);
+    }
+
+    #[test]
+    fn test_parse_base_candles_with_volume() {
+        // Format: [timestamp, open, close, high, low, volume]
+        let data = r#"[1754529180,0.92124,0.92155,0.92162,0.92124,100.0]"#;
+        let candle: BaseCandle = serde_json::from_str(data).unwrap();
+        assert_eq!(candle.volume, Some(100.0));
+    }
+
+    #[test]
+    fn test_parse_base_candles_with_null_volume() {
+        // Format: [timestamp, open, close, high, low, null]
+        let data = r#"[1754529180,0.92124,0.92155,0.92162,0.92124,null]"#;
+        let candle: BaseCandle = serde_json::from_str(data).unwrap();
+        assert_eq!(candle.volume, None);
+    }
+
+    #[test]
+    fn test_compile_candles_zero_period() {
+        let ticks = vec![
+            HistoryItem::Tick([1000.0, 1.0]),
+            HistoryItem::Tick([1001.0, 1.1]),
+        ];
+        let candles = compile_candles_from_ticks(&ticks, 0, "TEST");
+        assert!(candles.is_empty());
+    }
+
+    #[test]
+    fn test_compile_candles_empty_ticks() {
+        let ticks = vec![];
+        let candles = compile_candles_from_ticks(&ticks, 60, "TEST");
+        assert!(candles.is_empty());
+    }
+
+    #[test]
+    fn test_compile_candles_single_tick() {
+        let ticks = vec![HistoryItem::Tick([1000.0, 1.5])];
+        let candles = compile_candles_from_ticks(&ticks, 60, "TEST");
+        assert_eq!(candles.len(), 1);
+        let c = &candles[0];
+        // 1000 / 60 = 16.66.. -> floor 16. 16 * 60 = 960.
+        // So timestamp should be 960.
+        assert_eq!(c.timestamp, 960.0);
+        assert_eq!(c.open.to_string(), "1.5");
+        assert_eq!(c.high.to_string(), "1.5");
+        assert_eq!(c.low.to_string(), "1.5");
+        assert_eq!(c.close.to_string(), "1.5");
     }
 }

@@ -137,7 +137,7 @@ impl Ssid {
 
         // Handle raw quotes that might be invalid JSON string (e.g. "42["auth",...]")
         if trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len() >= 2 {
-            let unquoted = &trimmed[1..trimmed.len()-1];
+            let unquoted = &trimmed[1..trimmed.len() - 1];
             // If stripping quotes reveals the prefix, use it
             if unquoted.starts_with("42[") {
                 return Self::parse(unquoted);
@@ -147,9 +147,9 @@ impl Ssid {
         let prefix = "42[\"auth\",";
 
         let parsed = if let Some(stripped) = trimmed.strip_prefix(prefix) {
-            stripped
-                .strip_suffix("]")
-                .ok_or_else(|| CoreError::SsidParsing("Error parsing ssid: missing closing bracket".into()))?
+            stripped.strip_suffix("]").ok_or_else(|| {
+                CoreError::SsidParsing("Error parsing ssid: missing closing bracket".into())
+            })?
         } else {
             trimmed
         };

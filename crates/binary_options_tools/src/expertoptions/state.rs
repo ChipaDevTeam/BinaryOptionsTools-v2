@@ -1,6 +1,6 @@
 use binary_options_tools_core_pre::traits::AppState;
 use chrono::Local;
-use rust_decimal::{Decimal, dec};
+use rust_decimal::{dec, Decimal};
 use tokio::sync::RwLock;
 
 use crate::expertoptions::{modules::profile::Demo, types::Assets};

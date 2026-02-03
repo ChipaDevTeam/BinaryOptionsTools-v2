@@ -1,6 +1,7 @@
 import asyncio
 import json
 from datetime import timedelta
+from typing import Optional, Union, List, Dict, Tuple
 
 from ..config import Config
 from ..validator import Validator
@@ -151,9 +152,7 @@ class SyncRawSubscription:
 
 
 class PocketOption:
-    def __init__(
-        self, ssid: str, url: str | None = None, config: Config | dict | str = None, **_
-    ):
+    def __init__(self, ssid: str, url: Optional[str] = None, config: Union[Config, dict, str] = None, **_):
         """
         Initializes a new PocketOption instance.
 
@@ -217,35 +216,27 @@ class PocketOption:
     def __del__(self):
         self.loop.close()
 
-    def buy(
-        self, asset: str, amount: float, time: int, check_win: bool = False
-    ) -> tuple[str, dict]:
+    def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
         Takes the asset, and amount to place a buy trade that will expire in time (in seconds).
         If check_win is True then the function will return a tuple containing the trade id and a dictionary containing the trade data and the result of the trade ("win", "draw", "loss)
         If check_win is False then the function will return a tuple with the id of the trade and the trade as a dict
         """
-        return self.loop.run_until_complete(
-            self._client.buy(asset, amount, time, check_win)
-        )
+        return self.loop.run_until_complete(self._client.buy(asset, amount, time, check_win))
 
-    def sell(
-        self, asset: str, amount: float, time: int, check_win: bool = False
-    ) -> tuple[str, dict]:
+    def sell(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
         Takes the asset, and amount to place a sell trade that will expire in time (in seconds).
         If check_win is True then the function will return a tuple containing the trade id and a dictionary containing the trade data and the result of the trade ("win", "draw", "loss)
         If check_win is False then the function will return a tuple with the id of the trade and the trade as a dict
         """
-        return self.loop.run_until_complete(
-            self._client.sell(asset, amount, time, check_win)
-        )
+        return self.loop.run_until_complete(self._client.sell(asset, amount, time, check_win))
 
     def check_win(self, id: str) -> dict:
         """Returns a dictionary containing the trade data and the result of the trade ("win", "draw", "loss)"""
         return self.loop.run_until_complete(self._client.check_win(id))
 
-    def get_candles(self, asset: str, period: int, offset: int) -> list[dict]:
+    def get_candles(self, asset: str, period: int, offset: int) -> List[Dict]:
         """
         Takes the asset you want to get the candles and return a list of raw candles in dictionary format
         Each candle contains:
@@ -255,13 +246,9 @@ class PocketOption:
             * high: highest price
             * low: lowest price
         """
-        return self.loop.run_until_complete(
-            self._client.get_candles(asset, period, offset)
-        )
+        return self.loop.run_until_complete(self._client.get_candles(asset, period, offset))
 
-    def get_candles_advanced(
-        self, asset: str, period: int, offset: int, time: int
-    ) -> list[dict]:
+    def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> List[Dict]:
         """
         Retrieves historical candle data for an asset.
 
@@ -272,7 +259,7 @@ class PocketOption:
             time (int): Time to fetch candles from
 
         Returns:
-            list[dict]: List of candles, each containing:
+            List[Dict]: List of candles, each containing:
                 - time: Candle timestamp
                 - open: Opening price
                 - high: Highest price
@@ -284,19 +271,17 @@ class PocketOption:
             Maximum period depends on the timeframe
         """
 
-        return self.loop.run_until_complete(
-            self._client.get_candles_advanced(asset, period, offset, time)
-        )
+        return self.loop.run_until_complete(self._client.get_candles_advanced(asset, period, offset, time))
 
     def balance(self) -> float:
         "Returns the balance of the account"
         return self.loop.run_until_complete(self._client.balance())
 
-    def opened_deals(self) -> list[dict]:
+    def opened_deals(self) -> List[Dict]:
         "Returns a list of all the opened deals as dictionaries"
         return self.loop.run_until_complete(self._client.opened_deals())
 
-    def closed_deals(self) -> list[dict]:
+    def closed_deals(self) -> List[Dict]:
         "Returns a list of all the closed deals as dictionaries"
         return self.loop.run_until_complete(self._client.closed_deals())
 
@@ -304,30 +289,22 @@ class PocketOption:
         "Removes all the closed deals from memory, this function doesn't return anything"
         self.loop.run_until_complete(self._client.clear_closed_deals())
 
-    def payout(
-        self, asset: None | str | list[str] = None
-    ) -> dict[str, int | None] | list[int | None] | int | None:
+    def payout(self, asset: Optional[Union[str, List[str]]] = None) -> Union[Dict[str, Optional[int]], List[Optional[int]], int, None]:
         "Returns a dict of asset | payout for each asset, if 'asset' is not None then it will return the payout of the asset or a list of the payouts for each asset it was passed"
         return self.loop.run_until_complete(self._client.payout(asset))
 
-    def history(self, asset: str, period: int) -> list[dict]:
+    def history(self, asset: str, period: int) -> List[Dict]:
         "Returns a list of dictionaries containing the latest data available for the specified asset starting from 'period', the data is in the same format as the returned data of the 'get_candles' function."
         return self.loop.run_until_complete(self._client.history(asset, period))
 
     def subscribe_symbol(self, asset: str) -> SyncSubscription:
         """Returns a sync iterator over the associated asset, it will return real time raw candles and will return new candles while the 'PocketOption' class is loaded if the class is droped then the iterator will fail"""
-        return SyncSubscription(
-            self.loop.run_until_complete(self._client._subscribe_symbol_inner(asset))
-        )
+        return SyncSubscription(self.loop.run_until_complete(self._client._subscribe_symbol_inner(asset)))
 
-    def subscribe_symbol_chuncked(
-        self, asset: str, chunck_size: int
-    ) -> SyncSubscription:
+    def subscribe_symbol_chuncked(self, asset: str, chunck_size: int) -> SyncSubscription:
         """Returns a sync iterator over the associated asset, it will return real time candles formed with the specified amount of raw candles and will return new candles while the 'PocketOption' class is loaded if the class is droped then the iterator will fail"""
         return SyncSubscription(
-            self.loop.run_until_complete(
-                self._client._subscribe_symbol_chuncked_inner(asset, chunck_size)
-            )
+            self.loop.run_until_complete(self._client._subscribe_symbol_chuncked_inner(asset, chunck_size))
         )
 
     def subscribe_symbol_timed(self, asset: str, time: timedelta) -> SyncSubscription:
@@ -335,23 +312,15 @@ class PocketOption:
         Returns a sync iterator over the associated asset, it will return real time candles formed with candles ranging from time `start_time` to `start_time` + `time` allowing users to get the latest candle of `time` duration and will return new candles while the 'PocketOption' class is loaded if the class is droped then the iterator will fail
         Please keep in mind the iterator won't return a new candle exactly each `time` duration, there could be a small delay and imperfect timestamps
         """
-        return SyncSubscription(
-            self.loop.run_until_complete(
-                self._client._subscribe_symbol_timed_inner(asset, time)
-            )
-        )
+        return SyncSubscription(self.loop.run_until_complete(self._client._subscribe_symbol_timed_inner(asset, time)))
 
-    def subscribe_symbol_time_aligned(
-        self, asset: str, time: timedelta
-    ) -> SyncSubscription:
+    def subscribe_symbol_time_aligned(self, asset: str, time: timedelta) -> SyncSubscription:
         """
         Returns a sync iterator over the associated asset, it will return real time candles formed with candles ranging from time `start_time` to `start_time` + `time` allowing users to get the latest candle of `time` duration and will return new candles while the 'PocketOption' class is loaded if the class is droped then the iterator will fail
         Please keep in mind the iterator won't return a new candle exactly each `time` duration, there could be a small delay and imperfect timestamps
         """
         return SyncSubscription(
-            self.loop.run_until_complete(
-                self._client._subscribe_symbol_time_aligned_inner(asset, time)
-            )
+            self.loop.run_until_complete(self._client._subscribe_symbol_time_aligned_inner(asset, time))
         )
 
     def get_server_time(self) -> int:
@@ -448,9 +417,7 @@ class PocketOption:
         """
         self.loop.run_until_complete(self._client.unsubscribe(asset))
 
-    def create_raw_handler(
-        self, validator: Validator, keep_alive: str | None = None
-    ) -> "RawHandlerSync":
+    def create_raw_handler(self, validator: Validator, keep_alive: Optional[str] = None) -> "RawHandlerSync":
         """
         Creates a raw handler for advanced WebSocket message handling.
 
@@ -476,7 +443,5 @@ class PocketOption:
                 print(message)
             ```
         """
-        async_handler = self.loop.run_until_complete(
-            self._client.create_raw_handler(validator, keep_alive)
-        )
+        async_handler = self.loop.run_until_complete(self._client.create_raw_handler(validator, keep_alive))
         return RawHandlerSync(async_handler, self.loop)

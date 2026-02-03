@@ -1,7 +1,7 @@
 import asyncio
 
 # print(BinaryOptionsToolsV2)
-from BinaryOptionsToolsV2.BinaryOptionsToolsV2.pocketoption.asynchronous import (
+from BinaryOptionsToolsV2.pocketoption.asynchronous import (
     PocketOptionAsync,
 )
 
@@ -29,8 +29,13 @@ async def main(ssid):
     await asyncio.sleep(5)
     stream = await api.subscribe_symbol("EURUSD_otc")
     async for item in stream:
-        print(item["time"], item["open"])
-
+        # Check if 'time' key exists (it might be 'timestamp' or different structure)
+        if "time" in item:
+            print(item["time"], item.get("open"))
+        elif "timestamp" in item:
+            print(item["timestamp"], item.get("open"))
+        else:
+            print("Received item:", item)
 
 if __name__ == "__main__":
     ssid = input("Write your ssid: ")

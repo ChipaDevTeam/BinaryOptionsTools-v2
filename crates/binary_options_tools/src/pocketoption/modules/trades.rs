@@ -1,4 +1,8 @@
-use std::{collections::{HashMap, VecDeque}, fmt::Debug, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt::Debug,
+    sync::Arc,
+};
 
 use async_trait::async_trait;
 use binary_options_tools_core_pre::{
@@ -154,7 +158,10 @@ impl ApiModule<State> for TradesApiModule {
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
     ) -> Self::Handle {
-        TradesHandle { sender, _receiver: receiver }
+        TradesHandle {
+            sender,
+            _receiver: receiver,
+        }
     }
 
     async fn run(&mut self) -> CoreResult<()> {

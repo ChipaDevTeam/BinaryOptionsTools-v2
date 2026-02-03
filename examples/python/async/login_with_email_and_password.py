@@ -1,10 +1,7 @@
 import asyncio
 import json  # For the SSID formatting function
-import sys
-from datetime import datetime, timedelta, timezone
 
 from colorama import Fore, init
-from tabulate import tabulate  # Keep if catalogador is re-enabled (currently not used)
 
 init()  # Initialize colorama
 
@@ -142,7 +139,7 @@ async def login_and_get_ssid(email_str: str, password_str: str) -> str | None:
                             + f"Login button found with selector #{idx + 1} ('{selector}')."
                         )
                         break
-                except:
+                except Exception:
                     if (
                         idx == len(login_button_selectors) - 1
                     ):  # If last selector also failed
@@ -234,7 +231,7 @@ async def login_and_get_ssid(email_str: str, password_str: str) -> str | None:
                 ):
                     is_demo_account = 1
                     print(yellow + "Detected DEMO account from page elements/URL.")
-            except:
+            except Exception:
                 pass  # Ignore if elements not found, keep default
 
             # UID is harder to get dynamically and is critical. Using hardcoded from example for now.

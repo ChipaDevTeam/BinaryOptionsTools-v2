@@ -8,7 +8,7 @@ use binary_options_tools_core_pre::{
     traits::{ApiModule, Rule},
 };
 use core::fmt;
-use futures_util::stream::unfold;
+use futures_util::{future::join_all, stream::unfold};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -17,7 +17,9 @@ use tokio::select;
 use tracing::{debug, warn};
 use uuid::Uuid;
 
-use crate::pocketoption::candle::{BaseCandle, SubscriptionType};
+use crate::pocketoption::candle::{
+    compile_candles_from_ticks, BaseCandle, HistoryItem, SubscriptionType,
+};
 use crate::pocketoption::error::PocketError;
 use crate::pocketoption::types::{MultiPatternRule, StreamData as RawCandle, SubscriptionEvent};
 use crate::pocketoption::{
@@ -37,8 +39,10 @@ pub struct ChangeSymbol {
 pub struct History {
     pub asset: String,
     pub period: u32,
-    pub candles: Vec<BaseCandle>,
-    pub history: Vec<Vec<f64>>,
+    #[serde(default)]
+    pub candles: Option<Vec<BaseCandle>>,
+    #[serde(default)]
+    pub history: Option<Vec<HistoryItem>>,
 }
 
 #[derive(Deserialize)]
@@ -61,6 +65,7 @@ impl fmt::Display for ChangeSymbol {
 /// Maximum number of concurrent subscriptions allowed
 const MAX_SUBSCRIPTIONS: usize = 4;
 const MAX_CHANNEL_CAPACITY: usize = 64;
+const RECONNECT_INITIAL_DELAY: Duration = Duration::from_secs(2);
 
 #[derive(Debug, thiserror::Error)]
 pub enum SubscriptionError {
@@ -74,7 +79,11 @@ pub enum SubscriptionError {
 #[derive(Debug)]
 pub enum Command {
     /// Subscribe to an asset's stream
-    Subscribe { asset: String, command_id: Uuid },
+    Subscribe {
+        asset: String,
+        sub_type: SubscriptionType,
+        command_id: Uuid,
+    },
     /// Unsubscribe from an asset's stream
     Unsubscribe { asset: String, command_id: Uuid },
     /// History
@@ -133,13 +142,24 @@ struct SubscriptionCallback;
 #[async_trait]
 impl ReconnectCallback<State> for SubscriptionCallback {
     async fn call(&self, state: Arc<State>, ws_sender: &AsyncSender<Message>) -> CoreResult<()> {
-        tokio::time::sleep(Duration::from_secs(2)).await; // FIXME: This is a temporary delay, it may need to be fine tuned
+        tokio::time::sleep(RECONNECT_INITIAL_DELAY).await;
         // Resubscribe to all active subscriptions
-        for symbol in state.active_subscriptions.read().await.keys() {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            // Resubscribe to each active subscription
-            send_subscribe_message(ws_sender, symbol, 1).await?;
+        let subscriptions = state.active_subscriptions.read().await.clone();
+
+        // Send subscription messages concurrently
+        let futures = subscriptions.into_iter().map(|(symbol, (_, sub_type))| {
+            let ws_sender = ws_sender.clone();
+            let period = sub_type.period_secs().unwrap_or(1);
+            async move { send_subscribe_message(&ws_sender, &symbol, period).await }
+        });
+
+        let results = join_all(futures).await;
+
+        // Check for errors
+        for result in results {
+            result?;
         }
+
         Ok(())
     }
 }
@@ -176,6 +196,7 @@ impl SubscriptionsHandle {
         self.sender
             .send(Command::Subscribe {
                 asset: asset.clone(),
+                sub_type: sub_type.clone(),
                 command_id: id,
             })
             .await
@@ -381,7 +402,11 @@ impl ApiModule<State> for SubscriptionsApiModule {
             select! {
                 Ok(cmd) = self.command_receiver.recv() => {
                     match cmd {
-                        Command::Subscribe { asset, command_id } => {
+                        Command::Subscribe {
+                            asset,
+                            sub_type,
+                            command_id,
+                        } => {
                             // TODO: Handle subscription request
                             // 1. Check if max subscriptions reached
                             // 2. Create stream channel
@@ -397,10 +422,13 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                 continue;
                             } else {
                                 // Create stream channel
-                                self.send_subscribe_message(&asset, 1).await?;
-                                let (stream_sender, stream_receiver) = bounded_async(MAX_CHANNEL_CAPACITY);
-                                self.add_subscription(asset.clone(), stream_sender).await.map_err(|e| CoreError::Other(e.to_string()))?;
-
+                                let period = sub_type.period_secs().unwrap_or(1);
+                                self.send_subscribe_message(&asset, period).await?;
+                                let (stream_sender, stream_receiver) =
+                                    bounded_async(MAX_CHANNEL_CAPACITY);
+                                self.add_subscription(asset.clone(), sub_type, stream_sender)
+                                    .await
+                                    .map_err(|e| CoreError::Other(e.to_string()))?;
 
                                 // Send success response with stream receiver
                                 self.command_responder.send(CommandResponse::SubscriptionSuccess {
@@ -408,7 +436,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                     stream_receiver,
                                 }).await?;
                             }
-                        },
+                        }
                         Command::Unsubscribe { asset, command_id } => {
                             // TODO: Handle unsubscription request
                             // 1. Find subscription by ID
@@ -494,12 +522,35 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                         }
                                     });
                                     if let Some(command_id) = id {
-                                        let candles = data.candles.into_iter().map(|c| Candle::try_from((c, data.asset.clone()))).collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Other(e.to_string()))?;
-                                        if let Err(e) = self.command_responder.send(CommandResponse::History {
-                                            command_id,
-                                            data: candles
-                                        }).await {
-                                            warn!(target: "SubscriptionsApiModule", "Failed to send history response: {}", e);
+                                        let symbol = data.asset.clone();
+                                        let candles_res = if let Some(candles) = data.candles {
+                                            candles.into_iter()
+                                                .map(|c| Candle::try_from((c, symbol.clone())))
+                                                .collect::<Result<Vec<_>, _>>()
+                                                .map_err(|e| PocketError::General(e.to_string()))
+                                        } else if let Some(history) = data.history {
+                                            Ok(compile_candles_from_ticks(&history, data.period, &symbol))
+                                        } else {
+                                            Ok(Vec::new())
+                                        };
+
+                                        match candles_res {
+                                            Ok(candles) => {
+                                                if let Err(e) = self.command_responder.send(CommandResponse::History {
+                                                    command_id,
+                                                    data: candles
+                                                }).await {
+                                                    warn!(target: "SubscriptionsApiModule", "Failed to send history response: {}", e);
+                                                }
+                                            }
+                                            Err(e) => {
+                                                if let Err(e) = self.command_responder.send(CommandResponse::HistoryFailed {
+                                                    command_id,
+                                                    error: Box::new(e)
+                                                }).await {
+                                                    warn!(target: "SubscriptionsApiModule", "Failed to send history failed response: {}", e);
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -536,8 +587,9 @@ impl ApiModule<State> for SubscriptionsApiModule {
         // - Subscription confirmations
         // - Subscription errors
         Box::new(MultiPatternRule::new(vec![
-            r#"451-["updateStream",{"#,
-            r#"451-["updateHistoryNewFast","#,
+            "updateStream",
+            "updateHistoryNewFast",
+            "updateHistoryNew",
         ]))
     }
 }
@@ -563,6 +615,7 @@ impl SubscriptionsApiModule {
     async fn add_subscription(
         &mut self,
         asset: String,
+        sub_type: SubscriptionType,
         stream_sender: AsyncSender<SubscriptionEvent>,
     ) -> PocketResult<()> {
         if self.is_max_subscriptions_reached().await {
@@ -585,7 +638,7 @@ impl SubscriptionsApiModule {
             .active_subscriptions
             .write()
             .await
-            .insert(asset, stream_sender);
+            .insert(asset, (stream_sender, sub_type));
         Ok(())
     }
 
@@ -601,7 +654,7 @@ impl SubscriptionsApiModule {
         // 1. Remove from active_subscriptions
         // 2. Remove from asset_to_subscription
         // 3. Return removed subscription info
-        if let Some(stream_sender) = self.state.active_subscriptions.write().await.remove(asset) {
+        if let Some((stream_sender, _)) = self.state.active_subscriptions.write().await.remove(asset) {
             stream_sender.send(SubscriptionEvent::Terminated { reason: "Unsubscribed from main module".to_string() })
                 .await.inspect_err(|e| warn!(target: "SubscriptionsApiModule", "Failed to send termination signal: {}", e))?;
             return Ok(true);
@@ -612,9 +665,11 @@ impl SubscriptionsApiModule {
 
     async fn resend_connection_messages(&self) -> CoreResult<()> {
         // Resend connection messages to re-establish subscriptions
-        for symbol in self.state.active_subscriptions.read().await.keys() {
+        let subscriptions = self.state.active_subscriptions.read().await.clone();
+        for (symbol, (_, sub_type)) in subscriptions {
+            let period = sub_type.period_secs().unwrap_or(1);
             // Send subscription message for each active asset
-            self.send_subscribe_message(symbol, 1).await?;
+            self.send_subscribe_message(&symbol, period).await?;
         }
         Ok(())
     }
@@ -643,7 +698,7 @@ impl SubscriptionsApiModule {
         // 1. Find subscription by asset
         // 2. Send StreamData::Candle to stream
         // 3. Handle send errors (stream might be closed)
-        if let Some(stream_sender) = self.state.active_subscriptions.read().await.get(asset) {
+        if let Some((stream_sender, _)) = self.state.active_subscriptions.read().await.get(asset) {
             stream_sender
                 .send(SubscriptionEvent::Update {
                     asset: asset.to_string(),

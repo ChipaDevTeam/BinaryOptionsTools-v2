@@ -3,11 +3,11 @@ use std::sync::Arc;
 use binary_options_tools_core_pre::{
     connector::{Connector as ConnectorTrait, ConnectorError, ConnectorResult},
     reimports::{
-        Connector, MaybeTlsStream, Request, WebSocketStream, connect_async_tls_with_config,
-        generate_key,
+        connect_async_tls_with_config, generate_key, Connector, MaybeTlsStream, Request,
+        WebSocketStream,
     },
 };
-use futures_util::{StreamExt, stream::FuturesUnordered};
+use futures_util::{stream::FuturesUnordered, StreamExt};
 use tokio::net::TcpStream;
 use tracing::{info, warn};
 use url::Url;
@@ -63,7 +63,16 @@ pub async fn try_connect(
     init_crypto_provider();
     let mut root_store = rustls::RootCertStore::empty();
     let certs_result = rustls_native_certs::load_native_certs();
-    for cert in certs_result.certs {
+    if !certs_result.errors.is_empty() {
+        warn!(target: "ExpertConnect", "Some native certificates failed to load: {:?}", certs_result.errors);
+    }
+    let certs = certs_result.certs;
+    if certs.is_empty() {
+        return Err(ConnectorError::Custom(
+            "Could not load any native certificates".to_string(),
+        ));
+    }
+    for cert in certs {
         root_store.add(cert).ok();
     }
     let tls_config = rustls::ClientConfig::builder()

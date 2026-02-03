@@ -1,8 +1,8 @@
 use std::{
     collections::HashMap,
     sync::{
-        Arc,
         atomic::{AtomicBool, Ordering},
+        Arc,
     },
     time::Duration,
 };
@@ -133,7 +133,10 @@ impl ApiModule<State> for DealsApiModule {
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
     ) -> Self::Handle {
-        DealsHandle { sender, _receiver: receiver }
+        DealsHandle {
+            sender,
+            _receiver: receiver,
+        }
     }
 
     async fn run(&mut self) -> binary_options_tools_core_pre::error::CoreResult<()> {

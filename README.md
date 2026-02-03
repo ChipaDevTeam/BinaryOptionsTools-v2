@@ -34,9 +34,6 @@ Currently supporting **PocketOption** (Quick Trading Mode) with both real and de
 - Automatic reconnection handling
 - Historical candle data (`get_candles`, `get_candles_advanced`)
 - Advanced validators
-- Trade history (`history`)
-- Payout information retrieval
-- Deal end time queries
 
 We're working to restore all functionality with improved stability and performance.
 
@@ -102,7 +99,8 @@ We're working to restore all functionality with improved stability and performan
 
 ### Python
 
-#### Using pip (Prebuilt Wheels):
+#### Using pip (Prebuilt Wheels)
+
 ```bash
 # Windows
 pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.3/BinaryOptionsToolsV2-0.2.3-cp38-abi3-win_amd64.whl"
@@ -115,6 +113,7 @@ pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/down
 ```
 
 **Requirements**:
+
 - **OS**: Windows, Linux, macOS
 - **Python**: 3.8 - 3.12
 
@@ -148,10 +147,14 @@ binary_options_tools = { path = "crates/binary_options_tools" }
 ```python
 from BinaryOptionsToolsV2 import PocketOptionAsync
 import asyncio
+import os
 
 async def main():
-    # Initialize client with SSID
-    client = PocketOptionAsync(ssid="your-session-id")
+    # Initialize client with SSID from environment variable
+    ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        raise ValueError("Please set POCKET_OPTION_SSID environment variable")
+    client = PocketOptionAsync(ssid=ssid)
     # Connection is established automatically during initialization
     
     # Get account balance

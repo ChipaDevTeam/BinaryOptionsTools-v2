@@ -25,12 +25,12 @@ futures-util = "0.3.31"
 php_serde = "0.6.0"
 pin-project-lite = "0.2.16"
 rand = "0.9.1"
-reqwest = { version = "0.12.15", features = ["json"] }
+reqwest = { version = "0.12.15", default-features = false, features = ["rustls-tls", "json"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0.140", features = [] }
 thiserror = "2.0.12"
 tokio = { version = "1.44.2", features = ["macros", "io-util", "rt", "sync"] }
-tokio-tungstenite = { version = "0.27.0", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.27.0", default-features = false, features = ["rustls-tls-webpki-roots", "connect", "handshake"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["json"] }
 url = { version = "2.5.4", features = ["serde"] }

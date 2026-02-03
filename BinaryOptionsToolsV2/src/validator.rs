@@ -3,8 +3,9 @@
 use std::sync::Arc;
 
 use pyo3::{
-    Bound, Py, PyAny, PyResult, pyclass, pymethods,
+    pyclass, pymethods,
     types::{PyAnyMethods, PyList},
+    Bound, Py, PyAny, PyResult,
 };
 use regex::Regex;
 

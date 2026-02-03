@@ -1,5 +1,5 @@
 use binary_options_tools::{error::BinaryOptionsError, pocketoption::error::PocketError};
-use pyo3::{PyErr, exceptions::PyValueError};
+use pyo3::{exceptions::PyValueError, PyErr};
 use thiserror::Error;
 use uuid::Uuid;
 

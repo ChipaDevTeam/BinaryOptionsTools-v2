@@ -2,9 +2,17 @@ import asyncio
 import json
 import sys
 from datetime import timedelta
+from typing import Optional, Union, List, Dict, Tuple
 
 from ..config import Config
 from ..validator import Validator
+
+
+if sys.version_info < (3, 10):
+
+    async def anext(iterator):
+        """Polyfill for anext for Python < 3.10"""
+        return await iterator.__anext__()
 
 
 class AsyncSubscription:
@@ -134,9 +142,7 @@ class RawHandler:
 
 # This file contains all the async code for the PocketOption Module
 class PocketOptionAsync:
-    def __init__(
-        self, ssid: str, url: str | None = None, config: Config | dict | str = None, **_
-    ):
+    def __init__(self, ssid: str, url: Optional[str] = None, config: Union[Config, dict, str] = None, **_):
         """
         Initializes a new PocketOptionAsync instance.
 
@@ -191,9 +197,7 @@ class PocketOptionAsync:
             elif isinstance(config, Config):
                 self.config = config
             else:
-                raise ValueError(
-                    "Config must be either a Config object, dictionary, or JSON string"
-                )
+                raise ValueError("Config must be either a Config object, dictionary, or JSON string")
 
             if url is not None:
                 self.config.urls.insert(0, url)
@@ -205,9 +209,7 @@ class PocketOptionAsync:
             self.client = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
         self.logger = Logger()
 
-    async def buy(
-        self, asset: str, amount: float, time: int, check_win: bool = False
-    ) -> tuple[str, dict]:
+    async def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
         Places a buy (call) order for the specified asset.
 
@@ -218,7 +220,7 @@ class PocketOptionAsync:
             check_win (bool): If True, waits for trade result. Defaults to True.
 
         Returns:
-            tuple[str, dict]: Tuple containing (trade_id, trade_details)
+            Tuple[str, Dict]: Tuple containing (trade_id, trade_details)
             trade_details includes:
                 - asset: Trading asset
                 - amount: Trade amount
@@ -239,9 +241,7 @@ class PocketOptionAsync:
             trade = json.loads(trade)
             return trade_id, trade
 
-    async def sell(
-        self, asset: str, amount: float, time: int, check_win: bool = False
-    ) -> tuple[str, dict]:
+    async def sell(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
         Places a sell (put) order for the specified asset.
 
@@ -252,7 +252,7 @@ class PocketOptionAsync:
             check_win (bool): If True, waits for trade result. Defaults to True.
 
         Returns:
-            tuple[str, dict]: Tuple containing (trade_id, trade_details)
+            Tuple[str, Dict]: Tuple containing (trade_id, trade_details)
             trade_details includes:
                 - asset: Trading asset
                 - amount: Trade amount
@@ -319,7 +319,7 @@ class PocketOptionAsync:
 
         return await _timeout(check(id), duration)
 
-    async def get_candles(self, asset: str, period: int, offset: int) -> list[dict]:
+    async def get_candles(self, asset: str, period: int, offset: int) -> List[Dict]:
         """
         Retrieves historical candle data for an asset.
 
@@ -329,7 +329,7 @@ class PocketOptionAsync:
             period (int): Historical period in seconds to fetch
 
         Returns:
-            list[dict]: List of candles, each containing:
+            List[Dict]: List of candles, each containing:
                 - time: Candle timestamp
                 - open: Opening price
                 - high: Highest price
@@ -346,9 +346,7 @@ class PocketOptionAsync:
         #     "The get_candles method is not implemented in the PocketOptionAsync class. "
         # )
 
-    async def get_candles_advanced(
-        self, asset: str, period: int, offset: int, time: int
-    ) -> list[dict]:
+    async def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> List[Dict]:
         """
         Retrieves historical candle data for an asset.
 
@@ -359,7 +357,7 @@ class PocketOptionAsync:
             time (int): Time to fetch candles from
 
         Returns:
-            list[dict]: List of candles, each containing:
+            List[Dict]: List of candles, each containing:
                 - time: Candle timestamp
                 - open: Opening price
                 - high: Highest price
@@ -388,14 +386,14 @@ class PocketOptionAsync:
         """
         return await self.client.balance()
 
-    async def opened_deals(self) -> list[dict]:
+    async def opened_deals(self) -> List[Dict]:
         "Returns a list of all the opened deals as dictionaries"
         return json.loads(await self.client.opened_deals())
         # raise NotImplementedError(
         #     "The opened_deals method is not implemented in the PocketOptionAsync class. "
         # )
 
-    async def closed_deals(self) -> list[dict]:
+    async def closed_deals(self) -> List[Dict]:
         "Returns a list of all the closed deals as dictionaries"
         return json.loads(await self.client.closed_deals())
         # raise NotImplementedError(
@@ -407,8 +405,8 @@ class PocketOptionAsync:
         await self.client.clear_closed_deals()
 
     async def payout(
-        self, asset: None | str | list[str] = None
-    ) -> dict[str, int | None] | list[int | None] | int | None:
+        self, asset: Optional[Union[str, List[str]]] = None
+    ) -> Union[Dict[str, Optional[int]], List[Optional[int]], int, None]:
         """
         Retrieves current payout percentages for all assets.
 
@@ -430,7 +428,7 @@ class PocketOptionAsync:
             return [payout.get(ast) for ast in asset]
         return payout
 
-    async def history(self, asset: str, period: int) -> list[dict]:
+    async def history(self, asset: str, period: int) -> List[Dict]:
         "Returns a list of dictionaries containing the latest data available for the specified asset starting from 'period', the data is in the same format as the returned data of the 'get_candles' function."
         return json.loads(await self.client.history(asset, period))
 
@@ -465,17 +463,11 @@ class PocketOptionAsync:
         """
         return AsyncSubscription(await self._subscribe_symbol_inner(asset))
 
-    async def subscribe_symbol_chuncked(
-        self, asset: str, chunck_size: int
-    ) -> AsyncSubscription:
+    async def subscribe_symbol_chuncked(self, asset: str, chunck_size: int) -> AsyncSubscription:
         """Returns an async iterator over the associated asset, it will return real time candles formed with the specified amount of raw candles and will return new candles while the 'PocketOptionAsync' class is loaded if the class is droped then the iterator will fail"""
-        return AsyncSubscription(
-            await self._subscribe_symbol_chuncked_inner(asset, chunck_size)
-        )
+        return AsyncSubscription(await self._subscribe_symbol_chuncked_inner(asset, chunck_size))
 
-    async def subscribe_symbol_timed(
-        self, asset: str, time: timedelta
-    ) -> AsyncSubscription:
+    async def subscribe_symbol_timed(self, asset: str, time: timedelta) -> AsyncSubscription:
         """
         Creates a timed real-time data subscription for an asset.
 
@@ -496,9 +488,7 @@ class PocketOptionAsync:
         """
         return AsyncSubscription(await self._subscribe_symbol_timed_inner(asset, time))
 
-    async def subscribe_symbol_time_aligned(
-        self, asset: str, time: timedelta
-    ) -> AsyncSubscription:
+    async def subscribe_symbol_time_aligned(self, asset: str, time: timedelta) -> AsyncSubscription:
         """
         Creates a time-aligned real-time data subscription for an asset.
 
@@ -517,9 +507,7 @@ class PocketOptionAsync:
                     print(f"Time-aligned update: {update}")
             ```
         """
-        return AsyncSubscription(
-            await self._subscribe_symbol_time_aligned_inner(asset, time)
-        )
+        return AsyncSubscription(await self._subscribe_symbol_time_aligned_inner(asset, time))
 
     async def get_server_time(self) -> int:
         """Returns the current server time as a UNIX timestamp"""
@@ -627,9 +615,7 @@ class PocketOptionAsync:
         """
         await self.client.unsubscribe(asset)
 
-    async def create_raw_handler(
-        self, validator: Validator, keep_alive: str | None = None
-    ) -> "RawHandler":
+    async def create_raw_handler(self, validator: Validator, keep_alive: Optional[str] = None) -> "RawHandler":
         """
         Creates a raw handler for advanced WebSocket message handling.
 
@@ -655,9 +641,7 @@ class PocketOptionAsync:
                 print(message)
             ```
         """
-        rust_handler = await self.client.create_raw_handler(
-            validator.raw_validator, keep_alive
-        )
+        rust_handler = await self.client.create_raw_handler(validator.raw_validator, keep_alive)
         return RawHandler(rust_handler)
 
 

@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration as StdDuration;
 
 use binary_options_tools::pocketoption::{
-    PocketOption as OriginalPocketOption, candle::SubscriptionType, types::Action as OriginalAction,
+    candle::SubscriptionType, types::Action as OriginalAction, PocketOption as OriginalPocketOption,
 };
 use uuid::Uuid;
 
@@ -431,7 +431,7 @@ impl PocketOption {
         keep_alive: Option<String>,
     ) -> Result<Arc<RawHandler>, UniError> {
         use binary_options_tools::pocketoption::modules::raw::Outgoing;
-        
+
         let keep_alive_msg = keep_alive.map(Outgoing::Text);
         let inner_handler = self
             .inner

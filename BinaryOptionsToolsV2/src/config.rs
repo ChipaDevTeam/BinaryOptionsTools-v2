@@ -1,6 +1,6 @@
-use pyo3::prelude::*;
-use pyo3::exceptions::PyValueError;
 use binary_options_tools::config::Config;
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
 use std::time::Duration;
 use url::Url;
 
@@ -17,10 +17,7 @@ impl PyConfig {
     pub fn new() -> Self {
         let inner = Config::default();
         let url_cache = inner.urls.iter().map(|u| u.to_string()).collect();
-        Self {
-            inner,
-            url_cache,
-        }
+        Self { inner, url_cache }
     }
 
     #[getter]

@@ -2,6 +2,7 @@
 
 mod config;
 mod error;
+mod framework;
 mod logs;
 mod pocketoption;
 mod runtime;
@@ -9,8 +10,9 @@ mod stream;
 mod validator;
 
 use config::PyConfig;
-use logs::{LogBuilder, Logger, StreamLogsIterator, StreamLogsLayer, start_tracing};
-use pocketoption::{RawPocketOption, RawStreamIterator, StreamIterator, RawHandle, RawHandler};
+use framework::{PyBot, PyContext, PyStrategy, PyVirtualMarket};
+use logs::{start_tracing, LogBuilder, Logger, StreamLogsIterator, StreamLogsLayer};
+use pocketoption::{RawHandle, RawHandler, RawPocketOption, RawStreamIterator, StreamIterator};
 use pyo3::prelude::*;
 use validator::RawValidator;
 
@@ -27,6 +29,10 @@ fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<RawValidator>()?;
     m.add_class::<RawHandle>()?;
     m.add_class::<RawHandler>()?;
+    m.add_class::<PyBot>()?;
+    m.add_class::<PyStrategy>()?;
+    m.add_class::<PyContext>()?;
+    m.add_class::<PyVirtualMarket>()?;
 
     m.add_function(wrap_pyfunction!(start_tracing, m)?)?;
     Ok(())

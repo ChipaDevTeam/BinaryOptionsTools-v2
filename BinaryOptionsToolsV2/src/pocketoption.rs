@@ -13,9 +13,9 @@ use binary_options_tools::pocketoption::pocket_client::PocketOption;
 use async_stream;
 use binary_options_tools::validator::Validator as CrateValidator;
 use binary_options_tools::validator::Validator;
-use futures_util::StreamExt;
 use futures_util::stream::{BoxStream, Fuse};
-use pyo3::{Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python, pyclass, pymethods};
+use futures_util::StreamExt;
+use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python};
 use pyo3_async_runtimes::tokio::future_into_py;
 use tungstenite;
 use uuid::Uuid;
@@ -69,7 +69,7 @@ async fn send_raw_message_and_wait(
 #[pyclass]
 #[derive(Clone)]
 pub struct RawPocketOption {
-    client: PocketOption,
+    pub(crate) client: PocketOption,
 }
 
 #[pyclass]
@@ -123,10 +123,13 @@ impl RawPocketOption {
     pub fn new_with_url(py: Python<'_>, ssid: String, url: String) -> PyResult<Self> {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
-            let client = tokio::time::timeout(Duration::from_secs(10), PocketOption::new_with_url(ssid, url))
-                .await
-                .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
-                .map_err(BinaryErrorPy::from)?;
+            let client = tokio::time::timeout(
+                Duration::from_secs(10),
+                PocketOption::new_with_url(ssid, url),
+            )
+            .await
+            .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
+            .map_err(BinaryErrorPy::from)?;
             Ok(Self { client })
         })
     }
@@ -138,11 +141,13 @@ impl RawPocketOption {
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
         future_into_py(py, async move {
-            let client =
-                tokio::time::timeout(Duration::from_secs(10), PocketOption::new_with_url(ssid, url))
-                    .await
-                    .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
-                    .map_err(BinaryErrorPy::from)?;
+            let client = tokio::time::timeout(
+                Duration::from_secs(10),
+                PocketOption::new_with_url(ssid, url),
+            )
+            .await
+            .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
+            .map_err(BinaryErrorPy::from)?;
             Ok(RawPocketOption { client })
         })
     }
@@ -153,13 +158,11 @@ impl RawPocketOption {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
             let timeout = config.inner.connection_initialization_timeout;
-            let client = tokio::time::timeout(
-                timeout,
-                PocketOption::new_with_config(ssid, config.inner),
-            )
-            .await
-            .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
-                .map_err(BinaryErrorPy::from)?;
+            let client =
+                tokio::time::timeout(timeout, PocketOption::new_with_config(ssid, config.inner))
+                    .await
+                    .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
+                    .map_err(BinaryErrorPy::from)?;
             Ok(Self { client })
         })
     }
@@ -172,13 +175,11 @@ impl RawPocketOption {
     ) -> PyResult<Bound<'py, PyAny>> {
         future_into_py(py, async move {
             let timeout = config.inner.connection_initialization_timeout;
-            let client = tokio::time::timeout(
-                timeout,
-                PocketOption::new_with_config(ssid, config.inner),
-            )
-            .await
-            .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
-            .map_err(BinaryErrorPy::from)?;
+            let client =
+                tokio::time::timeout(timeout, PocketOption::new_with_config(ssid, config.inner))
+                    .await
+                    .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
+                    .map_err(BinaryErrorPy::from)?;
             Ok(RawPocketOption { client })
         })
     }
@@ -795,14 +796,18 @@ impl RawHandle {
         let validator = validator.get().clone();
         future_into_py(py, async move {
             let crate_validator: CrateValidator = validator.into();
-            let keep_alive = keep_alive_message.map(|msg| {
-                binary_options_tools::pocketoption::modules::raw::Outgoing::Text(msg)
-            });
+            let keep_alive = keep_alive_message
+                .map(|msg| binary_options_tools::pocketoption::modules::raw::Outgoing::Text(msg));
             let handler = handle
                 .create(crate_validator, keep_alive)
                 .await
                 .map_err(BinaryErrorPy::from)?;
-            Python::attach(|py| RawHandler { handler: Arc::new(Mutex::new(handler)) }.into_py_any(py))
+            Python::attach(|py| {
+                RawHandler {
+                    handler: Arc::new(Mutex::new(handler)),
+                }
+                .into_py_any(py)
+            })
         })
     }
 
@@ -826,11 +831,7 @@ impl RawHandler {
     }
 
     /// Send a text message
-    pub fn send_text<'py>(
-        &self,
-        py: Python<'py>,
-        text: String,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    pub fn send_text<'py>(&self, py: Python<'py>, text: String) -> PyResult<Bound<'py, PyAny>> {
         let handler = self.handler.clone();
         future_into_py(py, async move {
             let handler = handler.lock().await;
@@ -840,15 +841,14 @@ impl RawHandler {
     }
 
     /// Send a binary message
-    pub fn send_binary<'py>(
-        &self,
-        py: Python<'py>,
-        data: Vec<u8>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    pub fn send_binary<'py>(&self, py: Python<'py>, data: Vec<u8>) -> PyResult<Bound<'py, PyAny>> {
         let handler = self.handler.clone();
         future_into_py(py, async move {
             let handler = handler.lock().await;
-            handler.send_binary(data).await.map_err(BinaryErrorPy::from)?;
+            handler
+                .send_binary(data)
+                .await
+                .map_err(BinaryErrorPy::from)?;
             Ok(())
         })
     }
@@ -886,7 +886,7 @@ impl RawHandler {
     pub fn subscribe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let handler = self.handler.blocking_lock();
         let receiver = handler.subscribe();
-        
+
         // Create a boxed stream that yields String values
         let boxed_stream = async_stream::stream! {
             while let Ok(msg) = receiver.recv().await {

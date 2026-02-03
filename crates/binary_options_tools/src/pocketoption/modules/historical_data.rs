@@ -6,13 +6,14 @@ use binary_options_tools_core_pre::{
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, Rule},
 };
+use rust_decimal::prelude::ToPrimitive;
 use serde::Deserialize;
 use tokio::{select, sync::Mutex, time::timeout};
 use tracing::warn;
 use uuid::Uuid;
 
 use crate::pocketoption::{
-    candle::{BaseCandle, Candle},
+    candle::{compile_candles_from_ticks, BaseCandle, Candle, CandleItem, HistoryItem},
     error::{PocketError, PocketResult},
     state::State,
     types::MultiPatternRule,
@@ -23,7 +24,12 @@ const MAX_MISMATCH_RETRIES: usize = 5;
 
 #[derive(Debug, Clone)]
 pub enum Command {
-    GetHistory {
+    GetTicks {
+        asset: String,
+        period: u32,
+        req_id: Uuid,
+    },
+    GetCandles {
         asset: String,
         period: u32,
         req_id: Uuid,
@@ -32,28 +38,38 @@ pub enum Command {
 
 #[derive(Debug, Clone)]
 pub enum CommandResponse {
-    Success { req_id: Uuid, candles: Vec<Candle> },
+    Ticks {
+        req_id: Uuid,
+        ticks: Vec<(f64, f64)>,
+    },
+    Candles {
+        req_id: Uuid,
+        candles: Vec<Candle>,
+    },
     Error(String),
 }
 
 #[derive(Deserialize)]
 pub struct HistoryResponse {
-    asset: String,
-    #[allow(dead_code)]
-    period: u64,
+    pub asset: String,
+    pub period: u32,
     #[serde(default)]
-    #[allow(dead_code)]
-    history: Option<Vec<Vec<f64>>>,
-    // Separate arrays for OHLC data
-    o: Vec<f64>,
-    h: Vec<f64>,
-    l: Vec<f64>,
-    c: Vec<f64>,
-    #[serde(alias = "t")]
-    timestamps: Vec<u64>,
+    pub history: Option<Vec<HistoryItem>>,
     #[serde(default)]
-    #[allow(dead_code)]
-    v: Option<Vec<f64>>, // Volume might be optional
+    pub candles: Option<Vec<CandleItem>>,
+    // Separate arrays for OHLC data (legacy format)
+    #[serde(default)]
+    pub o: Option<Vec<f64>>,
+    #[serde(default)]
+    pub h: Option<Vec<f64>>,
+    #[serde(default)]
+    pub l: Option<Vec<f64>>,
+    #[serde(default)]
+    pub c: Option<Vec<f64>>,
+    #[serde(alias = "t", default)]
+    pub timestamps: Option<Vec<u64>>,
+    #[serde(default)]
+    pub v: Option<Vec<f64>>,
 }
 
 #[derive(Deserialize)]
@@ -72,22 +88,24 @@ pub struct HistoricalDataHandle {
 }
 
 impl HistoricalDataHandle {
-    /// Retrieves historical candle data for a specific asset and period.
+    /// Retrieves historical tick data (timestamp, price) for a specific asset and period.
     ///
-    /// **Concurrency Warning:**
-    /// This method uses a shared internal lock (`call_lock`) to serialize requests across
-    /// all clones of this handle. This ensures that only one `get_history` request is
-    /// in-flight at a time for the underlying client actor, matching the actor's single-request
-    /// limitation. Concurrent calls will be queued and executed sequentially.
-    pub async fn get_history(&self, asset: String, period: u32) -> PocketResult<Vec<Candle>> {
-        // Acquire lock to serialize requests.
-        // This ensures that we don't have concurrent get_history calls racing for responses
-        // on the shared receiver, matching the single-request limitation of the actor.
+    /// # Expected Data Format
+    /// The response is expected to contain a list of ticks, where each tick is a tuple of `(timestamp, price)`.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let ticks = handle.ticks("EURUSD_otc".to_string(), 60).await?;
+    /// for (timestamp, price) in ticks {
+    ///     println!("Time: {}, Price: {}", timestamp, price);
+    /// }
+    /// ```
+    pub async fn ticks(&self, asset: String, period: u32) -> PocketResult<Vec<(f64, f64)>> {
         let _guard = self.call_lock.lock().await;
 
         let id = Uuid::new_v4();
         self.sender
-            .send(Command::GetHistory {
+            .send(Command::GetTicks {
                 asset: asset.clone(),
                 period,
                 req_id: id,
@@ -96,19 +114,16 @@ impl HistoricalDataHandle {
             .map_err(CoreError::from)?;
         let mut mismatch_count = 0;
         loop {
-            // Mismatched `req_id` cases are typically only expected if other consumers
-            // are unexpectedly sharing the same response receiver, or if messages
-            // arrive severely out of order (though less likely with serialized requests).
             match timeout(HISTORICAL_DATA_TIMEOUT, self.receiver.recv()).await {
-                Ok(Ok(CommandResponse::Success { req_id, candles })) => {
+                Ok(Ok(CommandResponse::Ticks { req_id, ticks })) => {
                     if req_id == id {
-                        return Ok(candles);
+                        return Ok(ticks);
                     } else {
                         warn!("Received response for unknown req_id: {}", req_id);
                         mismatch_count += 1;
                         if mismatch_count >= MAX_MISMATCH_RETRIES {
                             return Err(PocketError::Timeout {
-                                task: "get_history".to_string(),
+                                task: "ticks".to_string(),
                                 context: format!(
                                     "asset: {}, period: {}, exceeded mismatch retries",
                                     asset, period
@@ -119,11 +134,16 @@ impl HistoricalDataHandle {
                         continue;
                     }
                 }
+                Ok(Ok(CommandResponse::Candles { .. })) => {
+                    // If we got candles but wanted ticks, we might be in trouble if we don't handle it.
+                    // But usually the actor handles the response type.
+                    continue;
+                }
                 Ok(Ok(CommandResponse::Error(e))) => return Err(PocketError::General(e)),
                 Ok(Err(e)) => return Err(CoreError::from(e).into()),
                 Err(_) => {
                     return Err(PocketError::Timeout {
-                        task: "get_history".to_string(),
+                        task: "ticks".to_string(),
                         context: format!("asset: {}, period: {}", asset, period),
                         duration: HISTORICAL_DATA_TIMEOUT,
                     });
@@ -131,6 +151,80 @@ impl HistoricalDataHandle {
             }
         }
     }
+
+    /// Retrieves historical candle data for a specific asset and period.
+    ///
+    /// # Expected Data Format
+    /// The response is expected to contain a list of `Candle` objects.
+    /// The server response typically includes OHLC data which is parsed into `Candle` structs.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let candles = handle.candles("EURUSD_otc".to_string(), 60).await?;
+    /// for candle in candles {
+    ///     println!("Time: {}, Open: {}, Close: {}", candle.timestamp, candle.open, candle.close);
+    /// }
+    /// ```
+    pub async fn candles(&self, asset: String, period: u32) -> PocketResult<Vec<Candle>> {
+        let _guard = self.call_lock.lock().await;
+
+        let id = Uuid::new_v4();
+        self.sender
+            .send(Command::GetCandles {
+                asset: asset.clone(),
+                period,
+                req_id: id,
+            })
+            .await
+            .map_err(CoreError::from)?;
+        let mut mismatch_count = 0;
+        loop {
+            match timeout(HISTORICAL_DATA_TIMEOUT, self.receiver.recv()).await {
+                Ok(Ok(CommandResponse::Candles { req_id, candles })) => {
+                    if req_id == id {
+                        return Ok(candles);
+                    } else {
+                        warn!("Received response for unknown req_id: {}", req_id);
+                        mismatch_count += 1;
+                        if mismatch_count >= MAX_MISMATCH_RETRIES {
+                            return Err(PocketError::Timeout {
+                                task: "candles".to_string(),
+                                context: format!(
+                                    "asset: {}, period: {}, exceeded mismatch retries",
+                                    asset, period
+                                ),
+                                duration: HISTORICAL_DATA_TIMEOUT,
+                            });
+                        }
+                        continue;
+                    }
+                }
+                Ok(Ok(CommandResponse::Ticks { .. })) => {
+                    continue;
+                }
+                Ok(Ok(CommandResponse::Error(e))) => return Err(PocketError::General(e)),
+                Ok(Err(e)) => return Err(CoreError::from(e).into()),
+                Err(_) => {
+                    return Err(PocketError::Timeout {
+                        task: "candles".to_string(),
+                        context: format!("asset: {}, period: {}", asset, period),
+                        duration: HISTORICAL_DATA_TIMEOUT,
+                    });
+                }
+            }
+        }
+    }
+
+    /// Deprecated: use `ticks()` or `candles()` instead.
+    pub async fn get_history(&self, asset: String, period: u32) -> PocketResult<Vec<Candle>> {
+        self.candles(asset, period).await
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum RequestType {
+    Ticks,
+    Candles,
 }
 
 /// This API module handles historical data requests.
@@ -149,7 +243,7 @@ pub struct HistoricalDataApiModule {
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
-    last_req_id: Option<Uuid>,
+    pending_request: Option<(Uuid, String, u32, RequestType)>,
 }
 
 #[async_trait]
@@ -171,7 +265,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
             command_responder,
             message_receiver,
             to_ws_sender,
-            last_req_id: None,
+            pending_request: None,
         }
     }
 
@@ -191,11 +285,27 @@ impl ApiModule<State> for HistoricalDataApiModule {
             select! {
                 Ok(cmd) = self.command_receiver.recv() => {
                     match cmd {
-                        Command::GetHistory { asset, period, req_id } => {
-                            if self.last_req_id.is_some() {
-                                warn!(target: "HistoricalDataApiModule", "Overwriting a pending request. Concurrent get_history calls are not supported.");
+                        Command::GetTicks { asset, period, req_id } => {
+                            if self.pending_request.is_some() {
+                                warn!(target: "HistoricalDataApiModule", "Overwriting a pending request. Concurrent calls are not supported.");
                             }
-                            self.last_req_id = Some(req_id);
+                            self.pending_request = Some((req_id, asset.clone(), period, RequestType::Ticks));
+                            let payload = serde_json::json!([
+                                "changeSymbol",
+                                {
+                                    "asset": asset,
+                                    "period": period
+                                }
+                            ]);
+                            let serialized_payload = serde_json::to_string(&payload)?;
+                            let msg = format!("42{}", serialized_payload);
+                            self.to_ws_sender.send(Message::text(msg)).await?;
+                        }
+                        Command::GetCandles { asset, period, req_id } => {
+                            if self.pending_request.is_some() {
+                                warn!(target: "HistoricalDataApiModule", "Overwriting a pending request. Concurrent calls are not supported.");
+                            }
+                            self.pending_request = Some((req_id, asset.clone(), period, RequestType::Candles));
                             let payload = serde_json::json!([
                                 "changeSymbol",
                                 {
@@ -219,66 +329,145 @@ impl ApiModule<State> for HistoricalDataApiModule {
                     if let Some(response) = response {
                         match response {
                             ServerResponse::Success(candles) => {
-                                if let Some(req_id) = self.last_req_id.take() {
-                                    self.command_responder.send(CommandResponse::Success {
-                                        req_id,
-                                        candles,
-                                    }).await?;
+                                if let Some((req_id, _, _, req_type)) = self.pending_request.take() {
+                                    match req_type {
+                                        RequestType::Candles => {
+                                            self.command_responder.send(CommandResponse::Candles {
+                                                req_id,
+                                                candles,
+                                            }).await?;
+                                        }
+                                        RequestType::Ticks => {
+                                            // Convert candles back to ticks (not ideal but better than nothing)
+                                            let ticks = candles.iter().filter_map(|c| {
+                                                match c.close.to_f64() {
+                                                    Some(price) => Some((c.timestamp, price)),
+                                                    None => {
+                                                        warn!(target: "HistoricalDataApiModule", "Failed to convert close price to f64 for timestamp {}", c.timestamp);
+                                                        None
+                                                    }
+                                                }
+                                            }).collect();
+                                            self.command_responder.send(CommandResponse::Ticks {
+                                                req_id,
+                                                ticks,
+                                            }).await?;
+                                        }
+                                    }
                                 } else {
                                     warn!(target: "HistoricalDataApiModule", "Received history data but no req_id was pending. Discarding.");
                                 }
                             }
                             ServerResponse::History(history_response) => {
-                                if let Some(req_id) = self.last_req_id.take() {
-                                    let len = history_response.timestamps.len();
-                                    let mut candles = Vec::with_capacity(len);
-                                    let symbol = history_response.asset;
-
-                                    // Check if all arrays have the same length (basic validation)
-                                    if history_response.o.len() != len
-                                        || history_response.h.len() != len
-                                        || history_response.l.len() != len
-                                        || history_response.c.len() != len
-                                    {
+                                if let Some((_req_id, requested_asset, requested_period, _req_type)) = self.pending_request.as_ref() {
+                                    // Validate that the response matches the pending request
+                                    if history_response.asset != *requested_asset || history_response.period != *requested_period {
                                         warn!(
                                             target: "HistoricalDataApiModule",
-                                            "History response array lengths mismatch. Timestamps: {}, Open: {}, High: {}, Low: {}, Close: {}",
-                                            len, history_response.o.len(), history_response.h.len(), history_response.l.len(), history_response.c.len()
+                                            "Received history for {} (p:{}) but expected {} (p:{}). Skipping.",
+                                            history_response.asset, history_response.period, requested_asset, requested_period
                                         );
-                                        // We might still try to parse as many as possible or fail.
-                                        // Let's iterate up to the minimum length to be safe.
+                                        continue;
                                     }
 
-                                    let min_len = len
-                                        .min(history_response.o.len())
-                                        .min(history_response.h.len())
-                                        .min(history_response.l.len())
-                                        .min(history_response.c.len());
+                                    let (req_id, _, _, req_type) = if let Some(req) = self.pending_request.take() {
+                                        req
+                                    } else {
+                                        warn!(target: "HistoricalDataApiModule", "Pending request missing when expected.");
+                                        continue;
+                                    };
+                                    let symbol = history_response.asset;
 
-                                    for i in 0..min_len {
-                                        let base_candle = BaseCandle {
-                                            timestamp: history_response.timestamps[i] as f64,
-                                            open: history_response.o[i],
-                                            close: history_response.c[i],
-                                            high: history_response.h[i],
-                                            low: history_response.l[i],
-                                            volume: history_response.v.as_ref().and_then(|v| v.get(i).cloned()),
-                                        };
-                                        if let Ok(candle) = Candle::try_from((base_candle, symbol.clone())) {
-                                            candles.push(candle);
+                                    // Extract ticks first if available
+                                    let mut ticks = Vec::new();
+                                    if let Some(history_items) = history_response.history.as_ref() {
+                                        ticks = history_items.iter().map(|item| item.to_tick()).collect();
+                                    }
+
+                                    if req_type == RequestType::Ticks {
+                                        // If we only have candles, try to get ticks from them
+                                        if ticks.is_empty() {
+                                             if let Some(candle_items) = history_response.candles {
+                                                ticks = candle_items.iter().map(|item| (item.0, item.2)).collect(); // timestamp, close
+                                             } else if let (Some(timestamps), Some(c)) = (history_response.timestamps, history_response.c) {
+                                                let len = timestamps.len().min(c.len());
+                                                for i in 0..len {
+                                                    ticks.push((timestamps[i] as f64, c[i]));
+                                                }
+                                             }
                                         }
-                                    }
 
-                                    self.command_responder.send(CommandResponse::Success {
-                                        req_id,
-                                        candles,
-                                    }).await?;
+                                        self.command_responder.send(CommandResponse::Ticks {
+                                            req_id,
+                                            ticks,
+                                        }).await?;
+                                    } else {
+                                        // RequestType::Candles
+                                        let mut candles = Vec::new();
+                                        let mut has_candles = false;
+                                        if let Some(candle_items) = history_response.candles {
+                                            if !candle_items.is_empty() {
+                                                has_candles = true;
+                                                // Handle nested array candles format
+                                                // Format: [timestamp, open, close, high, low, volume]
+                                                for item in candle_items {
+                                                    let base_candle = BaseCandle {
+                                                        timestamp: item.0,
+                                                        open: item.1,
+                                                        close: item.2,
+                                                        high: item.3,
+                                                        low: item.4,
+                                                        volume: Some(item.5),
+                                                    };
+                                                    if let Ok(candle) = Candle::try_from((base_candle, symbol.clone())) {
+                                                        candles.push(candle);
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if !has_candles {
+                                            if let Some(history_items) = history_response.history {
+                                                // Handle nested array ticks format - compile to candles
+                                                candles = compile_candles_from_ticks(&history_items, history_response.period, &symbol);
+                                            } else if let (Some(timestamps), Some(o), Some(h), Some(l), Some(c)) = (
+                                                history_response.timestamps,
+                                                history_response.o,
+                                                history_response.h,
+                                                history_response.l,
+                                                history_response.c,
+                                            ) {
+                                                // Handle legacy separate arrays format
+                                                let len = timestamps.len();
+                                                let min_len = len.min(o.len()).min(h.len()).min(l.len()).min(c.len());
+
+                                                for i in 0..min_len {
+                                                    let base_candle = BaseCandle {
+                                                        timestamp: timestamps[i] as f64,
+                                                        open: o[i],
+                                                        close: c[i],
+                                                        high: h[i],
+                                                        low: l[i],
+                                                        volume: history_response.v.as_ref().and_then(|v| v.get(i).cloned()),
+                                                    };
+                                                    if let Ok(candle) = Candle::try_from((base_candle, symbol.clone())) {
+                                                        candles.push(candle);
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        self.command_responder.send(CommandResponse::Candles {
+                                            req_id,
+                                            candles,
+                                        }).await?;
+                                    }
                                 } else {
                                     warn!(target: "HistoricalDataApiModule", "Received history data but no req_id was pending. Discarding.");
                                 }
                             }
                             ServerResponse::Fail(e) => {
-                                self.last_req_id = None;
+                                self.pending_request = None;
                                 self.command_responder.send(CommandResponse::Error(e)).await?;
                             }
                         }
@@ -297,6 +486,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
         Box::new(MultiPatternRule::new(vec![
             "updateHistory",
             "updateHistoryNewFast",
+            "updateHistoryNew",
         ]))
     }
 }
@@ -306,7 +496,7 @@ mod tests {
     use super::*;
     use crate::pocketoption::ssid::Ssid;
     use crate::pocketoption::state::StateBuilder;
-    use binary_options_tools_core_pre::reimports::{Message, bounded_async};
+    use binary_options_tools_core_pre::reimports::{bounded_async, Message};
     use binary_options_tools_core_pre::traits::ApiModule;
     use std::sync::Arc;
     use uuid::Uuid;
@@ -349,7 +539,7 @@ mod tests {
         let period = 60;
 
         cmd_tx
-            .send(Command::GetHistory {
+            .send(Command::GetCandles {
                 asset: asset.clone(),
                 period,
                 req_id,
@@ -393,7 +583,7 @@ mod tests {
             .expect("Failed to receive module response");
 
         match response {
-            CommandResponse::Success {
+            CommandResponse::Candles {
                 req_id: r_id,
                 candles,
             } => {
@@ -406,7 +596,7 @@ mod tests {
                     rust_decimal::Decimal::from_str_exact("122.24").unwrap()
                 );
             }
-            CommandResponse::Error(e) => panic!("Received error response: {}", e),
+            _ => panic!("Expected Candles response"),
         }
     }
 
@@ -447,7 +637,7 @@ mod tests {
         let period = 60;
 
         cmd_tx
-            .send(Command::GetHistory {
+            .send(Command::GetCandles {
                 asset: asset.clone(),
                 period,
                 req_id,
@@ -482,7 +672,7 @@ mod tests {
             .expect("Failed to receive module response");
 
         match response {
-            CommandResponse::Success {
+            CommandResponse::Candles {
                 req_id: r_id,
                 candles,
             } => {
@@ -494,7 +684,330 @@ mod tests {
                     rust_decimal::Decimal::from_str_exact("0.59514").unwrap()
                 );
             }
-            CommandResponse::Error(e) => panic!("Received error response: {}", e),
+            _ => panic!("Expected Candles response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_historical_data_mismatch_retry() {
+        // Setup channels
+        let (cmd_tx, cmd_rx) = bounded_async(10);
+        let (resp_tx, resp_rx) = bounded_async(10);
+        let (msg_tx, msg_rx) = bounded_async(10);
+        let (ws_tx, ws_rx) = bounded_async(10);
+
+        // Create shared state
+        let dummy_ssid_str =
+            r#"42["auth",{"session":"dummy_session","isDemo":1,"uid":123,"platform":2}]"#;
+        let ssid = Ssid::parse(dummy_ssid_str).expect("Failed to parse dummy SSID");
+
+        let state = Arc::new(
+            StateBuilder::default()
+                .ssid(ssid)
+                .build()
+                .expect("Failed to build state"),
+        );
+
+        // Initialize the module
+        let mut module =
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+
+        // Spawn the module loop
+        tokio::spawn(async move {
+            if let Err(e) = module.run().await {
+                eprintln!("Module run error: {:?}", e);
+            }
+        });
+
+        // 1. Send GetCandles command
+        let req_id = Uuid::new_v4();
+        let asset = "EURUSD_otc".to_string();
+        let period = 60;
+
+        cmd_tx
+            .send(Command::GetCandles {
+                asset: asset.clone(),
+                period,
+                req_id,
+            })
+            .await
+            .expect("Failed to send command");
+
+        // 2. Consume WS message
+        let _ = ws_rx.recv().await.expect("Failed to receive WS message");
+
+        // 3. Send MISMATCHING response (wrong asset)
+        let response_payload_mismatch = r#"{
+            "asset": "WRONG_ASSET",
+            "period": 60,
+            "history": []
+        }"#;
+        let msg_mismatch = Message::Text(response_payload_mismatch.to_string().into());
+        msg_tx
+            .send(Arc::new(msg_mismatch))
+            .await
+            .expect("Failed to send mismatch message");
+
+        // 4. Send CORRECT response
+        let response_payload_correct = r#"{
+            "asset": "EURUSD_otc",
+            "period": 60,
+            "history": []
+        }"#;
+        let msg_correct = Message::Text(response_payload_correct.to_string().into());
+        msg_tx
+            .send(Arc::new(msg_correct))
+            .await
+            .expect("Failed to send correct message");
+
+        // 5. Verify we get the response for the correct one
+        // The mismatch one should be ignored.
+        let response = timeout(Duration::from_secs(1), resp_rx.recv())
+            .await
+            .expect("Timed out waiting for response")
+            .expect("Failed to receive module response");
+
+        match response {
+            CommandResponse::Candles { req_id: r_id, .. } => {
+                assert_eq!(r_id, req_id);
+            }
+            _ => panic!("Expected Candles response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_historical_data_no_pending_request() {
+        // Setup channels
+        let (_cmd_tx, cmd_rx) = bounded_async(10);
+        let (resp_tx, resp_rx) = bounded_async(10);
+        let (msg_tx, msg_rx) = bounded_async(10);
+        let (ws_tx, _ws_rx) = bounded_async(10);
+
+        let dummy_ssid_str =
+            r#"42["auth",{"session":"dummy_session","isDemo":1,"uid":123,"platform":2}]"#;
+        let ssid = Ssid::parse(dummy_ssid_str).expect("Failed to parse dummy SSID");
+        let state = Arc::new(
+            StateBuilder::default()
+                .ssid(ssid)
+                .build()
+                .expect("Failed to build state"),
+        );
+
+        let mut module =
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+
+        tokio::spawn(async move {
+            let _ = module.run().await;
+        });
+
+        // 1. Send unsolicited response
+        let response_payload = r#"{
+            "asset": "EURUSD_otc",
+            "period": 60,
+            "history": []
+        }"#;
+        let msg = Message::Text(response_payload.to_string().into());
+        msg_tx
+            .send(Arc::new(msg))
+            .await
+            .expect("Failed to send message");
+
+        // 2. Verify NO response is sent
+        let result = timeout(Duration::from_millis(200), resp_rx.recv()).await;
+        assert!(
+            result.is_err(),
+            "Should not receive a response when no request was pending"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_requests() {
+        // Setup channels
+        let (cmd_tx, cmd_rx) = bounded_async(10);
+        let (resp_tx, resp_rx) = bounded_async(10);
+        let (msg_tx, msg_rx) = bounded_async(10);
+        let (ws_tx, ws_rx) = bounded_async(10);
+
+        // Create shared state
+        let dummy_ssid_str =
+            r#"42["auth",{"session":"dummy_session","isDemo":1,"uid":123,"platform":2}]"#;
+        let ssid = Ssid::parse(dummy_ssid_str).expect("Failed to parse dummy SSID");
+        let state = Arc::new(
+            StateBuilder::default()
+                .ssid(ssid)
+                .build()
+                .expect("Failed to build state"),
+        );
+
+        // Initialize the module
+        let mut module =
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+
+        // Spawn the module loop
+        tokio::spawn(async move {
+            if let Err(e) = module.run().await {
+                eprintln!("Module run error: {:?}", e);
+            }
+        });
+
+        // 1. Send First Request
+        let req_id1 = Uuid::new_v4();
+        cmd_tx
+            .send(Command::GetCandles {
+                asset: "ASSET1".to_string(),
+                period: 60,
+                req_id: req_id1,
+            })
+            .await
+            .expect("Failed to send command 1");
+
+        // Consume WS message 1
+        let _ = ws_rx.recv().await.expect("Failed to receive WS message 1");
+
+        // 2. Send Second Request (Concurrent)
+        let req_id2 = Uuid::new_v4();
+        cmd_tx
+            .send(Command::GetCandles {
+                asset: "ASSET2".to_string(),
+                period: 60,
+                req_id: req_id2,
+            })
+            .await
+            .expect("Failed to send command 2");
+
+        // Consume WS message 2
+        let _ = ws_rx.recv().await.expect("Failed to receive WS message 2");
+
+        // 3. Send Response for Request 2 (The one that should be pending now)
+        let response_payload2 = r#"{
+            "asset": "ASSET2",
+            "period": 60,
+            "history": []
+        }"#;
+        msg_tx
+            .send(Arc::new(Message::Text(
+                response_payload2.to_string().into(),
+            )))
+            .await
+            .expect("Failed to send message");
+
+        // 4. Verify Response for Request 2
+        let response = timeout(Duration::from_secs(1), resp_rx.recv())
+            .await
+            .expect("Timed out")
+            .expect("Failed to receive response");
+
+        match response {
+            CommandResponse::Candles { req_id, .. } => {
+                assert_eq!(
+                    req_id, req_id2,
+                    "Should receive response for the second request"
+                );
+            }
+            _ => panic!("Expected Candles response"),
+        }
+
+        // 5. Send Response for Request 1 (Should be ignored as it was overwritten)
+        let response_payload1 = r#"{
+            "asset": "ASSET1",
+            "period": 60,
+            "history": []
+        }"#;
+        msg_tx
+            .send(Arc::new(Message::Text(
+                response_payload1.to_string().into(),
+            )))
+            .await
+            .expect("Failed to send message");
+
+        // 6. Verify NO Response for Request 1
+        let result = timeout(Duration::from_millis(200), resp_rx.recv()).await;
+        assert!(
+            result.is_err(),
+            "Should not receive response for overwritten request"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_invalid_json_response() {
+        // Setup channels
+        let (cmd_tx, cmd_rx) = bounded_async(10);
+        let (resp_tx, resp_rx) = bounded_async(10);
+        let (msg_tx, msg_rx) = bounded_async(10);
+        let (ws_tx, ws_rx) = bounded_async(10);
+
+        // Create shared state
+        let dummy_ssid_str =
+            r#"42["auth",{"session":"dummy_session","isDemo":1,"uid":123,"platform":2}]"#;
+        let ssid = Ssid::parse(dummy_ssid_str).expect("Failed to parse dummy SSID");
+        let state = Arc::new(
+            StateBuilder::default()
+                .ssid(ssid)
+                .build()
+                .expect("Failed to build state"),
+        );
+
+        // Initialize the module
+        let mut module =
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+
+        // Spawn the module loop
+        tokio::spawn(async move {
+            if let Err(e) = module.run().await {
+                eprintln!("Module run error: {:?}", e);
+            }
+        });
+
+        // 1. Send Request
+        let req_id = Uuid::new_v4();
+        cmd_tx
+            .send(Command::GetCandles {
+                asset: "EURUSD_otc".to_string(),
+                period: 60,
+                req_id,
+            })
+            .await
+            .expect("Failed to send command");
+
+        // Consume WS message
+        let _ = ws_rx.recv().await.expect("Failed to receive WS message");
+
+        // 2. Send Invalid JSON Response
+        let invalid_payload = "INVALID_JSON_DATA";
+        msg_tx
+            .send(Arc::new(Message::Text(invalid_payload.to_string().into())))
+            .await
+            .expect("Failed to send message");
+
+        // 3. Verify NO Crash and NO Response (it should be ignored)
+        let result = timeout(Duration::from_millis(200), resp_rx.recv()).await;
+        assert!(
+            result.is_err(),
+            "Should not receive response for invalid JSON"
+        );
+
+        // 4. Send Valid Response afterwards to ensure module is still alive
+        let valid_payload = r#"{
+            "asset": "EURUSD_otc",
+            "period": 60,
+            "history": []
+        }"#;
+        msg_tx
+            .send(Arc::new(Message::Text(valid_payload.to_string().into())))
+            .await
+            .expect("Failed to send message");
+
+        // 5. Verify Response
+        let response = timeout(Duration::from_secs(1), resp_rx.recv())
+            .await
+            .expect("Timed out")
+            .expect("Failed to receive response");
+
+        match response {
+            CommandResponse::Candles { req_id: r_id, .. } => {
+                assert_eq!(r_id, req_id);
+            }
+            _ => panic!("Expected Candles response"),
         }
     }
 }
