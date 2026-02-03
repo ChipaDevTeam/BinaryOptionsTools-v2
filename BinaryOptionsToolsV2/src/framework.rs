@@ -36,34 +36,68 @@ pub struct StrategyWrapper {
 #[async_trait]
 impl Strategy for StrategyWrapper {
     async fn on_start(&self, ctx: &Context) -> PocketResult<()> {
-        Python::attach(|py| {
-            let py_ctx = PyContext {
-                client: Some(ctx.client.clone()),
-                market: ctx.market.clone(),
-            };
-            self.inner
-                .call_method1(py, "on_start", (py_ctx,))
-                .map_err(|e| {
-                    binary_options_tools::pocketoption::error::PocketError::General(format!("Python on_start error: {}", e))
-                })
-        }).map(|_| ())?;
+        let inner = self.inner.clone();
+        let client = ctx.client.clone();
+        let market = ctx.market.clone();
+
+        tokio::task::spawn_blocking(move || {
+            Python::attach(|py| {
+                let py_ctx = PyContext {
+                    client: Some(client),
+                    market: market,
+                };
+                inner
+                    .call_method1(py, "on_start", (py_ctx,))
+                    .map_err(|e| {
+                        binary_options_tools::pocketoption::error::PocketError::General(format!(
+                            "Python on_start error: {}",
+                            e
+                        ))
+                    })
+            })
+            .map(|_| ())
+        })
+        .await
+        .map_err(|e| {
+            binary_options_tools::pocketoption::error::PocketError::General(format!(
+                "Spawn blocking error: {}",
+                e
+            ))
+        })??;
         Ok(())
     }
 
     async fn on_candle(&self, ctx: &Context, asset: &str, candle: &Candle) -> PocketResult<()> {
         let candle_json = serde_json::to_string(candle).unwrap_or_default();
         let asset = asset.to_string();
-        Python::attach(|py| {
-            let py_ctx = PyContext {
-                client: Some(ctx.client.clone()),
-                market: ctx.market.clone(),
-            };
-            self.inner
-                .call_method1(py, "on_candle", (py_ctx, asset, candle_json))
-                .map_err(|e| {
-                    binary_options_tools::pocketoption::error::PocketError::General(format!("Python on_candle error: {}", e))
-                })
-        }).map(|_| ())?;
+        let inner = self.inner.clone();
+        let client = ctx.client.clone();
+        let market = ctx.market.clone();
+
+        tokio::task::spawn_blocking(move || {
+            Python::attach(|py| {
+                let py_ctx = PyContext {
+                    client: Some(client),
+                    market: market,
+                };
+                inner
+                    .call_method1(py, "on_candle", (py_ctx, asset, candle_json))
+                    .map_err(|e| {
+                        binary_options_tools::pocketoption::error::PocketError::General(format!(
+                            "Python on_candle error: {}",
+                            e
+                        ))
+                    })
+            })
+            .map(|_| ())
+        })
+        .await
+        .map_err(|e| {
+            binary_options_tools::pocketoption::error::PocketError::General(format!(
+                "Spawn blocking error: {}",
+                e
+            ))
+        })??;
         Ok(())
     }
 }
@@ -158,10 +192,14 @@ impl PyBot {
                 std::time::Duration::from_secs(period as u64),
             )
             .map_err(BinaryErrorPy::from)?;
-            
+
             bot.add_asset(asset, subscription);
+            Ok(())
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Bot already consumed or run() called",
+            ))
         }
-        Ok(())
     }
 
     pub fn run<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {

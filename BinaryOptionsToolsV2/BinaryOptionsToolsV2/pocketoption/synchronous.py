@@ -1,6 +1,7 @@
 import asyncio
 import json
 from datetime import timedelta
+from typing import Optional, Union, List, Dict
 
 from ..config import Config
 from ..validator import Validator
@@ -151,7 +152,7 @@ class SyncRawSubscription:
 
 
 class PocketOption:
-    def __init__(self, ssid: str, url: str | None = None, config: Config | dict | str = None, **_):
+    def __init__(self, ssid: str, url: Optional[str] = None, config: Union[Config, dict, str] = None, **_):
         """
         Initializes a new PocketOption instance.
 
@@ -288,7 +289,7 @@ class PocketOption:
         "Removes all the closed deals from memory, this function doesn't return anything"
         self.loop.run_until_complete(self._client.clear_closed_deals())
 
-    def payout(self, asset: None | str | list[str] = None) -> dict[str, int | None] | list[int | None] | int | None:
+    def payout(self, asset: Optional[Union[str, List[str]]] = None) -> Union[Dict[str, Optional[int]], List[Optional[int]], int, None]:
         "Returns a dict of asset | payout for each asset, if 'asset' is not None then it will return the payout of the asset or a list of the payouts for each asset it was passed"
         return self.loop.run_until_complete(self._client.payout(asset))
 
@@ -416,7 +417,7 @@ class PocketOption:
         """
         self.loop.run_until_complete(self._client.unsubscribe(asset))
 
-    def create_raw_handler(self, validator: Validator, keep_alive: str | None = None) -> "RawHandlerSync":
+    def create_raw_handler(self, validator: Validator, keep_alive: Optional[str] = None) -> "RawHandlerSync":
         """
         Creates a raw handler for advanced WebSocket message handling.
 

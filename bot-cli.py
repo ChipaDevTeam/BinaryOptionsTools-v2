@@ -57,10 +57,10 @@ def init_project(name):
         f.write(DOTENV_TEMPLATE)
 
     print(f"Project {name} initialized successfully!")
-    print(f"Next steps:")
+    print("Next steps:")
     print(f"  1. cd {name}")
-    print(f"  2. Edit .env and add your POCKET_OPTION_SSID")
-    print(f"  3. Run your bot: python bot.py")
+    print("  2. Edit .env and add your POCKET_OPTION_SSID")
+    print("  3. Run your bot: python bot.py")
 
 
 def main():

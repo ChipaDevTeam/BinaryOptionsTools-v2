@@ -19,10 +19,10 @@ async def main():
     """
 
     # 1. Configuration
-    ssid = os.getenv("PO_SSID")
+    ssid = os.getenv("POCKET_OPTION_SSID")
     if not ssid:
-        logger.error("PO_SSID environment variable not set.")
-        logger.info("Please set it using: export PO_SSID='your_session_id'")
+        logger.error("POCKET_OPTION_SSID environment variable not set.")
+        logger.info("Please set it using: export POCKET_OPTION_SSID='your_session_id'")
         return
 
     logger.info("Initializing PocketOptionAsync client...")
@@ -60,7 +60,8 @@ async def main():
         # 5. Real-time Subscriptions
         logger.info("\n--- Real-time Data ---")
         logger.info(f"Subscribing to {asset} (1s)...")
-        subscription = await client.subscribe_symbol(asset, 1)
+        from datetime import timedelta
+        subscription = await client.subscribe_symbol_timed(asset, timedelta(seconds=1))
 
         logger.info("Collecting 3 live candles...")
         count = 0
@@ -87,7 +88,8 @@ async def main():
             await asyncio.sleep(duration + 2)
 
             result = await client.check_win(trade_id)
-            logger.info(f"Trade Result: {'WIN' if result else 'LOSS'}")
+            # result is a dict with 'result' key being "win", "loss", or "draw"
+            logger.info(f"Trade Result: {result.get('result', 'unknown').upper()}")
 
         except Exception as e:
             logger.error(f"Trading error: {e}")

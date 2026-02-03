@@ -2,6 +2,7 @@ import asyncio
 import json
 import sys
 from datetime import timedelta
+from typing import Optional, Union, List, Dict
 
 from ..config import Config
 from ..validator import Validator
@@ -141,7 +142,7 @@ class RawHandler:
 
 # This file contains all the async code for the PocketOption Module
 class PocketOptionAsync:
-    def __init__(self, ssid: str, url: str | None = None, config: Config | dict | str = None, **_):
+    def __init__(self, ssid: str, url: Optional[str] = None, config: Union[Config, dict, str] = None, **_):
         """
         Initializes a new PocketOptionAsync instance.
 
@@ -404,8 +405,8 @@ class PocketOptionAsync:
         await self.client.clear_closed_deals()
 
     async def payout(
-        self, asset: None | str | list[str] = None
-    ) -> dict[str, int | None] | list[int | None] | int | None:
+        self, asset: Optional[Union[str, List[str]]] = None
+    ) -> Union[Dict[str, Optional[int]], List[Optional[int]], int, None]:
         """
         Retrieves current payout percentages for all assets.
 
@@ -614,7 +615,7 @@ class PocketOptionAsync:
         """
         await self.client.unsubscribe(asset)
 
-    async def create_raw_handler(self, validator: Validator, keep_alive: str | None = None) -> "RawHandler":
+    async def create_raw_handler(self, validator: Validator, keep_alive: Optional[str] = None) -> "RawHandler":
         """
         Creates a raw handler for advanced WebSocket message handling.
 

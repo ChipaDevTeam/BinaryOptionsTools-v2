@@ -79,7 +79,11 @@ pub enum SubscriptionError {
 #[derive(Debug)]
 pub enum Command {
     /// Subscribe to an asset's stream
-    Subscribe { asset: String, command_id: Uuid },
+    Subscribe {
+        asset: String,
+        sub_type: SubscriptionType,
+        command_id: Uuid,
+    },
     /// Unsubscribe from an asset's stream
     Unsubscribe { asset: String, command_id: Uuid },
     /// History
@@ -140,12 +144,16 @@ impl ReconnectCallback<State> for SubscriptionCallback {
     async fn call(&self, state: Arc<State>, ws_sender: &AsyncSender<Message>) -> CoreResult<()> {
         tokio::time::sleep(RECONNECT_INITIAL_DELAY).await;
         // Resubscribe to all active subscriptions
-        let symbols: Vec<String> = state.active_subscriptions.read().await.keys().cloned().collect();
+        let subscriptions = state.active_subscriptions.read().await.clone();
 
         // Send subscription messages concurrently
-        let futures = symbols.into_iter().map(|symbol| {
+        let futures = subscriptions.into_iter().map(|(symbol, (_, sub_type))| {
             let ws_sender = ws_sender.clone();
-            async move { send_subscribe_message(&ws_sender, &symbol, 1).await }
+            let period = match sub_type {
+                SubscriptionType::TimeAligned { duration, .. } => duration.as_secs() as u32,
+                _ => 1,
+            };
+            async move { send_subscribe_message(&ws_sender, &symbol, period).await }
         });
 
         let results = join_all(futures).await;
@@ -191,6 +199,7 @@ impl SubscriptionsHandle {
         self.sender
             .send(Command::Subscribe {
                 asset: asset.clone(),
+                sub_type: sub_type.clone(),
                 command_id: id,
             })
             .await
@@ -396,7 +405,11 @@ impl ApiModule<State> for SubscriptionsApiModule {
             select! {
                 Ok(cmd) = self.command_receiver.recv() => {
                     match cmd {
-                        Command::Subscribe { asset, command_id } => {
+                        Command::Subscribe {
+                            asset,
+                            sub_type,
+                            command_id,
+                        } => {
                             // TODO: Handle subscription request
                             // 1. Check if max subscriptions reached
                             // 2. Create stream channel
@@ -412,10 +425,18 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                 continue;
                             } else {
                                 // Create stream channel
-                                self.send_subscribe_message(&asset, 1).await?;
-                                let (stream_sender, stream_receiver) = bounded_async(MAX_CHANNEL_CAPACITY);
-                                self.add_subscription(asset.clone(), stream_sender).await.map_err(|e| CoreError::Other(e.to_string()))?;
-
+                                let period = match sub_type {
+                                    SubscriptionType::TimeAligned { duration, .. } => {
+                                        duration.as_secs() as u32
+                                    }
+                                    _ => 1,
+                                };
+                                self.send_subscribe_message(&asset, period).await?;
+                                let (stream_sender, stream_receiver) =
+                                    bounded_async(MAX_CHANNEL_CAPACITY);
+                                self.add_subscription(asset.clone(), sub_type, stream_sender)
+                                    .await
+                                    .map_err(|e| CoreError::Other(e.to_string()))?;
 
                                 // Send success response with stream receiver
                                 self.command_responder.send(CommandResponse::SubscriptionSuccess {
@@ -423,7 +444,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                     stream_receiver,
                                 }).await?;
                             }
-                        },
+                        }
                         Command::Unsubscribe { asset, command_id } => {
                             // TODO: Handle unsubscription request
                             // 1. Find subscription by ID
@@ -590,6 +611,7 @@ impl SubscriptionsApiModule {
     async fn add_subscription(
         &mut self,
         asset: String,
+        sub_type: SubscriptionType,
         stream_sender: AsyncSender<SubscriptionEvent>,
     ) -> PocketResult<()> {
         if self.is_max_subscriptions_reached().await {
@@ -612,7 +634,7 @@ impl SubscriptionsApiModule {
             .active_subscriptions
             .write()
             .await
-            .insert(asset, stream_sender);
+            .insert(asset, (stream_sender, sub_type));
         Ok(())
     }
 
@@ -628,7 +650,7 @@ impl SubscriptionsApiModule {
         // 1. Remove from active_subscriptions
         // 2. Remove from asset_to_subscription
         // 3. Return removed subscription info
-        if let Some(stream_sender) = self.state.active_subscriptions.write().await.remove(asset) {
+        if let Some((stream_sender, _)) = self.state.active_subscriptions.write().await.remove(asset) {
             stream_sender.send(SubscriptionEvent::Terminated { reason: "Unsubscribed from main module".to_string() })
                 .await.inspect_err(|e| warn!(target: "SubscriptionsApiModule", "Failed to send termination signal: {}", e))?;
             return Ok(true);
@@ -639,9 +661,14 @@ impl SubscriptionsApiModule {
 
     async fn resend_connection_messages(&self) -> CoreResult<()> {
         // Resend connection messages to re-establish subscriptions
-        for symbol in self.state.active_subscriptions.read().await.keys() {
+        let subscriptions = self.state.active_subscriptions.read().await.clone();
+        for (symbol, (_, sub_type)) in subscriptions {
+            let period = match sub_type {
+                SubscriptionType::TimeAligned { duration, .. } => duration.as_secs() as u32,
+                _ => 1,
+            };
             // Send subscription message for each active asset
-            self.send_subscribe_message(symbol, 1).await?;
+            self.send_subscribe_message(&symbol, period).await?;
         }
         Ok(())
     }
@@ -670,7 +697,7 @@ impl SubscriptionsApiModule {
         // 1. Find subscription by asset
         // 2. Send StreamData::Candle to stream
         // 3. Handle send errors (stream might be closed)
-        if let Some(stream_sender) = self.state.active_subscriptions.read().await.get(asset) {
+        if let Some((stream_sender, _)) = self.state.active_subscriptions.read().await.get(asset) {
             stream_sender
                 .send(SubscriptionEvent::Update {
                     asset: asset.to_string(),
