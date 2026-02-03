@@ -33,6 +33,12 @@ classifiers = [
 ]
 dynamic = ["version"]
 
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-asyncio",
+]
+
 [project.urls]
 Homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
 Documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html"
@@ -44,6 +50,10 @@ Discord = "https://discord.com/invite/chipa-1261483112991555665"
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "BinaryOptionsToolsV2"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["../tests"]
 
 [tool.ruff]
 line-length = 120

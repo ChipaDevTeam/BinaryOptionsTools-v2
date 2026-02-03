@@ -78,7 +78,7 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
-          pip install pytest
+          pip install pytest pytest-asyncio
           mkdir test_run
           cd test_run
           pytest ../../tests
@@ -92,7 +92,7 @@ jobs:
           install: |
             apt-get update
             apt-get install -y --no-install-recommends python3 python3-pip
-            pip3 install -U pip pytest
+            pip3 install -U pip pytest pytest-asyncio
           run: |
             set -e
             cd BinaryOptionsToolsV2
@@ -164,7 +164,7 @@ jobs:
             python3 -m virtualenv .venv
             source .venv/bin/activate
             pip install BinaryOptionsToolsV2 --no-index --find-links dist --force-reinstall
-            pip install pytest
+            pip install pytest pytest-asyncio
             mkdir test_run
             cd test_run
             pytest ../../tests
@@ -182,7 +182,7 @@ jobs:
             cd BinaryOptionsToolsV2
             python3 -m virtualenv .venv
             source .venv/bin/activate
-            pip install pytest
+            pip install pytest pytest-asyncio
             pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
             mkdir test_run
             cd test_run
@@ -237,7 +237,7 @@ jobs:
           python3 -m venv .venv
           source .venv/Scripts/activate
           pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
-          pip install pytest
+          pip install pytest pytest-asyncio
           mkdir test_run
           cd test_run
           pytest ../../tests
@@ -282,7 +282,7 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
-          pip install pytest
+          pip install pytest pytest-asyncio
           mkdir test_run
           cd test_run
           pytest ../../tests

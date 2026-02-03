@@ -39,7 +39,7 @@ impl Strategy for StrategyWrapper {
         let client = ctx.client.clone();
         let market = ctx.market.clone();
 
-        tokio::task::spawn_blocking(move || {
+        tokio::task::spawn_blocking(move || -> PocketResult<()> {
             Python::attach(|py| {
                 let py_ctx = PyContext {
                     client: Some(client),
@@ -73,7 +73,7 @@ impl Strategy for StrategyWrapper {
         let client = ctx.client.clone();
         let market = ctx.market.clone();
 
-        tokio::task::spawn_blocking(move || {
+        tokio::task::spawn_blocking(move || -> PocketResult<()> {
             Python::attach(|py| {
                 let py_ctx = PyContext {
                     client: Some(client),
