@@ -29,11 +29,16 @@ class DashboardStrategy(PyStrategy):
         candle = json.loads(candle_json)
         self.last_candles[asset] = candle
 
-        # Random simulation of balance check
-        asyncio.create_task(self.update_balance(ctx))
+        # Use a tracked task for balance update to avoid leaks/storms
+        if not hasattr(self, "_balance_task") or self._balance_task.done():
+            self._balance_task = asyncio.create_task(self.update_balance(ctx))
 
     async def update_balance(self, ctx):
-        self.balance = await ctx.client.balance()
+        try:
+            self.balance = await ctx.client.balance()
+        except Exception as e:
+            # In a real app, log the error
+            pass
 
     def make_layout(self):
         layout = Layout()
@@ -94,14 +99,33 @@ async def main():
         try:
             while True:
                 layout["main"]["market"].update(strategy.generate_table())
+
+                uptime = "00:00:00"
+                if hasattr(strategy, "start_time"):
+                     uptime = str(datetime.now() - strategy.start_time)
+
                 layout["header"].update(
                     Panel(
-                        f"BinaryOptionsTools Bot Dashboard | Balance: ${strategy.balance:.2f} | Uptime: {datetime.now() - strategy.start_time}"
+                        f"BinaryOptionsTools Bot Dashboard | Balance: ${strategy.balance:.2f} | Uptime: {uptime}"
                     )
                 )
                 await asyncio.sleep(0.5)
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, KeyboardInterrupt):
             pass
+        finally:
+            bot_task.cancel()
+            try:
+                await bot_task
+            except asyncio.CancelledError:
+                pass
+
+            # Cancel balance task if exists
+            if hasattr(strategy, "_balance_task") and not strategy._balance_task.done():
+                strategy._balance_task.cancel()
+                try:
+                    await strategy._balance_task
+                except asyncio.CancelledError:
+                    pass
 
 
 if __name__ == "__main__":

@@ -18,8 +18,9 @@ class MyRSIStrategy(PyStrategy):
         super().__init__()
         self.rsi_period = rsi_period
         self.prices = {}
+        self._tasks = set()
 
-    def on_start(self, ctx):
+    def on_start(self, _ctx):
         print("Strategy started!")
 
     def on_candle(self, ctx, asset, candle_json):
@@ -30,7 +31,9 @@ class MyRSIStrategy(PyStrategy):
         if str(candle["close"]).endswith("5"):
             print(f"Signal detected on {asset}! Buying...")
             # ctx.buy returns a future
-            asyncio.create_task(self.execute_trade(ctx, asset))
+            task = asyncio.create_task(self.execute_trade(ctx, asset))
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
 
     async def execute_trade(self, ctx, asset):
         try:

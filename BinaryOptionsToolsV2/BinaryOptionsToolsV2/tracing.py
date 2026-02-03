@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import timedelta
+from typing import Optional
 
 try:
     from BinaryOptionsToolsV2.BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
@@ -113,13 +114,13 @@ class LogBuilder:
     def __init__(self):
         self.builder = RustLogBuilder()
 
-    def create_logs_iterator(self, level: str = "DEBUG", timeout: None | timedelta = None) -> LogSubscription:
+    def create_logs_iterator(self, level: str = "DEBUG", timeout: Optional[timedelta] = None) -> LogSubscription:
         """
         Create a new logs iterator with the specified level and timeout.
 
         Args:
             level (str): The logging level (default is "DEBUG").
-            timeout (None | timedelta): Optional timeout for the iterator.
+            timeout (Optional[timedelta]): Optional timeout for the iterator.
 
         Returns:
             StreamLogsIterator: A new StreamLogsIterator instance that supports both asynchronous and synchronousiterators.

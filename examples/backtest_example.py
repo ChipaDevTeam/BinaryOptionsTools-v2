@@ -4,12 +4,18 @@ from BinaryOptionsToolsV2 import RawPocketOption, PyBot, PyStrategy, PyVirtualMa
 
 
 class MyBacktestStrategy(PyStrategy):
+    def __init__(self):
+        super().__init__()
+        self._tasks = set()
+
     def on_candle(self, ctx, asset, candle_json):
         candle = json.loads(candle_json)
         # print(f"Backtest candle for {asset}: {candle['close']}")
         if candle["close"] > candle["open"]:
             # Buy on green candle
-            asyncio.create_task(ctx.buy(asset, 10.0, 60))
+            task = asyncio.create_task(ctx.buy(asset, 10.0, 60))
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
 
 
 async def main():

@@ -11,6 +11,7 @@ documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
 readme = "Readme.md"
 keywords = ["binary-options", "pocketoption", "trading", "expertoption", "automation"]
 categories = ["api-bindings", "asynchronous"]
+include = ["src/**/*", "data/**/*", "Cargo.toml", "Readme.md"]
 
 [dependencies]
 anyhow = "1.0.98"
