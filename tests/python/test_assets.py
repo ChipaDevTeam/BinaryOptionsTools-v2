@@ -1,7 +1,10 @@
 import asyncio
 import os
+import sys
+# Ensure we use the local version of the library
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../BinaryOptionsToolsV2")))
 
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+from BinaryOptionsToolsV2 import PocketOptionAsync
 
 
 # Function to read assets from a file
@@ -18,9 +21,10 @@ def write_asset(filename, asset):
 
 
 async def main(ssid: str):
-    api = PocketOptionAsync(ssid)
+    async with PocketOptionAsync(ssid) as api:
+        print("Connected and assets loaded.")
 
-    # Define file paths
+        # Define file paths
     assets_file = "tests/assets.txt"
     tested_assets_file = "assets.tested.txt"
     not_working_assets_file = "not-working-assets.txt"
@@ -57,5 +61,7 @@ async def main(ssid: str):
 
 
 if __name__ == "__main__":
-    ssid = input("Please enter your ssid: ")
+    ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        ssid = input("Please enter your ssid: ")
     asyncio.run(main(ssid))

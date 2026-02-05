@@ -209,6 +209,19 @@ class PocketOptionAsync:
             self.client = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
         self.logger = Logger()
 
+    async def __aenter__(self):
+        """
+        Context manager entry. Waits for assets to be loaded.
+        """
+        await self.wait_for_assets()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """
+        Context manager exit. Disconnects the client.
+        """
+        await self.disconnect()
+
     async def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
         Places a buy (call) order for the specified asset.
@@ -291,21 +304,24 @@ class PocketOptionAsync:
             ValueError: If trade_id is invalid
             TimeoutError: If result check times out
         """
-        end_time = await self.client.get_deal_end_time(id)
+        from datetime import datetime
+        import time as py_time
+        
+        # Set a reasonable timeout to prevent hanging
+        timeout_seconds = 60  # Increased timeout to accommodate longer trade durations
+        
+        try:
+            # Use asyncio.wait_for as additional protection against hanging
+            import asyncio
+            trade = await asyncio.wait_for(self._get_trade_result(id), timeout=timeout_seconds)
+            return trade
+        except asyncio.TimeoutError:
+            raise TimeoutError(f"Timeout waiting for trade result for ID: {id}")
 
-        if end_time is not None:
-            # Import time here since it might not be at top level
-            import time as py_time
-
-            duration = end_time - int(py_time.time())
-            if duration <= 0:
-                duration = 5  # If duration is less than 0 then the trade is closed and the function should take less than 5 seconds to run
-        else:
-            duration = self.config.timeout_secs
-        duration += self.config.extra_duration
-
-        # self.logger.debug(f"Timeout set to: {duration} (extra seconds included)")
-        async def check(id):
+    async def _get_trade_result(self, id: str) -> dict:
+        """Internal method to get trade result with timeout protection"""
+        try:
+            # The Rust client should handle its own timeout, but we'll add a safeguard
             trade = await self.client.check_win(id)
             trade = json.loads(trade)
             win = trade["profit"]
@@ -316,8 +332,9 @@ class PocketOptionAsync:
             else:
                 trade["result"] = "loss"
             return trade
-
-        return await _timeout(check(id), duration)
+        except Exception as e:
+            # Catch any other errors from the Rust client
+            raise Exception(f"Error getting trade result for ID {id}: {str(e)}")
 
     async def get_candles(self, asset: str, period: int, offset: int) -> List[Dict]:
         """

@@ -1,9 +1,13 @@
 import asyncio
-from BinaryOptionsToolsV2 import PocketOption
+import os
+import sys
+# Ensure we use the local version of the library
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../BinaryOptionsToolsV2")))
 
-# Mock SSID (won't connect effectively but allows object creation)
-SSID = r'42["auth",{"session":"mock_session","isDemo":1,"uid":12345,"platform":1}]'
+from BinaryOptionsToolsV2 import PocketOptionAsync
 
+# Get SSID from environment variable
+SSID = os.getenv("POCKET_OPTION_SSID")
 
 async def trade_task(api, asset, amount, time, task_id):
     print(f"Task {task_id}: Starting trade...")
@@ -16,23 +20,27 @@ async def trade_task(api, asset, amount, time, task_id):
 
 
 async def main():
-    # This test assumes we can mock the connection or at least instantiate the client
-    # Without a live server or extensive mocking, this script is illustrative.
-    # However, if we could run it, it would hang.
-
-    try:
-        api = await PocketOption(SSID)
-    except Exception as e:
-        print(f"Failed to init api (expected if no connection): {e}")
+    if not SSID:
+        print("POCKET_OPTION_SSID not set. Skipping test.")
         return
 
-    # Simulate two concurrent trades
-    task1 = asyncio.create_task(trade_task(api, "EURUSD_otc", 1.0, 60, 1))
-    task2 = asyncio.create_task(trade_task(api, "EURUSD_otc", 1.0, 60, 2))
+    try:
+        print("Connecting...")
+        async with PocketOptionAsync(SSID) as api:
+            print("Connected and assets loaded.")
+            
+            # Verify connection
+            await api.balance()
+            
+            # Simulate two concurrent trades
+            print("Starting concurrent trades...")
+            task1 = asyncio.create_task(trade_task(api, "EURUSD_otc", 1.0, 60, 1))
+            task2 = asyncio.create_task(trade_task(api, "EURUSD_otc", 1.0, 60, 2))
 
-    await asyncio.gather(task1, task2)
+            await asyncio.gather(task1, task2)
 
-    await api.disconnect()
+    except Exception as e:
+        print(f"Failed to init api or run test: {e}")
 
 
 if __name__ == "__main__":

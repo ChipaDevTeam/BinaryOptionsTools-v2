@@ -212,6 +212,8 @@ class PocketOption:
         """
         self.loop = asyncio.new_event_loop()
         self._client = PocketOptionAsync(ssid, url=url, config=config)
+        # Wait for assets to ensure connection is ready
+        self.loop.run_until_complete(self._client.wait_for_assets())
 
     def __del__(self):
         self.loop.close()

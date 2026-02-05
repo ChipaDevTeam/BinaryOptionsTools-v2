@@ -4,104 +4,126 @@ Example script demonstrating the new connection control and raw handler features
 
 import asyncio
 import json
+import os
+import sys
+import pytest
 
-from BinaryOptionsToolsV2.pocketoption import (
+# Ensure we use the local version of the library
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../BinaryOptionsToolsV2")))
+
+from BinaryOptionsToolsV2 import (
     PocketOption,
     PocketOptionAsync,
     RawHandler,
 )
 from BinaryOptionsToolsV2.validator import Validator
 
-
+@pytest.mark.asyncio
 async def test_async_connection_control():
     """Test async connection control methods."""
     print("=== Testing Async Connection Control ===")
 
-    ssid = "your_session_id_here"
-    client = PocketOptionAsync(ssid)
+    ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        print("Error: POCKET_OPTION_SSID environment variable not set")
+        return
 
-    # Test disconnect and connect
-    print("Disconnecting...")
-    await client.disconnect()
-    print("✓ Disconnected")
+    # Use context manager or manual
+    async with PocketOptionAsync(ssid) as client:
+        # Test disconnect and connect
+        print("Disconnecting...")
+        await client.disconnect()
+        print("✓ Disconnected")
 
-    await asyncio.sleep(2)
+        await asyncio.sleep(2)
 
-    print("Reconnecting...")
-    await client.connect()
-    print("✓ Connected")
+        print("Reconnecting...")
+        await client.connect()
+        print("✓ Connected")
 
-    # Test reconnect
-    print("Testing reconnect...")
-    await client.reconnect()
-    print("✓ Reconnected")
+        # Test reconnect
+        print("Testing reconnect...")
+        await client.reconnect()
+        print("✓ Reconnected")
 
 
+@pytest.mark.asyncio
 async def test_async_raw_handler():
     """Test async raw handler functionality."""
     print("\n=== Testing Async Raw Handler ===")
 
-    ssid = "your_session_id_here"
-    client = PocketOptionAsync(ssid)
+    ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        print("Error: POCKET_OPTION_SSID environment variable not set")
+        return
 
-    # Create a validator for balance messages
-    validator = Validator.contains('"balance"')
+    async with PocketOptionAsync(ssid) as client:
+        # Create a validator for balance messages
+        validator = Validator.contains('"balance"')
 
-    # Create raw handler
-    print("Creating raw handler...")
-    handler = await client.create_raw_handler(validator)
-    print(f"✓ Handler created with ID: {handler.id()}")
+        # Create raw handler
+        print("Creating raw handler...")
+        handler = await client.create_raw_handler(validator)
+        print(f"✓ Handler created with ID: {handler.id()}")
 
-    # Send a message and wait for response
-    print("Sending message and waiting for response...")
-    response = await handler.send_and_wait('42["getBalance"]')
-    print(f"✓ Received response: {response[:100]}...")
+        # Send a message and wait for response
+        print("Sending message and waiting for response...")
+        response = await handler.send_and_wait('42["getBalance"]')
+        print(f"✓ Received response: {response[:100]}...")
 
-    # Subscribe to messages
-    print("Subscribing to stream...")
-    stream = await handler.subscribe()
+        # Subscribe to messages
+        print("Subscribing to stream...")
+        stream = await handler.subscribe()
 
-    # Read a few messages
-    count = 0
-    async for message in stream:
-        print(f"✓ Message {count + 1}: {message[:100]}...")
-        count += 1
-        if count >= 3:
-            break
+        # Read a few messages
+        count = 0
+        async for message in stream:
+            print(f"✓ Message {count + 1}: {message[:100]}...")
+            count += 1
+            if count >= 3:
+                break
 
     print("✓ Raw handler test completed")
 
 
+@pytest.mark.asyncio
 async def test_async_unsubscribe():
     """Test unsubscribing from asset streams."""
     print("\n=== Testing Async Unsubscribe ===")
 
-    ssid = "your_session_id_here"
-    client = PocketOptionAsync(ssid)
+    ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        print("Error: POCKET_OPTION_SSID environment variable not set")
+        return
 
-    # Subscribe to an asset
-    print("Subscribing to EURUSD_otc...")
-    subscription = await client.subscribe_symbol("EURUSD_otc")
+    async with PocketOptionAsync(ssid) as client:
+        # Subscribe to an asset
+        print("Subscribing to EURUSD_otc...")
+        subscription = await client.subscribe_symbol("EURUSD_otc")
 
-    # Get a few updates
-    count = 0
-    async for candle in subscription:
-        print(f"✓ Candle {count + 1}: {candle}")
-        count += 1
-        if count >= 3:
-            break
+        # Get a few updates
+        count = 0
+        async for candle in subscription:
+            print(f"✓ Candle {count + 1}: {candle}")
+            count += 1
+            if count >= 3:
+                break
 
-    # Unsubscribe
-    print("Unsubscribing from EURUSD_otc...")
-    await client.unsubscribe("EURUSD_otc")
-    print("✓ Unsubscribed")
+        # Unsubscribe
+        print("Unsubscribing from EURUSD_otc...")
+        await client.unsubscribe("EURUSD_otc")
+        print("✓ Unsubscribed")
+
 
 
 def test_sync_connection_control():
     """Test sync connection control methods."""
     print("\n=== Testing Sync Connection Control ===")
 
-    ssid = "your_session_id_here"
+    ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        print("Error: POCKET_OPTION_SSID environment variable not set")
+        return
     client = PocketOption(ssid)
 
     # Test disconnect and connect
@@ -127,7 +149,10 @@ def test_sync_raw_handler():
     """Test sync raw handler functionality."""
     print("\n=== Testing Sync Raw Handler ===")
 
-    ssid = "your_session_id_here"
+    ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        print("Error: POCKET_OPTION_SSID environment variable not set")
+        return
     client = PocketOption(ssid)
 
     # Create a validator
@@ -162,7 +187,10 @@ def test_sync_unsubscribe():
     """Test unsubscribing from asset streams (sync)."""
     print("\n=== Testing Sync Unsubscribe ===")
 
-    ssid = "your_session_id_here"
+    ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        print("Error: POCKET_OPTION_SSID environment variable not set")
+        return
     client = PocketOption(ssid)
 
     # Subscribe to an asset
@@ -208,9 +236,9 @@ async def main():
 
 
 if __name__ == "__main__":
-    # Replace with your actual session ID
-    print("NOTE: Replace 'your_session_id_here' with your actual SSID before running!")
-    print()
+    if not os.getenv("POCKET_OPTION_SSID"):
+        print("NOTE: Set POCKET_OPTION_SSID environment variable before running!")
+        print()
 
     # Uncomment to run tests
     # asyncio.run(main())
