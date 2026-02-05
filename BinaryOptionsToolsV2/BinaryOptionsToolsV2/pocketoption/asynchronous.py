@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import sys
 from datetime import timedelta
 from typing import Optional, Union, List, Dict, Tuple
@@ -188,6 +189,25 @@ class PocketOptionAsync:
         except ImportError:
             from BinaryOptionsToolsV2 import RawPocketOption
         from ..tracing import Logger
+
+        # Handle case where shell stripped quotes from the SSID (e.g. export SSID=42[auth,{session:...}])
+        if ssid.startswith('42[auth,'):
+            # 1. Fix the prefix
+            ssid = ssid.replace('42[auth,', '42["auth",', 1)
+
+            # 2. Quote keys in the JSON object (alphanumeric keys followed by colon)
+            ssid = re.sub(r'(?<=[{,])\s*([a-zA-Z0-9_]+)\s*:', r'"\1":', ssid)
+
+            # 3. Quote values (alphanumeric values followed by comma or closing bracket)
+            def quote_value(match):
+                val = match.group(1)
+                # Keep numbers and booleans/null unquoted
+                if val.isdigit() or val in ['true', 'false', 'null']:
+                    return f':{val}'
+                # Quote everything else
+                return f':"{val}"'
+
+            ssid = re.sub(r':\s*([a-zA-Z0-9_]+)(?=[,}\]])', quote_value, ssid)
 
         if config is not None:
             if isinstance(config, dict):
