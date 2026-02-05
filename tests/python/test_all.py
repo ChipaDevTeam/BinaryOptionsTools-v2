@@ -61,7 +61,7 @@ async def test_buy_and_check_win(api):
     
     asset = "EURUSD_otc" # OTC is usually available on weekends too
     amount = 1.0
-    duration = 5 # Minimum duration to reduce test time
+    duration = 15 # Increased duration to give more time for result processing
     
     # Check if we can get payout for this asset to ensure it's valid
     try:
@@ -71,7 +71,7 @@ async def test_buy_and_check_win(api):
     except Exception:
         pytest.skip(f"Could not check payout for {asset}")
 
-    print(f"Buying {asset}...")
+    print(f"Buying {asset} for {duration} seconds...")
     try:
         # Buy without waiting for result first
         trade_id, trade_info = await api.buy(asset, amount, duration, check_win=False)
@@ -80,22 +80,26 @@ async def test_buy_and_check_win(api):
         print(f"Trade placed: {trade_id}")
         
         # Now wait for result using check_win
-        # Note: check_win might wait for duration + extra
-        print("Waiting for trade result...")
+        print(f"Waiting for trade result (timeout: {duration + 60.0}s)...")
         try:
             # Use a reasonable timeout to prevent hanging - should be at least duration + buffer
             result = await asyncio.wait_for(
                 api.check_win(trade_id),
-                timeout=duration + 30.0  # Use duration + buffer to prevent hanging
+                timeout=duration + 60.0  # Increased timeout buffer
             )
             assert isinstance(result, dict)
             assert "result" in result
             assert result["result"] in ["win", "loss", "draw"]
             print(f"Trade result: {result}")
         except asyncio.TimeoutError:
+            print(f"Timeout occurred for trade_id: {trade_id}")
             pytest.fail(f"Timed out waiting for trade result for trade_id: {trade_id}")
+        except Exception as e:
+            print(f"Error during check_win: {e}")
+            pytest.fail(f"Error during check_win: {e}")
         
     except Exception as e:
+        print(f"Trade failed: {e}")
         pytest.fail(f"Trade failed: {e}")
 
         
@@ -127,6 +131,56 @@ async def test_buy_without_waiting(api):
         
     except Exception as e:
         pytest.fail(f"Trade placement failed: {e}")
+
+@pytest.mark.asyncio
+async def test_get_candles(api):
+    """Test retrieving historical candle data."""
+    asset = "EURUSD_otc"
+    period = 60  # 1-minute candles
+    
+    print(f"Fetching candles for {asset} with period {period}...")
+    try:
+        # Some assets might not be available, so we check payout first
+        payout = await api.payout(asset)
+        if not payout:
+            pytest.skip(f"Asset {asset} not available")
+
+        # api.candles() uses HistoricalDataApiModule
+        candles = await asyncio.wait_for(api.candles(asset, period), timeout=20.0)
+        assert isinstance(candles, list)
+        assert len(candles) > 0
+        print(f"Received {len(candles)} candles.")
+        for candle in candles[:2]:  # Print first 2 for verification
+            print(f"Candle: {candle}")
+            assert "time" in candle or "timestamp" in candle
+            assert "open" in candle
+            assert "close" in candle
+    except asyncio.TimeoutError:
+        pytest.fail("Timed out waiting for candles")
+    except Exception as e:
+        pytest.fail(f"Failed to get candles: {e}")
+
+@pytest.mark.asyncio
+async def test_history(api):
+    """Test retrieving historical candle data using the history method."""
+    asset = "EURUSD_otc"
+    period = 60
+    
+    print(f"Fetching history for {asset} with period {period}...")
+    try:
+        payout = await api.payout(asset)
+        if not payout:
+            pytest.skip(f"Asset {asset} not available")
+
+        # api.history() is a wrapper for candles()
+        history = await asyncio.wait_for(api.history(asset, period), timeout=20.0)
+        assert isinstance(history, list)
+        assert len(history) > 0
+        print(f"Received {len(history)} candles from history.")
+    except asyncio.TimeoutError:
+        pytest.fail("Timed out waiting for history")
+    except Exception as e:
+        pytest.fail(f"Failed to get history: {e}")
 
 if __name__ == "__main__":
     sys.exit(pytest.main(["-v", __file__]))

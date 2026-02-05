@@ -218,8 +218,14 @@ impl Rule for TwoStepRule {
         match msg {
             Message::Text(text) => {
                 if text.starts_with(&self.pattern) {
-                    tracing::debug!(target: "TwoStepRule", "Pattern matched! Next binary message will be accepted.");
+                    tracing::debug!(target: "TwoStepRule", "Pattern matched! Next message will be accepted.");
                     self.valid.store(true, Ordering::SeqCst);
+                    return false;
+                }
+                
+                if self.valid.load(Ordering::SeqCst) {
+                    self.valid.store(false, Ordering::SeqCst);
+                    return true;
                 }
                 false
             }
@@ -291,6 +297,11 @@ impl Rule for MultiPatternRule {
                             }
                         }
                     }
+                }
+                
+                if self.valid.load(Ordering::SeqCst) {
+                    self.valid.store(false, Ordering::SeqCst);
+                    return true;
                 }
                 false
             }

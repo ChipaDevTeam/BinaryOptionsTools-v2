@@ -356,6 +356,25 @@ class PocketOptionAsync:
             # Catch any other errors from the Rust client
             raise Exception(f"Error getting trade result for ID {id}: {str(e)}")
 
+    async def candles(self, asset: str, period: int) -> List[Dict]:
+        """
+        Retrieves historical candle data for an asset.
+
+        Args:
+            asset (str): Trading asset (e.g., "EURUSD_otc")
+            period (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
+
+        Returns:
+            List[Dict]: List of candles, each containing:
+                - time: Candle timestamp
+                - open: Opening price
+                - high: Highest price
+                - low: Lowest price
+                - close: Closing price
+        """
+        candles = await self.client.candles(asset, period)
+        return json.loads(candles)
+
     async def get_candles(self, asset: str, period: int, offset: int) -> List[Dict]:
         """
         Retrieves historical candle data for an asset.

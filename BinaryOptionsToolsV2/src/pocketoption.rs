@@ -281,6 +281,27 @@ impl RawPocketOption {
         })
     }
 
+    /// Gets historical candle data for a specific asset and period.
+    pub fn candles<'py>(
+        &self,
+        py: Python<'py>,
+        asset: String,
+        period: u32,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let res = client
+                .candles(asset, period)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| {
+                serde_json::to_string(&res)
+                    .map_err(BinaryErrorPy::from)?
+                    .into_py_any(py)
+            })
+        })
+    }
+
     pub fn get_candles<'py>(
         &self,
         py: Python<'py>,

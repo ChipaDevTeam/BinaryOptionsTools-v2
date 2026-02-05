@@ -9,7 +9,6 @@ import sys
 import pytest
 
 from BinaryOptionsToolsV2 import (
-    PocketOption,
     PocketOptionAsync,
     RawHandler,
 )

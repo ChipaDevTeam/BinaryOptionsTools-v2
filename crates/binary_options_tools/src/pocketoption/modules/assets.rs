@@ -33,13 +33,25 @@ impl LightweightModule<State> for AssetsModule {
 
     async fn run(&mut self) -> CoreResult<()> {
         while let Ok(msg) = self.receiver.recv().await {
-            if let Message::Binary(text) = &*msg {
-                if let Ok(assets) = serde_json::from_slice::<Assets>(text) {
-                    debug!("Loaded assets: {:?}", assets.names());
-                    self.state.set_assets(assets).await;
-                } else {
-                    warn!("Failed to parse assets message: {:?}", text);
+            match &*msg {
+                Message::Binary(data) => {
+                    if let Ok(assets) = serde_json::from_slice::<Assets>(data) {
+                        debug!("Loaded assets (binary): {:?}", assets.names());
+                        self.state.set_assets(assets).await;
+                    } else {
+                        warn!("Failed to parse assets message (binary): {:?}", data);
+                    }
                 }
+                Message::Text(text) => {
+                    if let Ok(assets) = serde_json::from_str::<Assets>(text) {
+                        debug!("Loaded assets (text): {:?}", assets.names());
+                        self.state.set_assets(assets).await;
+                    } else {
+                        // It might be the header message, which we ignore in the run loop
+                        // since TwoStepRule already matched it.
+                    }
+                }
+                _ => {}
             }
         }
         Err(CoreError::LightweightModuleLoop("AssetsModule".into()))
