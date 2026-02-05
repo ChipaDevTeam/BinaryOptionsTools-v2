@@ -200,14 +200,14 @@ class PocketOptionAsync:
 
             # 3. Quote values (alphanumeric values followed by comma or closing bracket)
             def quote_value(match):
-                val = match.group(1)
+                val = match.group(1).strip()
                 # Keep numbers and booleans/null unquoted
                 if val.isdigit() or val in ['true', 'false', 'null']:
                     return f':{val}'
                 # Quote everything else
                 return f':"{val}"'
 
-            ssid = re.sub(r':\s*([a-zA-Z0-9_]+)(?=[,}\]])', quote_value, ssid)
+            ssid = re.sub(r':\s*([^,}\]]+?)(?=\s*[,}\]])', quote_value, ssid)
 
         if config is not None:
             if isinstance(config, dict):
