@@ -1,314 +1,338 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BinaryOptionsToolsUni API Reference</title>
     <style>
-        :root {
-            --primary-color: #2563eb;
-            --secondary-color: #1e40af;
-            --success-color: #059669;
-            --danger-color: #dc2626;
-            --warning-color: #d97706;
-            --bg-color: #f8fafc;
-            --surface-color: #ffffff;
-            --border-color: #e2e8f0;
-            --text-primary: #1e293b;
-            --text-secondary: #64748b;
-            --code-bg: #1e293b;
-            --code-text: #e2e8f0;
-        }
+      :root {
+        --primary-color: #2563eb;
+        --secondary-color: #1e40af;
+        --success-color: #059669;
+        --danger-color: #dc2626;
+        --warning-color: #d97706;
+        --bg-color: #f8fafc;
+        --surface-color: #ffffff;
+        --border-color: #e2e8f0;
+        --text-primary: #1e293b;
+        --text-secondary: #64748b;
+        --code-bg: #1e293b;
+        --code-text: #e2e8f0;
+      }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: var(--text-primary);
-            background: var(--bg-color);
-        }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        line-height: 1.6;
+        color: var(--text-primary);
+        background: var(--bg-color);
+      }
 
-        .header {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: white;
-            padding: 2rem 1rem;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
+      .header {
+        background: linear-gradient(
+          135deg,
+          var(--primary-color),
+          var(--secondary-color)
+        );
+        color: white;
+        padding: 2rem 1rem;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
 
+      .header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .header p {
+        font-size: 1.1rem;
+        opacity: 0.9;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+      }
+
+      .nav {
+        background: var(--surface-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        position: sticky;
+        top: 1rem;
+        z-index: 100;
+      }
+
+      .nav h3 {
+        margin-bottom: 0.5rem;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .nav ul {
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .nav a {
+        text-decoration: none;
+        color: var(--primary-color);
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        transition: all 0.2s;
+        display: block;
+      }
+
+      .nav a:hover {
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .section {
+        background: var(--surface-color);
+        border-radius: 8px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+
+      .section h2 {
+        color: var(--primary-color);
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--border-color);
+        font-size: 1.75rem;
+      }
+
+      .section h3 {
+        color: var(--text-primary);
+        margin: 1.5rem 0 1rem 0;
+        font-size: 1.25rem;
+      }
+
+      .language-switcher {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .language-btn {
+        padding: 0.5rem 1rem;
+        border: 2px solid var(--border-color);
+        background: var(--surface-color);
+        color: var(--text-primary);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+
+      .language-btn:hover {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+      }
+
+      .language-btn.active {
+        background: var(--primary-color);
+        border-color: var(--primary-color);
+        color: white;
+      }
+
+      .code-block {
+        position: relative;
+        margin: 1rem 0;
+      }
+
+      .code-content {
+        display: none;
+      }
+
+      .code-content.active {
+        display: block;
+      }
+
+      pre {
+        background: var(--code-bg);
+        color: var(--code-text);
+        padding: 1.5rem;
+        border-radius: 8px;
+        overflow-x: auto;
+        font-size: 0.875rem;
+        line-height: 1.5;
+      }
+
+      code {
+        font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+      }
+
+      .info-box {
+        background: #dbeafe;
+        border-left: 4px solid var(--primary-color);
+        padding: 1rem;
+        margin: 1rem 0;
+        border-radius: 4px;
+      }
+
+      .warning-box {
+        background: #fef3c7;
+        border-left: 4px solid var(--warning-color);
+        padding: 1rem;
+        margin: 1rem 0;
+        border-radius: 4px;
+      }
+
+      .success-box {
+        background: #d1fae5;
+        border-left: 4px solid var(--success-color);
+        padding: 1rem;
+        margin: 1rem 0;
+        border-radius: 4px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      th {
+        background: var(--bg-color);
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      tr:hover {
+        background: var(--bg-color);
+      }
+
+      .footer {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-secondary);
+        border-top: 1px solid var(--border-color);
+        margin-top: 3rem;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-left: 0.5rem;
+      }
+
+      .badge-new {
+        background: var(--success-color);
+        color: white;
+      }
+
+      .badge-beta {
+        background: var(--warning-color);
+        color: white;
+      }
+
+      @media (max-width: 768px) {
         .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .header p {
-            font-size: 1.1rem;
-            opacity: 0.9;
+          font-size: 1.75rem;
         }
 
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem 1rem;
-        }
-
-        .nav {
-            background: var(--surface-color);
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            position: sticky;
-            top: 1rem;
-            z-index: 100;
-        }
-
-        .nav h3 {
-            margin-bottom: 0.5rem;
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .nav ul {
-            list-style: none;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-
-        .nav a {
-            text-decoration: none;
-            color: var(--primary-color);
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            transition: all 0.2s;
-            display: block;
-        }
-
-        .nav a:hover {
-            background: var(--primary-color);
-            color: white;
+          padding: 1rem;
         }
 
         .section {
-            background: var(--surface-color);
-            border-radius: 8px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          padding: 1rem;
         }
 
-        .section h2 {
-            color: var(--primary-color);
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid var(--border-color);
-            font-size: 1.75rem;
+        .nav {
+          position: static;
         }
-
-        .section h3 {
-            color: var(--text-primary);
-            margin: 1.5rem 0 1rem 0;
-            font-size: 1.25rem;
-        }
-
-        .language-switcher {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .language-btn {
-            padding: 0.5rem 1rem;
-            border: 2px solid var(--border-color);
-            background: var(--surface-color);
-            color: var(--text-primary);
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.875rem;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
-
-        .language-btn:hover {
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-        }
-
-        .language-btn.active {
-            background: var(--primary-color);
-            border-color: var(--primary-color);
-            color: white;
-        }
-
-        .code-block {
-            position: relative;
-            margin: 1rem 0;
-        }
-
-        .code-content {
-            display: none;
-        }
-
-        .code-content.active {
-            display: block;
-        }
-
-        pre {
-            background: var(--code-bg);
-            color: var(--code-text);
-            padding: 1.5rem;
-            border-radius: 8px;
-            overflow-x: auto;
-            font-size: 0.875rem;
-            line-height: 1.5;
-        }
-
-        code {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-        }
-
-        .info-box {
-            background: #dbeafe;
-            border-left: 4px solid var(--primary-color);
-            padding: 1rem;
-            margin: 1rem 0;
-            border-radius: 4px;
-        }
-
-        .warning-box {
-            background: #fef3c7;
-            border-left: 4px solid var(--warning-color);
-            padding: 1rem;
-            margin: 1rem 0;
-            border-radius: 4px;
-        }
-
-        .success-box {
-            background: #d1fae5;
-            border-left: 4px solid var(--success-color);
-            padding: 1rem;
-            margin: 1rem 0;
-            border-radius: 4px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1rem 0;
-        }
-
-        th, td {
-            text-align: left;
-            padding: 0.75rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        th {
-            background: var(--bg-color);
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        tr:hover {
-            background: var(--bg-color);
-        }
-
-        .footer {
-            text-align: center;
-            padding: 2rem;
-            color: var(--text-secondary);
-            border-top: 1px solid var(--border-color);
-            margin-top: 3rem;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-left: 0.5rem;
-        }
-
-        .badge-new {
-            background: var(--success-color);
-            color: white;
-        }
-
-        .badge-beta {
-            background: var(--warning-color);
-            color: white;
-        }
-
-        @media (max-width: 768px) {
-            .header h1 {
-                font-size: 1.75rem;
-            }
-
-            .container {
-                padding: 1rem;
-            }
-
-            .section {
-                padding: 1rem;
-            }
-
-            .nav {
-                position: static;
-            }
-        }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="header">
-        <h1>🚀 BinaryOptionsToolsUni</h1>
-        <p>Multi-Language API Reference with Interactive Examples</p>
+      <h1>🚀 BinaryOptionsToolsUni</h1>
+      <p>Multi-Language API Reference with Interactive Examples</p>
     </div>
 
     <div class="container">
-        <nav class="nav">
-            <h3>Quick Navigation</h3>
-            <ul>
-                <li><a href="#quick-start">Quick Start</a></li>
-                <li><a href="#trading">Trading</a></li>
-                <li><a href="#account">Account</a></li>
-                <li><a href="#market-data">Market Data</a></li>
-                <li><a href="#subscriptions">Subscriptions</a></li>
-                <li><a href="#connection">Connection</a></li>
-                <li><a href="#errors">Error Handling</a></li>
-                <li><a href="#best-practices">Best Practices</a></li>
-            </ul>
-        </nav>
+      <nav class="nav">
+        <h3>Quick Navigation</h3>
+        <ul>
+          <li><a href="#quick-start">Quick Start</a></li>
+          <li><a href="#trading">Trading</a></li>
+          <li><a href="#account">Account</a></li>
+          <li><a href="#market-data">Market Data</a></li>
+          <li><a href="#subscriptions">Subscriptions</a></li>
+          <li><a href="#connection">Connection</a></li>
+          <li><a href="#errors">Error Handling</a></li>
+          <li><a href="#best-practices">Best Practices</a></li>
+        </ul>
+      </nav>
 
-        <div class="info-box">
-            <strong>📝 Note:</strong> This is an interactive API reference. Use the language tabs to switch between Python, Kotlin, Swift, Go, Ruby, and C# examples.
+      <div class="info-box">
+        <strong>📝 Note:</strong> This is an interactive API reference. Use the
+        language tabs to switch between Python, Kotlin, Swift, Go, Ruby, and C#
+        examples.
+      </div>
+
+      <section id="quick-start" class="section">
+        <h2>🚀 Quick Start</h2>
+
+        <h3>Initialize Client</h3>
+        <div class="language-switcher">
+          <button
+            class="language-btn active"
+            onclick="switchLanguage('python', this)"
+          >
+            Python
+          </button>
+          <button class="language-btn" onclick="switchLanguage('kotlin', this)">
+            Kotlin
+          </button>
+          <button class="language-btn" onclick="switchLanguage('swift', this)">
+            Swift
+          </button>
+          <button class="language-btn" onclick="switchLanguage('go', this)">
+            Go
+          </button>
+          <button class="language-btn" onclick="switchLanguage('ruby', this)">
+            Ruby
+          </button>
+          <button class="language-btn" onclick="switchLanguage('csharp', this)">
+            C#
+          </button>
         </div>
 
-        <section id="quick-start" class="section">
-            <h2>🚀 Quick Start</h2>
-            
-            <h3>Initialize Client</h3>
-            <div class="language-switcher">
-                <button class="language-btn active" onclick="switchLanguage('python', this)">Python</button>
-                <button class="language-btn" onclick="switchLanguage('kotlin', this)">Kotlin</button>
-                <button class="language-btn" onclick="switchLanguage('swift', this)">Swift</button>
-                <button class="language-btn" onclick="switchLanguage('go', this)">Go</button>
-                <button class="language-btn" onclick="switchLanguage('ruby', this)">Ruby</button>
-                <button class="language-btn" onclick="switchLanguage('csharp', this)">C#</button>
-            </div>
-
-            <div class="code-block">
-                <div class="code-content active" data-lang="python">
-                    <pre><code>import asyncio
+        <div class="code-block">
+          <div class="code-content active" data-lang="python">
+            <pre><code>import asyncio
 from binaryoptionstoolsuni import PocketOption
 
 async def main():
@@ -324,10 +348,10 @@ async def main():
     await client.shutdown()
 
 asyncio.run(main())</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="kotlin">
-                    <pre><code>import com.chipadevteam.binaryoptionstoolsuni.*
+          <div class="code-content" data-lang="kotlin">
+            <pre><code>import com.chipadevteam.binaryoptionstoolsuni.*
 import kotlinx.coroutines.*
 
 suspend fun main() = coroutineScope {
@@ -342,10 +366,10 @@ suspend fun main() = coroutineScope {
     // Shutdown gracefully
     client.shutdown()
 }</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="swift">
-                    <pre><code>import BinaryOptionsToolsUni
+          <div class="code-content" data-lang="swift">
+            <pre><code>import BinaryOptionsToolsUni
 
 Task {
     // Initialize client
@@ -359,10 +383,10 @@ Task {
     // Shutdown gracefully
     try await client.shutdown()
 }</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="go">
-                    <pre><code>package main
+          <div class="code-content" data-lang="go">
+            <pre><code>package main
 
 import (
     "fmt"
@@ -382,10 +406,10 @@ func main() {
     // Shutdown gracefully
     client.Shutdown()
 }</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="ruby">
-                    <pre><code>require 'binaryoptionstoolsuni'
+          <div class="code-content" data-lang="ruby">
+            <pre><code>require 'binaryoptionstoolsuni'
 require 'async'
 
 Async do
@@ -400,10 +424,10 @@ Async do
   # Shutdown gracefully
   client.shutdown
 end</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="csharp">
-                    <pre><code>using BinaryOptionsToolsUni;
+          <div class="code-content" data-lang="csharp">
+            <pre><code>using BinaryOptionsToolsUni;
 
 // Initialize client
 var client = await PocketOption.InitAsync("your_ssid");
@@ -415,158 +439,203 @@ Console.WriteLine($"Balance: ${balance}");
 
 // Shutdown gracefully
 await client.ShutdownAsync();</code></pre>
-                </div>
-            </div>
-        </section>
+          </div>
+        </div>
+      </section>
 
-        <section id="trading" class="section">
-            <h2>💰 Trading Operations</h2>
+      <section id="trading" class="section">
+        <h2>💰 Trading Operations</h2>
 
-            <h3>Place a Call (Buy) Trade</h3>
-            <div class="language-switcher">
-                <button class="language-btn active" onclick="switchLanguage('python', this)">Python</button>
-                <button class="language-btn" onclick="switchLanguage('kotlin', this)">Kotlin</button>
-                <button class="language-btn" onclick="switchLanguage('swift', this)">Swift</button>
-                <button class="language-btn" onclick="switchLanguage('go', this)">Go</button>
-                <button class="language-btn" onclick="switchLanguage('ruby', this)">Ruby</button>
-                <button class="language-btn" onclick="switchLanguage('csharp', this)">C#</button>
-            </div>
+        <h3>Place a Call (Buy) Trade</h3>
+        <div class="language-switcher">
+          <button
+            class="language-btn active"
+            onclick="switchLanguage('python', this)"
+          >
+            Python
+          </button>
+          <button class="language-btn" onclick="switchLanguage('kotlin', this)">
+            Kotlin
+          </button>
+          <button class="language-btn" onclick="switchLanguage('swift', this)">
+            Swift
+          </button>
+          <button class="language-btn" onclick="switchLanguage('go', this)">
+            Go
+          </button>
+          <button class="language-btn" onclick="switchLanguage('ruby', this)">
+            Ruby
+          </button>
+          <button class="language-btn" onclick="switchLanguage('csharp', this)">
+            C#
+          </button>
+        </div>
 
-            <div class="code-block">
-                <div class="code-content active" data-lang="python">
-                    <pre><code># Place a $1 call trade on EURUSD_otc for 60 seconds
+        <div class="code-block">
+          <div class="code-content active" data-lang="python">
+            <pre><code># Place a $1 call trade on EURUSD_otc for 60 seconds
 trade = await client.buy("EURUSD_otc", 60, 1.0)
 print(f"Trade ID: {trade.id}")
 print(f"Asset: {trade.asset}")
 print(f"Amount: ${trade.amount}")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="kotlin">
-                    <pre><code>// Place a $1 call trade on EURUSD_otc for 60 seconds
+          <div class="code-content" data-lang="kotlin">
+            <pre><code>// Place a $1 call trade on EURUSD_otc for 60 seconds
 val trade = client.buy("EURUSD_otc", 60u, 1.0)
 println("Trade ID: ${trade.id}")
 println("Asset: ${trade.asset}")
 println("Amount: $${trade.amount}")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="swift">
-                    <pre><code>// Place a $1 call trade on EURUSD_otc for 60 seconds
+          <div class="code-content" data-lang="swift">
+            <pre><code>// Place a $1 call trade on EURUSD_otc for 60 seconds
 let trade = try await client.buy(asset: "EURUSD_otc", time: 60, amount: 1.0)
 print("Trade ID: \(trade.id)")
 print("Asset: \(trade.asset)")
 print("Amount: $\(trade.amount)")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="go">
-                    <pre><code>// Place a $1 call trade on EURUSD_otc for 60 seconds
+          <div class="code-content" data-lang="go">
+            <pre><code>// Place a $1 call trade on EURUSD_otc for 60 seconds
 trade, _ := client.Buy("EURUSD_otc", 60, 1.0)
 fmt.Printf("Trade ID: %s\n", trade.Id)
 fmt.Printf("Asset: %s\n", trade.Asset)
 fmt.Printf("Amount: $%.2f\n", trade.Amount)</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="ruby">
-                    <pre><code># Place a $1 call trade on EURUSD_otc for 60 seconds
+          <div class="code-content" data-lang="ruby">
+            <pre><code># Place a $1 call trade on EURUSD_otc for 60 seconds
 trade = client.buy('EURUSD_otc', 60, 1.0)
 puts "Trade ID: #{trade.id}"
 puts "Asset: #{trade.asset}"
 puts "Amount: $#{trade.amount}"</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="csharp">
-                    <pre><code>// Place a $1 call trade on EURUSD_otc for 60 seconds
+          <div class="code-content" data-lang="csharp">
+            <pre><code>// Place a $1 call trade on EURUSD_otc for 60 seconds
 var trade = await client.BuyAsync("EURUSD_otc", 60, 1.0);
 Console.WriteLine($"Trade ID: {trade.Id}");
 Console.WriteLine($"Asset: {trade.Asset}");
 Console.WriteLine($"Amount: ${trade.Amount}");</code></pre>
-                </div>
-            </div>
+          </div>
+        </div>
 
-            <h3>Place a Put (Sell) Trade</h3>
-            <div class="language-switcher">
-                <button class="language-btn active" onclick="switchLanguage('python', this)">Python</button>
-                <button class="language-btn" onclick="switchLanguage('kotlin', this)">Kotlin</button>
-                <button class="language-btn" onclick="switchLanguage('swift', this)">Swift</button>
-                <button class="language-btn" onclick="switchLanguage('go', this)">Go</button>
-                <button class="language-btn" onclick="switchLanguage('ruby', this)">Ruby</button>
-                <button class="language-btn" onclick="switchLanguage('csharp', this)">C#</button>
-            </div>
+        <h3>Place a Put (Sell) Trade</h3>
+        <div class="language-switcher">
+          <button
+            class="language-btn active"
+            onclick="switchLanguage('python', this)"
+          >
+            Python
+          </button>
+          <button class="language-btn" onclick="switchLanguage('kotlin', this)">
+            Kotlin
+          </button>
+          <button class="language-btn" onclick="switchLanguage('swift', this)">
+            Swift
+          </button>
+          <button class="language-btn" onclick="switchLanguage('go', this)">
+            Go
+          </button>
+          <button class="language-btn" onclick="switchLanguage('ruby', this)">
+            Ruby
+          </button>
+          <button class="language-btn" onclick="switchLanguage('csharp', this)">
+            C#
+          </button>
+        </div>
 
-            <div class="code-block">
-                <div class="code-content active" data-lang="python">
-                    <pre><code># Place a $1 put trade on EURUSD_otc for 60 seconds
+        <div class="code-block">
+          <div class="code-content active" data-lang="python">
+            <pre><code># Place a $1 put trade on EURUSD_otc for 60 seconds
 trade = await client.sell("EURUSD_otc", 60, 1.0)
 print(f"Trade ID: {trade.id}")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="kotlin">
-                    <pre><code>// Place a $1 put trade on EURUSD_otc for 60 seconds
+          <div class="code-content" data-lang="kotlin">
+            <pre><code>// Place a $1 put trade on EURUSD_otc for 60 seconds
 val trade = client.sell("EURUSD_otc", 60u, 1.0)
 println("Trade ID: ${trade.id}")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="swift">
-                    <pre><code>// Place a $1 put trade on EURUSD_otc for 60 seconds
+          <div class="code-content" data-lang="swift">
+            <pre><code>// Place a $1 put trade on EURUSD_otc for 60 seconds
 let trade = try await client.sell(asset: "EURUSD_otc", time: 60, amount: 1.0)
 print("Trade ID: \(trade.id)")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="go">
-                    <pre><code>// Place a $1 put trade on EURUSD_otc for 60 seconds
+          <div class="code-content" data-lang="go">
+            <pre><code>// Place a $1 put trade on EURUSD_otc for 60 seconds
 trade, _ := client.Sell("EURUSD_otc", 60, 1.0)
 fmt.Printf("Trade ID: %s\n", trade.Id)</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="ruby">
-                    <pre><code># Place a $1 put trade on EURUSD_otc for 60 seconds
+          <div class="code-content" data-lang="ruby">
+            <pre><code># Place a $1 put trade on EURUSD_otc for 60 seconds
 trade = client.sell('EURUSD_otc', 60, 1.0)
 puts "Trade ID: #{trade.id}"</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="csharp">
-                    <pre><code>// Place a $1 put trade on EURUSD_otc for 60 seconds
+          <div class="code-content" data-lang="csharp">
+            <pre><code>// Place a $1 put trade on EURUSD_otc for 60 seconds
 var trade = await client.SellAsync("EURUSD_otc", 60, 1.0);
 Console.WriteLine($"Trade ID: {trade.Id}");</code></pre>
-                </div>
-            </div>
+          </div>
+        </div>
 
-            <h3>Check Trade Result</h3>
-            <div class="language-switcher">
-                <button class="language-btn active" onclick="switchLanguage('python', this)">Python</button>
-                <button class="language-btn" onclick="switchLanguage('kotlin', this)">Kotlin</button>
-                <button class="language-btn" onclick="switchLanguage('swift', this)">Swift</button>
-                <button class="language-btn" onclick="switchLanguage('go', this)">Go</button>
-                <button class="language-btn" onclick="switchLanguage('ruby', this)">Ruby</button>
-                <button class="language-btn" onclick="switchLanguage('csharp', this)">C#</button>
-            </div>
+        <h3>Check Trade Result</h3>
+        <div class="language-switcher">
+          <button
+            class="language-btn active"
+            onclick="switchLanguage('python', this)"
+          >
+            Python
+          </button>
+          <button class="language-btn" onclick="switchLanguage('kotlin', this)">
+            Kotlin
+          </button>
+          <button class="language-btn" onclick="switchLanguage('swift', this)">
+            Swift
+          </button>
+          <button class="language-btn" onclick="switchLanguage('go', this)">
+            Go
+          </button>
+          <button class="language-btn" onclick="switchLanguage('ruby', this)">
+            Ruby
+          </button>
+          <button class="language-btn" onclick="switchLanguage('csharp', this)">
+            C#
+          </button>
+        </div>
 
-            <div class="code-block">
-                <div class="code-content active" data-lang="python">
-                    <pre><code># Check if a trade won or lost
+        <div class="code-block">
+          <div class="code-content active" data-lang="python">
+            <pre><code># Check if a trade won or lost
 result = await client.result(trade.id)
 status = "WIN" if result.profit > 0 else "LOSS"
 print(f"Result: {status}")
 print(f"Profit: ${result.profit:.2f}")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="kotlin">
-                    <pre><code>// Check if a trade won or lost
+          <div class="code-content" data-lang="kotlin">
+            <pre><code>// Check if a trade won or lost
 val result = client.result(trade.id)
 val status = if (result.profit > 0) "WIN" else "LOSS"
 println("Result: $status")
 println("Profit: $${result.profit}")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="swift">
-                    <pre><code>// Check if a trade won or lost
+          <div class="code-content" data-lang="swift">
+            <pre><code>// Check if a trade won or lost
 let result = try await client.result(id: trade.id)
 let status = result.profit > 0 ? "WIN" : "LOSS"
 print("Result: \(status)")
 print("Profit: $\(result.profit)")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="go">
-                    <pre><code>// Check if a trade won or lost
+          <div class="code-content" data-lang="go">
+            <pre><code>// Check if a trade won or lost
 result, _ := client.Result(trade.Id)
 status := "LOSS"
 if result.Profit > 0 {
@@ -574,113 +643,143 @@ if result.Profit > 0 {
 }
 fmt.Printf("Result: %s\n", status)
 fmt.Printf("Profit: $%.2f\n", result.Profit)</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="ruby">
-                    <pre><code># Check if a trade won or lost
+          <div class="code-content" data-lang="ruby">
+            <pre><code># Check if a trade won or lost
 result = client.result(trade.id)
 status = result.profit > 0 ? 'WIN' : 'LOSS'
 puts "Result: #{status}"
 puts "Profit: $#{result.profit}"</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="csharp">
-                    <pre><code>// Check if a trade won or lost
+          <div class="code-content" data-lang="csharp">
+            <pre><code>// Check if a trade won or lost
 var result = await client.ResultAsync(trade.Id);
 var status = result.Profit > 0 ? "WIN" : "LOSS";
 Console.WriteLine($"Result: {status}");
 Console.WriteLine($"Profit: ${result.Profit:F2}");</code></pre>
-                </div>
-            </div>
-        </section>
+          </div>
+        </div>
+      </section>
 
-        <section id="account" class="section">
-            <h2>👤 Account Management</h2>
+      <section id="account" class="section">
+        <h2>👤 Account Management</h2>
 
-            <h3>Get Balance</h3>
-            <div class="language-switcher">
-                <button class="language-btn active" onclick="switchLanguage('python', this)">Python</button>
-                <button class="language-btn" onclick="switchLanguage('kotlin', this)">Kotlin</button>
-                <button class="language-btn" onclick="switchLanguage('swift', this)">Swift</button>
-                <button class="language-btn" onclick="switchLanguage('go', this)">Go</button>
-                <button class="language-btn" onclick="switchLanguage('ruby', this)">Ruby</button>
-                <button class="language-btn" onclick="switchLanguage('csharp', this)">C#</button>
-            </div>
+        <h3>Get Balance</h3>
+        <div class="language-switcher">
+          <button
+            class="language-btn active"
+            onclick="switchLanguage('python', this)"
+          >
+            Python
+          </button>
+          <button class="language-btn" onclick="switchLanguage('kotlin', this)">
+            Kotlin
+          </button>
+          <button class="language-btn" onclick="switchLanguage('swift', this)">
+            Swift
+          </button>
+          <button class="language-btn" onclick="switchLanguage('go', this)">
+            Go
+          </button>
+          <button class="language-btn" onclick="switchLanguage('ruby', this)">
+            Ruby
+          </button>
+          <button class="language-btn" onclick="switchLanguage('csharp', this)">
+            C#
+          </button>
+        </div>
 
-            <div class="code-block">
-                <div class="code-content active" data-lang="python">
-                    <pre><code>balance = await client.balance()
+        <div class="code-block">
+          <div class="code-content active" data-lang="python">
+            <pre><code>balance = await client.balance()
 print(f"Current balance: ${balance:.2f}")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="kotlin">
-                    <pre><code>val balance = client.balance()
+          <div class="code-content" data-lang="kotlin">
+            <pre><code>val balance = client.balance()
 println("Current balance: $${"%.2f".format(balance)}")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="swift">
-                    <pre><code>let balance = await client.balance()
+          <div class="code-content" data-lang="swift">
+            <pre><code>let balance = await client.balance()
 print("Current balance: $\(String(format: "%.2f", balance))")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="go">
-                    <pre><code>balance := client.Balance()
+          <div class="code-content" data-lang="go">
+            <pre><code>balance := client.Balance()
 fmt.Printf("Current balance: $%.2f\n", balance)</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="ruby">
-                    <pre><code>balance = client.balance
+          <div class="code-content" data-lang="ruby">
+            <pre><code>balance = client.balance
 puts "Current balance: $#{'%.2f' % balance}"</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="csharp">
-                    <pre><code>var balance = await client.BalanceAsync();
+          <div class="code-content" data-lang="csharp">
+            <pre><code>var balance = await client.BalanceAsync();
 Console.WriteLine($"Current balance: ${balance:F2}");</code></pre>
-                </div>
-            </div>
+          </div>
+        </div>
 
-            <h3>Check Account Type</h3>
-            <div class="language-switcher">
-                <button class="language-btn active" onclick="switchLanguage('python', this)">Python</button>
-                <button class="language-btn" onclick="switchLanguage('kotlin', this)">Kotlin</button>
-                <button class="language-btn" onclick="switchLanguage('swift', this)">Swift</button>
-                <button class="language-btn" onclick="switchLanguage('go', this)">Go</button>
-                <button class="language-btn" onclick="switchLanguage('ruby', this)">Ruby</button>
-                <button class="language-btn" onclick="switchLanguage('csharp', this)">C#</button>
-            </div>
+        <h3>Check Account Type</h3>
+        <div class="language-switcher">
+          <button
+            class="language-btn active"
+            onclick="switchLanguage('python', this)"
+          >
+            Python
+          </button>
+          <button class="language-btn" onclick="switchLanguage('kotlin', this)">
+            Kotlin
+          </button>
+          <button class="language-btn" onclick="switchLanguage('swift', this)">
+            Swift
+          </button>
+          <button class="language-btn" onclick="switchLanguage('go', this)">
+            Go
+          </button>
+          <button class="language-btn" onclick="switchLanguage('ruby', this)">
+            Ruby
+          </button>
+          <button class="language-btn" onclick="switchLanguage('csharp', this)">
+            C#
+          </button>
+        </div>
 
-            <div class="code-block">
-                <div class="code-content active" data-lang="python">
-                    <pre><code>is_demo = client.is_demo()
+        <div class="code-block">
+          <div class="code-content active" data-lang="python">
+            <pre><code>is_demo = client.is_demo()
 account_type = "Demo" if is_demo else "Real"
 print(f"Account type: {account_type}")
 
 if not is_demo:
     print("⚠️ WARNING: Using REAL account!")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="kotlin">
-                    <pre><code>val isDemo = client.isDemo()
+          <div class="code-content" data-lang="kotlin">
+            <pre><code>val isDemo = client.isDemo()
 val accountType = if (isDemo) "Demo" else "Real"
 println("Account type: $accountType")
 
 if (!isDemo) {
     println("⚠️ WARNING: Using REAL account!")
 }</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="swift">
-                    <pre><code>let isDemo = client.isDemo()
+          <div class="code-content" data-lang="swift">
+            <pre><code>let isDemo = client.isDemo()
 let accountType = isDemo ? "Demo" : "Real"
 print("Account type: \(accountType)")
 
 if !isDemo {
     print("⚠️ WARNING: Using REAL account!")
 }</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="go">
-                    <pre><code>isDemo := client.IsDemo()
+          <div class="code-content" data-lang="go">
+            <pre><code>isDemo := client.IsDemo()
 accountType := "Real"
 if isDemo {
     accountType = "Demo"
@@ -690,18 +789,18 @@ fmt.Printf("Account type: %s\n", accountType)
 if !isDemo {
     fmt.Println("⚠️ WARNING: Using REAL account!")
 }</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="ruby">
-                    <pre><code>is_demo = client.is_demo?
+          <div class="code-content" data-lang="ruby">
+            <pre><code>is_demo = client.is_demo?
 account_type = is_demo ? "Demo" : "Real"
 puts "Account type: #{account_type}"
 
 puts "⚠️ WARNING: Using REAL account!" unless is_demo</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="csharp">
-                    <pre><code>var isDemo = client.IsDemo();
+          <div class="code-content" data-lang="csharp">
+            <pre><code>var isDemo = client.IsDemo();
 var accountType = isDemo ? "Demo" : "Real";
 Console.WriteLine($"Account type: {accountType}");
 
@@ -709,36 +808,51 @@ if (!isDemo)
 {
     Console.WriteLine("⚠️ WARNING: Using REAL account!");
 }</code></pre>
-                </div>
-            </div>
-        </section>
+          </div>
+        </div>
+      </section>
 
-        <section id="market-data" class="section">
-            <h2>📊 Market Data</h2>
+      <section id="market-data" class="section">
+        <h2>📊 Market Data</h2>
 
-            <h3>Get Historical Candles</h3>
-            <div class="language-switcher">
-                <button class="language-btn active" onclick="switchLanguage('python', this)">Python</button>
-                <button class="language-btn" onclick="switchLanguage('kotlin', this)">Kotlin</button>
-                <button class="language-btn" onclick="switchLanguage('swift', this)">Swift</button>
-                <button class="language-btn" onclick="switchLanguage('go', this)">Go</button>
-                <button class="language-btn" onclick="switchLanguage('ruby', this)">Ruby</button>
-                <button class="language-btn" onclick="switchLanguage('csharp', this)">C#</button>
-            </div>
+        <h3>Get Historical Candles</h3>
+        <div class="language-switcher">
+          <button
+            class="language-btn active"
+            onclick="switchLanguage('python', this)"
+          >
+            Python
+          </button>
+          <button class="language-btn" onclick="switchLanguage('kotlin', this)">
+            Kotlin
+          </button>
+          <button class="language-btn" onclick="switchLanguage('swift', this)">
+            Swift
+          </button>
+          <button class="language-btn" onclick="switchLanguage('go', this)">
+            Go
+          </button>
+          <button class="language-btn" onclick="switchLanguage('ruby', this)">
+            Ruby
+          </button>
+          <button class="language-btn" onclick="switchLanguage('csharp', this)">
+            C#
+          </button>
+        </div>
 
-            <div class="code-block">
-                <div class="code-content active" data-lang="python">
-                    <pre><code># Get last 100 candles with 60-second period
+        <div class="code-block">
+          <div class="code-content active" data-lang="python">
+            <pre><code># Get last 100 candles with 60-second period
 candles = await client.get_candles("EURUSD_otc", 60, 100)
 print(f"Retrieved {len(candles)} candles")
 
 # Display first 5 candles
 for candle in candles[:5]:
     print(f"Time: {candle.time}, Open: {candle.open}, Close: {candle.close}")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="kotlin">
-                    <pre><code>// Get last 100 candles with 60-second period
+          <div class="code-content" data-lang="kotlin">
+            <pre><code>// Get last 100 candles with 60-second period
 val candles = client.getCandles("EURUSD_otc", 60, 100)
 println("Retrieved ${candles.size} candles")
 
@@ -746,10 +860,10 @@ println("Retrieved ${candles.size} candles")
 candles.take(5).forEach { candle ->
     println("Time: ${candle.time}, Open: ${candle.open}, Close: ${candle.close}")
 }</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="swift">
-                    <pre><code>// Get last 100 candles with 60-second period
+          <div class="code-content" data-lang="swift">
+            <pre><code>// Get last 100 candles with 60-second period
 let candles = try await client.getCandles(asset: "EURUSD_otc", period: 60, offset: 100)
 print("Retrieved \(candles.count) candles")
 
@@ -757,10 +871,10 @@ print("Retrieved \(candles.count) candles")
 for candle in candles.prefix(5) {
     print("Time: \(candle.time), Open: \(candle.open), Close: \(candle.close)")
 }</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="go">
-                    <pre><code>// Get last 100 candles with 60-second period
+          <div class="code-content" data-lang="go">
+            <pre><code>// Get last 100 candles with 60-second period
 candles, _ := client.GetCandles("EURUSD_otc", 60, 100)
 fmt.Printf("Retrieved %d candles\n", len(candles))
 
@@ -769,10 +883,10 @@ for i, candle := range candles {
     if i >= 5 { break }
     fmt.Printf("Time: %d, Open: %.5f, Close: %.5f\n", candle.Time, candle.Open, candle.Close)
 }</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="ruby">
-                    <pre><code># Get last 100 candles with 60-second period
+          <div class="code-content" data-lang="ruby">
+            <pre><code># Get last 100 candles with 60-second period
 candles = client.get_candles('EURUSD_otc', 60, 100)
 puts "Retrieved #{candles.length} candles"
 
@@ -780,10 +894,10 @@ puts "Retrieved #{candles.length} candles"
 candles.first(5).each do |candle|
   puts "Time: #{candle.time}, Open: #{candle.open}, Close: #{candle.close}"
 end</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="csharp">
-                    <pre><code>// Get last 100 candles with 60-second period
+          <div class="code-content" data-lang="csharp">
+            <pre><code>// Get last 100 candles with 60-second period
 var candles = await client.GetCandlesAsync("EURUSD_otc", 60, 100);
 Console.WriteLine($"Retrieved {candles.Count} candles");
 
@@ -792,142 +906,187 @@ foreach (var candle in candles.Take(5))
 {
     Console.WriteLine($"Time: {candle.Time}, Open: {candle.Open}, Close: {candle.Close}");
 }</code></pre>
-                </div>
-            </div>
-        </section>
+          </div>
+        </div>
+      </section>
 
-        <section id="subscriptions" class="section">
-            <h2>📡 Real-time Subscriptions</h2>
+      <section id="subscriptions" class="section">
+        <h2>📡 Real-time Subscriptions</h2>
 
-            <h3>Subscribe to Asset</h3>
-            <div class="language-switcher">
-                <button class="language-btn active" onclick="switchLanguage('python', this)">Python</button>
-                <button class="language-btn" onclick="switchLanguage('kotlin', this)">Kotlin</button>
-                <button class="language-btn" onclick="switchLanguage('swift', this)">Swift</button>
-                <button class="language-btn" onclick="switchLanguage('go', this)">Go</button>
-                <button class="language-btn" onclick="switchLanguage('ruby', this)">Ruby</button>
-                <button class="language-btn" onclick="switchLanguage('csharp', this)">C#</button>
-            </div>
+        <h3>Subscribe to Asset</h3>
+        <div class="language-switcher">
+          <button
+            class="language-btn active"
+            onclick="switchLanguage('python', this)"
+          >
+            Python
+          </button>
+          <button class="language-btn" onclick="switchLanguage('kotlin', this)">
+            Kotlin
+          </button>
+          <button class="language-btn" onclick="switchLanguage('swift', this)">
+            Swift
+          </button>
+          <button class="language-btn" onclick="switchLanguage('go', this)">
+            Go
+          </button>
+          <button class="language-btn" onclick="switchLanguage('ruby', this)">
+            Ruby
+          </button>
+          <button class="language-btn" onclick="switchLanguage('csharp', this)">
+            C#
+          </button>
+        </div>
 
-            <div class="code-block">
-                <div class="code-content active" data-lang="python">
-                    <pre><code># Subscribe to 60-second candles
+        <div class="code-block">
+          <div class="code-content active" data-lang="python">
+            <pre><code># Subscribe to 60-second candles
 subscription = await client.subscribe("EURUSD_otc", 60)
 print("Subscribed to EURUSD_otc")
 
 # The actual streaming implementation depends on generated bindings
 # Typically you'll receive candles via callback or iterator</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="kotlin">
-                    <pre><code>// Subscribe to 60-second candles
+          <div class="code-content" data-lang="kotlin">
+            <pre><code>// Subscribe to 60-second candles
 val subscription = client.subscribe("EURUSD_otc", 60u)
 println("Subscribed to EURUSD_otc")
 
 // The actual streaming implementation depends on generated bindings</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="swift">
-                    <pre><code>// Subscribe to 60-second candles
+          <div class="code-content" data-lang="swift">
+            <pre><code>// Subscribe to 60-second candles
 let subscription = try await client.subscribe(asset: "EURUSD_otc", durationSecs: 60)
 print("Subscribed to EURUSD_otc")
 
 // The actual streaming implementation depends on generated bindings</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="go">
-                    <pre><code>// Subscribe to 60-second candles
+          <div class="code-content" data-lang="go">
+            <pre><code>// Subscribe to 60-second candles
 subscription, _ := client.Subscribe("EURUSD_otc", 60)
 fmt.Println("Subscribed to EURUSD_otc")
 
 // The actual streaming implementation depends on generated bindings</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="ruby">
-                    <pre><code># Subscribe to 60-second candles
+          <div class="code-content" data-lang="ruby">
+            <pre><code># Subscribe to 60-second candles
 subscription = client.subscribe('EURUSD_otc', 60)
 puts "Subscribed to EURUSD_otc"
 
 # The actual streaming implementation depends on generated bindings</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="csharp">
-                    <pre><code>// Subscribe to 60-second candles
+          <div class="code-content" data-lang="csharp">
+            <pre><code>// Subscribe to 60-second candles
 var subscription = await client.SubscribeAsync("EURUSD_otc", 60);
 Console.WriteLine("Subscribed to EURUSD_otc");
 
 // The actual streaming implementation depends on generated bindings</code></pre>
-                </div>
-            </div>
-        </section>
+          </div>
+        </div>
+      </section>
 
-        <section id="connection" class="section">
-            <h2>🔌 Connection Management</h2>
+      <section id="connection" class="section">
+        <h2>🔌 Connection Management</h2>
 
-            <h3>Reconnect to Server</h3>
-            <div class="language-switcher">
-                <button class="language-btn active" onclick="switchLanguage('python', this)">Python</button>
-                <button class="language-btn" onclick="switchLanguage('kotlin', this)">Kotlin</button>
-                <button class="language-btn" onclick="switchLanguage('swift', this)">Swift</button>
-                <button class="language-btn" onclick="switchLanguage('go', this)">Go</button>
-                <button class="language-btn" onclick="switchLanguage('ruby', this)">Ruby</button>
-                <button class="language-btn" onclick="switchLanguage('csharp', this)">C#</button>
-            </div>
+        <h3>Reconnect to Server</h3>
+        <div class="language-switcher">
+          <button
+            class="language-btn active"
+            onclick="switchLanguage('python', this)"
+          >
+            Python
+          </button>
+          <button class="language-btn" onclick="switchLanguage('kotlin', this)">
+            Kotlin
+          </button>
+          <button class="language-btn" onclick="switchLanguage('swift', this)">
+            Swift
+          </button>
+          <button class="language-btn" onclick="switchLanguage('go', this)">
+            Go
+          </button>
+          <button class="language-btn" onclick="switchLanguage('ruby', this)">
+            Ruby
+          </button>
+          <button class="language-btn" onclick="switchLanguage('csharp', this)">
+            C#
+          </button>
+        </div>
 
-            <div class="code-block">
-                <div class="code-content active" data-lang="python">
-                    <pre><code>await client.reconnect()
+        <div class="code-block">
+          <div class="code-content active" data-lang="python">
+            <pre><code>await client.reconnect()
 await asyncio.sleep(2)  # Wait for reconnection
 print("Reconnected to server")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="kotlin">
-                    <pre><code>client.reconnect()
+          <div class="code-content" data-lang="kotlin">
+            <pre><code>client.reconnect()
 delay(2000)
 println("Reconnected to server")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="swift">
-                    <pre><code>try await client.reconnect()
+          <div class="code-content" data-lang="swift">
+            <pre><code>try await client.reconnect()
 try await Task.sleep(nanoseconds: 2_000_000_000)
 print("Reconnected to server")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="go">
-                    <pre><code>client.Reconnect()
+          <div class="code-content" data-lang="go">
+            <pre><code>client.Reconnect()
 time.Sleep(2 * time.Second)
 fmt.Println("Reconnected to server")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="ruby">
-                    <pre><code>client.reconnect
+          <div class="code-content" data-lang="ruby">
+            <pre><code>client.reconnect
 sleep 2
 puts "Reconnected to server"</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="csharp">
-                    <pre><code>await client.ReconnectAsync();
+          <div class="code-content" data-lang="csharp">
+            <pre><code>await client.ReconnectAsync();
 await Task.Delay(2000);
 Console.WriteLine("Reconnected to server");</code></pre>
-                </div>
-            </div>
-        </section>
+          </div>
+        </div>
+      </section>
 
-        <section id="errors" class="section">
-            <h2>⚠️ Error Handling</h2>
+      <section id="errors" class="section">
+        <h2>⚠️ Error Handling</h2>
 
-            <div class="language-switcher">
-                <button class="language-btn active" onclick="switchLanguage('python', this)">Python</button>
-                <button class="language-btn" onclick="switchLanguage('kotlin', this)">Kotlin</button>
-                <button class="language-btn" onclick="switchLanguage('swift', this)">Swift</button>
-                <button class="language-btn" onclick="switchLanguage('go', this)">Go</button>
-                <button class="language-btn" onclick="switchLanguage('ruby', this)">Ruby</button>
-                <button class="language-btn" onclick="switchLanguage('csharp', this)">C#</button>
-            </div>
+        <div class="language-switcher">
+          <button
+            class="language-btn active"
+            onclick="switchLanguage('python', this)"
+          >
+            Python
+          </button>
+          <button class="language-btn" onclick="switchLanguage('kotlin', this)">
+            Kotlin
+          </button>
+          <button class="language-btn" onclick="switchLanguage('swift', this)">
+            Swift
+          </button>
+          <button class="language-btn" onclick="switchLanguage('go', this)">
+            Go
+          </button>
+          <button class="language-btn" onclick="switchLanguage('ruby', this)">
+            Ruby
+          </button>
+          <button class="language-btn" onclick="switchLanguage('csharp', this)">
+            C#
+          </button>
+        </div>
 
-            <div class="code-block">
-                <div class="code-content active" data-lang="python">
-                    <pre><code>from binaryoptionstoolsuni import PocketOption, UniError
+        <div class="code-block">
+          <div class="code-content active" data-lang="python">
+            <pre><code>from binaryoptionstoolsuni import PocketOption, UniError
 
 try:
     client = await PocketOption.init("invalid_ssid")
@@ -936,10 +1095,10 @@ except UniError as e:
     print(f"API Error: {e}")
 except Exception as e:
     print(f"Unexpected error: {e}")</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="kotlin">
-                    <pre><code>import com.chipadevteam.binaryoptionstoolsuni.*
+          <div class="code-content" data-lang="kotlin">
+            <pre><code>import com.chipadevteam.binaryoptionstoolsuni.*
 
 try {
     val client = PocketOption.init("invalid_ssid")
@@ -949,10 +1108,10 @@ try {
 } catch (e: Exception) {
     println("Unexpected error: ${e.message}")
 }</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="swift">
-                    <pre><code>import BinaryOptionsToolsUni
+          <div class="code-content" data-lang="swift">
+            <pre><code>import BinaryOptionsToolsUni
 
 do {
     let client = try await PocketOption.init(ssid: "invalid_ssid")
@@ -962,20 +1121,20 @@ do {
 } catch {
     print("Unexpected error: \(error)")
 }</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="go">
-                    <pre><code>client, err := bot.PocketOptionInit("invalid_ssid")
+          <div class="code-content" data-lang="go">
+            <pre><code>client, err := bot.PocketOptionInit("invalid_ssid")
 if err != nil {
     fmt.Printf("API Error: %v\n", err)
     return
 }
 
 balance := client.Balance()</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="ruby">
-                    <pre><code>begin
+          <div class="code-content" data-lang="ruby">
+            <pre><code>begin
   client = BinaryOptionsToolsUni::PocketOption.init('invalid_ssid')
   balance = client.balance
 rescue BinaryOptionsToolsUni::UniError => e
@@ -983,10 +1142,10 @@ rescue BinaryOptionsToolsUni::UniError => e
 rescue => e
   puts "Unexpected error: #{e.message}"
 end</code></pre>
-                </div>
+          </div>
 
-                <div class="code-content" data-lang="csharp">
-                    <pre><code>using BinaryOptionsToolsUni;
+          <div class="code-content" data-lang="csharp">
+            <pre><code>using BinaryOptionsToolsUni;
 
 try
 {
@@ -1001,206 +1160,237 @@ catch (Exception ex)
 {
     Console.WriteLine($"Unexpected error: {ex.Message}");
 }</code></pre>
-                </div>
-            </div>
-        </section>
+          </div>
+        </div>
+      </section>
 
-        <section id="best-practices" class="section">
-            <h2>✅ Best Practices</h2>
+      <section id="best-practices" class="section">
+        <h2>✅ Best Practices</h2>
 
-            <div class="success-box">
-                <h3>1. Always Wait for Initialization</h3>
-                <p>After creating the client, wait 2 seconds for the API to fully initialize:</p>
-                <ul>
-                    <li><strong>Python:</strong> <code>await asyncio.sleep(2)</code></li>
-                    <li><strong>Kotlin:</strong> <code>delay(2000)</code></li>
-                    <li><strong>Swift:</strong> <code>try await Task.sleep(nanoseconds: 2_000_000_000)</code></li>
-                    <li><strong>Go:</strong> <code>time.Sleep(2 * time.Second)</code></li>
-                    <li><strong>Ruby:</strong> <code>sleep 2</code></li>
-                    <li><strong>C#:</strong> <code>await Task.Delay(2000)</code></li>
-                </ul>
-            </div>
+        <div class="success-box">
+          <h3>1. Always Wait for Initialization</h3>
+          <p>
+            After creating the client, wait 2 seconds for the API to fully
+            initialize:
+          </p>
+          <ul>
+            <li>
+              <strong>Python:</strong> <code>await asyncio.sleep(2)</code>
+            </li>
+            <li><strong>Kotlin:</strong> <code>delay(2000)</code></li>
+            <li>
+              <strong>Swift:</strong>
+              <code>try await Task.sleep(nanoseconds: 2_000_000_000)</code>
+            </li>
+            <li>
+              <strong>Go:</strong> <code>time.Sleep(2 * time.Second)</code>
+            </li>
+            <li><strong>Ruby:</strong> <code>sleep 2</code></li>
+            <li><strong>C#:</strong> <code>await Task.Delay(2000)</code></li>
+          </ul>
+        </div>
 
-            <div class="warning-box">
-                <h3>2. Always Check Account Type</h3>
-                <p>Before trading with real money, verify you're not on a demo account:</p>
-                <pre><code>if not client.is_demo():
+        <div class="warning-box">
+          <h3>2. Always Check Account Type</h3>
+          <p>
+            Before trading with real money, verify you're not on a demo account:
+          </p>
+          <pre><code>if not client.is_demo():
     print("WARNING: Using REAL account!")</code></pre>
-            </div>
+        </div>
 
-            <div class="success-box">
-                <h3>3. Always Shutdown Gracefully</h3>
-                <p>Call <code>shutdown()</code> when finished to properly close connections and clean up resources.</p>
-            </div>
+        <div class="success-box">
+          <h3>3. Always Shutdown Gracefully</h3>
+          <p>
+            Call <code>shutdown()</code> when finished to properly close
+            connections and clean up resources.
+          </p>
+        </div>
 
-            <div class="info-box">
-                <h3>4. Use Timeouts for Results</h3>
-                <p>For time-sensitive operations, use <code>result_with_timeout()</code>:</p>
-                <pre><code>result = await client.result_with_timeout(trade.id, 120)  # 120 seconds</code></pre>
-            </div>
+        <div class="info-box">
+          <h3>4. Use Timeouts for Results</h3>
+          <p>
+            For time-sensitive operations, use
+            <code>result_with_timeout()</code>:
+          </p>
+          <pre><code>result = await client.result_with_timeout(trade.id, 120)  # 120 seconds</code></pre>
+        </div>
 
-            <div class="success-box">
-                <h3>5. Handle Errors Appropriately</h3>
-                <p>Use try-catch blocks to handle connection errors and invalid operations gracefully.</p>
-            </div>
-        </section>
+        <div class="success-box">
+          <h3>5. Handle Errors Appropriately</h3>
+          <p>
+            Use try-catch blocks to handle connection errors and invalid
+            operations gracefully.
+          </p>
+        </div>
+      </section>
 
-        <section class="section">
-            <h2>📚 API Method Reference</h2>
+      <section class="section">
+        <h2>📚 API Method Reference</h2>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Method</th>
-                        <th>Description</th>
-                        <th>Returns</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><code>init(ssid)</code></td>
-                        <td>Initialize client with session ID</td>
-                        <td>Client instance</td>
-                    </tr>
-                    <tr>
-                        <td><code>new(ssid)</code></td>
-                        <td>Alternative initialization method</td>
-                        <td>Client instance</td>
-                    </tr>
-                    <tr>
-                        <td><code>new_with_url(ssid, url)</code></td>
-                        <td>Initialize with custom WebSocket URL</td>
-                        <td>Client instance</td>
-                    </tr>
-                    <tr>
-                        <td><code>balance()</code></td>
-                        <td>Get current account balance</td>
-                        <td>Float</td>
-                    </tr>
-                    <tr>
-                        <td><code>is_demo()</code></td>
-                        <td>Check if demo account</td>
-                        <td>Boolean</td>
-                    </tr>
-                    <tr>
-                        <td><code>buy(asset, time, amount)</code></td>
-                        <td>Place call trade</td>
-                        <td>Deal object</td>
-                    </tr>
-                    <tr>
-                        <td><code>sell(asset, time, amount)</code></td>
-                        <td>Place put trade</td>
-                        <td>Deal object</td>
-                    </tr>
-                    <tr>
-                        <td><code>trade(asset, action, time, amount)</code></td>
-                        <td>Place trade with action</td>
-                        <td>Deal object</td>
-                    </tr>
-                    <tr>
-                        <td><code>result(id)</code></td>
-                        <td>Check trade result</td>
-                        <td>Deal object</td>
-                    </tr>
-                    <tr>
-                        <td><code>result_with_timeout(id, timeout)</code></td>
-                        <td>Check trade result with timeout</td>
-                        <td>Deal object</td>
-                    </tr>
-                    <tr>
-                        <td><code>get_opened_deals()</code></td>
-                        <td>Get list of open trades</td>
-                        <td>List of Deals</td>
-                    </tr>
-                    <tr>
-                        <td><code>get_closed_deals()</code></td>
-                        <td>Get list of closed trades</td>
-                        <td>List of Deals</td>
-                    </tr>
-                    <tr>
-                        <td><code>clear_closed_deals()</code></td>
-                        <td>Clear closed trades from memory</td>
-                        <td>Void</td>
-                    </tr>
-                    <tr>
-                        <td><code>get_candles(asset, period, offset)</code></td>
-                        <td>Get historical candles</td>
-                        <td>List of Candles</td>
-                    </tr>
-                    <tr>
-                        <td><code>subscribe(asset, duration)</code></td>
-                        <td>Subscribe to real-time data</td>
-                        <td>Subscription</td>
-                    </tr>
-                    <tr>
-                        <td><code>unsubscribe(asset)</code></td>
-                        <td>Unsubscribe from asset</td>
-                        <td>Void</td>
-                    </tr>
-                    <tr>
-                        <td><code>server_time()</code></td>
-                        <td>Get server timestamp</td>
-                        <td>Integer (Unix timestamp)</td>
-                    </tr>
-                    <tr>
-                        <td><code>reconnect()</code></td>
-                        <td>Reconnect to server</td>
-                        <td>Void</td>
-                    </tr>
-                    <tr>
-                        <td><code>shutdown()</code></td>
-                        <td>Shutdown client</td>
-                        <td>Void</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+        <table>
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Description</th>
+              <th>Returns</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>init(ssid)</code></td>
+              <td>Initialize client with session ID</td>
+              <td>Client instance</td>
+            </tr>
+            <tr>
+              <td><code>new(ssid)</code></td>
+              <td>Alternative initialization method</td>
+              <td>Client instance</td>
+            </tr>
+            <tr>
+              <td><code>new_with_url(ssid, url)</code></td>
+              <td>Initialize with custom WebSocket URL</td>
+              <td>Client instance</td>
+            </tr>
+            <tr>
+              <td><code>balance()</code></td>
+              <td>Get current account balance</td>
+              <td>Float</td>
+            </tr>
+            <tr>
+              <td><code>is_demo()</code></td>
+              <td>Check if demo account</td>
+              <td>Boolean</td>
+            </tr>
+            <tr>
+              <td><code>buy(asset, time, amount)</code></td>
+              <td>Place call trade</td>
+              <td>Deal object</td>
+            </tr>
+            <tr>
+              <td><code>sell(asset, time, amount)</code></td>
+              <td>Place put trade</td>
+              <td>Deal object</td>
+            </tr>
+            <tr>
+              <td><code>trade(asset, action, time, amount)</code></td>
+              <td>Place trade with action</td>
+              <td>Deal object</td>
+            </tr>
+            <tr>
+              <td><code>result(id)</code></td>
+              <td>Check trade result</td>
+              <td>Deal object</td>
+            </tr>
+            <tr>
+              <td><code>result_with_timeout(id, timeout)</code></td>
+              <td>Check trade result with timeout</td>
+              <td>Deal object</td>
+            </tr>
+            <tr>
+              <td><code>get_opened_deals()</code></td>
+              <td>Get list of open trades</td>
+              <td>List of Deals</td>
+            </tr>
+            <tr>
+              <td><code>get_closed_deals()</code></td>
+              <td>Get list of closed trades</td>
+              <td>List of Deals</td>
+            </tr>
+            <tr>
+              <td><code>clear_closed_deals()</code></td>
+              <td>Clear closed trades from memory</td>
+              <td>Void</td>
+            </tr>
+            <tr>
+              <td><code>get_candles(asset, period, offset)</code></td>
+              <td>Get historical candles</td>
+              <td>List of Candles</td>
+            </tr>
+            <tr>
+              <td><code>subscribe(asset, duration)</code></td>
+              <td>Subscribe to real-time data</td>
+              <td>Subscription</td>
+            </tr>
+            <tr>
+              <td><code>unsubscribe(asset)</code></td>
+              <td>Unsubscribe from asset</td>
+              <td>Void</td>
+            </tr>
+            <tr>
+              <td><code>server_time()</code></td>
+              <td>Get server timestamp</td>
+              <td>Integer (Unix timestamp)</td>
+            </tr>
+            <tr>
+              <td><code>reconnect()</code></td>
+              <td>Reconnect to server</td>
+              <td>Void</td>
+            </tr>
+            <tr>
+              <td><code>shutdown()</code></td>
+              <td>Shutdown client</td>
+              <td>Void</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
     </div>
 
     <footer class="footer">
-        <p><strong>BinaryOptionsToolsUni</strong> v0.1.0 | Multi-Language Trading API</p>
-        <p>Join our <a href="https://discord.gg/p7YyFqSmAz">Discord Community</a> | <a href="https://github.com/ChipaDevTeam/BinaryOptionsTools-v2">GitHub</a></p>
-        <p>Platform: PocketOption (Quick Trading) | Free for Personal Use</p>
+      <p>
+        <strong>BinaryOptionsToolsUni</strong> v0.1.0 | Multi-Language Trading
+        API
+      </p>
+      <p>
+        Join our <a href="https://discord.gg/p7YyFqSmAz">Discord Community</a> |
+        <a href="https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+          >GitHub</a
+        >
+      </p>
+      <p>Platform: PocketOption (Quick Trading) | Free for Personal Use</p>
     </footer>
 
     <script>
-        function switchLanguage(lang, button) {
-            // Get the parent section
-            const section = button.closest('.section');
-            
-            // Update button states in this section
-            const buttons = section.querySelectorAll('.language-btn');
-            buttons.forEach(btn => btn.classList.remove('active'));
-            
-            // Find and activate all buttons with the same language in this section
-            section.querySelectorAll('.language-btn').forEach(btn => {
-                if (btn.textContent.toLowerCase().includes(lang.toLowerCase()) || 
-                    (lang === 'csharp' && btn.textContent === 'C#')) {
-                    btn.classList.add('active');
-                }
-            });
-            
-            // Update code blocks in this section
-            const codeBlocks = section.querySelectorAll('.code-content');
-            codeBlocks.forEach(block => {
-                if (block.dataset.lang === lang) {
-                    block.classList.add('active');
-                } else {
-                    block.classList.remove('active');
-                }
-            });
-        }
+      function switchLanguage(lang, button) {
+        // Get the parent section
+        const section = button.closest(".section");
 
-        // Add smooth scrolling for navigation links
-        document.querySelectorAll('.nav a').forEach(link => {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            });
+        // Update button states in this section
+        const buttons = section.querySelectorAll(".language-btn");
+        buttons.forEach((btn) => btn.classList.remove("active"));
+
+        // Find and activate all buttons with the same language in this section
+        section.querySelectorAll(".language-btn").forEach((btn) => {
+          if (
+            btn.textContent.toLowerCase().includes(lang.toLowerCase()) ||
+            (lang === "csharp" && btn.textContent === "C#")
+          ) {
+            btn.classList.add("active");
+          }
         });
+
+        // Update code blocks in this section
+        const codeBlocks = section.querySelectorAll(".code-content");
+        codeBlocks.forEach((block) => {
+          if (block.dataset.lang === lang) {
+            block.classList.add("active");
+          } else {
+            block.classList.remove("active");
+          }
+        });
+      }
+
+      // Add smooth scrolling for navigation links
+      document.querySelectorAll(".nav a").forEach((link) => {
+        link.addEventListener("click", function (e) {
+          e.preventDefault();
+          const target = document.querySelector(this.getAttribute("href"));
+          if (target) {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+      });
     </script>
-</body>
+  </body>
 </html>

@@ -60,7 +60,7 @@ We're working to restore all functionality with improved stability and performan
 - **Subscription Management**: Unsubscribe from specific assets or handlers
 - **WebSocket Health Monitoring**: Automatic ping/pong keepalive
 
-### Advanced Features
+### Framework Features
 
 - **Raw Handler API**: Low-level WebSocket access for custom protocol implementations
 - **Message Validation**: Built-in validator system for response filtering
@@ -70,7 +70,7 @@ We're working to restore all functionality with improved stability and performan
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │         User Application                │
 │      (Python/Rust/JavaScript)           │
@@ -144,6 +144,8 @@ binary_options_tools = { path = "crates/binary_options_tools" }
 
 ### Python - Async API
 
+Using the asynchronous API with a context manager ensures proper connection handling and resource cleanup.
+
 ```python
 from BinaryOptionsToolsV2 import PocketOptionAsync
 import asyncio
@@ -154,101 +156,160 @@ async def main():
     ssid = os.getenv("POCKET_OPTION_SSID")
     if not ssid:
         raise ValueError("Please set POCKET_OPTION_SSID environment variable")
-    client = PocketOptionAsync(ssid=ssid)
-    # Connection is established automatically during initialization
-    
-    # Get account balance
-    balance = await client.balance()
-    print(f"Balance: ${balance}")
-    
-    # Place a trade
-    asset = "EURUSD_otc"
-    amount = 1.0  # $1
-    duration = 60  # 60 seconds
-    
-    # The `buy` function is used for "call" trades. For "put" trades, use the `sell` method.
-    trade_id, deal = await client.buy(asset, amount, duration)
-    # trade_id, deal = await client.sell(asset, amount, duration)
-    print(f"Trade placed: {deal}")
-    
-    # Check if trade won
-    result = await client.check_win(trade_id)
-    print(f"Trade result: {result}")
-    
-    # Disconnect
-    await client.disconnect()
+
+    # Use context manager for automatic connection and cleanup
+    async with PocketOptionAsync(ssid=ssid) as client:
+        # Get account balance
+        balance = await client.balance()
+        print(f"Balance: ${balance}")
+
+        # Place a trade
+        asset = "EURUSD_otc"
+        amount = 1.0   # $1
+        duration = 60  # 60 seconds
+
+        # 'buy' for call, 'sell' for put
+        trade_id, deal = await client.buy(asset, amount, duration)
+        print(f"Trade placed: {deal}")
+
+        # Check result (waits for trade expiry)
+        result = await client.check_win(trade_id)
+        print(f"Trade result: {result['result']}")
 
 asyncio.run(main())
 ```
 
 ### Python - Sync API
 
+For simple scripts, the synchronous API provides a straightforward blocking interface.
+
 ```python
 from BinaryOptionsToolsV2 import PocketOption
-import time
+import os
 
-# Initialize client
-client = PocketOption(ssid="your-session-id")
-# Connection is established automatically during initialization
+ssid = os.getenv("POCKET_OPTION_SSID")
 
-# Place trade (blocking)
-# The `buy` function is used for "call" trades. For "put" trades, use the `sell` method.
-trade_id, deal = client.buy("EURUSD_otc", 1.0, 60)
-# trade_id, deal = client.sell("EURUSD_otc", 1.0, 60)
-print(f"Trade placed: {deal}")
-result = client.check_win(trade_id)
-print(f"Trade result: {result}")
+# The sync client also supports context managers
+with PocketOption(ssid=ssid) as client:
+    balance = client.balance()
+    print(f"Balance: ${balance}")
 
-# Disconnect
-client.disconnect()
+    trade_id, deal = client.buy("EURUSD_otc", 1.0, 60)
+    print(f"Trade result: {client.check_win(trade_id)['result']}")
 ```
 
 ### Real-time Data Streaming
+
+BinaryOptionsTools-v2 provides high-performance data streams with multiple aggregation strategies.
 
 ```python
 import asyncio
 from BinaryOptionsToolsV2 import PocketOptionAsync
 
 async def main():
-    client = PocketOptionAsync(ssid="your_ssid_here")
-    
-    # Subscribe to 60-second candles
-    subscription = await client.subscribe_symbol("EURUSD_otc", 60)
-    
-    # Process candles
-    async for candle in subscription:
-        print(f"Time: {candle['time']}, Close: {candle['close']}")
-        
-        # Break after 10 candles
-        if candle['index'] >= 10:
-            break
-    
-    await client.disconnect()
+    async with PocketOptionAsync(ssid="your_ssid") as client:
+        # Subscribe to 60-second candles
+        subscription = await client.subscribe_symbol("EURUSD_otc", 60)
+
+        print("Waiting for candles...")
+        async for candle in subscription:
+            print(f"Time: {candle['time']}, Close: {candle['close']}")
+
+            # Use 'index' or your own logic to break
+            if candle.get('index', 0) >= 10:
+                break
 
 asyncio.run(main())
 ```
 
-### Raw Handler API (Advanced)
+## Advanced Usage & Raw API
+
+### Raw Handler API
+
+The Raw Handler API allows low-level access to the WebSocket protocol while providing powerful filtering using the `Validator` system.
 
 ```python
 import asyncio
 from BinaryOptionsToolsV2 import PocketOptionAsync, Validator
 
 async def main():
-    client = PocketOptionAsync(ssid="your_ssid_here")
-    
-    # Create raw handler with validator
-    validator = Validator.contains("price")
-    handler = await client.create_raw_handler(validator)
-    
-    # Send custom WebSocket message
-    await handler.send_text('42["custom/request"]')
-    
-    # Wait for validated response
-    response = await handler.wait_next()
-    print(f"Received: {response}")
-    
+    async with PocketOptionAsync(ssid="your_ssid") as client:
+        # 1. Create a validator for messages we care about
+        # Matches any message containing "balance"
+        validator = Validator.contains("balance")
+
+        # 2. Create the handler
+        handler = await client.create_raw_handler(validator)
+
+        # 3. Use send_and_wait for Request-Response patterns
+        print("Requesting balance via raw protocol...")
+        response = await handler.send_and_wait('42["getBalance"]')
+        print(f"Raw Response: {response}")
+
+        # 4. Or use subscribe() for a filtered stream
+        stream = await handler.subscribe()
+
+        # Trigger another update
+        await handler.send_text('42["getBalance"]')
+
+        async for message in stream:
+            print(f"Stream Update: {message}")
+            break # Exit after one message
+
+asyncio.run(main())
+```
+
+### Connection Control
+
+You can manually control the underlying WebSocket connection for complex lifecycle management.
+
+```python
+async with PocketOptionAsync(ssid) as client:
+    # Manually disconnect
     await client.disconnect()
+    print("Offline")
+
+    # ... do some offline work ...
+
+    # Re-establish connection
+    await client.connect()
+
+    # Force a full reset (disconnect + reconnect)
+    await client.reconnect()
+```
+
+### SSID Authentication
+
+Authentication is handled via the `SSID` cookie value from a logged-in PocketOption session.
+
+**Format**: `42["auth",{"session":"...","uid":...}]`
+
+Refer to the [tutorials directory](tutorials/) for detailed guides on how to extract your SSID using browser developer tools.
+
+## Error Handling
+
+Proper error handling is crucial for trading bots. Here are common scenarios:
+
+```python
+import asyncio
+from BinaryOptionsToolsV2 import PocketOptionAsync
+
+async def main():
+    try:
+        async with PocketOptionAsync(ssid="invalid_ssid") as client:
+            await client.balance()
+
+    except ValueError as e:
+        print(f"Configuration Error: {e}")
+        # e.g., Missing SSID or invalid format
+
+    except TimeoutError as e:
+        print(f"Operation Timed Out: {e}")
+        # Network lag or server unresponsiveness
+
+    except Exception as e:
+        print(f"Unexpected Error: {e}")
+        # General catch-all
 
 asyncio.run(main())
 ```
@@ -263,7 +324,7 @@ asyncio.run(main())
 
 ### Project Structure
 
-```
+```text
 BinaryOptionsTools-v2/
 ├── crates/
 │   ├── binary_options_tools/    # Main Rust library
@@ -358,7 +419,7 @@ See the full [LICENSE](LICENSE) file for complete terms and conditions.
 **IMPORTANT**: This software is provided "AS IS" without any warranty. The authors and ChipaDevTeam are NOT responsible for:
 
 - Any financial losses incurred from using this software
-- Any trading decisions made using this software  
+- Any trading decisions made using this software
 - Any bugs, errors, or issues in the software
 - Any consequences of using this software for trading
 

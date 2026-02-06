@@ -32,6 +32,7 @@ ruby buy.rb
 ## Important
 
 Always wait 5 seconds after initialization:
+
 ```ruby
 client = BinaryOptionsToolsUni::PocketOption.new("your-session-id")
 sleep 5  # Critical!

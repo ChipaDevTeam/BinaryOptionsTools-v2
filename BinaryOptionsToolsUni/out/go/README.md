@@ -35,17 +35,17 @@ func main() {
     if err != nil {
         panic(err)
     }
-    
+
     // IMPORTANT: Wait for connection to establish
     time.Sleep(5 * time.Second)
-    
+
     // Get account balance
     balance, err := client.Balance()
     if err != nil {
         panic(err)
     }
     fmt.Printf("Account Balance: $%.2f\n", balance)
-    
+
     // Place a buy trade
     deal, err := client.Buy("EURUSD_otc", 60, 1.0)
     if err != nil {
@@ -74,16 +74,16 @@ func buyTradeExample() {
     if err != nil {
         panic(err)
     }
-    
+
     // Wait for connection
     time.Sleep(5 * time.Second)
-    
+
     // Place a buy trade on EURUSD for 60 seconds with $1
     deal, err := client.Buy("EURUSD_otc", 60, 1.0)
     if err != nil {
         panic(err)
     }
-    
+
     fmt.Println("Trade placed successfully!")
     fmt.Printf("Deal data: %+v\n", deal)
 }
@@ -106,16 +106,16 @@ func sellTradeExample() {
     if err != nil {
         panic(err)
     }
-    
+
     // Wait for connection
     time.Sleep(5 * time.Second)
-    
+
     // Place a sell trade on EURUSD for 60 seconds with $1
     deal, err := client.Sell("EURUSD_otc", 60, 1.0)
     if err != nil {
         panic(err)
     }
-    
+
     fmt.Println("Trade placed successfully!")
     fmt.Printf("Deal data: %+v\n", deal)
 }
@@ -138,16 +138,16 @@ func balanceExample() {
     if err != nil {
         panic(err)
     }
-    
+
     // Wait for connection
     time.Sleep(5 * time.Second)
-    
+
     // Get current balance
     balance, err := client.Balance()
     if err != nil {
         panic(err)
     }
-    
+
     fmt.Printf("Your current balance is: $%.2f\n", balance)
 }
 ```
@@ -169,26 +169,26 @@ func checkWinExample() {
     if err != nil {
         panic(err)
     }
-    
+
     // Wait for connection
     time.Sleep(5 * time.Second)
-    
+
     // Place a trade
     deal, err := client.Buy("EURUSD_otc", 60, 1.0)
     if err != nil {
         panic(err)
     }
     tradeID := deal.ID // Extract trade ID from deal
-    
+
     // Wait for trade to complete
     time.Sleep(65 * time.Second)
-    
+
     // Check the result
     result, err := client.CheckWin(tradeID)
     if err != nil {
         panic(err)
     }
-    
+
     fmt.Printf("Trade result: %+v\n", result)
 }
 ```
@@ -210,17 +210,17 @@ func subscribeExample() {
     if err != nil {
         panic(err)
     }
-    
+
     // Wait for connection
     time.Sleep(5 * time.Second)
-    
+
     // Subscribe to real-time candle data for EURUSD
     // Duration in seconds for each candle
     subscription, err := client.Subscribe("EURUSD_otc", 60)
     if err != nil {
         panic(err)
     }
-    
+
     fmt.Println("Listening for real-time candles...")
     // Process subscription stream
     _ = subscription
@@ -252,6 +252,7 @@ time.Sleep(5 * time.Second)  // Critical!
 ### Supported Assets
 
 Common assets include:
+
 - `EURUSD_otc` - Euro/US Dollar (OTC)
 - `GBPUSD_otc` - British Pound/US Dollar (OTC)
 - `USDJPY_otc` - US Dollar/Japanese Yen (OTC)

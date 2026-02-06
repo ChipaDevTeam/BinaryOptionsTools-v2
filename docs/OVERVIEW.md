@@ -121,39 +121,39 @@ User clicks [Kotlin] tab ↓
 
 ### Size Metrics
 
-| Metric | Count |
-|--------|-------|
-| **Total files created** | 8 |
+| Metric                           | Count  |
+| -------------------------------- | ------ |
+| **Total files created**          | 8      |
 | **Total lines of documentation** | ~4,800 |
-| **Code examples** | 100+ |
-| **Languages covered** | 6 |
-| **API methods documented** | 20+ |
-| **Complete working examples** | 15+ |
-| **Trading strategies explained** | 3 |
+| **Code examples**                | 100+   |
+| **Languages covered**            | 6      |
+| **API methods documented**       | 20+    |
+| **Complete working examples**    | 15+    |
+| **Trading strategies explained** | 3      |
 
 ### Language Coverage
 
-| Language | Quick Start | API Examples | Trading Guide | Status |
-|----------|-------------|--------------|---------------|--------|
-| Python 🐍 | ✅ | ✅ | ✅ | Complete |
-| Kotlin 🟣 | ✅ | ✅ | ✅ | Complete |
-| Swift 🍎 | ✅ | ✅ | ✅ | Complete |
-| Go 🔷 | ✅ | ✅ | ✅ | Complete |
-| Ruby 💎 | ✅ | ✅ | ✅ | Complete |
-| C# 🔵 | ✅ | ✅ | ✅ | Complete |
+| Language  | Quick Start | API Examples | Trading Guide | Status   |
+| --------- | ----------- | ------------ | ------------- | -------- |
+| Python 🐍 | ✅          | ✅           | ✅            | Complete |
+| Kotlin 🟣 | ✅          | ✅           | ✅            | Complete |
+| Swift 🍎  | ✅          | ✅           | ✅            | Complete |
+| Go 🔷     | ✅          | ✅           | ✅            | Complete |
+| Ruby 💎   | ✅          | ✅           | ✅            | Complete |
+| C# 🔵     | ✅          | ✅           | ✅            | Complete |
 
 ### Content Coverage
 
-| Section | Examples | Interactive | Status |
-|---------|----------|-------------|--------|
-| Quick Start | ✅ 6 languages | ✅ Yes | Complete |
-| Trading Operations | ✅ 3 methods × 6 langs | ✅ Yes | Complete |
-| Account Management | ✅ 3 methods × 6 langs | ✅ Yes | Complete |
-| Market Data | ✅ 2 methods × 6 langs | ✅ Yes | Complete |
-| Subscriptions | ✅ 2 methods × 6 langs | ✅ Yes | Complete |
-| Connection Management | ✅ 2 methods × 6 langs | ✅ Yes | Complete |
-| Error Handling | ✅ 1 example × 6 langs | ✅ Yes | Complete |
-| Best Practices | ✅ 5 tips | ✅ Yes | Complete |
+| Section               | Examples               | Interactive | Status   |
+| --------------------- | ---------------------- | ----------- | -------- |
+| Quick Start           | ✅ 6 languages         | ✅ Yes      | Complete |
+| Trading Operations    | ✅ 3 methods × 6 langs | ✅ Yes      | Complete |
+| Account Management    | ✅ 3 methods × 6 langs | ✅ Yes      | Complete |
+| Market Data           | ✅ 2 methods × 6 langs | ✅ Yes      | Complete |
+| Subscriptions         | ✅ 2 methods × 6 langs | ✅ Yes      | Complete |
+| Connection Management | ✅ 2 methods × 6 langs | ✅ Yes      | Complete |
+| Error Handling        | ✅ 1 example × 6 langs | ✅ Yes      | Complete |
+| Best Practices        | ✅ 5 tips              | ✅ Yes      | Complete |
 
 ---
 

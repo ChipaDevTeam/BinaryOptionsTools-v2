@@ -1,13 +1,20 @@
 import asyncio
 import os
 import sys
+
 # Ensure we use the local version of the library
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../BinaryOptionsToolsV2")))
+sys.path.insert(
+    0,
+    os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../../BinaryOptionsToolsV2")
+    ),
+)
 
 from BinaryOptionsToolsV2 import PocketOptionAsync
 
 # Get SSID from environment variable
 SSID = os.getenv("POCKET_OPTION_SSID")
+
 
 async def trade_task(api, asset, amount, time, task_id):
     print(f"Task {task_id}: Starting trade...")
@@ -28,10 +35,10 @@ async def main():
         print("Connecting...")
         async with PocketOptionAsync(SSID) as api:
             print("Connected and assets loaded.")
-            
+
             # Verify connection
             await api.balance()
-            
+
             # Simulate two concurrent trades
             print("Starting concurrent trades...")
             task1 = asyncio.create_task(trade_task(api, "EURUSD_otc", 1.0, 60, 1))

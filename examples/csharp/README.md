@@ -26,6 +26,7 @@ csc /reference:binary_options_tools_uni.dll Basic.cs
 ```
 
 Or create a .csproj file and run with:
+
 ```bash
 dotnet run
 ```
@@ -33,23 +34,30 @@ dotnet run
 ## Available Examples
 
 ### `Basic.cs`
+
 Basic example showing:
+
 - Client initialization
 - Getting account balance
 
 ### `Balance.cs`
+
 Simple example showing how to get your account balance.
 
 ### `Buy.cs`
+
 Example demonstrating how to place a buy trade and check profit/loss.
 
 ### `Sell.cs`
+
 Example demonstrating how to place a sell trade and check profit/loss.
 
 ### `CheckWin.cs`
+
 Example showing how to check trade results after completion.
 
 ### `Subscribe.cs`
+
 Example demonstrating how to subscribe to real-time candle data.
 
 ## Important Notes

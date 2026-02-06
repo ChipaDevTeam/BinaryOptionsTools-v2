@@ -27,14 +27,14 @@ import kotlinx.coroutines.*
 suspend fun main() {
     // Initialize client with your session ID
     val client = PocketOption.new("your-session-id")
-    
+
     // IMPORTANT: Wait for connection to establish
     delay(5000)
-    
+
     // Get account balance
     val balance = client.balance()
     println("Account Balance: $$balance")
-    
+
     // Place a buy trade
     val deal = client.buy("EURUSD_otc", 60u, 1.0)
     println("Trade placed: $deal")
@@ -53,14 +53,14 @@ suspend fun buyTradeExample() {
     // Initialize client
     val client = PocketOption.new("your-session-id")
     delay(5000)  // Wait for connection
-    
+
     // Place a buy trade on EURUSD for 60 seconds with $1
     val deal = client.buy(
         asset = "EURUSD_otc",
         time = 60u,
         amount = 1.0
     )
-    
+
     println("Trade placed successfully!")
     println("Deal data: $deal")
 }
@@ -76,14 +76,14 @@ suspend fun sellTradeExample() {
     // Initialize client
     val client = PocketOption.new("your-session-id")
     delay(5000)  // Wait for connection
-    
+
     // Place a sell trade on EURUSD for 60 seconds with $1
     val deal = client.sell(
         asset = "EURUSD_otc",
         time = 60u,
         amount = 1.0
     )
-    
+
     println("Trade placed successfully!")
     println("Deal data: $deal")
 }
@@ -99,7 +99,7 @@ suspend fun balanceExample() {
     // Initialize client
     val client = PocketOption.new("your-session-id")
     delay(5000)  // Wait for connection
-    
+
     // Get current balance
     val balance = client.balance()
     println("Your current balance is: $$balance")
@@ -116,14 +116,14 @@ suspend fun checkWinExample() {
     // Initialize client
     val client = PocketOption.new("your-session-id")
     delay(5000)  // Wait for connection
-    
+
     // Place a trade
     val deal = client.buy("EURUSD_otc", 60u, 1.0)
     val tradeId = deal.id  // Extract trade ID from deal
-    
+
     // Wait for trade to complete
     delay(65000)
-    
+
     // Check the result
     val result = client.checkWin(tradeId)
     println("Trade result: $result")
@@ -140,11 +140,11 @@ suspend fun subscribeExample() {
     // Initialize client
     val client = PocketOption.new("your-session-id")
     delay(5000)  // Wait for connection
-    
+
     // Subscribe to real-time candle data for EURUSD
     // Duration in seconds for each candle
     val subscription = client.subscribe("EURUSD_otc", 60u)
-    
+
     println("Listening for real-time candles...")
     // Process subscription stream
 }
@@ -172,6 +172,7 @@ delay(5000)  // Critical!
 ### Supported Assets
 
 Common assets include:
+
 - `EURUSD_otc` - Euro/US Dollar (OTC)
 - `GBPUSD_otc` - British Pound/US Dollar (OTC)
 - `USDJPY_otc` - US Dollar/Japanese Yen (OTC)

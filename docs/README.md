@@ -7,7 +7,7 @@ Welcome to the comprehensive documentation for **BinaryOptionsToolsUni** - Multi
 BinaryOptionsToolsUni provides native bindings for:
 
 - 🐍 **Python** - Async/await support
-- 🟣 **Kotlin** - Coroutines support  
+- 🟣 **Kotlin** - Coroutines support
 - 🍎 **Swift** - Modern Swift with async/await
 - 🔷 **Go** - Goroutines and channels
 - 💎 **Ruby** - Async Fiber support
@@ -44,10 +44,10 @@ from binaryoptionstoolsuni import PocketOption
 async def main():
     client = await PocketOption.init("your_ssid")
     await asyncio.sleep(2)
-    
+
     balance = await client.balance()
     print(f"Balance: ${balance}")
-    
+
     await client.shutdown()
 
 asyncio.run(main())
@@ -68,10 +68,10 @@ import kotlinx.coroutines.*
 suspend fun main() = coroutineScope {
     val client = PocketOption.init("your_ssid")
     delay(2000)
-    
+
     val balance = client.balance()
     println("Balance: $$balance")
-    
+
     client.shutdown()
 }
 ```
@@ -92,10 +92,10 @@ import BinaryOptionsToolsUni
 Task {
     let client = try await PocketOption.init(ssid: "your_ssid")
     try await Task.sleep(nanoseconds: 2_000_000_000)
-    
+
     let balance = await client.balance()
     print("Balance: $\(balance)")
-    
+
     try await client.shutdown()
 }
 ```
@@ -118,10 +118,10 @@ import (
 func main() {
     client, _ := bot.PocketOptionInit("your_ssid")
     time.Sleep(2 * time.Second)
-    
+
     balance := client.Balance()
     fmt.Printf("Balance: $%.2f\n", balance)
-    
+
     client.Shutdown()
 }
 ```
@@ -139,15 +139,15 @@ require 'async'
 Async do
   client = BinaryOptionsToolsUni::PocketOption.init('your_ssid')
   sleep 2
-  
+
   balance = client.balance
   puts "Balance: $#{balance}"
-  
+
   client.shutdown
 end
 ```
 
-### C#
+### C #
 
 ```bash
 dotnet add package BinaryOptionsToolsUni
@@ -216,37 +216,37 @@ try {
 
 ### Trading Operations
 
-| Feature | Description | Status |
-|---------|-------------|--------|
-| **Place Call Trade** | Buy/Long position | ✅ Available |
-| **Place Put Trade** | Sell/Short position | ✅ Available |
-| **Check Trade Result** | Get win/loss outcome | ✅ Available |
+| Feature                 | Description                  | Status       |
+| ----------------------- | ---------------------------- | ------------ |
+| **Place Call Trade**    | Buy/Long position            | ✅ Available |
+| **Place Put Trade**     | Sell/Short position          | ✅ Available |
+| **Check Trade Result**  | Get win/loss outcome         | ✅ Available |
 | **Result with Timeout** | Wait for result with timeout | ✅ Available |
 
 ### Account Management
 
-| Feature | Description | Status |
-|---------|-------------|--------|
-| **Get Balance** | Current account balance | ✅ Available |
-| **Check Demo/Real** | Verify account type | ✅ Available |
-| **Get Open Deals** | List active trades | ✅ Available |
-| **Get Closed Deals** | List completed trades | ✅ Available |
+| Feature              | Description             | Status       |
+| -------------------- | ----------------------- | ------------ |
+| **Get Balance**      | Current account balance | ✅ Available |
+| **Check Demo/Real**  | Verify account type     | ✅ Available |
+| **Get Open Deals**   | List active trades      | ✅ Available |
+| **Get Closed Deals** | List completed trades   | ✅ Available |
 
 ### Market Data
 
-| Feature | Description | Status |
-|---------|-------------|--------|
-| **Historical Candles** | Get OHLC candle data | ✅ Available |
-| **Advanced Candles** | Candles with timestamp | ✅ Available |
-| **Server Time** | Get server timestamp | ✅ Available |
+| Feature                 | Description            | Status       |
+| ----------------------- | ---------------------- | ------------ |
+| **Historical Candles**  | Get OHLC candle data   | ✅ Available |
+| **Advanced Candles**    | Candles with timestamp | ✅ Available |
+| **Server Time**         | Get server timestamp   | ✅ Available |
 | **Real-time Subscribe** | Subscribe to live data | ✅ Available |
 
 ### Connection Management
 
-| Feature | Description | Status |
-|---------|-------------|--------|
-| **Reconnect** | Reconnect to server | ✅ Available |
-| **Shutdown** | Graceful disconnect | ✅ Available |
+| Feature        | Description              | Status       |
+| -------------- | ------------------------ | ------------ |
+| **Reconnect**  | Reconnect to server      | ✅ Available |
+| **Shutdown**   | Graceful disconnect      | ✅ Available |
 | **Custom URL** | Use custom WebSocket URL | ✅ Available |
 
 ---
@@ -486,13 +486,13 @@ cargo build --release
 
 ### Benchmarks
 
-| Operation | Time | Notes |
-|-----------|------|-------|
-| Initialize Client | ~2s | Includes WebSocket connection |
-| Place Trade | ~100-500ms | Network dependent |
-| Get Balance | ~50-200ms | Fast operation |
-| Get Candles (100) | ~200-500ms | Depends on data size |
-| Subscribe | ~100-300ms | One-time setup |
+| Operation         | Time       | Notes                         |
+| ----------------- | ---------- | ----------------------------- |
+| Initialize Client | ~2s        | Includes WebSocket connection |
+| Place Trade       | ~100-500ms | Network dependent             |
+| Get Balance       | ~50-200ms  | Fast operation                |
+| Get Candles (100) | ~200-500ms | Depends on data size          |
+| Subscribe         | ~100-300ms | One-time setup                |
 
 ### Optimization Tips
 

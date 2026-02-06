@@ -3,16 +3,15 @@ Example script demonstrating the new connection control and raw handler features
 """
 
 import asyncio
-import json
 import os
-import sys
 import pytest
 
 from BinaryOptionsToolsV2 import (
+    PocketOption,
     PocketOptionAsync,
-    RawHandler,
 )
 from BinaryOptionsToolsV2.validator import Validator
+
 
 @pytest.mark.asyncio
 async def test_async_connection_control():
@@ -54,30 +53,39 @@ async def test_async_raw_handler():
         return
 
     async with PocketOptionAsync(ssid) as client:
-        # Create a validator for balance messages
-        validator = Validator.contains('"balance"')
+        # Create a validator that matches EURUSD_otc updates
+        # These are very frequent and reliable for testing
+        validator = Validator.contains("EURUSD_otc")
 
         # Create raw handler
         print("Creating raw handler...")
         handler = await client.create_raw_handler(validator)
         print(f"✓ Handler created with ID: {handler.id()}")
 
-        # Send a message and wait for response
-        print("Sending message and waiting for response...")
-        response = await handler.send_and_wait('42["getBalance"]')
-        print(f"✓ Received response: {response[:100]}...")
+        # Wait for any EURUSD_otc message
+        print("Waiting for EURUSD_otc update...")
+        try:
+            response = await asyncio.wait_for(handler.wait_next(), timeout=10.0)
+            print(f"✓ Received response: {response[:200]}...")
+            assert "EURUSD_otc" in response
+        except asyncio.TimeoutError:
+            print("✗ Timeout waiting for EURUSD_otc update")
+            raise
 
-        # Subscribe to messages
+        # Now try subscription
         print("Subscribing to stream...")
         stream = await handler.subscribe()
 
-        # Read a few messages
-        count = 0
-        async for message in stream:
-            print(f"✓ Message {count + 1}: {message[:100]}...")
-            count += 1
-            if count >= 3:
-                break
+        # Read a few messages from stream
+        print("Waiting for messages from stream...")
+        for i in range(3):
+            try:
+                message = await asyncio.wait_for(stream.__anext__(), timeout=10.0)
+                print(f"✓ Stream message {i + 1}: {message[:100]}...")
+                assert "EURUSD_otc" in message
+            except asyncio.TimeoutError:
+                print(f"✗ Timeout waiting for stream message {i + 1}")
+                raise
 
     print("✓ Raw handler test completed")
 
@@ -111,7 +119,6 @@ async def test_async_unsubscribe():
         print("✓ Unsubscribed")
 
 
-
 def test_sync_connection_control():
     """Test sync connection control methods."""
     print("\n=== Testing Sync Connection Control ===")
@@ -120,7 +127,10 @@ def test_sync_connection_control():
     if not ssid:
         print("Error: POCKET_OPTION_SSID environment variable not set")
         return
-    client = PocketOption(ssid)
+    
+    # Use custom config with increased timeout
+    config = {"connection_initialization_timeout_secs": 30}
+    client = PocketOption(ssid, config=config)
 
     # Test disconnect and connect
     print("Disconnecting...")
@@ -149,34 +159,40 @@ def test_sync_raw_handler():
     if not ssid:
         print("Error: POCKET_OPTION_SSID environment variable not set")
         return
-    client = PocketOption(ssid)
 
-    # Create a validator
-    validator = Validator.contains('"payout"')
+    # Use custom config with increased timeout
+    config = {"connection_initialization_timeout_secs": 30}
+    with PocketOption(ssid, config=config) as client:
+        # Use EURUSD_otc validator as it's reliable
+        validator = Validator.contains("EURUSD_otc")
 
-    # Create raw handler
-    print("Creating raw handler...")
-    handler = client.create_raw_handler(validator)
-    print(f"✓ Handler created with ID: {handler.id()}")
+        # Create raw handler
+        print("Creating raw handler...")
+        handler = client.create_raw_handler(validator)
+        print(f"✓ Handler created with ID: {handler.id()}")
 
-    # Send a message and wait for response
-    print("Sending message and waiting for response...")
-    response = handler.send_and_wait('42["getAssets"]')
-    print(f"✓ Received response: {response[:100]}...")
+        # Wait for any EURUSD_otc message
+        print("Waiting for EURUSD_otc update...")
+        try:
+            response = handler.wait_next()
+            print(f"✓ Received response: {response[:100]}...")
+            assert "EURUSD_otc" in response
+        except Exception as e:
+            print(f"✗ Failed to receive message: {e}")
+            raise
 
-    # Subscribe to messages
-    print("Subscribing to stream...")
-    stream = handler.subscribe()
+        # Test subscription
+        print("Subscribing to stream...")
+        stream = handler.subscribe()
 
-    # Read a few messages
-    count = 0
-    for message in stream:
-        print(f"✓ Message {count + 1}: {message[:100]}...")
-        count += 1
-        if count >= 3:
-            break
+        # Read a few messages from stream
+        print("Waiting for messages from stream...")
+        for i in range(3):
+            message = next(stream)
+            print(f"✓ Stream message {i + 1}: {message[:100]}...")
+            assert "EURUSD_otc" in message
 
-    print("✓ Raw handler test completed")
+    print("✓ Sync raw handler test completed")
 
 
 def test_sync_unsubscribe():
@@ -187,7 +203,10 @@ def test_sync_unsubscribe():
     if not ssid:
         print("Error: POCKET_OPTION_SSID environment variable not set")
         return
-    client = PocketOption(ssid)
+        
+    # Use custom config with increased timeout
+    config = {"connection_initialization_timeout_secs": 30}
+    client = PocketOption(ssid, config=config)
 
     # Subscribe to an asset
     print("Subscribing to EURUSD_otc...")

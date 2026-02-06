@@ -109,7 +109,7 @@ git push
 - Select source: `main` branch, `/docs` folder
 - Save
 
-2. **Access at:**
+1. **Access at:**
 
 ```
 https://chipadevteam.github.io/BinaryOptionsTools-v2/BinaryOptionsToolsUni/docs/API_REFERENCE.html
@@ -161,16 +161,16 @@ npx serve
 
 ### File Breakdown
 
-| File | Purpose | Lines | Status |
-|------|---------|-------|--------|
-| `DEMO.html` | Interactive demo | ~450 | ✅ Complete |
-| `API_REFERENCE.html` | Full interactive API docs | ~1,100 | ✅ Complete |
-| `API_REFERENCE.md` | Markdown API reference | ~900 | ✅ Complete |
-| `TRADING_GUIDE.md` | Trading strategies | ~600 | ✅ Complete |
-| `README.md` | Documentation hub | ~800 | ✅ Complete |
-| `INDEX.md` | Directory index | ~250 | ✅ Complete |
-| `DOCUMENTATION_SUMMARY.md` | Build summary | ~500 | ✅ Complete |
-| `NEXT_STEPS.md` | This file | ~200 | ✅ You are here! |
+| File                       | Purpose                   | Lines  | Status           |
+| -------------------------- | ------------------------- | ------ | ---------------- |
+| `DEMO.html`                | Interactive demo          | ~450   | ✅ Complete      |
+| `API_REFERENCE.html`       | Full interactive API docs | ~1,100 | ✅ Complete      |
+| `API_REFERENCE.md`         | Markdown API reference    | ~900   | ✅ Complete      |
+| `TRADING_GUIDE.md`         | Trading strategies        | ~600   | ✅ Complete      |
+| `README.md`                | Documentation hub         | ~800   | ✅ Complete      |
+| `INDEX.md`                 | Directory index           | ~250   | ✅ Complete      |
+| `DOCUMENTATION_SUMMARY.md` | Build summary             | ~500   | ✅ Complete      |
+| `NEXT_STEPS.md`            | This file                 | ~200   | ✅ You are here! |
 
 **Total:** ~4,800 lines of documentation
 

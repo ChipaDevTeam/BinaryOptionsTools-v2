@@ -77,7 +77,6 @@ BinaryOptionsToolsUni/
   - 📊 Complete method reference table
   - ⚡ JavaScript-powered language switching
   - 🌈 Professional color scheme
-  
 - **Sections**:
   - Quick Start
   - Trading Operations
@@ -136,22 +135,32 @@ The HTML documentation includes sophisticated JavaScript that:
 
 ```html
 <div class="language-switcher">
-    <button class="language-btn active" onclick="switchLanguage('python', this)">Python</button>
-    <button class="language-btn" onclick="switchLanguage('kotlin', this)">Kotlin</button>
-    <button class="language-btn" onclick="switchLanguage('swift', this)">Swift</button>
-    <button class="language-btn" onclick="switchLanguage('go', this)">Go</button>
-    <button class="language-btn" onclick="switchLanguage('ruby', this)">Ruby</button>
-    <button class="language-btn" onclick="switchLanguage('csharp', this)">C#</button>
+  <button class="language-btn active" onclick="switchLanguage('python', this)">
+    Python
+  </button>
+  <button class="language-btn" onclick="switchLanguage('kotlin', this)">
+    Kotlin
+  </button>
+  <button class="language-btn" onclick="switchLanguage('swift', this)">
+    Swift
+  </button>
+  <button class="language-btn" onclick="switchLanguage('go', this)">Go</button>
+  <button class="language-btn" onclick="switchLanguage('ruby', this)">
+    Ruby
+  </button>
+  <button class="language-btn" onclick="switchLanguage('csharp', this)">
+    C#
+  </button>
 </div>
 
 <!-- Python example (shown by default) -->
 <div class="code-content active" data-lang="python">
-    <pre><code>trade = await client.buy("EURUSD_otc", 60, 1.0)</code></pre>
+  <pre><code>trade = await client.buy("EURUSD_otc", 60, 1.0)</code></pre>
 </div>
 
 <!-- Kotlin example (hidden by default) -->
 <div class="code-content" data-lang="kotlin">
-    <pre><code>val trade = client.buy("EURUSD_otc", 60u, 1.0)</code></pre>
+  <pre><code>val trade = client.buy("EURUSD_otc", 60u, 1.0)</code></pre>
 </div>
 
 <!-- ... other languages ... -->

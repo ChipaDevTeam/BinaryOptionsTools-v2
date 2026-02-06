@@ -31,6 +31,7 @@ cargo run --example <example_name>
 ```
 
 For example:
+
 ```bash
 cargo run --example balance
 cargo run --example buy
@@ -46,65 +47,82 @@ rustc basic.rs && ./basic
 ## Available Examples
 
 ### `basic.rs`
+
 Basic example showing:
+
 - Client initialization
 - Getting account balance
 - Getting server time
 - Checking if account is demo
 
 **Run:**
+
 ```bash
 cargo run --example basic
 ```
 
 ### `balance.rs`
+
 Simple example showing how to get your account balance.
 
 **Run:**
+
 ```bash
 cargo run --example balance
 ```
 
 ### `buy.rs`
+
 Example demonstrating:
+
 - Placing a buy trade
 - Checking balance before and after
 - Calculating profit/loss
 
 **Run:**
+
 ```bash
 cargo run --example buy
 ```
 
 ### `sell.rs`
+
 Example demonstrating:
+
 - Placing a sell trade
 - Checking balance before and after
 - Calculating profit/loss
 
 **Run:**
+
 ```bash
 cargo run --example sell
 ```
 
 ### `check_win.rs`
+
 Example showing:
+
 - Placing trades
 - Checking trade results manually
 - Using automatic result checking with timeout
 
 **Run:**
+
 ```bash
 cargo run --example check_win
 ```
 
 ### `subscribe_symbol.rs`
+
 Example demonstrating:
+
 - Subscribing to real-time candle data
 - Processing candle streams
 - Displaying OHLC (Open, High, Low, Close) data
 
 **Run:**
+
 ```bash
 cargo run --example subscribe_symbol
 ```

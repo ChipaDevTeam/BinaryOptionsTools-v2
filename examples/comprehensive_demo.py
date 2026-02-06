@@ -4,7 +4,12 @@ import logging
 import sys
 
 # Ensure we use the local version of the library
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../BinaryOptionsToolsV2")))
+sys.path.insert(
+    0,
+    os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../../BinaryOptionsToolsV2")
+    ),
+)
 
 from BinaryOptionsToolsV2 import PocketOptionAsync
 
@@ -31,7 +36,7 @@ async def main():
         return
 
     logger.info("Initializing PocketOptionAsync client...")
-    
+
     # Use context manager to ensure connection and assets are loaded
     async with PocketOptionAsync(ssid=ssid) as client:
         logger.info("Connected and assets loaded.")
@@ -59,7 +64,9 @@ async def main():
                 # Fetch 60s candles, offset 0 (latest)
                 # Add timeout to prevent hanging if the server doesn't respond
                 logger.info(f"Fetching candles for {asset}...")
-                candles = await asyncio.wait_for(client.get_candles(asset, 60, 0), timeout=10.0)
+                candles = await asyncio.wait_for(
+                    client.get_candles(asset, 60, 0), timeout=10.0
+                )
                 logger.info(f"Retrieved {len(candles)} candles for {asset}")
                 if candles:
                     logger.info(f"Latest candle: {candles[-1]}")
@@ -71,7 +78,9 @@ async def main():
             try:
                 # Try history method as alternative
                 logger.info(f"Fetching history for {asset}...")
-                history_data = await asyncio.wait_for(client.history(asset, 60), timeout=10.0)
+                history_data = await asyncio.wait_for(
+                    client.history(asset, 60), timeout=10.0
+                )
                 logger.info(f"Retrieved {len(history_data)} history items for {asset}")
             except asyncio.TimeoutError:
                 logger.error("Timed out fetching history")
@@ -82,7 +91,10 @@ async def main():
             logger.info("\n--- Real-time Data ---")
             logger.info(f"Subscribing to {asset} (1s)...")
             from datetime import timedelta
-            subscription = await client.subscribe_symbol_timed(asset, timedelta(seconds=1))
+
+            subscription = await client.subscribe_symbol_timed(
+                asset, timedelta(seconds=1)
+            )
 
             logger.info("Collecting 3 live candles...")
             count = 0
@@ -109,10 +121,12 @@ async def main():
                     # In a real app, you might use a callback or loop checking status
                     # Here we wait for duration + buffer
                     # However, check_win handles the wait internally mostly
-                    
+
                     result = await client.check_win(trade_id)
                     # result is a dict with 'result' key being "win", "loss", or "draw"
-                    logger.info(f"Trade Result: {result.get('result', 'unknown').upper()}")
+                    logger.info(
+                        f"Trade Result: {result.get('result', 'unknown').upper()}"
+                    )
 
                 except Exception as e:
                     logger.error(f"Trading error: {e}")
@@ -121,7 +135,7 @@ async def main():
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
-        
+
         logger.info("\n--- Cleanup ---")
         # Disconnect is handled by context manager
 

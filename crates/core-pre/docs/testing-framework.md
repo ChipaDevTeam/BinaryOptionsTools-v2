@@ -266,7 +266,6 @@ The TestingWrapper has been successfully implemented with full ClientRunner inte
 1. **Integrated ClientRunner Execution**: The TestingWrapper now actually runs the ClientRunner in a background task, providing real connection testing.
 
 2. **Proper Lifecycle Management**:
-
    - `start()` method launches the ClientRunner and statistics collection
    - `stop()` method gracefully stops statistics collection but preserves the client
    - `stop_and_shutdown()` method provides complete shutdown using `client.shutdown()`

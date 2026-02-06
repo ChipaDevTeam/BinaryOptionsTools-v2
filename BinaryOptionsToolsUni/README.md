@@ -14,17 +14,20 @@ Cross-platform library for binary options trading automation using UniFFI. Provi
 ## 📦 Installation
 
 ### C# (.NET)
+
 ```bash
 # Coming soon - NuGet package
 dotnet add package BinaryOptionsToolsUni
 ```
 
 ### Go
+
 ```bash
 go get github.com/ChipaDevTeam/BinaryOptionsTools-v2/bindings/go
 ```
 
 ### Kotlin
+
 ```gradle
 dependencies {
     implementation 'com.chipadevteam:binaryoptionstoolsuni:0.1.0'
@@ -32,16 +35,19 @@ dependencies {
 ```
 
 ### Python
+
 ```bash
 pip install binaryoptionstoolsuni
 ```
 
 ### Ruby
+
 ```bash
 gem install binaryoptionstoolsuni
 ```
 
 ### Swift
+
 ```swift
 // Add to Package.swift
 dependencies: [
@@ -54,6 +60,7 @@ dependencies: [
 All languages follow the same API structure. Here's a quick example in each supported language:
 
 ### Python
+
 ```python
 import asyncio
 from binaryoptionstoolsuni import PocketOption
@@ -61,10 +68,10 @@ from binaryoptionstoolsuni import PocketOption
 async def main():
     client = await PocketOption.init("your_ssid")
     await asyncio.sleep(2)  # Wait for initialization
-    
+
     balance = await client.balance()
     print(f"Balance: ${balance}")
-    
+
     # Place a trade
     trade = await client.buy("EURUSD_otc", 60, 1.0)
     print(f"Trade ID: {trade.id}")
@@ -73,6 +80,7 @@ asyncio.run(main())
 ```
 
 ### Kotlin
+
 ```kotlin
 import com.chipadevteam.binaryoptionstoolsuni.*
 import kotlinx.coroutines.*
@@ -80,10 +88,10 @@ import kotlinx.coroutines.*
 suspend fun main() = coroutineScope {
     val client = PocketOption.init("your_ssid")
     delay(2000) // Wait for initialization
-    
+
     val balance = client.balance()
     println("Balance: $$balance")
-    
+
     // Place a trade
     val trade = client.buy("EURUSD_otc", 60u, 1.0)
     println("Trade ID: ${trade.id}")
@@ -91,16 +99,17 @@ suspend fun main() = coroutineScope {
 ```
 
 ### Swift
+
 ```swift
 import BinaryOptionsToolsUni
 
 Task {
     let client = try await PocketOption.init(ssid: "your_ssid")
     try await Task.sleep(nanoseconds: 2_000_000_000) // Wait for initialization
-    
+
     let balance = await client.balance()
     print("Balance: $\(balance)")
-    
+
     // Place a trade
     let trade = try await client.buy(asset: "EURUSD_otc", time: 60, amount: 1.0)
     print("Trade ID: \(trade.id)")
@@ -108,6 +117,7 @@ Task {
 ```
 
 ### Go
+
 ```go
 package main
 
@@ -123,10 +133,10 @@ func main() {
         panic(err)
     }
     time.Sleep(2 * time.Second) // Wait for initialization
-    
+
     balance := client.Balance()
     fmt.Printf("Balance: $%.2f\n", balance)
-    
+
     // Place a trade
     trade, err := client.Buy("EURUSD_otc", 60, 1.0)
     if err != nil {
@@ -137,6 +147,7 @@ func main() {
 ```
 
 ### Ruby
+
 ```ruby
 require 'binaryoptionstoolsuni'
 require 'async'
@@ -144,17 +155,18 @@ require 'async'
 Async do
   client = BinaryOptionsToolsUni::PocketOption.init('your_ssid')
   sleep 2 # Wait for initialization
-  
+
   balance = client.balance
   puts "Balance: $#{balance}"
-  
+
   # Place a trade
   trade = client.buy('EURUSD_otc', 60, 1.0)
   puts "Trade ID: #{trade.id}"
 end
 ```
 
-### C#
+### C #
+
 ```csharp
 using BinaryOptionsToolsUni;
 
@@ -181,23 +193,27 @@ Comprehensive API documentation with examples in all supported languages:
 ## ✨ Features
 
 ### Trading Operations
+
 - ✅ Place Call/Put trades
 - ✅ Check trade results
 - ✅ Get open and closed deals
 - ✅ Support for both demo and real accounts
 
 ### Account Management
+
 - ✅ Get account balance
 - ✅ Check demo/real account status
 - ✅ Manage trade history
 
 ### Market Data
+
 - ✅ Get historical candles (OHLC data)
 - ✅ Subscribe to real-time price updates
 - ✅ Get asset information and payouts
 - ✅ Server time synchronization
 
 ### Connection Management
+
 - ✅ Automatic reconnection
 - ✅ Connection state management
 - ✅ Custom WebSocket URLs
@@ -229,6 +245,7 @@ Comprehensive API documentation with examples in all supported languages:
 ## 🔧 Building from Source
 
 ### Prerequisites
+
 - Rust 1.70+ with `cargo`
 - UniFFI CLI: `cargo install uniffi_bindgen`
 - Target language toolchains (as needed)
@@ -252,6 +269,7 @@ cargo run --bin uniffi-bindgen generate src/binary_options_tools_uni.udl \
 ## 🤝 Contributing
 
 Contributions are welcome! Please ensure:
+
 1. Code follows language-specific best practices
 2. All tests pass
 3. New features include examples for all supported languages
@@ -267,6 +285,7 @@ See [LICENSE](../LICENSE) file for details.
 ## ⚠️ Disclaimer
 
 This software is provided "AS IS" without warranty. The authors and ChipaDevTeam are NOT responsible for:
+
 - Any financial losses incurred from using this software
 - Any trading decisions made using this software
 - Any bugs, errors, or issues in the software

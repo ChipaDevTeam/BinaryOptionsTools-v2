@@ -26,14 +26,14 @@ import BinaryOptionsToolsUni
 Task {
     // Initialize client with your session ID
     let client = try await PocketOption(ssid: "your-session-id")
-    
+
     // IMPORTANT: Wait for connection to establish
     try await Task.sleep(nanoseconds: 5_000_000_000)
-    
+
     // Get account balance
     let balance = try await client.balance()
     print("Account Balance: $\(balance)")
-    
+
     // Place a buy trade
     let deal = try await client.buy(asset: "EURUSD_otc", time: 60, amount: 1.0)
     print("Trade placed: \(deal)")
@@ -51,14 +51,14 @@ func buyTradeExample() async throws {
     // Initialize client
     let client = try await PocketOption(ssid: "your-session-id")
     try await Task.sleep(nanoseconds: 5_000_000_000)  // Wait for connection
-    
+
     // Place a buy trade on EURUSD for 60 seconds with $1
     let deal = try await client.buy(
         asset: "EURUSD_otc",
         time: 60,
         amount: 1.0
     )
-    
+
     print("Trade placed successfully!")
     print("Deal data: \(deal)")
 }
@@ -73,14 +73,14 @@ func sellTradeExample() async throws {
     // Initialize client
     let client = try await PocketOption(ssid: "your-session-id")
     try await Task.sleep(nanoseconds: 5_000_000_000)  // Wait for connection
-    
+
     // Place a sell trade on EURUSD for 60 seconds with $1
     let deal = try await client.sell(
         asset: "EURUSD_otc",
         time: 60,
         amount: 1.0
     )
-    
+
     print("Trade placed successfully!")
     print("Deal data: \(deal)")
 }
@@ -95,7 +95,7 @@ func balanceExample() async throws {
     // Initialize client
     let client = try await PocketOption(ssid: "your-session-id")
     try await Task.sleep(nanoseconds: 5_000_000_000)  // Wait for connection
-    
+
     // Get current balance
     let balance = try await client.balance()
     print("Your current balance is: $\(balance)")
@@ -111,14 +111,14 @@ func checkWinExample() async throws {
     // Initialize client
     let client = try await PocketOption(ssid: "your-session-id")
     try await Task.sleep(nanoseconds: 5_000_000_000)  // Wait for connection
-    
+
     // Place a trade
     let deal = try await client.buy(asset: "EURUSD_otc", time: 60, amount: 1.0)
     let tradeId = deal.id  // Extract trade ID from deal
-    
+
     // Wait for trade to complete
     try await Task.sleep(nanoseconds: 65_000_000_000)
-    
+
     // Check the result
     let result = try await client.checkWin(tradeId: tradeId)
     print("Trade result: \(result)")
@@ -134,11 +134,11 @@ func subscribeExample() async throws {
     // Initialize client
     let client = try await PocketOption(ssid: "your-session-id")
     try await Task.sleep(nanoseconds: 5_000_000_000)  // Wait for connection
-    
+
     // Subscribe to real-time candle data for EURUSD
     // Duration in seconds for each candle
     let subscription = try await client.subscribe(asset: "EURUSD_otc", durationSecs: 60)
-    
+
     print("Listening for real-time candles...")
     // Process subscription stream
 }
@@ -166,6 +166,7 @@ try await Task.sleep(nanoseconds: 5_000_000_000)  // Critical!
 ### Supported Assets
 
 Common assets include:
+
 - `EURUSD_otc` - Euro/US Dollar (OTC)
 - `GBPUSD_otc` - British Pound/US Dollar (OTC)
 - `USDJPY_otc` - US Dollar/Japanese Yen (OTC)
@@ -184,7 +185,7 @@ import BinaryOptionsToolsUni
 struct ContentView: View {
     @State private var balance: Double = 0
     @State private var isLoading = false
-    
+
     var body: some View {
         VStack {
             if isLoading {
@@ -192,12 +193,12 @@ struct ContentView: View {
             } else {
                 Text("Balance: $\(balance, specifier: "%.2f")")
             }
-            
+
             Button("Get Balance") {
                 Task {
                     isLoading = true
                     defer { isLoading = false }
-                    
+
                     let client = try await PocketOption(ssid: "your-session-id")
                     try await Task.sleep(nanoseconds: 5_000_000_000)
                     balance = try await client.balance()

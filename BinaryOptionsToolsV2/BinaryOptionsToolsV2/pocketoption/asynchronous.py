@@ -3,11 +3,13 @@ import json
 import re
 import sys
 from datetime import timedelta
-from typing import Optional, Union, List, Dict, Tuple
+from typing import Optional, Union, List, Dict, Tuple, TYPE_CHECKING
 
 from ..config import Config
 from ..validator import Validator
 
+if TYPE_CHECKING:
+    from ..BinaryOptionsToolsV2 import RawPocketOption
 
 if sys.version_info < (3, 10):
 
@@ -121,7 +123,7 @@ class RawHandler:
                 print(f"Update: {data}")
             ```
         """
-        return await self._handler.subscribe()
+        return self._handler.subscribe()
 
     def id(self) -> str:
         """
@@ -191,23 +193,23 @@ class PocketOptionAsync:
         from ..tracing import Logger
 
         # Handle case where shell stripped quotes from the SSID (e.g. export SSID=42[auth,{session:...}])
-        if ssid.startswith('42[auth,'):
+        if ssid.startswith("42[auth,"):
             # 1. Fix the prefix
-            ssid = ssid.replace('42[auth,', '42["auth",', 1)
+            ssid = ssid.replace("42[auth,", '42["auth",', 1)
 
             # 2. Quote keys in the JSON object (alphanumeric keys followed by colon)
-            ssid = re.sub(r'(?<=[{,])\s*([a-zA-Z0-9_]+)\s*:', r'"\1":', ssid)
+            ssid = re.sub(r"(?<=[{,])\s*([a-zA-Z0-9_]+)\s*:", r'"\1":', ssid)
 
             # 3. Quote values (alphanumeric values followed by comma or closing bracket)
             def quote_value(match):
                 val = match.group(1).strip()
                 # Keep numbers and booleans/null unquoted
-                if val.isdigit() or val in ['true', 'false', 'null']:
-                    return f':{val}'
+                if val.isdigit() or val in ["true", "false", "null"]:
+                    return f":{val}"
                 # Quote everything else
                 return f':"{val}"'
 
-            ssid = re.sub(r':\s*([^,}\]]+?)(?=\s*[,}\]])', quote_value, ssid)
+            ssid = re.sub(r":\s*([^,}\]]+?)(?=\s*[,}\]])", quote_value, ssid)
 
         if config is not None:
             if isinstance(config, dict):
@@ -221,12 +223,12 @@ class PocketOptionAsync:
 
             if url is not None:
                 self.config.urls.insert(0, url)
-            self.client = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
+            self.client: "RawPocketOption" = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
         else:
             self.config = Config()
             if url is not None:
                 self.config.urls.insert(0, url)
-            self.client = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
+            self.client: "RawPocketOption" = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
         self.logger = Logger()
 
     async def __aenter__(self):
@@ -324,15 +326,14 @@ class PocketOptionAsync:
             ValueError: If trade_id is invalid
             TimeoutError: If result check times out
         """
-        from datetime import datetime
-        import time as py_time
-        
+
         # Set a reasonable timeout to prevent hanging
         timeout_seconds = 60  # Increased timeout to accommodate longer trade durations
-        
+
         try:
             # Use asyncio.wait_for as additional protection against hanging
             import asyncio
+
             trade = await asyncio.wait_for(self._get_trade_result(id), timeout=timeout_seconds)
             return trade
         except asyncio.TimeoutError:

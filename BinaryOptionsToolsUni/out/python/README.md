@@ -26,18 +26,18 @@ import asyncio
 async def main():
     # Initialize client with your session ID
     client = await PocketOption.new("your-session-id")
-    
+
     # IMPORTANT: Wait for connection to establish
     await asyncio.sleep(5)
-    
+
     # Get account balance
     balance = await client.balance()
     print(f"Account Balance: ${balance}")
-    
+
     # Place a buy trade
     deal = await client.buy("EURUSD_otc", 60, 1.0)
     print(f"Trade placed: {deal}")
-    
+
     # Subscribe to real-time data
     subscription = await client.subscribe("EURUSD_otc", 60)
     # Process subscription data...
@@ -58,14 +58,14 @@ async def buy_trade_example():
     # Initialize client
     client = await PocketOption.new("your-session-id")
     await asyncio.sleep(5)  # Wait for connection
-    
+
     # Place a buy trade on EURUSD for 60 seconds with $1
     deal = await client.buy(
         asset="EURUSD_otc",
         time=60,
         amount=1.0
     )
-    
+
     print(f"Trade placed successfully!")
     print(f"Deal data: {deal}")
 
@@ -82,14 +82,14 @@ async def sell_trade_example():
     # Initialize client
     client = await PocketOption.new("your-session-id")
     await asyncio.sleep(5)  # Wait for connection
-    
+
     # Place a sell trade on EURUSD for 60 seconds with $1
     deal = await client.sell(
         asset="EURUSD_otc",
         time=60,
         amount=1.0
     )
-    
+
     print(f"Trade placed successfully!")
     print(f"Deal data: {deal}")
 
@@ -106,7 +106,7 @@ async def balance_example():
     # Initialize client
     client = await PocketOption.new("your-session-id")
     await asyncio.sleep(5)  # Wait for connection
-    
+
     # Get current balance
     balance = await client.balance()
     print(f"Your current balance is: ${balance}")
@@ -124,14 +124,14 @@ async def check_win_example():
     # Initialize client
     client = await PocketOption.new("your-session-id")
     await asyncio.sleep(5)  # Wait for connection
-    
+
     # Place a trade
     deal = await client.buy("EURUSD_otc", 60, 1.0)
     trade_id = deal.id  # Extract trade ID from deal
-    
+
     # Wait for trade to complete
     await asyncio.sleep(65)
-    
+
     # Check the result
     result = await client.check_win(trade_id)
     print(f"Trade result: {result}")
@@ -149,11 +149,11 @@ async def subscribe_example():
     # Initialize client
     client = await PocketOption.new("your-session-id")
     await asyncio.sleep(5)  # Wait for connection
-    
+
     # Subscribe to real-time candle data for EURUSD
     # Duration in seconds for each candle
     subscription = await client.subscribe("EURUSD_otc", duration_secs=60)
-    
+
     print("Listening for real-time candles...")
     # Process subscription stream
     # (Implementation depends on the SubscriptionStream interface)
@@ -183,6 +183,7 @@ await asyncio.sleep(5)  # Critical!
 ### Supported Assets
 
 Common assets include:
+
 - `EURUSD_otc` - Euro/US Dollar (OTC)
 - `GBPUSD_otc` - British Pound/US Dollar (OTC)
 - `USDJPY_otc` - US Dollar/Japanese Yen (OTC)

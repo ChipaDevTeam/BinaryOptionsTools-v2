@@ -3,6 +3,7 @@
 ## Quick Deployment Steps
 
 ### 1. Enable GitHub Pages
+
 1. Go to your repository on GitHub
 2. Click on **Settings** tab
 3. Scroll down to **Pages** section
@@ -11,21 +12,25 @@
 6. Click **Save**
 
 ### 2. Update Configuration
+
 Before deploying, update these values in the documentation:
 
-#### In `_config.yml`:
+#### In `_config.yml`
+
 ```yaml
 url: "https://yourusername.github.io"
 baseurl: "/your-repository-name"
 ```
 
-#### Replace placeholders:
+#### Replace placeholders
+
 - `yourusername` → Your GitHub username
 - `your-repository-name` → Your actual repository name
 - `your-google-site-verification-code` → Your Google Search Console verification code
 - `your-bing-site-verification-code` → Your Bing Webmaster verification code
 
 ### 3. Test Locally (Optional)
+
 ```bash
 cd docs
 python -m http.server 8000
@@ -33,10 +38,13 @@ python -m http.server 8000
 ```
 
 ### 4. Custom Domain (Optional)
+
 1. Add a `CNAME` file to the docs folder with your domain:
+
    ```
    your-domain.com
    ```
+
 2. Configure DNS settings with your domain provider
 
 ## Features Enabled
@@ -53,6 +61,7 @@ python -m http.server 8000
 ✅ **Search Functionality** - Built-in documentation search
 
 ## File Structure
+
 ```
 docs/
 ├── index.html              # Homepage
@@ -80,16 +89,19 @@ docs/
 ## Customization
 
 ### Colors
+
 Edit the CSS custom properties in `assets/css/main.css`:
+
 ```css
 :root {
-  --primary-color: #8B5CF6;    /* Main purple */
-  --secondary-color: #A855F7;   /* Secondary purple */
-  --accent-color: #C084FC;      /* Light purple */
+  --primary-color: #8b5cf6; /* Main purple */
+  --secondary-color: #a855f7; /* Secondary purple */
+  --accent-color: #c084fc; /* Light purple */
 }
 ```
 
 ### Content
+
 - Edit HTML files directly for content changes
 - Modify JavaScript files for functionality changes
 - Update CSS files for styling changes
@@ -97,16 +109,19 @@ Edit the CSS custom properties in `assets/css/main.css`:
 ## Troubleshooting
 
 ### Site not loading?
+
 1. Check if GitHub Pages is enabled in repository settings
 2. Ensure the branch and folder are correctly selected
 3. Wait 5-10 minutes for changes to propagate
 
 ### Styles not loading?
+
 1. Check file paths in HTML files
 2. Ensure all CSS files are in `assets/css/`
 3. Verify `.nojekyll` file exists
 
 ### JavaScript not working?
+
 1. Check browser console for errors
 2. Ensure all JS files are in `assets/js/`
 3. Verify file paths in HTML files
@@ -121,14 +136,20 @@ Edit the CSS custom properties in `assets/css/main.css`:
 ## Analytics Integration
 
 Add Google Analytics by inserting this code before `</head>` in all HTML files:
+
 ```html
 <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
+<script
+  async
+  src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"
+></script>
 <script>
   window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'GA_MEASUREMENT_ID');
+  function gtag() {
+    dataLayer.push(arguments);
+  }
+  gtag("js", new Date());
+  gtag("config", "GA_MEASUREMENT_ID");
 </script>
 ```
 
@@ -137,6 +158,7 @@ Replace `GA_MEASUREMENT_ID` with your actual Google Analytics measurement ID.
 ## Support
 
 For issues with the documentation site:
+
 1. Check this deployment guide
 2. Verify all file paths are correct
 3. Test locally before deploying

@@ -8,14 +8,16 @@ from BinaryOptionsToolsV2.pocketoption.asynchronous import PocketOptionAsync
 # Get SSID from environment variable
 SSID = os.getenv("POCKET_OPTION_SSID")
 
+
 @pytest.fixture
 async def api():
     if not SSID:
         pytest.skip("POCKET_OPTION_SSID not set")
-    
+
     # Use context manager which waits for assets automatically
     async with PocketOptionAsync(SSID) as client:
         yield client
+
 
 @pytest.mark.asyncio
 async def test_balance(api):
@@ -27,21 +29,25 @@ async def test_balance(api):
     except Exception as e:
         pytest.fail(f"Failed to get balance: {e}")
 
+
 @pytest.mark.asyncio
 async def test_server_time(api):
     """Test retrieving server time."""
     try:
         # Give the websocket 2 seconds to receive the time sync packet
         await asyncio.sleep(2)
-        
+
         time = await asyncio.wait_for(api.get_server_time(), timeout=10.0)
         assert isinstance(time, (int, float))
         assert time > 1577836800  # 2020-01-01
         print(f"Server time: {time}")
     except asyncio.TimeoutError:
-        pytest.fail("Timed out getting server time - server time may not be initialized")
+        pytest.fail(
+            "Timed out getting server time - server time may not be initialized"
+        )
     except Exception as e:
         pytest.fail(f"Failed to get server time: {e}")
+
 
 @pytest.mark.asyncio
 async def test_is_demo(api):
@@ -53,16 +59,17 @@ async def test_is_demo(api):
     except Exception as e:
         pytest.fail(f"Failed to check is_demo: {e}")
 
+
 @pytest.mark.asyncio
 async def test_buy_and_check_win(api):
     """Test buying an asset and checking the result."""
     if not api.is_demo():
         pytest.skip("Skipping trade test on real account to avoid losing money")
-    
-    asset = "EURUSD_otc" # OTC is usually available on weekends too
+
+    asset = "EURUSD_otc"  # OTC is usually available on weekends too
     amount = 1.0
-    duration = 15 # Increased duration to give more time for result processing
-    
+    duration = 15  # Increased duration to give more time for result processing
+
     # Check if we can get payout for this asset to ensure it's valid
     try:
         payout = await api.payout(asset)
@@ -78,14 +85,14 @@ async def test_buy_and_check_win(api):
         assert trade_id
         assert isinstance(trade_info, dict)
         print(f"Trade placed: {trade_id}")
-        
+
         # Now wait for result using check_win
         print(f"Waiting for trade result (timeout: {duration + 60.0}s)...")
         try:
             # Use a reasonable timeout to prevent hanging - should be at least duration + buffer
             result = await asyncio.wait_for(
                 api.check_win(trade_id),
-                timeout=duration + 60.0  # Increased timeout buffer
+                timeout=duration + 20.0,
             )
             assert isinstance(result, dict)
             assert "result" in result
@@ -97,22 +104,22 @@ async def test_buy_and_check_win(api):
         except Exception as e:
             print(f"Error during check_win: {e}")
             pytest.fail(f"Error during check_win: {e}")
-        
+
     except Exception as e:
         print(f"Trade failed: {e}")
         pytest.fail(f"Trade failed: {e}")
 
-        
+
 @pytest.mark.asyncio
 async def test_buy_without_waiting(api):
     """Test buying an asset without waiting for the result (faster test)."""
     if not api.is_demo():
         pytest.skip("Skipping trade test on real account to avoid losing money")
-    
+
     asset = "EURUSD_otc"
     amount = 1.0
     duration = 5
-    
+
     # Check if we can get payout for this asset to ensure it's valid
     try:
         payout = await api.payout(asset)
@@ -128,16 +135,17 @@ async def test_buy_without_waiting(api):
         assert trade_id
         assert isinstance(trade_info, dict)
         print(f"Trade placed: {trade_id}, Info: {trade_info}")
-        
+
     except Exception as e:
         pytest.fail(f"Trade placement failed: {e}")
+
 
 @pytest.mark.asyncio
 async def test_get_candles(api):
     """Test retrieving historical candle data."""
     asset = "EURUSD_otc"
     period = 60  # 1-minute candles
-    
+
     print(f"Fetching candles for {asset} with period {period}...")
     try:
         # Some assets might not be available, so we check payout first
@@ -160,12 +168,13 @@ async def test_get_candles(api):
     except Exception as e:
         pytest.fail(f"Failed to get candles: {e}")
 
+
 @pytest.mark.asyncio
 async def test_history(api):
     """Test retrieving historical candle data using the history method."""
     asset = "EURUSD_otc"
     period = 60
-    
+
     print(f"Fetching history for {asset} with period {period}...")
     try:
         payout = await api.payout(asset)
@@ -181,6 +190,7 @@ async def test_history(api):
         pytest.fail("Timed out waiting for history")
     except Exception as e:
         pytest.fail(f"Failed to get history: {e}")
+
 
 if __name__ == "__main__":
     sys.exit(pytest.main(["-v", __file__]))

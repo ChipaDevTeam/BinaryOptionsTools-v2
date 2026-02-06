@@ -37,6 +37,7 @@ dependencies {
 ### Swift
 
 Add to `Package.swift`:
+
 ```swift
 dependencies: [
     .package(url: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2", from: "0.1.0")
@@ -55,7 +56,7 @@ go get github.com/ChipaDevTeam/BinaryOptionsTools-v2/bindings/go
 gem install binaryoptionstoolsuni
 ```
 
-### C#
+### C #
 
 ```bash
 dotnet add package BinaryOptionsToolsUni
@@ -76,10 +77,10 @@ from binaryoptionstoolsuni import PocketOption
 async def main():
     client = await PocketOption.init("your_ssid")
     await asyncio.sleep(2)  # Wait for API to initialize
-    
+
     balance = await client.balance()
     print(f"Balance: ${balance}")
-    
+
     await client.shutdown()
 
 asyncio.run(main())
@@ -94,10 +95,10 @@ import kotlinx.coroutines.*
 suspend fun main() = coroutineScope {
     val client = PocketOption.init("your_ssid")
     delay(2000) // Wait for API to initialize
-    
+
     val balance = client.balance()
     println("Balance: $$balance")
-    
+
     client.shutdown()
 }
 ```
@@ -110,10 +111,10 @@ import BinaryOptionsToolsUni
 Task {
     let client = try await PocketOption.init(ssid: "your_ssid")
     try await Task.sleep(nanoseconds: 2_000_000_000)
-    
+
     let balance = await client.balance()
     print("Balance: $\(balance)")
-    
+
     try await client.shutdown()
 }
 ```
@@ -132,10 +133,10 @@ import (
 func main() {
     client, _ := bot.PocketOptionInit("your_ssid")
     time.Sleep(2 * time.Second)
-    
+
     balance := client.Balance()
     fmt.Printf("Balance: $%.2f\n", balance)
-    
+
     client.Shutdown()
 }
 ```
@@ -149,15 +150,15 @@ require 'async'
 Async do
   client = BinaryOptionsToolsUni::PocketOption.init('your_ssid')
   sleep 2
-  
+
   balance = client.balance
   puts "Balance: $#{balance}"
-  
+
   client.shutdown
 end
 ```
 
-#### C#
+#### C #
 
 ```csharp
 using BinaryOptionsToolsUni;
@@ -227,7 +228,7 @@ puts "Asset: #{trade.asset}"
 puts "Amount: $#{trade.amount}"
 ```
 
-#### C#
+#### C #
 
 ```csharp
 // Place a $1 call trade on EURUSD_otc for 60 seconds
@@ -279,7 +280,7 @@ trade = client.sell('EURUSD_otc', 60, 1.0)
 puts "Trade ID: #{trade.id}"
 ```
 
-#### C#
+#### C #
 
 ```csharp
 // Place a $1 put trade on EURUSD_otc for 60 seconds
@@ -338,7 +339,7 @@ puts "Result: #{result.profit > 0 ? 'WIN' : 'LOSS'}"
 puts "Profit: $#{result.profit}"
 ```
 
-#### C#
+#### C #
 
 ```csharp
 // Check if a trade won or lost
@@ -388,7 +389,7 @@ balance = client.balance
 puts "Current balance: $#{'%.2f' % balance}"
 ```
 
-#### C#
+#### C #
 
 ```csharp
 var balance = await client.BalanceAsync();
@@ -440,7 +441,7 @@ account_type = is_demo ? "Demo" : "Real"
 puts "Account type: #{account_type}"
 ```
 
-#### C#
+#### C #
 
 ```csharp
 var isDemo = client.IsDemo();
@@ -499,7 +500,7 @@ open_deals.each do |deal|
 end
 ```
 
-#### C#
+#### C #
 
 ```csharp
 var openDeals = await client.GetOpenedDealsAsync();
@@ -569,7 +570,7 @@ closed_deals.each do |deal|
 end
 ```
 
-#### C#
+#### C #
 
 ```csharp
 var closedDeals = await client.GetClosedDealsAsync();
@@ -642,7 +643,7 @@ candles.first(5).each do |candle|
 end
 ```
 
-#### C#
+#### C #
 
 ```csharp
 // Get last 100 candles with 60-second period
@@ -691,7 +692,7 @@ server_time = client.server_time
 puts "Server timestamp: #{server_time}"
 ```
 
-#### C#
+#### C #
 
 ```csharp
 var serverTime = await client.ServerTimeAsync();
@@ -755,7 +756,7 @@ puts "Subscribed to EURUSD_otc"
 # Receive candles (implementation depends on generated bindings)
 ```
 
-#### C#
+#### C #
 
 ```csharp
 // Subscribe to 60-second candles
@@ -802,7 +803,7 @@ client.unsubscribe('EURUSD_otc')
 puts "Unsubscribed from EURUSD_otc"
 ```
 
-#### C#
+#### C #
 
 ```csharp
 await client.UnsubscribeAsync("EURUSD_otc");
@@ -855,7 +856,7 @@ sleep 2
 puts "Reconnected to server"
 ```
 
-#### C#
+#### C #
 
 ```csharp
 await client.ReconnectAsync();
@@ -900,7 +901,7 @@ client.shutdown
 puts "Client shut down gracefully"
 ```
 
-#### C#
+#### C #
 
 ```csharp
 await client.ShutdownAsync();
@@ -980,7 +981,7 @@ rescue => e
 end
 ```
 
-### C#
+### C #
 
 ```csharp
 using BinaryOptionsToolsUni;
@@ -1059,29 +1060,29 @@ See the [examples directory](../examples/) for complete working examples in each
 
 ## API Method Reference
 
-| Method | Description | Returns |
-|--------|-------------|---------|
-| `init(ssid)` / `new(ssid)` | Initialize client with session ID | Client instance |
-| `new_with_url(ssid, url)` | Initialize with custom WebSocket URL | Client instance |
-| `balance()` | Get current account balance | Float |
-| `is_demo()` | Check if demo account | Boolean |
-| `buy(asset, time, amount)` | Place call trade | Deal object |
-| `sell(asset, time, amount)` | Place put trade | Deal object |
-| `trade(asset, action, time, amount)` | Place trade with action | Deal object |
-| `result(id)` | Check trade result | Deal object |
-| `result_with_timeout(id, timeout)` | Check trade result with timeout | Deal object |
-| `get_opened_deals()` | Get list of open trades | List of Deals |
-| `get_closed_deals()` | Get list of closed trades | List of Deals |
-| `clear_closed_deals()` | Clear closed trades from memory | Void |
-| `get_candles(asset, period, offset)` | Get historical candles | List of Candles |
-| `get_candles_advanced(asset, period, time, offset)` | Get historical candles (advanced) | List of Candles |
-| `history(asset, period)` | Get historical data | List of Candles |
-| `subscribe(asset, duration)` | Subscribe to real-time data | Subscription |
-| `unsubscribe(asset)` | Unsubscribe from asset | Void |
-| `server_time()` | Get server timestamp | Integer (Unix timestamp) |
-| `assets()` | Get available assets | List of Assets (optional) |
-| `reconnect()` | Reconnect to server | Void |
-| `shutdown()` | Shutdown client | Void |
+| Method                                              | Description                          | Returns                   |
+| --------------------------------------------------- | ------------------------------------ | ------------------------- |
+| `init(ssid)` / `new(ssid)`                          | Initialize client with session ID    | Client instance           |
+| `new_with_url(ssid, url)`                           | Initialize with custom WebSocket URL | Client instance           |
+| `balance()`                                         | Get current account balance          | Float                     |
+| `is_demo()`                                         | Check if demo account                | Boolean                   |
+| `buy(asset, time, amount)`                          | Place call trade                     | Deal object               |
+| `sell(asset, time, amount)`                         | Place put trade                      | Deal object               |
+| `trade(asset, action, time, amount)`                | Place trade with action              | Deal object               |
+| `result(id)`                                        | Check trade result                   | Deal object               |
+| `result_with_timeout(id, timeout)`                  | Check trade result with timeout      | Deal object               |
+| `get_opened_deals()`                                | Get list of open trades              | List of Deals             |
+| `get_closed_deals()`                                | Get list of closed trades            | List of Deals             |
+| `clear_closed_deals()`                              | Clear closed trades from memory      | Void                      |
+| `get_candles(asset, period, offset)`                | Get historical candles               | List of Candles           |
+| `get_candles_advanced(asset, period, time, offset)` | Get historical candles (advanced)    | List of Candles           |
+| `history(asset, period)`                            | Get historical data                  | List of Candles           |
+| `subscribe(asset, duration)`                        | Subscribe to real-time data          | Subscription              |
+| `unsubscribe(asset)`                                | Unsubscribe from asset               | Void                      |
+| `server_time()`                                     | Get server timestamp                 | Integer (Unix timestamp)  |
+| `assets()`                                          | Get available assets                 | List of Assets (optional) |
+| `reconnect()`                                       | Reconnect to server                  | Void                      |
+| `shutdown()`                                        | Shutdown client                      | Void                      |
 
 ---
 

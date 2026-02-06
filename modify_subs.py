@@ -14,8 +14,14 @@ with open(file_path, "r") as f:
 # };
 # It handles whitespace variations.
 
-pattern_period = re.compile(r'let period = match sub_type \{\sSubscriptionType::TimeAligned \{ duration, \.\. \} => duration\.as_secs\(\) as u32,\s_ => 1,\s\};', re.DOTALL)
-pattern_period2 = re.compile(r'let period = match sub_type \{\sSubscriptionType::TimeAligned \{ duration, \.\. \} => \{\sduration\.as_secs\(\) as u32\s\}\s_ => 1,\s\};', re.DOTALL)
+pattern_period = re.compile(
+    r"let period = match sub_type \{\sSubscriptionType::TimeAligned \{ duration, \.\. \} => duration\.as_secs\(\) as u32,\s_ => 1,\s\};",
+    re.DOTALL,
+)
+pattern_period2 = re.compile(
+    r"let period = match sub_type \{\sSubscriptionType::TimeAligned \{ duration, \.\. \} => \{\sduration\.as_secs\(\) as u32\s\}\s_ => 1,\s\};",
+    re.DOTALL,
+)
 
 # Check occurrences
 matches = pattern_period.findall(content)
@@ -23,13 +29,20 @@ matches2 = pattern_period2.findall(content)
 print(f"Found {len(matches)} matches for pattern 1")
 print(f"Found {len(matches2)} matches for pattern 2")
 
-new_content = pattern_period.sub('let period = sub_type.period_secs().unwrap_or(1);', content)
-new_content = pattern_period2.sub('let period = sub_type.period_secs().unwrap_or(1);', new_content)
+new_content = pattern_period.sub(
+    "let period = sub_type.period_secs().unwrap_or(1);", content
+)
+new_content = pattern_period2.sub(
+    "let period = sub_type.period_secs().unwrap_or(1);", new_content
+)
 
 # Replace History handling
 # We need to find the block handling ServerResponse::History
 
-history_pattern = re.compile(r'Ok\(ServerResponse::History\(data\)\) => \{.?if let Some\(command_id\) = id \{.?let symbol = data\.asset\.clone\(\);.?let candles = if let Some\(candles\) = data\.candles \{.?\}\s*else if let Some\(history\) = data\.history \{.?\}\s*else \{.?\};\sif let Err\(e\) = self\.command_responder\.send\(CommandResponse::History \{.?\}\)\.await \{.?\}\s*\}\s*\}', re.DOTALL | re.MULTILINE)
+history_pattern = re.compile(
+    r"Ok\(ServerResponse::History\(data\)\) => \{.?if let Some\(command_id\) = id \{.?let symbol = data\.asset\.clone\(\);.?let candles = if let Some\(candles\) = data\.candles \{.?\}\s*else if let Some\(history\) = data\.history \{.?\}\s*else \{.?\};\sif let Err\(e\) = self\.command_responder\.send\(CommandResponse::History \{.?\}\)\.await \{.?\}\s*\}\s*\}",
+    re.DOTALL | re.MULTILINE,
+)
 
 # I will construct the regex carefully or search for specific substring to replace.
 # The original code segment:
@@ -90,7 +103,9 @@ new_history_block = r"""                                        let candles_res 
 
 # Find the start of the block
 start_marker = "let candles = if let Some(candles) = data.candles {"
-end_marker = 'warn!(target: "SubscriptionsApiModule", "Failed to send history response: {}", e);'
+end_marker = (
+    'warn!(target: "SubscriptionsApiModule", "Failed to send history response: {}", e);'
+)
 
 start_idx = new_content.find(start_marker)
 if start_idx == -1:
@@ -118,7 +133,7 @@ if end_idx_sub == -1:
 # I'll normalize whitespace for matching? No, dangerous.
 
 # I will simply locate the lines and replace.
-lines = new_content.split('\n')
+lines = new_content.split("\n")
 start_line = -1
 end_line = -1
 
@@ -130,11 +145,18 @@ for i, line in enumerate(lines):
 if start_line != -1:
     # Look for the end of the block
     for i in range(start_line, len(lines)):
-        if 'warn!(target: "SubscriptionsApiModule", "Failed to send history response: {}", e);' in lines[i]:
-            if i + 2 < len(lines) and lines[i+1].strip() == "}" and lines[i+2].strip() == "}":
+        if (
+            'warn!(target: "SubscriptionsApiModule", "Failed to send history response: {}", e);'
+            in lines[i]
+        ):
+            if (
+                i + 2 < len(lines)
+                and lines[i + 1].strip() == "}"
+                and lines[i + 2].strip() == "}"
+            ):
                 end_line = i + 2
                 break
-            elif i + 1 < len(lines) and lines[i+1].strip() == "}":
+            elif i + 1 < len(lines) and lines[i + 1].strip() == "}":
                 end_line = i + 1
                 break
 
@@ -148,8 +170,8 @@ if start_line != -1 and end_line != -1:
 
     # Replace the lines
     end_line_inclusive = end_line + 1
-    lines[start_line:end_line_inclusive] = new_lines_str.split('\n')
-    final_content = '\n'.join(lines)
+    lines[start_line:end_line_inclusive] = new_lines_str.split("\n")
+    final_content = "\n".join(lines)
     with open(file_path, "w") as f:
         f.write(final_content)
     print("Successfully modified file")

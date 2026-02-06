@@ -1,8 +1,14 @@
 import asyncio
 import sys
 import os
+
 # Ensure we use the local version of the library
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../BinaryOptionsToolsV2")))
+sys.path.insert(
+    0,
+    os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../../BinaryOptionsToolsV2")
+    ),
+)
 
 # print(BinaryOptionsToolsV2)
 from BinaryOptionsToolsV2 import PocketOptionAsync
@@ -39,8 +45,10 @@ async def main(ssid):
             else:
                 print("Received item:", item)
 
+
 if __name__ == "__main__":
     import os
+
     ssid = os.getenv("POCKET_OPTION_SSID")
     if not ssid:
         ssid = input("Write your ssid: ")

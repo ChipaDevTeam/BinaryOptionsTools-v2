@@ -1,17 +1,19 @@
-const { PocketOption } = require('./binary-options-tools.node');
+const { PocketOption } = require("./binary-options-tools.node");
 
 async function main(ssid) {
-    // Initialize the API client
-    const api = new PocketOption(ssid);
-    
-    // Wait for connection to establish
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    
-    // The getDealEndTime method does not exist in the current API implementation
-    // Please refer to the documentation for available methods
-    console.log("The getDealEndTime method is not available in the current API implementation.");
+  // Initialize the API client
+  const api = new PocketOption(ssid);
+
+  // Wait for connection to establish
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
+  // The getDealEndTime method does not exist in the current API implementation
+  // Please refer to the documentation for available methods
+  console.log(
+    "The getDealEndTime method is not available in the current API implementation.",
+  );
 }
 
 // Check if ssid is provided as command line argument
-const ssid = ''
+const ssid = "";
 main(ssid).catch(console.error);

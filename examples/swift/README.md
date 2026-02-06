@@ -33,6 +33,7 @@ swift Balance.swift
 ## Important
 
 Always wait 5 seconds after initialization:
+
 ```swift
 let client = try await PocketOption(ssid: "your-session-id")
 try await Task.sleep(nanoseconds: 5_000_000_000)  // Critical!

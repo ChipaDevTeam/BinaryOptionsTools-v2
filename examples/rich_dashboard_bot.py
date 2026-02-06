@@ -2,7 +2,7 @@ import asyncio
 import os
 import json
 from datetime import datetime
-from BinaryOptionsToolsV2 import RawPocketOption, PyBot, PyStrategy, start_tracing
+from BinaryOptionsToolsV2 import RawPocketOption, PyBot, PyStrategy
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
@@ -36,7 +36,7 @@ class DashboardStrategy(PyStrategy):
     async def update_balance(self, ctx):
         try:
             self.balance = await ctx.client.balance()
-        except Exception as e:
+        except Exception:
             # In a real app, log the error
             pass
 
@@ -102,7 +102,7 @@ async def main():
 
                 uptime = "00:00:00"
                 if hasattr(strategy, "start_time"):
-                     uptime = str(datetime.now() - strategy.start_time)
+                    uptime = str(datetime.now() - strategy.start_time)
 
                 layout["header"].update(
                     Panel(

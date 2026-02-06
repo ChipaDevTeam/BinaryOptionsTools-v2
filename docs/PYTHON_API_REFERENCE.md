@@ -15,11 +15,11 @@ Complete reference guide for all features and methods available in the BinaryOpt
 
 ## Trading Operations
 
-| Feature | Async Code | Sync Code | Description |
-|---------|-----------|-----------|-------------|
-| **Buy/Call Order** | `await client.buy(asset, amount, time, check_win)` | `client.buy(asset, amount, time, check_win)` | Places a buy (call) order. Returns `(trade_id, trade_data)`. Set `check_win=True` to wait for result. |
-| **Sell/Put Order** | `await client.sell(asset, amount, time, check_win)` | `client.sell(asset, amount, time, check_win)` | Places a sell (put) order. Returns `(trade_id, trade_data)`. Set `check_win=True` to wait for result. |
-| **Check Trade Result** | `await client.check_win(trade_id)` | `client.check_win(trade_id)` | Checks if a trade won, lost, or drew. Returns dict with `result` ("win"/"loss"/"draw") and `profit`. |
+| Feature                | Async Code                                          | Sync Code                                     | Description                                                                                           |
+| ---------------------- | --------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **Buy/Call Order**     | `await client.buy(asset, amount, time, check_win)`  | `client.buy(asset, amount, time, check_win)`  | Places a buy (call) order. Returns `(trade_id, trade_data)`. Set `check_win=True` to wait for result. |
+| **Sell/Put Order**     | `await client.sell(asset, amount, time, check_win)` | `client.sell(asset, amount, time, check_win)` | Places a sell (put) order. Returns `(trade_id, trade_data)`. Set `check_win=True` to wait for result. |
+| **Check Trade Result** | `await client.check_win(trade_id)`                  | `client.check_win(trade_id)`                  | Checks if a trade won, lost, or drew. Returns dict with `result` ("win"/"loss"/"draw") and `profit`.  |
 
 ### Trading Example
 
@@ -47,13 +47,13 @@ print(f"Result: {trade['result']}, Profit: {trade['profit']}")
 
 ## Account Management
 
-| Feature | Async Code | Sync Code | Description |
-|---------|-----------|-----------|-------------|
-| **Get Balance** | `await client.balance()` | `client.balance()` | Returns current account balance as float. |
-| **Check Demo Account** | `client.is_demo()` | `client.is_demo()` | Returns `True` if using demo account, `False` for real account. |
-| **Get Opened Deals** | `await client.opened_deals()` | `client.opened_deals()` | Returns list of all currently open trades with full details. |
-| **Get Closed Deals** | `await client.closed_deals()` | `client.closed_deals()` | Returns list of all closed trades from memory. |
-| **Clear Closed Deals** | `await client.clear_closed_deals()` | `client.clear_closed_deals()` | Removes all closed deals from memory. Returns nothing. |
+| Feature                | Async Code                          | Sync Code                     | Description                                                     |
+| ---------------------- | ----------------------------------- | ----------------------------- | --------------------------------------------------------------- |
+| **Get Balance**        | `await client.balance()`            | `client.balance()`            | Returns current account balance as float.                       |
+| **Check Demo Account** | `client.is_demo()`                  | `client.is_demo()`            | Returns `True` if using demo account, `False` for real account. |
+| **Get Opened Deals**   | `await client.opened_deals()`       | `client.opened_deals()`       | Returns list of all currently open trades with full details.    |
+| **Get Closed Deals**   | `await client.closed_deals()`       | `client.closed_deals()`       | Returns list of all closed trades from memory.                  |
+| **Clear Closed Deals** | `await client.clear_closed_deals()` | `client.clear_closed_deals()` | Removes all closed deals from memory. Returns nothing.          |
 
 ### Account Management Example
 
@@ -85,13 +85,13 @@ closed_trades = client.closed_deals()
 
 ## Market Data
 
-| Feature | Async Code | Sync Code | Description |
-|---------|-----------|-----------|-------------|
-| **Get Historical Candles** | `await client.get_candles(asset, period, offset)` | `client.get_candles(asset, period, offset)` | Returns list of historical candles (OHLC) for the asset. Each candle has `time`, `open`, `high`, `low`, `close`. |
-| **Get Candles (Advanced)** | `await client.get_candles_advanced(asset, period, offset, time)` | `client.get_candles_advanced(asset, period, offset, time)` | Returns historical candles starting from specific timestamp. More control over time range. |
-| **Get Asset Payout** | `await client.payout(asset)` | `client.payout(asset)` | Returns payout percentage. Pass `None` for all assets dict, string for single asset int, or list for multiple assets list. |
-| **Get History** | `await client.history(asset, period)` | `client.history(asset, period)` | Returns latest available historical data for asset starting from period. Same format as `get_candles`. |
-| **Get Server Time** | `await client.get_server_time()` | `client.get_server_time()` | Returns current server time as UNIX timestamp (int). |
+| Feature                    | Async Code                                                       | Sync Code                                                  | Description                                                                                                                |
+| -------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Get Historical Candles** | `await client.get_candles(asset, period, offset)`                | `client.get_candles(asset, period, offset)`                | Returns list of historical candles (OHLC) for the asset. Each candle has `time`, `open`, `high`, `low`, `close`.           |
+| **Get Candles (Advanced)** | `await client.get_candles_advanced(asset, period, offset, time)` | `client.get_candles_advanced(asset, period, offset, time)` | Returns historical candles starting from specific timestamp. More control over time range.                                 |
+| **Get Asset Payout**       | `await client.payout(asset)`                                     | `client.payout(asset)`                                     | Returns payout percentage. Pass `None` for all assets dict, string for single asset int, or list for multiple assets list. |
+| **Get History**            | `await client.history(asset, period)`                            | `client.history(asset, period)`                            | Returns latest available historical data for asset starting from period. Same format as `get_candles`.                     |
+| **Get Server Time**        | `await client.get_server_time()`                                 | `client.get_server_time()`                                 | Returns current server time as UNIX timestamp (int).                                                                       |
 
 ### Market Data Example
 
@@ -136,13 +136,13 @@ server_time = client.get_server_time()
 
 ## Real-time Subscriptions
 
-| Feature | Async Code | Sync Code | Description |
-|---------|-----------|-----------|-------------|
-| **Subscribe (Raw)** | `await client.subscribe_symbol(asset)` | `client.subscribe_symbol(asset)` | Returns iterator that yields real-time raw tick data as it arrives. Most granular data. |
-| **Subscribe (Chunked)** | `await client.subscribe_symbol_chuncked(asset, chunk_size)` | `client.subscribe_symbol_chuncked(asset, chunk_size)` | Returns iterator that yields candles formed from specified number of raw ticks. Groups raw data into chunks. |
-| **Subscribe (Timed)** | `await client.subscribe_symbol_timed(asset, timedelta)` | `client.subscribe_symbol_timed(asset, timedelta)` | Returns iterator that yields candles formed over specified time duration. Creates time-based candles. |
+| Feature                      | Async Code                                                     | Sync Code                                                | Description                                                                                                    |
+| ---------------------------- | -------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **Subscribe (Raw)**          | `await client.subscribe_symbol(asset)`                         | `client.subscribe_symbol(asset)`                         | Returns iterator that yields real-time raw tick data as it arrives. Most granular data.                        |
+| **Subscribe (Chunked)**      | `await client.subscribe_symbol_chuncked(asset, chunk_size)`    | `client.subscribe_symbol_chuncked(asset, chunk_size)`    | Returns iterator that yields candles formed from specified number of raw ticks. Groups raw data into chunks.   |
+| **Subscribe (Timed)**        | `await client.subscribe_symbol_timed(asset, timedelta)`        | `client.subscribe_symbol_timed(asset, timedelta)`        | Returns iterator that yields candles formed over specified time duration. Creates time-based candles.          |
 | **Subscribe (Time-Aligned)** | `await client.subscribe_symbol_time_aligned(asset, timedelta)` | `client.subscribe_symbol_time_aligned(asset, timedelta)` | Returns iterator that yields candles perfectly aligned to time intervals (e.g., exactly on minute boundaries). |
-| **Unsubscribe** | `await client.unsubscribe(asset)` | `client.unsubscribe(asset)` | Unsubscribes from an asset's data stream by asset name. Cleans up resources. |
+| **Unsubscribe**              | `await client.unsubscribe(asset)`                              | `client.unsubscribe(asset)`                              | Unsubscribes from an asset's data stream by asset name. Cleans up resources.                                   |
 
 ### Subscription Examples
 
@@ -208,11 +208,11 @@ client.unsubscribe("EURUSD_otc")
 
 ## Connection Management
 
-| Feature | Async Code | Sync Code | Description |
-|---------|-----------|-----------|-------------|
-| **Disconnect** | `await client.disconnect()` | `client.disconnect()` | Closes WebSocket connection while keeping configuration. Can reconnect later. |
-| **Connect** | `await client.connect()` | `client.connect()` | Establishes connection after manual disconnect. Uses same config and credentials. |
-| **Reconnect** | `await client.reconnect()` | `client.reconnect()` | Disconnects and immediately reconnects. Useful for resetting connection state. |
+| Feature        | Async Code                  | Sync Code             | Description                                                                       |
+| -------------- | --------------------------- | --------------------- | --------------------------------------------------------------------------------- |
+| **Disconnect** | `await client.disconnect()` | `client.disconnect()` | Closes WebSocket connection while keeping configuration. Can reconnect later.     |
+| **Connect**    | `await client.connect()`    | `client.connect()`    | Establishes connection after manual disconnect. Uses same config and credentials. |
+| **Reconnect**  | `await client.reconnect()`  | `client.reconnect()`  | Disconnects and immediately reconnects. Useful for resetting connection state.    |
 
 ### Connection Management Example
 
@@ -253,16 +253,16 @@ time.sleep(2)  # Wait for reconnection to complete
 
 The Raw Handler API provides low-level WebSocket access for custom protocol implementations and advanced use cases.
 
-| Feature | Async Code | Sync Code | Description |
-|---------|-----------|-----------|-------------|
-| **Create Handler** | `await client.create_raw_handler(validator, keep_alive)` | `client.create_raw_handler(validator, keep_alive)` | Creates a raw handler with message validator. Returns `RawHandler` (async) or `RawHandlerSync`. |
-| **Send Text** | `await handler.send_text(message)` | `handler.send_text(message)` | Sends a text WebSocket message without waiting for response. |
-| **Send Binary** | `await handler.send_binary(data)` | `handler.send_binary(data)` | Sends binary WebSocket message without waiting for response. |
-| **Send and Wait** | `await handler.send_and_wait(message)` | `handler.send_and_wait(message)` | Sends message and waits for first matching response based on validator. |
-| **Wait Next** | `await handler.wait_next()` | `handler.wait_next()` | Waits for next message that matches handler's validator. |
-| **Subscribe Stream** | `await handler.subscribe()` | `handler.subscribe()` | Returns iterator yielding all matching messages. For continuous monitoring. |
-| **Get Handler ID** | `handler.id()` | `handler.id()` | Returns unique UUID string identifier for this handler. |
-| **Close Handler** | `await handler.close()` | `handler.close()` | Closes handler and cleans up resources (automatic on scope exit). |
+| Feature              | Async Code                                               | Sync Code                                          | Description                                                                                     |
+| -------------------- | -------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **Create Handler**   | `await client.create_raw_handler(validator, keep_alive)` | `client.create_raw_handler(validator, keep_alive)` | Creates a raw handler with message validator. Returns `RawHandler` (async) or `RawHandlerSync`. |
+| **Send Text**        | `await handler.send_text(message)`                       | `handler.send_text(message)`                       | Sends a text WebSocket message without waiting for response.                                    |
+| **Send Binary**      | `await handler.send_binary(data)`                        | `handler.send_binary(data)`                        | Sends binary WebSocket message without waiting for response.                                    |
+| **Send and Wait**    | `await handler.send_and_wait(message)`                   | `handler.send_and_wait(message)`                   | Sends message and waits for first matching response based on validator.                         |
+| **Wait Next**        | `await handler.wait_next()`                              | `handler.wait_next()`                              | Waits for next message that matches handler's validator.                                        |
+| **Subscribe Stream** | `await handler.subscribe()`                              | `handler.subscribe()`                              | Returns iterator yielding all matching messages. For continuous monitoring.                     |
+| **Get Handler ID**   | `handler.id()`                                           | `handler.id()`                                     | Returns unique UUID string identifier for this handler.                                         |
+| **Close Handler**    | `await handler.close()`                                  | `handler.close()`                                  | Closes handler and cleans up resources (automatic on scope exit).                               |
 
 ### Raw Handler Examples
 
@@ -327,13 +327,13 @@ handler.close()
 
 Validators filter incoming WebSocket messages. Create complex filters using the Validator class.
 
-| Validator Type | Code | Description |
-|---------------|------|-------------|
-| **Starts With** | `Validator.starts_with(prefix)` | Matches messages starting with prefix string. |
-| **Contains** | `Validator.contains(substring)` | Matches messages containing substring anywhere. |
-| **Regex** | `Validator.regex(pattern)` | Matches messages against regex pattern. |
-| **All (AND)** | `Validator.all([validator1, validator2, ...])` | Matches only if ALL validators match (logical AND). |
-| **Any (OR)** | `Validator.any([validator1, validator2, ...])` | Matches if ANY validator matches (logical OR). |
+| Validator Type  | Code                                           | Description                                         |
+| --------------- | ---------------------------------------------- | --------------------------------------------------- |
+| **Starts With** | `Validator.starts_with(prefix)`                | Matches messages starting with prefix string.       |
+| **Contains**    | `Validator.contains(substring)`                | Matches messages containing substring anywhere.     |
+| **Regex**       | `Validator.regex(pattern)`                     | Matches messages against regex pattern.             |
+| **All (AND)**   | `Validator.all([validator1, validator2, ...])` | Matches only if ALL validators match (logical AND). |
+| **Any (OR)**    | `Validator.any([validator1, validator2, ...])` | Matches if ANY validator matches (logical OR).      |
 
 #### Validator Examples
 
@@ -377,7 +377,7 @@ client = PocketOptionAsync(
     url="wss://custom-server.com/websocket"
 )
 
-# Sync - with custom URL  
+# Sync - with custom URL
 client = PocketOption(
     ssid="your_ssid",
     url="wss://custom-server.com/websocket"
@@ -405,14 +405,14 @@ client = PocketOptionAsync(ssid, config=config)
 
 **Configuration Parameters**:
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `max_allowed_loops` | int | 1000 | Maximum event loop iterations before timeout |
-| `sleep_interval` | int | 100 | Sleep time between operations (milliseconds) |
-| `reconnect_time` | int | 5 | Wait time before reconnection attempts (seconds) |
-| `connection_initialization_timeout_secs` | int | 30 | Timeout for initial connection (seconds) |
-| `timeout_secs` | int | 30 | General operation timeout (seconds) |
-| `urls` | List[str] | Platform defaults | List of WebSocket URLs for fallback |
+| Parameter                                | Type      | Default           | Description                                      |
+| ---------------------------------------- | --------- | ----------------- | ------------------------------------------------ |
+| `max_allowed_loops`                      | int       | 1000              | Maximum event loop iterations before timeout     |
+| `sleep_interval`                         | int       | 100               | Sleep time between operations (milliseconds)     |
+| `reconnect_time`                         | int       | 5                 | Wait time before reconnection attempts (seconds) |
+| `connection_initialization_timeout_secs` | int       | 30                | Timeout for initial connection (seconds)         |
+| `timeout_secs`                           | int       | 30                | General operation timeout (seconds)              |
+| `urls`                                   | List[str] | Platform defaults | List of WebSocket URLs for fallback              |
 
 If you need custom configuration options, please:
 
@@ -432,25 +432,25 @@ from BinaryOptionsToolsV2 import PocketOptionAsync
 async def main():
     client = PocketOptionAsync(ssid="your_ssid")
     await asyncio.sleep(2)  # Wait for API to initialize
-    
+
     # Check account
     balance = await client.balance()
     is_demo = client.is_demo()
     print(f"{'Demo' if is_demo else 'Real'} Account - Balance: ${balance}")
-    
+
     # Get market data
     payout = await client.payout("EURUSD_otc")
     print(f"EURUSD_OTC Payout: {payout}%")
-    
+
     # Place trade
     asset = "EURUSD_otc"
     amount = 1.0
     duration = 60
-    
+
     trade_id, trade = await client.buy(asset, amount, duration, check_win=True)
     print(f"Trade Result: {trade['result']}")
     print(f"Profit: ${trade['profit']}")
-    
+
     await client.disconnect()
 
 asyncio.run(main())
@@ -487,22 +487,22 @@ from BinaryOptionsToolsV2 import PocketOptionAsync
 async def monitor_price():
     client = PocketOptionAsync(ssid="your_ssid")
     await asyncio.sleep(2)  # Wait for API to initialize
-    
+
     # Subscribe to 1-minute aligned candles
     subscription = await client.subscribe_symbol_time_aligned(
-        "EURUSD_otc", 
+        "EURUSD_otc",
         timedelta(minutes=1)
     )
-    
+
     candle_count = 0
     async for candle in subscription:
         print(f"Time: {candle['time']}")
         print(f"OHLC: {candle['open']}/{candle['high']}/{candle['low']}/{candle['close']}")
-        
+
         candle_count += 1
         if candle_count >= 10:
             break
-    
+
     await client.unsubscribe("EURUSD_otc")
     await client.disconnect()
 
@@ -519,33 +519,33 @@ from BinaryOptionsToolsV2 import PocketOptionAsync, Validator
 async def advanced_strategy():
     client = PocketOptionAsync(ssid="your_ssid")
     await asyncio.sleep(2)  # Wait for API to initialize
-    
+
     # Create custom message handler
     validator = Validator.all([
         Validator.contains('"type":"price"'),
         Validator.contains('"asset":"EURUSD_otc"')
     ])
-    
+
     handler = await client.create_raw_handler(validator)
-    
+
     # Monitor specific price updates
     count = 0
     async for message in await handler.subscribe():
         data = json.loads(message)
         price = data.get('price', 0)
-        
+
         print(f"Current price: {price}")
-        
+
         # Custom trading logic
         if price > 1.0950:
             trade_id, _ = await client.sell("EURUSD_otc", 1.0, 60)
             print(f"Sold at {price}, Trade ID: {trade_id}")
             break
-        
+
         count += 1
         if count >= 100:
             break
-    
+
     await client.disconnect()
 
 asyncio.run(advanced_strategy())
@@ -596,14 +596,14 @@ async def safe_trading():
     try:
         client = PocketOptionAsync(ssid="your_ssid")
         await asyncio.sleep(2)  # Wait for API to initialize
-        
+
         # Check connection
         balance = await client.balance()
-        
+
         # Place trade with error handling
         trade_id, trade = await client.buy("EURUSD_otc", 1.0, 60, check_win=True)
         print(f"Trade completed: {trade['result']}")
-        
+
     except ConnectionError as e:
         print(f"Connection error: {e}")
     except ValueError as e:
@@ -718,11 +718,11 @@ if payout < 80:
 
 ## Platform Support
 
-| Platform | Status | Features |
-|----------|--------|----------|
-| **PocketOption** | ✅ Fully Supported | Quick Trading, Real/Demo accounts, All features |
-| **Expert Options** | ❌ Not Yet | Planned for future release |
-| **IQ Option** | ❌ Not Yet | Planned for future release |
+| Platform           | Status             | Features                                        |
+| ------------------ | ------------------ | ----------------------------------------------- |
+| **PocketOption**   | ✅ Fully Supported | Quick Trading, Real/Demo accounts, All features |
+| **Expert Options** | ❌ Not Yet         | Planned for future release                      |
+| **IQ Option**      | ❌ Not Yet         | Planned for future release                      |
 
 ---
 

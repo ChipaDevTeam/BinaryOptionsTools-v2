@@ -4,14 +4,14 @@ Complete multi-language documentation with interactive code examples.
 
 ## 🎯 Quick Links
 
-| Document | Description | Format |
-|----------|-------------|--------|
-| **[DEMO.html](DEMO.html)** | Live demo of language switcher | HTML (Open in browser) |
-| **[API_REFERENCE.html](API_REFERENCE.html)** ⭐ | Interactive API reference | HTML (Open in browser) |
-| **[API_REFERENCE.md](API_REFERENCE.md)** | Complete API reference | Markdown |
-| **[TRADING_GUIDE.md](TRADING_GUIDE.md)** | Trading strategies & patterns | Markdown |
-| **[README.md](README.md)** | Documentation index | Markdown |
-| **[DOCUMENTATION_SUMMARY.md](DOCUMENTATION_SUMMARY.md)** | What was created | Markdown |
+| Document                                                 | Description                    | Format                 |
+| -------------------------------------------------------- | ------------------------------ | ---------------------- |
+| **[DEMO.html](DEMO.html)**                               | Live demo of language switcher | HTML (Open in browser) |
+| **[API_REFERENCE.html](API_REFERENCE.html)** ⭐          | Interactive API reference      | HTML (Open in browser) |
+| **[API_REFERENCE.md](API_REFERENCE.md)**                 | Complete API reference         | Markdown               |
+| **[TRADING_GUIDE.md](TRADING_GUIDE.md)**                 | Trading strategies & patterns  | Markdown               |
+| **[README.md](README.md)**                               | Documentation index            | Markdown               |
+| **[DOCUMENTATION_SUMMARY.md](DOCUMENTATION_SUMMARY.md)** | What was created               | Markdown               |
 
 ## 🚀 Getting Started
 
@@ -50,6 +50,7 @@ The HTML documentation includes an interactive language switcher that allows you
 - Each section has independent language selection
 
 **Example:**
+
 ```
 [Python] [Kotlin] [Swift] [Go] [Ruby] [C#]
          ^^^^^^^ (click any tab)
@@ -73,6 +74,7 @@ docs/
 ## 📚 What's Covered
 
 ### API Reference
+
 - ✅ Installation for all languages
 - ✅ Client initialization
 - ✅ Trading operations (buy, sell, check result)
@@ -85,6 +87,7 @@ docs/
 - ✅ Complete method reference table
 
 ### Trading Guide
+
 - ✅ Getting started with first trade
 - ✅ Trading basics (call/put, parameters)
 - ✅ Advanced strategies (Martingale, trend following, multi-asset)
@@ -96,6 +99,7 @@ docs/
 ## 🎨 Features
 
 ### Modern Design
+
 - Clean, professional UI
 - Responsive layout (mobile-friendly)
 - Syntax highlighting
@@ -103,6 +107,7 @@ docs/
 - Smooth animations
 
 ### Easy Navigation
+
 - Sticky navigation menu
 - Table of contents
 - Section anchors
@@ -110,6 +115,7 @@ docs/
 - Breadcrumbs
 
 ### Developer-Friendly
+
 - Copy-paste ready code
 - Practical examples
 - Real-world patterns
@@ -121,6 +127,7 @@ docs/
 ### Viewing HTML Files
 
 **Option 1: Open directly**
+
 ```bash
 # Windows
 start docs/DEMO.html
@@ -133,6 +140,7 @@ xdg-open docs/DEMO.html
 ```
 
 **Option 2: Use a local server**
+
 ```bash
 # Python
 python -m http.server 8000
@@ -146,6 +154,7 @@ npx serve
 ### Reading Markdown Files
 
 Markdown files can be viewed:
+
 - On GitHub (automatic rendering)
 - In VS Code (Markdown preview)
 - Using any Markdown viewer
@@ -154,6 +163,7 @@ Markdown files can be viewed:
 ## 📱 Mobile Support
 
 All HTML documentation is fully responsive:
+
 - ✅ Works on phones and tablets
 - ✅ Touch-friendly buttons
 - ✅ Readable code blocks
@@ -162,18 +172,21 @@ All HTML documentation is fully responsive:
 ## 🎓 Learning Path
 
 **For Beginners:**
+
 1. Start with [DEMO.html](DEMO.html)
 2. Read [README.md](README.md) introduction
 3. Try quick start for your language
 4. Explore [API_REFERENCE.html](API_REFERENCE.html)
 
 **For Experienced Developers:**
+
 1. Jump to [API_REFERENCE.html](API_REFERENCE.html)
 2. Review method reference table
 3. Check examples for your language
 4. Read [TRADING_GUIDE.md](TRADING_GUIDE.md) for strategies
 
 **For Traders:**
+
 1. Read [TRADING_GUIDE.md](TRADING_GUIDE.md) first
 2. Learn risk management section
 3. Try demo account examples
@@ -215,6 +228,7 @@ See [LICENSE](../../LICENSE) for details.
 ## ⚡ Quick Examples
 
 ### Python
+
 ```python
 import asyncio
 from binaryoptionstoolsuni import PocketOption
@@ -230,6 +244,7 @@ asyncio.run(main())
 ```
 
 ### Kotlin
+
 ```kotlin
 import com.chipadevteam.binaryoptionstoolsuni.*
 import kotlinx.coroutines.*
@@ -244,6 +259,7 @@ suspend fun main() = coroutineScope {
 ```
 
 ### Swift
+
 ```swift
 import BinaryOptionsToolsUni
 

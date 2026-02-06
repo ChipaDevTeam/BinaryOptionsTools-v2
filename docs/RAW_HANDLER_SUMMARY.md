@@ -1,4 +1,4 @@
-# ✅ Raw Handler & Validator Support Added!
+# ✅ Raw Handler & Validator Support Added
 
 ## Summary
 
@@ -51,35 +51,42 @@ I've successfully added **raw handler** and **validator** support to BinaryOptio
 ### Validator
 
 ✅ **Basic Validators:**
+
 - `starts_with(prefix)` - Check if message starts with prefix
-- `ends_with(suffix)` - Check if message ends with suffix  
+- `ends_with(suffix)` - Check if message ends with suffix
 - `contains(substring)` - Check if message contains substring
 - `regex(pattern)` - Match against regex pattern
 
 ✅ **Logical Combinators:**
+
 - `ne(validator)` - Negate a validator (NOT)
 - `all(validators)` - All validators must match (AND)
 - `any(validators)` - At least one validator must match (OR)
 
 ✅ **Instance Method:**
+
 - `check(message)` - Test if message matches validator
 
 ### Raw Handler
 
 ✅ **Send Methods:**
+
 - `send_text(message)` - Send text message
 - `send_binary(data)` - Send binary message
 - `send_and_wait(message)` - Send and wait for response
 
 ✅ **Receive Methods:**
+
 - `wait_next()` - Wait for next matching message
 
 ✅ **Keep-Alive:**
+
 - Optional keep-alive parameter for automatic reconnection
 
 ### Payout
 
 ✅ **New Method:**
+
 - `payout(asset)` - Get profit percentage for an asset
 
 ---
@@ -95,24 +102,24 @@ from binaryoptionstoolsuni import PocketOption, Validator
 async def main():
     client = await PocketOption.init("your_ssid")
     await asyncio.sleep(2)
-    
+
     # Create validator for balance messages
     validator = Validator.contains('"balance"')
-    
+
     # Create raw handler
     handler = await client.create_raw_handler(validator, None)
-    
+
     # Send custom message
     await handler.send_text('42["getBalance"]')
-    
+
     # Wait for response
     response = await handler.wait_next()
     print(f"Response: {response}")
-    
+
     # Get payout for asset
     payout = await client.payout("EURUSD_otc")
     print(f"Payout: {payout * 100}%")
-    
+
     await client.shutdown()
 
 asyncio.run(main())
@@ -127,22 +134,22 @@ import kotlinx.coroutines.*
 suspend fun main() = coroutineScope {
     val client = PocketOption.init("your_ssid")
     delay(2000)
-    
+
     // Create validator
     val validator = Validator.contains("\"balance\"")
-    
+
     // Create raw handler
     val handler = client.createRawHandler(validator, null)
-    
+
     // Send and receive
     handler.sendText("42[\"getBalance\"]")
     val response = handler.waitNext()
     println("Response: $response")
-    
+
     // Get payout
     val payout = client.payout("EURUSD_otc")
     println("Payout: ${payout?.times(100)}%")
-    
+
     client.shutdown()
 }
 ```
@@ -155,26 +162,26 @@ import BinaryOptionsToolsUni
 Task {
     let client = try await PocketOption.init(ssid: "your_ssid")
     try await Task.sleep(nanoseconds: 2_000_000_000)
-    
+
     // Create validator
     let validator = Validator.contains(substring: "\"balance\"")
-    
+
     // Create raw handler
     let handler = try await client.createRawHandler(
-        validator: validator, 
+        validator: validator,
         keepAlive: nil
     )
-    
+
     // Send and receive
     try await handler.sendText(message: "42[\"getBalance\"]")
     let response = try await handler.waitNext()
     print("Response: \(response)")
-    
+
     // Get payout
     if let payout = await client.payout(asset: "EURUSD_otc") {
         print("Payout: \(payout * 100)%")
     }
-    
+
     try await client.shutdown()
 }
 ```
@@ -185,22 +192,22 @@ Task {
 
 ### Python vs UniFFI
 
-| Feature | Python API | UniFFI API | Status |
-|---------|-----------|------------|--------|
-| **Validator.starts_with** | ✅ | ✅ | Same |
-| **Validator.ends_with** | ✅ | ✅ | Same |
-| **Validator.contains** | ✅ | ✅ | Same |
-| **Validator.regex** | ✅ | ✅ | Same |
-| **Validator.ne** | ✅ | ✅ | Same |
-| **Validator.all** | ✅ | ✅ | Same |
-| **Validator.any** | ✅ | ✅ | Same |
-| **Validator.custom** | ✅ | ❌ | Not supported (FFI limitation) |
-| **RawHandler.send_text** | ✅ | ✅ | Same |
-| **RawHandler.send_binary** | ✅ | ✅ | Same |
-| **RawHandler.send_and_wait** | ✅ | ✅ | Same |
-| **RawHandler.wait_next** | ✅ | ✅ | Same |
-| **Keep-alive support** | ✅ | ✅ | Same |
-| **Payout method** | ✅ | ✅ | Same |
+| Feature                      | Python API | UniFFI API | Status                         |
+| ---------------------------- | ---------- | ---------- | ------------------------------ |
+| **Validator.starts_with**    | ✅         | ✅         | Same                           |
+| **Validator.ends_with**      | ✅         | ✅         | Same                           |
+| **Validator.contains**       | ✅         | ✅         | Same                           |
+| **Validator.regex**          | ✅         | ✅         | Same                           |
+| **Validator.ne**             | ✅         | ✅         | Same                           |
+| **Validator.all**            | ✅         | ✅         | Same                           |
+| **Validator.any**            | ✅         | ✅         | Same                           |
+| **Validator.custom**         | ✅         | ❌         | Not supported (FFI limitation) |
+| **RawHandler.send_text**     | ✅         | ✅         | Same                           |
+| **RawHandler.send_binary**   | ✅         | ✅         | Same                           |
+| **RawHandler.send_and_wait** | ✅         | ✅         | Same                           |
+| **RawHandler.wait_next**     | ✅         | ✅         | Same                           |
+| **Keep-alive support**       | ✅         | ✅         | Same                           |
+| **Payout method**            | ✅         | ✅         | Same                           |
 
 **Note**: Custom validators (using Python functions) are not supported in UniFFI because they require calling Python functions from Rust, which is complex and not currently supported by UniFFI.
 
@@ -314,17 +321,20 @@ To test the new features:
 ## 🚀 Next Steps
 
 1. **Build the library:**
+
    ```bash
    cd BinaryOptionsToolsUni
    cargo build --release
    ```
 
 2. **Generate bindings:**
+
    ```bash
    cargo run --bin uniffi-bindgen
    ```
 
 3. **Test with Python:**
+
    ```bash
    # Install and test
    pip install .
@@ -350,12 +360,12 @@ New documentation created:
 
 Should be added to:
 
-2. **API_REFERENCE.html**
+1. **API_REFERENCE.html**
    - Add "Raw Handler" section
    - Add "Validator" section
    - Add interactive examples
 
-3. **README.md**
+2. **README.md**
    - Update feature list
    - Add raw handler mention
 
@@ -366,6 +376,7 @@ Should be added to:
 You now have complete **raw handler** and **validator** support in BinaryOptionsToolsUni!
 
 **What you can do:**
+
 - ✅ Filter WebSocket messages with validators
 - ✅ Send custom messages via raw handlers
 - ✅ Implement custom protocols
@@ -374,6 +385,7 @@ You now have complete **raw handler** and **validator** support in BinaryOptions
 - ✅ Use in all 6 languages (Python, Kotlin, Swift, Go, Ruby, C#)
 
 **Limitations:**
+
 - ❌ Custom validators (Python functions) not supported (FFI limitation)
 - ✅ All other features match Python version
 
