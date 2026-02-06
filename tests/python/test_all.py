@@ -15,7 +15,9 @@ async def api():
         pytest.skip("POCKET_OPTION_SSID not set")
 
     # Use context manager which waits for assets automatically
-    async with PocketOptionAsync(SSID) as client:
+    # Add timeout for connection initialization
+    config = {"connection_initialization_timeout_secs": 60, "timeout_secs": 20}
+    async with PocketOptionAsync(SSID, config=config) as client:
         yield client
 
 
@@ -68,7 +70,7 @@ async def test_buy_and_check_win(api):
 
     asset = "EURUSD_otc"  # OTC is usually available on weekends too
     amount = 1.0
-    duration = 15  # Increased duration to give more time for result processing
+    duration = 5
 
     # Check if we can get payout for this asset to ensure it's valid
     try:
