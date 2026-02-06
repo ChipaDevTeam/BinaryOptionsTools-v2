@@ -1,6 +1,5 @@
 import asyncio
 import os
-import sys
 
 from BinaryOptionsToolsV2 import PocketOptionAsync
 

@@ -5,7 +5,6 @@ from BinaryOptionsToolsV2 import (
     RawPocketOption,
     PyBot,
     PyStrategy,
-    PyContext,
     start_tracing,
 )
 from dotenv import load_dotenv
