@@ -127,7 +127,7 @@ def test_sync_connection_control():
     if not ssid:
         print("Error: POCKET_OPTION_SSID environment variable not set")
         return
-    
+
     # Use custom config with increased timeout
     config = {"connection_initialization_timeout_secs": 30}
     client = PocketOption(ssid, config=config)
@@ -203,7 +203,7 @@ def test_sync_unsubscribe():
     if not ssid:
         print("Error: POCKET_OPTION_SSID environment variable not set")
         return
-        
+
     # Use custom config with increased timeout
     config = {"connection_initialization_timeout_secs": 30}
     client = PocketOption(ssid, config=config)

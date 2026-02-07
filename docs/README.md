@@ -147,7 +147,7 @@ Async do
 end
 ```
 
-### C #
+### C
 
 ```bash
 dotnet add package BinaryOptionsToolsUni

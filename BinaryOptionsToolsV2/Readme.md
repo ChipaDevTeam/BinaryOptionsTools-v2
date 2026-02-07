@@ -314,6 +314,35 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+### Retrieving Historical Data
+
+```python
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main():
+    client = PocketOptionAsync(ssid="your-session-id")
+
+    # Fetch historical data (60s candles, starting from now)
+    # Note: get_candles takes (asset, period, offset)
+    candles = await client.get_candles("EURUSD_otc", 60, 0)
+
+    print(f"Retrieved {len(candles)} candles")
+    if candles:
+        print("Last candle:", candles[-1])
+        # Output format:
+        # {
+        #     'time': 1770428373,
+        #     'open': 1.22354,
+        #     'high': 1.22355,
+        #     'low': 1.22354,
+        #     'close': 1.22355
+        # }
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
 ### Real-Time Data Subscription (Synchronous)
 
 ```python

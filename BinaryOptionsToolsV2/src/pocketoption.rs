@@ -347,8 +347,12 @@ impl RawPocketOption {
         })
     }
 
-    pub async fn balance(&self) -> f64 {
-        self.client.balance().await
+    pub fn balance<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let balance = client.balance().await;
+            Ok(balance)
+        })
     }
 
     pub fn closed_deals<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -371,30 +375,40 @@ impl RawPocketOption {
         })
     }
 
-    pub async fn opened_deals(&self) -> PyResult<String> {
-        let deals = self.client.get_opened_deals().await;
-        Ok(serde_json::to_string(&deals).map_err(BinaryErrorPy::from)?)
+    pub fn opened_deals<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let deals = client.get_opened_deals().await;
+            let res = serde_json::to_string(&deals).map_err(BinaryErrorPy::from)?;
+            Ok(res)
+        })
     }
 
-    pub async fn payout(&self) -> PyResult<String> {
-        // Work in progress - this feature is not yet implemented in the new API
-        match self.client.assets().await {
-            Some(assets) => {
-                let payouts: HashMap<&String, i32> = assets
-                    .0
-                    .iter()
-                    .filter_map(|(asset, symbol)| {
-                        if symbol.is_active {
-                            Some((asset, symbol.payout))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                Ok(serde_json::to_string(&payouts).map_err(BinaryErrorPy::from)?)
+    pub fn payout<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            // Work in progress - this feature is not yet implemented in the new API
+            match client.assets().await {
+                Some(assets) => {
+                    let payouts: HashMap<&String, i32> = assets
+                        .0
+                        .iter()
+                        .filter_map(|(asset, symbol)| {
+                            if symbol.is_active {
+                                Some((asset, symbol.payout))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    let res = serde_json::to_string(&payouts).map_err(BinaryErrorPy::from)?;
+                    Ok(res)
+                }
+                None => {
+                    Err(BinaryErrorPy::Uninitialized("Assets not initialized yet.".into()).into())
+                }
             }
-            None => Err(BinaryErrorPy::Uninitialized("Assets not initialized yet.".into()).into()),
-        }
+        })
     }
 
     pub fn history<'py>(

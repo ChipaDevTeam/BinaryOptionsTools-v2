@@ -7,7 +7,7 @@ import sys
 sys.path.insert(
     0,
     os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../../BinaryOptionsToolsV2")
+        os.path.join(os.path.dirname(__file__), "../../../BinaryOptionsToolsV2")
     ),
 )
 
@@ -60,20 +60,20 @@ async def main():
 
             # 4. Historical Data (Candles)
             logger.info("\n--- Historical Data ---")
-            try:
-                # Fetch 60s candles, offset 0 (latest)
-                # Add timeout to prevent hanging if the server doesn't respond
-                logger.info(f"Fetching candles for {asset}...")
-                candles = await asyncio.wait_for(
-                    client.get_candles(asset, 60, 0), timeout=10.0
-                )
-                logger.info(f"Retrieved {len(candles)} candles for {asset}")
-                if candles:
-                    logger.info(f"Latest candle: {candles[-1]}")
-            except asyncio.TimeoutError:
-                logger.error("Timed out fetching candles via get_candles")
-            except Exception as e:
-                logger.error(f"Failed to fetch candles via get_candles: {e}")
+            # try:
+            #     # Fetch 60s candles, offset 0 (latest)
+            #     # Add timeout to prevent hanging if the server doesn't respond
+            #     logger.info(f"Fetching candles for {asset}...")
+            #     candles = await asyncio.wait_for(
+            #         client.get_candles(asset, 60, 0), timeout=10.0
+            #     )
+            #     logger.info(f"Retrieved {len(candles)} candles for {asset}")
+            #     if candles:
+            #         logger.info(f"Latest candle: {candles[-1]}")
+            # except asyncio.TimeoutError:
+            #     logger.error("Timed out fetching candles via get_candles")
+            # except Exception as e:
+            #     logger.error(f"Failed to fetch candles via get_candles: {e}")
 
             try:
                 # Try history method as alternative
@@ -107,7 +107,7 @@ async def main():
             # 6. Trading Operations
             logger.info("\n--- Trading Operations ---")
             amount = 1.0
-            duration = 60  # seconds
+            duration = 5  # seconds
 
             # Check if demo before trading
             if client.is_demo():
