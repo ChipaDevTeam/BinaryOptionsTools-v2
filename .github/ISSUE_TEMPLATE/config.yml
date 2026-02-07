@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discord Community
+    url: https://discord.gg/p7YyFqSmAz
+    about: Join our Discord server for questions, discussions, and support
+  - name: 📚 Documentation
+    url: https://chipadevteam.github.io/BinaryOptionsTools-v2/
+    about: Read our comprehensive documentation
+  - name: 💡 Discussions
+    url: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/discussions
+    about: Community discussions for ideas and general topics
+  - name: 🔒 Security Issue
+    url: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/security/advisories/new
+    about: Report security vulnerabilities privately
