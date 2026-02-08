@@ -200,16 +200,20 @@ class PocketOptionAsync:
             # 2. Quote keys in the JSON object (alphanumeric keys followed by colon)
             ssid = re.sub(r"(?<=[{,])\s*([a-zA-Z0-9_]+)\s*:", r'"\1":', ssid)
 
-            # 3. Quote values (alphanumeric values followed by comma or closing bracket)
-            def quote_value(match):
+            # 3. Quote values (quoted strings, numbers, bools, or unquoted strings)
+            def fix_value(match):
                 val = match.group(1).strip()
-                # Keep numbers and booleans/null unquoted
+                # If already quoted, leave it
+                if val.startswith('"') and val.endswith('"'):
+                    return f":{val}"
+                # If number/bool/null, leave it
                 if val.isdigit() or val in ["true", "false", "null"]:
                     return f":{val}"
-                # Quote everything else
+                # Otherwise, quote it
                 return f':"{val}"'
 
-            ssid = re.sub(r":\s*([^,}\]]+?)(?=\s*[,}\]])", quote_value, ssid)
+            # Regex: Match colon, then (quoted string OR unquoted chars), lookahead for separator
+            ssid = re.sub(r':\s*("(?:[^"\\]|\\.)*"|[^,}\]]+?)(?=\s*[,}\]])', fix_value, ssid)
 
         if config is not None:
             if isinstance(config, dict):
