@@ -1,0 +1,45 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "BinaryOptionsTools v2"
+abstract: "A high-performance, cross-platform library for binary options trading automation. Built with Rust for speed and reliability, with Python bindings for ease of use."
+authors:
+  - family-names: "ChipaDevTeam"
+    alias: "ChipaDevTeam"
+  - family-names: "Rick"
+    given-names: "Rick-29"
+    alias: "Rick-29"
+repository-code: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+url: "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+license: "BSD-3-Clause"
+keywords:
+  - "binary options"
+  - "trading"
+  - "pocketoption"
+  - "finance"
+  - "async"
+  - "rust"
+  - "python"
+  - "websocket"
+  - "automated trading"
+  - "financial technology"
+version: "0.2.4"
+date-released: "2024-01-01"
+identifiers:
+  - type: url
+    value: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+    description: "GitHub repository"
+  - type: url
+    value: "https://pypi.org/project/binaryoptionstoolsv2/"
+    description: "PyPI package"
+preferred-citation:
+  type: software
+  title: "BinaryOptionsTools v2: High-Performance Binary Options Trading Library"
+  authors:
+    - family-names: "ChipaDevTeam"
+      alias: "ChipaDevTeam"
+    - family-names: "Rick"
+      given-names: "Rick-29"
+      alias: "Rick-29"
+  year: 2024
+  url: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
