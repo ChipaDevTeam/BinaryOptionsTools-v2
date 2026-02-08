@@ -60,29 +60,29 @@ nav:
   - Home: index.md
   - Overview: overview.md
   - API Reference:
-    - Multi-Language: api/reference.md
-    - Python API: api/python.md
+      - Multi-Language: api/reference.md
+      - Python API: api/python.md
   - Examples:
-    - Python:
-      - Async Examples: examples/python/async/
-      - Sync Examples: examples/python/sync/
-    - Rust: examples/rust/
-    - JavaScript: examples/javascript/
-    - Swift: examples/swift/
-    - Kotlin: examples/kotlin/
-    - Go: examples/go/
-    - Ruby: examples/ruby/
-    - C#: examples/csharp/
+      - Python:
+          - Async Examples: examples/python/async/
+          - Sync Examples: examples/python/sync/
+      - Rust: examples/rust/
+      - JavaScript: examples/javascript/
+      - Swift: examples/swift/
+      - Kotlin: examples/kotlin/
+      - Go: examples/go/
+      - Ruby: examples/ruby/
+      - C#: examples/csharp/
   - Guides:
-    - Trading Guide: guides/trading.md
-    - Raw Handler Guide: guides/raw-handler.md
-    - Assets & Timeframes: guides/assets-timeframes.md
+      - Trading Guide: guides/trading.md
+      - Raw Handler Guide: guides/raw-handler.md
+      - Assets & Timeframes: guides/assets-timeframes.md
   - Architecture:
-    - Data Flow: architecture/dataflow.md
-    - Raw Module: architecture/raw-module.md
+      - Data Flow: architecture/dataflow.md
+      - Raw Module: architecture/raw-module.md
   - Project Info:
-    - Deployment: project/deployment.md
-    - Next Steps: project/next-steps.md
-    - Documentation Summary: project/docs-summary.md
-    - Enhancement Summary: project/enhancement-summary.md
-    - Raw Handler Summary: project/raw-handler-summary.md
+      - Deployment: project/deployment.md
+      - Next Steps: project/next-steps.md
+      - Documentation Summary: project/docs-summary.md
+      - Enhancement Summary: project/enhancement-summary.md
+      - Raw Handler Summary: project/raw-handler-summary.md

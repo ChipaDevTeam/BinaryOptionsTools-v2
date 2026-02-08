@@ -165,7 +165,7 @@ impl EnhancedConnectionManager {
         &self,
         url: &Url,
     ) -> BinaryOptionsResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
-        use crate::reimports::{Connector, connect_async_tls_with_config};
+        use crate::reimports::{connect_async_tls_with_config, Connector};
         use tokio_tungstenite::tungstenite::http::Request;
 
         let request = Request::builder()

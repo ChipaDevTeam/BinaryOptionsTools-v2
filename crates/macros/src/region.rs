@@ -1,6 +1,6 @@
-use darling::{FromDeriveInput, util::Override};
+use darling::{util::Override, FromDeriveInput};
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, quote};
+use quote::{quote, ToTokens};
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::fs::File;
@@ -167,10 +167,18 @@ impl Region {
     }
 
     fn get_demo(&self) -> Option<&Self> {
-        if self.demo { Some(self) } else { None }
+        if self.demo {
+            Some(self)
+        } else {
+            None
+        }
     }
 
     fn get_real(&self) -> Option<&Self> {
-        if !self.demo { Some(self) } else { None }
+        if !self.demo {
+            Some(self)
+        } else {
+            None
+        }
     }
 }

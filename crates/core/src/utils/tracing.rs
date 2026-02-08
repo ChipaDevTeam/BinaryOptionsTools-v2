@@ -1,13 +1,13 @@
 use std::{fs::OpenOptions, io::Write, time::Duration};
 
-use async_channel::{Sender, bounded};
+use async_channel::{bounded, Sender};
 use serde_json::Value;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{
-    Layer, Registry,
     fmt::{self, MakeWriter},
     layer::SubscriberExt,
     util::SubscriberInitExt,
+    Layer, Registry,
 };
 
 use crate::{constants::MAX_LOGGING_CHANNEL_CAPACITY, general::stream::RecieverStream};

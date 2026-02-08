@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use async_channel::{Receiver, Sender, bounded};
+use async_channel::{bounded, Receiver, Sender};
 use tokio::{
     sync::Mutex,
     time::{interval, sleep},
@@ -180,7 +180,7 @@ impl RateLimiter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::{Duration, sleep};
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn test_message_batcher() {

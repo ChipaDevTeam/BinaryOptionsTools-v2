@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use async_channel::{Receiver, RecvError, Sender, bounded};
+use async_channel::{bounded, Receiver, RecvError, Sender};
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{info, warn};
 

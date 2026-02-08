@@ -7,16 +7,18 @@ use tokio_stream::StreamExt;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize client
     let client = PocketOption::new("your-session-id").await?;
-    
+
     // IMPORTANT: Wait for connection to establish
     tokio::time::sleep(Duration::from_secs(5)).await;
-    
+
     // Subscribe to real-time candle data for EURUSD
-    let mut subscription = client.subscribe("EURUSD_otc", SubscriptionType::None).await?;
-    
+    let mut subscription = client
+        .subscribe("EURUSD_otc", SubscriptionType::None)
+        .await?;
+
     println!("Listening for real-time candles...");
     println!("Press Ctrl+C to stop\n");
-    
+
     // Process incoming candles
     let mut count = 0;
     while let Some(candle_result) = subscription.next().await {
@@ -30,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("Low:   {:.5}", candle.low);
                 println!("Close: {:.5}", candle.close);
                 println!();
-                
+
                 // Stop after 10 candles for demo purposes
                 if count >= 10 {
                     println!("Received 10 candles, stopping...");
@@ -42,6 +44,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-    
+
     Ok(())
 }

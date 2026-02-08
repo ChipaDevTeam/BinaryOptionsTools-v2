@@ -1,5 +1,5 @@
-use quote::{ToTokens, quote};
-use syn::{Expr, Token, Type, parse::Parse};
+use quote::{quote, ToTokens};
+use syn::{parse::Parse, Expr, Token, Type};
 
 pub struct Deserializer {
     res_type: Type,
