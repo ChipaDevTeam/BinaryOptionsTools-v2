@@ -188,7 +188,7 @@ Comprehensive API documentation with examples in all supported languages:
 - **[Full API Reference](docs/API_REFERENCE.md)** - Complete API documentation with multi-language examples
 - **[Trading Guide](docs/TRADING_GUIDE.md)** - Learn how to place trades and manage orders
 - **[Market Data Guide](docs/MARKET_DATA_GUIDE.md)** - Access real-time and historical data
-- **[Examples](examples/)** - Working code examples for each language
+- **[Examples](docs/examples/)** - Working code examples for each language
 
 ## ✨ Features
 

@@ -278,7 +278,7 @@ The TestingWrapper has been successfully implemented with full ClientRunner inte
 
 ### ✅ Working Example
 
-The `examples/testing_echo_client.rs` demonstrates full functionality:
+The `docs/examples/testing_echo_client.rs` demonstrates full functionality:
 
 - Real WebSocket connections to `wss://echo.websocket.org`
 - Live statistics collection and logging
@@ -296,7 +296,7 @@ The TestingWrapper is now a complete, production-ready testing framework for Web
 
 ## Examples
 
-See `examples/testing_echo_client.rs` for a complete example of using the testing framework.
+See `docs/examples/testing_echo_client.rs` for a complete example of using the testing framework.
 
 ## Contributing
 

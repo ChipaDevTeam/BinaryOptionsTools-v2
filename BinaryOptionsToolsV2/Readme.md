@@ -462,7 +462,7 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 
 ## 📚 Additional Resources
 
-- **Full Examples**: [examples/python](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/examples/python)
+- **Full Examples**: [docs/examples/python](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/docs/examples/python)
 - **API Documentation**: [https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html](https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html)
 - **Discord Community**: [Join us](https://discord.gg/T3FGXcmd)
 

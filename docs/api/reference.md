@@ -2,20 +2,6 @@
 
 Complete API reference for BinaryOptionsToolsUni with examples in all supported languages.
 
-> 📝 **Note**: This is a Markdown version. For the interactive version with language switchers, see [API_REFERENCE.html](API_REFERENCE.html)
-
-## Table of Contents
-
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Trading Operations](#trading-operations)
-- [Account Management](#account-management)
-- [Market Data](#market-data)
-- [Real-time Subscriptions](#real-time-subscriptions)
-- [Connection Management](#connection-management)
-- [Error Handling](#error-handling)
-- [Best Practices](#best-practices)
-
 ---
 
 ## Installation

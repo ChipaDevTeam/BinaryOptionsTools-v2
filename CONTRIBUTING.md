@@ -131,7 +131,7 @@ pytest ../tests/test_connection.py -v
 ## Documentation
 
 - Update the README.md if you change functionality
-- Add examples for new features in the `examples/` directory
+- Add examples for new features in the `docs/examples/` directory
 - Update relevant documentation in the `docs/` directory
 - Ensure all public APIs have docstrings/doc comments
 

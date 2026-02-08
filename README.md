@@ -316,9 +316,10 @@ asyncio.run(main())
 
 ## Documentation
 
-- **Python API**: [Full Python Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html)
-- **Examples**: Browse [examples directory](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/examples) for comprehensive code samples
-- **Architecture**: See [DOCUMENTATION_SUMMARY.md](docs/DOCUMENTATION_SUMMARY.md) for technical details
+- **Official Documentation**: [Explore the documentation site](https://chipadevteam.github.io/BinaryOptionsTools-v2/) (Powered by MkDocs)
+- **API Reference**: Comprehensive [multi-language API guide](https://chipadevteam.github.io/BinaryOptionsTools-v2/API_REFERENCE/)
+- **Examples**: Browse the [examples directory](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/examples) for comprehensive code samples
+- **Architecture**: See the [Architecture section](https://chipadevteam.github.io/BinaryOptionsTools-v2/architecture-dataflow/) for technical details
 
 ## Development
 
@@ -334,7 +335,7 @@ BinaryOptionsTools-v2/
 ├── BinaryOptionsToolsV2/
 │   ├── src/                     # Rust PyO3 bindings
 │   └── BinaryOptionsToolsV2/    # Python wrapper layer
-├── examples/
+├── docs/examples/
 │   ├── python/                  # Python examples
 │   └── javascript/              # Node.js examples (experimental)
 └── docs/                        # Documentation
