@@ -12,21 +12,21 @@ This project and everyone participating in it is governed by our [Code of Conduc
 
 Before creating bug reports, please check the [existing issues](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues) as you might find that you don't need to create one. When you are creating a bug report, please include as many details as possible:
 
-* **Use a clear and descriptive title** for the issue
-* **Describe the exact steps to reproduce the problem** with as many details as possible
-* **Provide specific examples** to demonstrate the steps
-* **Describe the behavior you observed** and what behavior you expected to see
-* **Include code samples and error messages** if applicable
-* **Specify your environment**: OS, Python version, library version, etc.
+- **Use a clear and descriptive title** for the issue
+- **Describe the exact steps to reproduce the problem** with as many details as possible
+- **Provide specific examples** to demonstrate the steps
+- **Describe the behavior you observed** and what behavior you expected to see
+- **Include code samples and error messages** if applicable
+- **Specify your environment**: OS, Python version, library version, etc.
 
 ### Suggesting Enhancements
 
 Enhancement suggestions are tracked as [GitHub issues](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues). When creating an enhancement suggestion, please include:
 
-* **Use a clear and descriptive title**
-* **Provide a detailed description of the suggested enhancement**
-* **Provide specific examples** to demonstrate the use case
-* **Explain why this enhancement would be useful** to most users
+- **Use a clear and descriptive title**
+- **Provide a detailed description of the suggested enhancement**
+- **Provide specific examples** to demonstrate the use case
+- **Explain why this enhancement would be useful** to most users
 
 ### Pull Requests
 
@@ -44,9 +44,9 @@ Please follow these steps for sending us your pull requests:
 
 ### Prerequisites
 
-* **Rust**: 1.70 or later (install via [rustup](https://rustup.rs/))
-* **Python**: 3.8 or later
-* **Maturin**: `pip install maturin`
+- **Rust**: 1.70 or later (install via [rustup](https://rustup.rs/))
+- **Python**: 3.8 or later
+- **Maturin**: `pip install maturin`
 
 ### Setting Up Your Development Environment
 
@@ -72,27 +72,28 @@ pytest ../tests/
 
 ### Rust Code
 
-* Follow the [Rust Style Guide](https://doc.rust-lang.org/nightly/style-guide/)
-* Run `cargo fmt` before committing
-* Run `cargo clippy` and fix all warnings
-* Write tests for new functionality
-* Document public APIs with doc comments
+- Follow the [Rust Style Guide](https://doc.rust-lang.org/nightly/style-guide/)
+- Run `cargo fmt` before committing
+- Run `cargo clippy` and fix all warnings
+- Write tests for new functionality
+- Document public APIs with doc comments
 
 ### Python Code
 
-* Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/) style guide
-* Use type hints where appropriate
-* Write docstrings for all public functions and classes
-* Keep line length under 120 characters (as configured in pyproject.toml)
+- Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/) style guide
+- Use type hints where appropriate
+- Write docstrings for all public functions and classes
+- Keep line length under 120 characters (as configured in pyproject.toml)
 
 ### Commit Messages
 
-* Use the present tense ("Add feature" not "Added feature")
-* Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
-* Limit the first line to 72 characters or less
-* Reference issues and pull requests liberally after the first line
+- Use the present tense ("Add feature" not "Added feature")
+- Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
+- Limit the first line to 72 characters or less
+- Reference issues and pull requests liberally after the first line
 
 Example:
+
 ```
 Add WebSocket reconnection with exponential backoff
 
@@ -122,24 +123,24 @@ pytest ../tests/test_connection.py -v
 
 ### Writing Tests
 
-* Write unit tests for all new functionality
-* Ensure tests are deterministic and don't require external services when possible
-* Use mocking for WebSocket connections when appropriate
-* Add integration tests for critical paths
+- Write unit tests for all new functionality
+- Ensure tests are deterministic and don't require external services when possible
+- Use mocking for WebSocket connections when appropriate
+- Add integration tests for critical paths
 
 ## Documentation
 
-* Update the README.md if you change functionality
-* Add examples for new features in the `examples/` directory
-* Update relevant documentation in the `docs/` directory
-* Ensure all public APIs have docstrings/doc comments
+- Update the README.md if you change functionality
+- Add examples for new features in the `docs/examples/` directory
+- Update relevant documentation in the `docs/` directory
+- Ensure all public APIs have docstrings/doc comments
 
 ## Community
 
-* Join our [Discord server](https://discord.gg/p7YyFqSmAz) for discussions
-* Be respectful and constructive in all interactions
-* Help others when you can
-* Share your use cases and experiences
+- Join our [Discord server](https://discord.gg/p7YyFqSmAz) for discussions
+- Be respectful and constructive in all interactions
+- Help others when you can
+- Share your use cases and experiences
 
 ## License
 

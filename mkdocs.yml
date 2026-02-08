@@ -1,0 +1,88 @@
+site_name: BinaryOptionsTools V2
+site_description: The most advanced binary options trading library for Python, JavaScript, and Rust.
+site_author: ChipaDevTeam
+site_url: https://chipadevteam.github.io/BinaryOptionsTools-v2/
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [BinaryOptionsToolsV2]
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - search.highlight
+    - search.share
+    - search.suggest
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Overview: overview.md
+  - API Reference:
+      - Multi-Language: api/reference.md
+      - Python API: api/python.md
+  - Examples:
+      - Python:
+          - Async Examples: examples/python/async/
+          - Sync Examples: examples/python/sync/
+      - Rust: examples/rust/
+      - JavaScript: examples/javascript/
+      - Swift: examples/swift/
+      - Kotlin: examples/kotlin/
+      - Go: examples/go/
+      - Ruby: examples/ruby/
+      - C#: examples/csharp/
+  - Guides:
+      - Trading Guide: guides/trading.md
+      - Raw Handler Guide: guides/raw-handler.md
+      - Assets & Timeframes: guides/assets-timeframes.md
+  - Architecture:
+      - Data Flow: architecture/dataflow.md
+      - Raw Module: architecture/raw-module.md
+  - Project Info:
+      - Deployment: project/deployment.md
+      - Next Steps: project/next-steps.md
+      - Documentation Summary: project/docs-summary.md
+      - Enhancement Summary: project/enhancement-summary.md
+      - Raw Handler Summary: project/raw-handler-summary.md

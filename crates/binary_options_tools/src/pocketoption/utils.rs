@@ -23,7 +23,7 @@ const WEBSOCKET_VERSION: &str = "13";
 
 pub fn get_index() -> PocketResult<u64> {
     let mut rng = rand::thread_rng();
-    
+
     let rand = rng.gen_range(10..99);
     let time = (Utc::now() + Duration::hours(2)).timestamp();
     format!("{time}{rand}")
@@ -132,31 +132,11 @@ pub mod float_time {
     where
         D: Deserializer<'de>,
     {
-        let s = f64::deserialize(deserializer)?.to_string();
-        let (secs, milis) = match s.split_once(".") {
-            Some((seconds, miliseconds)) => {
-                let secs: i64 = seconds
-                    .parse::<i64>()
-                    .map_err(|e| serde::de::Error::custom(e.to_string()))?;
-                let mut pow = 0;
-                if miliseconds.len() <= 9 {
-                    pow = 9u32.saturating_sub(miliseconds.len() as u32);
-                }
-                let milis = miliseconds
-                    .parse::<u32>()
-                    .map_err(|e| serde::de::Error::custom(e.to_string()))?
-                    * 10i32.pow(pow) as u32;
-                (secs, milis)
-            }
-            None => {
-                let secs: i64 = s
-                    .parse::<i64>()
-                    .map_err(|e| serde::de::Error::custom(e.to_string()))?;
+        let f = f64::deserialize(deserializer)?;
+        let secs = f.trunc() as i64;
+        let nanos = (f.fract() * 1_000_000_000.0).round() as u32;
 
-                (secs, 0)
-            }
-        };
-        DateTime::from_timestamp(secs, milis)
-            .ok_or(serde::de::Error::custom("Error parsing ints to time"))
+        DateTime::from_timestamp(secs, nanos)
+            .ok_or(serde::de::Error::custom("Error parsing float to time"))
     }
 }

@@ -14,7 +14,9 @@ static INIT: Once = Once::new();
 
 pub fn init_crypto_provider() {
     INIT.call_once(|| {
-        rustls::crypto::ring::default_provider().install_default().ok();
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .ok();
     });
 }
 

@@ -5,31 +5,53 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Bleeding Edge / Unreleased]
 
 ### Added
-- CONTRIBUTING.md with detailed contribution guidelines
-- CODE_OF_CONDUCT.md for community standards
-- SECURITY.md with security policy and best practices
-- CHANGELOG.md for tracking version history
-- CITATION.cff for academic citations
-- AUTHORS.md listing all contributors
-- ACKNOWLEDGMENTS.md for credits and thanks
 
-## [0.2.4] - 2024-01-XX
+- N/a
+
+### Changed
+
+- N/a
+
+### Fixed
+
+- N/a
+
+## [0.2.5] - 2024-02-08
 
 ### Added
+
+- Files to sort into respective folders - /SortLaterOr_rm/
+
+### Changed
+
+- Organized - Merged `/examples/` to `/docs/examples/`
+- Added more rules within `.gitignore`
+
+### Fixed
+
+- Prettier format
+- SSID parsing errors within demo vs real differences
+
+## [0.2.4] - 2024-02-03
+
+### Added
+
 - Advanced candle data retrieval with `get_candles` and `get_candles_advanced`
 - Advanced validators for message filtering
 - Improved WebSocket message handling
 - Enhanced documentation in the `docs/` directory
 
 ### Changed
+
 - Improved error handling for connection management
 - Updated Python bindings for better async support
 - Enhanced type safety across Rust and Python interfaces
 
 ### Fixed
+
 - Connection stability improvements
 - Memory leak fixes in WebSocket handlers
 - Error handling in subscription management
@@ -37,17 +59,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.3] - 2023-12-XX
 
 ### Added
+
 - Raw Handler API for advanced WebSocket control
 - Validator system for response filtering
 - Enhanced subscription management
 - Time-aligned subscription support
 
 ### Changed
+
 - Improved reconnection logic with exponential backoff
 - Better error messages and logging
 - Updated dependencies for security patches
 
 ### Fixed
+
 - Race conditions in message routing
 - Subscription cleanup on disconnect
 - Memory management in async operations
@@ -55,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] - 2023-11-XX
 
 ### Added
+
 - Complete rewrite in Rust for performance and reliability
 - Python bindings via PyO3
 - Async and sync Python APIs
@@ -64,18 +90,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Type-safe interfaces across languages
 
 ### Changed
+
 - Architecture redesigned with Rust core
 - Improved performance (10x faster than v1)
 - Better memory management
 - Enhanced error handling
 
 ### Removed
+
 - Python-only implementation (replaced with Rust core)
 - Legacy API endpoints (deprecated in v1)
 
 ## [0.1.x] - 2023-XX-XX
 
 ### Initial Release
+
 - Python-based implementation
 - Basic PocketOption API support
 - Trading operations (buy/sell)
@@ -105,7 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [PyPI Package](https://pypi.org/project/binaryoptionstoolsv2/)
 - [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/)
 
-[Unreleased]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/compare/BinaryOptionsToolsV2-0.2.4...HEAD
+[0.2.5]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.5
 [0.2.4]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.4
 [0.2.3]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.3
 [0.2.0]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.0

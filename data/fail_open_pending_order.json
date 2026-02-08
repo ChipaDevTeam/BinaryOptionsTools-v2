@@ -1,0 +1,19 @@
+{
+  "data": {
+    "data": {
+      "ticket": "74e3e01d-78f9-4619-82ce-f6cf9e51673a",
+      "openType": 0,
+      "amount": 1,
+      "uid": 87742848,
+      "isDemo": 1,
+      "symbol": "EURUSD_otc",
+      "openTime": "2024-12-31 20:24:24",
+      "openPrice": 0,
+      "timeframe": 60,
+      "minPayout": 60,
+      "command": 0,
+      "dateCreated": "2024-12-31 20:32:00"
+    },
+    "error": "OPEN_TIME"
+  }
+}

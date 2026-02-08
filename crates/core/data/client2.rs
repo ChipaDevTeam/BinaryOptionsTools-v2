@@ -1,21 +1,25 @@
 use std::{
-    collections::HashMap, f32::consts::E, ops::Deref, sync::Arc, time::{Duration, Instant}
+    collections::HashMap,
+    f32::consts::E,
+    ops::Deref,
+    sync::Arc,
+    time::{Duration, Instant},
 };
 
-use async_channel::{Receiver, Sender, bounded};
+use async_channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
 use futures_util::{
-    SinkExt, StreamExt,
     stream::{SplitSink, SplitStream},
+    SinkExt, StreamExt,
 };
 use tokio::{
     net::TcpStream,
+    select,
     sync::{Mutex, RwLock},
     task::JoinHandle,
-    time::{sleep, interval},
-    select,
+    time::{interval, sleep},
 };
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, tungstenite::Message};
+use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, info, warn};
 use url::Url;
 
@@ -44,13 +48,25 @@ pub enum WebSocketEvent<Transfer: MessageTransfer> {
     /// Balance data received
     BalanceUpdated { balance: f64, currency: String },
     /// Order opened successfully
-    OrderOpened { order_id: String, data: serde_json::Value },
+    OrderOpened {
+        order_id: String,
+        data: serde_json::Value,
+    },
     /// Order closed with result
-    OrderClosed { order_id: String, result: serde_json::Value },
+    OrderClosed {
+        order_id: String,
+        result: serde_json::Value,
+    },
     /// Stream update received (candles, etc.)
-    StreamUpdate { asset: String, data: serde_json::Value },
+    StreamUpdate {
+        asset: String,
+        data: serde_json::Value,
+    },
     /// Candles data received
-    CandlesReceived { asset: String, candles: Vec<serde_json::Value> },
+    CandlesReceived {
+        asset: String,
+        candles: Vec<serde_json::Value>,
+    },
     /// Message received from WebSocket
     MessageReceived { message: Transfer },
     /// Raw message received (unparsed)
@@ -58,7 +74,10 @@ pub enum WebSocketEvent<Transfer: MessageTransfer> {
     /// Message sent to WebSocket
     MessageSent { message: Transfer },
     /// Error occurred during operation
-    Error { error: String, context: Option<String> },
+    Error {
+        error: String,
+        context: Option<String>,
+    },
     /// Connection is being closed
     Closing,
     /// Keep-alive ping sent
@@ -152,16 +171,22 @@ impl KeepAliveManager {
         // Start ping task similar to Python implementation
         let ping_sender = message_sender.clone();
         let ping_interval = self.ping_interval;
-        
+
         self.ping_task = Some(tokio::spawn(async move {
             let mut interval = interval(ping_interval);
-            info!("Starting ping loop with {}s interval", ping_interval.as_secs());
-            
+            info!(
+                "Starting ping loop with {}s interval",
+                ping_interval.as_secs()
+            );
+
             loop {
                 interval.tick().await;
-                
+
                 // Send ping message like Python: '42["ps"]'
-                match ping_sender.send(Message::text(r#"42["ps"]"#.to_string())).await {
+                match ping_sender
+                    .send(Message::text(r#"42["ps"]"#.to_string()))
+                    .await
+                {
                     Ok(_) => {
                         debug!("Sent keep-alive ping");
                     }
@@ -171,7 +196,7 @@ impl KeepAliveManager {
                     }
                 }
             }
-            
+
             warn!("Ping loop terminated");
         }));
 
@@ -304,7 +329,7 @@ impl<T: DataHandler> SharedState<T> {
     pub async fn broadcast_event(&self, event: WebSocketEvent<T::Transfer>) {
         let handlers = self.event_handlers.read().await;
         let config = self.get_config().await;
-        
+
         if handlers.is_empty() {
             return;
         }
@@ -315,14 +340,14 @@ impl<T: DataHandler> SharedState<T> {
             if handler.handles_event(&event) {
                 let handler = handler.clone();
                 let event = event.clone();
-                
+
                 let task = tokio::spawn(async move {
                     if let Err(e) = handler.handle_event(&event).await {
                         error!("Event handler '{}' failed: {}", handler.name(), e);
                     }
                 });
                 tasks.push(task);
-                
+
                 // Limit concurrent handlers
                 if tasks.len() >= config.max_concurrent_handlers {
                     break;
@@ -332,10 +357,9 @@ impl<T: DataHandler> SharedState<T> {
 
         // Wait for all handlers to complete (with timeout like Python)
         let timeout_duration = Duration::from_secs(5);
-        if let Err(_) = tokio::time::timeout(
-            timeout_duration, 
-            futures_util::future::join_all(tasks)
-        ).await {
+        if let Err(_) =
+            tokio::time::timeout(timeout_duration, futures_util::future::join_all(tasks)).await
+        {
             warn!("Some event handlers timed out after {:?}", timeout_duration);
         }
     }
@@ -385,7 +409,7 @@ impl<T: DataHandler> SharedState<T> {
             connection_state: Arc::new(RwLock::new(ConnectionState::default())),
             event_handlers: Arc::new(RwLock::new(Vec::new())),
             config: Arc::new(RwLock::new(WebSocketClientConfig::default())),
-            event_manager: Arc::new(EventManager::new(buffer_size))
+            event_manager: Arc::new(EventManager::new(buffer_size)),
         }
     }
 
@@ -783,7 +807,11 @@ where
 
                             // Process the message
                             match handler
-                                .process_message(&message, &previous_info, &shared_state.data.raw_sender())
+                                .process_message(
+                                    &message,
+                                    &previous_info,
+                                    &shared_state.data.raw_sender(),
+                                )
                                 .await
                             {
                                 Ok((processed_message, should_close)) => {

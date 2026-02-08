@@ -47,7 +47,6 @@ The `DealsHandle` will expose the following method:
 ### Commands and Responses
 
 - **`Command` Enum**:
-
   - `CheckResult(Uuid)`: Command to check the result of a specific trade.
 
 - **`CommandResponse` Enum**:
@@ -89,7 +88,6 @@ The `TradesHandle` will expose the following methods:
 ### Commands and Responses
 
 - **`Command` Enum**:
-
   - `OpenOrder(OpenOrder)`: Command to place a new trade.
 
 - **`CommandResponse` Enum**:

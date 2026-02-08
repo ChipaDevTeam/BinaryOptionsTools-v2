@@ -1,7 +1,9 @@
 # Binary Options Tools (Rust)
+
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ChipaDevTeam/BinaryOptionsTools-v2)
 [![Crates.io](https://img.shields.io/crates/v/binary_options_tools.svg)](https://crates.io/crates/binary_options_tools)
 [![Docs.rs](https://docs.rs/binary_options_tools/badge.svg)](https://docs.rs/binary_options_tools)
+
 <!-- Add other badges as appropriate, e.g., license, build status -->
 
 A Rust crate providing tools to interact programmatically with various binary options trading platforms.
@@ -15,8 +17,9 @@ The core library is written in Rust for performance and safety, and it serves as
 ## Currently Supported Features
 
 ### PocketOption Platform
+
 - **Authentication**: Secure connection using session IDs (SSID)
-- **Account Management**: 
+- **Account Management**:
   - Get current account balance
   - Check if account is demo or real
   - Server time synchronization
@@ -38,9 +41,11 @@ The core library is written in Rust for performance and safety, and it serves as
   - Manual reconnection support
 
 ## TODO Features
+
 - Additional trading platforms (Expert Options, etc.)
 
 ## Implemented Features
+
 - Historical candle data retrieval
 - Closed deals management and history
 - Pending trades support
@@ -51,7 +56,7 @@ Add the crate to your `Cargo.toml` dependencies:
 
 ```toml
 [dependencies]
-binary_options_tools = "0.1.7" 
+binary_options_tools = "0.1.7"
 ```
 
 ## Quick Start
@@ -64,26 +69,26 @@ use std::time::Duration;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize client with session ID
     let client = PocketOption::new("your_session_id").await?;
-    
+
     // IMPORTANT: Wait for connection to establish
     tokio::time::sleep(Duration::from_secs(5)).await;
-    
+
     // Get account balance
     let balance = client.balance().await;
     println!("Current balance: ${}", balance);
-    
+
     // Place a buy trade on EURUSD for 60 seconds with $1
     let (trade_id, deal) = client.buy("EURUSD_otc", 60, 1.0).await?;
     println!("Trade placed with ID: {}", trade_id);
     println!("Deal data: {:?}", deal);
-    
+
     // Wait for trade to complete
     tokio::time::sleep(Duration::from_secs(65)).await;
-    
+
     // Check trade result
     let result = client.result(trade_id).await?;
     println!("Trade result: {:?}", result);
-    
+
     Ok(())
 }
 ```
@@ -101,29 +106,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize client
     let client = PocketOption::new("your_session_id").await?;
     tokio::time::sleep(Duration::from_secs(5)).await;
-    
+
     // Get account balance
     let balance = client.balance().await;
     println!("Current Balance: ${}", balance);
-    
+
     // Place a buy trade
     let (buy_id, buy_deal) = client.buy("EURUSD_otc", 60, 1.0).await?;
     println!("Buy Trade ID: {}", buy_id);
-    
+
     // Place a sell trade
     let (sell_id, sell_deal) = client.sell("EURUSD_otc", 60, 1.0).await?;
     println!("Sell Trade ID: {}", sell_id);
-    
+
     // Wait for trades to complete
     tokio::time::sleep(Duration::from_secs(65)).await;
-    
+
     // Check results
     let buy_result = client.result(buy_id).await?;
     let sell_result = client.result(sell_id).await?;
-    
+
     println!("Buy result: {:?}", buy_result);
     println!("Sell result: {:?}", sell_result);
-    
+
     Ok(())
 }
 ```
@@ -140,10 +145,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize client
     let client = PocketOption::new("your_session_id").await?;
     tokio::time::sleep(Duration::from_secs(5)).await;
-    
+
     // Subscribe to real-time candle data
     let mut subscription = client.subscribe("EURUSD_otc", SubscriptionType::None).await?;
-    
+
     println!("Listening for real-time candles...");
     while let Some(candle) = subscription.next().await {
         match candle {
@@ -159,7 +164,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Err(e) => eprintln!("Error receiving candle: {:?}", e),
         }
     }
-    
+
     Ok(())
 }
 ```
@@ -175,10 +180,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize client
     let client = PocketOption::new("your_session_id").await?;
     tokio::time::sleep(Duration::from_secs(5)).await;
-    
+
     // Get all opened deals
     let opened_deals = client.opened().await?;
-    
+
     if opened_deals.is_empty() {
         println!("No opened deals");
     } else {
@@ -190,7 +195,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("    Direction: {:?}", deal.action);
         }
     }
-    
+
     Ok(())
 }
 ```
@@ -206,18 +211,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize client
     let client = PocketOption::new("your_session_id").await?;
     tokio::time::sleep(Duration::from_secs(5)).await;
-    
+
     // Execute multiple operations concurrently
     let (balance, opened_deals, server_time) = tokio::try_join!(
         async { Ok::<_, Box<dyn std::error::Error>>(client.balance().await) },
         client.opened(),
         async { Ok::<_, Box<dyn std::error::Error>>(client.server_time().await) },
     )?;
-    
+
     println!("Balance: ${}", balance);
     println!("Opened Deals: {}", opened_deals.len());
     println!("Server Time: {}", server_time);
-    
+
     Ok(())
 }
 ```
@@ -244,6 +249,7 @@ tokio::time::sleep(Duration::from_secs(5)).await;  // Critical!
 ### Supported Assets
 
 Common assets include:
+
 - `EURUSD_otc` - Euro/US Dollar (OTC)
 - `GBPUSD_otc` - British Pound/US Dollar (OTC)
 - `USDJPY_otc` - US Dollar/Japanese Yen (OTC)

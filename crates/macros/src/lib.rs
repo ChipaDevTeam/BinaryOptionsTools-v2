@@ -16,7 +16,7 @@ use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use quote::quote;
 use serialize::Serializer;
-use syn::{DeriveInput, parse_macro_input};
+use syn::{parse_macro_input, DeriveInput};
 
 #[proc_macro]
 pub fn deserialize(input: TokenStream) -> TokenStream {

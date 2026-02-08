@@ -1,9 +1,9 @@
 ---
 name: Question
 about: Ask a question about using the library
-title: '[QUESTION] '
+title: "[QUESTION] "
 labels: question
-assignees: ''
+assignees: ""
 ---
 
 ## Question

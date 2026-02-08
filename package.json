@@ -1,0 +1,35 @@
+{
+  "name": "BinaryOptionsTools-v2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky",
+    "docs:serve": "python -m mkdocs serve",
+    "docs:build": "python -m mkdocs build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.28.1",
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "markdownlint-cli": "^0.47.0",
+    "markdownlint-cli2": "^0.20.0",
+    "prettier": "3.8.1"
+  },
+  "lint-staged": {
+    "*.py": [
+      "ruff check --fix",
+      "ruff format"
+    ],
+    "*.rs": [
+      "rustfmt"
+    ],
+    "*.md": [
+      "markdownlint --fix"
+    ]
+  }
+}

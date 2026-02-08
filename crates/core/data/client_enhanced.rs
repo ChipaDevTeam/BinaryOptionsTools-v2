@@ -4,21 +4,21 @@ use std::{
     time::{Duration, Instant},
 };
 
-use async_channel::{Receiver, Sender, bounded};
+use async_channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
 use futures_util::{
-    SinkExt, StreamExt,
     future::select_all,
     stream::{SplitSink, SplitStream},
+    SinkExt, StreamExt,
 };
 use tokio::{
     net::TcpStream,
     select,
-    sync::{Mutex, RwLock, Notify},
+    sync::{Mutex, Notify, RwLock},
     task::JoinHandle,
     time::{interval, sleep, timeout},
 };
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, tungstenite::Message};
+use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, info, warn};
 use url::Url;
 
@@ -573,7 +573,7 @@ where
                         // Note: We already update stats in send_message, but that's when it's queued.
                         // Maybe we want to track actual sent messages here?
                         // For now, let's just log debug
-                        */
+                         */
                         debug!("Message sent to WebSocket");
                     }
                     Err(e) => {
@@ -587,7 +587,7 @@ where
                                 }),
                             ))
                             .await?;
-                        
+
                         // If we can't write, the connection is likely dead.
                         // The receiver task should handle the close/error, but we can also break here.
                         break;

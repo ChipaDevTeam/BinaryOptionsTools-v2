@@ -23,9 +23,9 @@ Please delete options that are not relevant.
 
 Describe the specific changes you made:
 
-- 
-- 
-- 
+-
+-
+-
 
 ## Testing
 

@@ -1,116 +1,198 @@
 import pytest
-import sys
-from unittest.mock import MagicMock
-
-# Mock the Rust extension module BEFORE importing the package
-mock_rust_ext = MagicMock()
-# Mock the classes expected from the Rust extension
-mock_rust_ext.RawPocketOption = MagicMock()
-mock_rust_ext.LogBuilder = MagicMock()
-mock_rust_ext.Logger = MagicMock()
-mock_rust_ext.start_tracing = MagicMock()
-
-# We need to handle how it's imported.
-# It seems the code tries `from BinaryOptionsToolsV2.BinaryOptionsToolsV2 import ...`
-# AND `from BinaryOptionsToolsV2 import ...`
-
-# Mock `BinaryOptionsToolsV2.BinaryOptionsToolsV2`
-sys.modules["BinaryOptionsToolsV2.BinaryOptionsToolsV2"] = mock_rust_ext
-
-# Also mock `BinaryOptionsToolsV2` if strictly needed, but `BinaryOptionsToolsV2` is the package we are testing.
-# The package `BinaryOptionsToolsV2` tries to import from itself (the extension).
-
-# Let's try to patch the specific imports inside the modules after import?
-# No, imports happen at top level.
-
-# If we look at `tracing.py`:
-# try:
-#     from BinaryOptionsToolsV2.BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
-# except ImportError:
-#     from BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
-
-# If we run with PYTHONPATH=.../BinaryOptionsToolsV2 (the parent of the inner BinaryOptionsToolsV2),
-# then `import BinaryOptionsToolsV2` imports the package.
-# Inside that package, it tries to import the extension.
-
-# If we set sys.modules['BinaryOptionsToolsV2'] = mock_rust_ext, we block the actual package.
-# But we want to test the actual package code (`PocketOptionAsync` etc).
-
-# The inner `BinaryOptionsToolsV2` used in imports refers to the compiled extension.
-# If we are in the source tree, `BinaryOptionsToolsV2` is the package directory.
-# The code expects the extension to be importable.
-
-# Strategy:
-# 1. Allow `BinaryOptionsToolsV2` (package) to be imported.
-# 2. Mock `BinaryOptionsToolsV2.BinaryOptionsToolsV2` (extension).
-# 3. But `tracing.py` also tries `from BinaryOptionsToolsV2 import LogBuilder`.
-#    This implies `LogBuilder` should be available directly under `BinaryOptionsToolsV2`?
-#    This usually happens if `__init__.py` exposes it, or if it is a flat module.
-
-# Let's mock `BinaryOptionsToolsV2.BinaryOptionsToolsV2` which satisfies the first import attempt in `tracing.py`.
-
 import os
-from unittest.mock import AsyncMock, patch
-from datetime import timedelta
+import sys
 
-# Set up the mock for the extension module
-sys.modules["BinaryOptionsToolsV2.BinaryOptionsToolsV2"] = mock_rust_ext
+import asyncio
+from BinaryOptionsToolsV2.pocketoption.asynchronous import PocketOptionAsync
 
-# Now we can import the package
-from BinaryOptionsToolsV2 import PocketOptionAsync
-# Also need to make sure RawPocketOption is available where PocketOptionAsync looks for it.
-# It looks in `..BinaryOptionsToolsV2` (relative) or `BinaryOptionsToolsV2` (absolute).
+# Get SSID from environment variable
+SSID = os.getenv("POCKET_OPTION_SSID")
 
-# Mock responses
-MOCK_BALANCE = 1000.0
-MOCK_SSID = "test_ssid"
 
 @pytest.fixture
-def mock_client():
-    # We need to patch where RawPocketOption is used.
-    # In `asynchronous.py`: `from ..BinaryOptionsToolsV2 import RawPocketOption`
-    # or `from BinaryOptionsToolsV2 import RawPocketOption`
+async def api():
+    if not SSID:
+        pytest.skip("POCKET_OPTION_SSID not set")
 
-    # Since we mocked `BinaryOptionsToolsV2.BinaryOptionsToolsV2`, let's ensure it has what we need.
-    mock_rust_client = MagicMock()
-    mock_rust_client.balance = AsyncMock(return_value=MOCK_BALANCE)
-    mock_rust_client.buy = AsyncMock(return_value=("trade_id_123", '{"id": "trade_id_123", "profit": 0, "amount": 10}'))
-    mock_rust_client.check_win = AsyncMock(return_value='{"id": "trade_id_123", "profit": 8.5, "result": "win"}')
-    mock_rust_client.get_server_time = AsyncMock(return_value=1620000000)
+    # Use context manager which waits for assets automatically
+    # Add timeout for connection initialization
+    config = {"connection_initialization_timeout_secs": 60, "timeout_secs": 20}
+    async with PocketOptionAsync(SSID, config=config) as client:
+        yield client
 
-    mock_rust_ext.RawPocketOption.new_with_config.return_value = mock_rust_client
-
-    yield mock_rust_client
-
-@pytest.fixture
-def api(mock_client):
-    return PocketOptionAsync(MOCK_SSID)
 
 @pytest.mark.asyncio
-async def test_balance(api, mock_client):
-    balance = await api.balance()
-    assert balance == MOCK_BALANCE
-    mock_client.balance.assert_called_once()
+async def test_balance(api):
+    """Test retrieving balance."""
+    try:
+        balance = await api.balance()
+        assert isinstance(balance, (int, float))
+        print(f"Balance: {balance}")
+    except Exception as e:
+        pytest.fail(f"Failed to get balance: {e}")
+
 
 @pytest.mark.asyncio
-async def test_buy(api, mock_client):
-    trade_id, trade_info = await api.buy("EURUSD_otc", 10.0, 60, check_win=False)
-    assert trade_id == "trade_id_123"
-    assert trade_info["amount"] == 10
-    mock_client.buy.assert_called_with("EURUSD_otc", 10.0, 60)
+async def test_server_time(api):
+    """Test retrieving server time."""
+    try:
+        # Give the websocket 2 seconds to receive the time sync packet
+        await asyncio.sleep(2)
+
+        time = await asyncio.wait_for(api.get_server_time(), timeout=10.0)
+        assert isinstance(time, (int, float))
+        assert time > 1577836800  # 2020-01-01
+        print(f"Server time: {time}")
+    except asyncio.TimeoutError:
+        pytest.fail(
+            "Timed out getting server time - server time may not be initialized"
+        )
+    except Exception as e:
+        pytest.fail(f"Failed to get server time: {e}")
+
 
 @pytest.mark.asyncio
-async def test_check_win(api, mock_client):
-    # Mock get_deal_end_time to return a time in the past so check_win proceeds
-    mock_client.get_deal_end_time = AsyncMock(return_value=1620000000)
+async def test_is_demo(api):
+    """Test checking if account is demo."""
+    try:
+        is_demo = api.is_demo()
+        assert isinstance(is_demo, bool)
+        print(f"Is Demo: {is_demo}")
+    except Exception as e:
+        pytest.fail(f"Failed to check is_demo: {e}")
 
-    with patch("time.time", return_value=1620000010): # current time > end time
-        result = await api.check_win("trade_id_123")
-        assert result["result"] == "win"
-        assert result["profit"] == 8.5
 
 @pytest.mark.asyncio
-async def test_server_time(api, mock_client):
-    time = await api.get_server_time()
-    assert time == 1620000000
-    mock_client.get_server_time.assert_called_once()
+async def test_buy_and_check_win(api):
+    """Test buying an asset and checking the result."""
+    if not api.is_demo():
+        pytest.skip("Skipping trade test on real account to avoid losing money")
+
+    asset = "EURUSD_otc"  # OTC is usually available on weekends too
+    amount = 1.0
+    duration = 5
+
+    # Check if we can get payout for this asset to ensure it's valid
+    try:
+        payout = await api.payout(asset)
+        if not payout:
+            pytest.skip(f"Asset {asset} not available or no payout")
+    except Exception:
+        pytest.skip(f"Could not check payout for {asset}")
+
+    print(f"Buying {asset} for {duration} seconds...")
+    try:
+        # Buy without waiting for result first
+        trade_id, trade_info = await api.buy(asset, amount, duration, check_win=False)
+        assert trade_id
+        assert isinstance(trade_info, dict)
+        print(f"Trade placed: {trade_id}")
+
+        # Now wait for result using check_win
+        print(f"Waiting for trade result (timeout: {duration + 60.0}s)...")
+        try:
+            # Use a reasonable timeout to prevent hanging - should be at least duration + buffer
+            result = await asyncio.wait_for(
+                api.check_win(trade_id),
+                timeout=duration + 20.0,
+            )
+            assert isinstance(result, dict)
+            assert "result" in result
+            assert result["result"] in ["win", "loss", "draw"]
+            print(f"Trade result: {result}")
+        except asyncio.TimeoutError:
+            print(f"Timeout occurred for trade_id: {trade_id}")
+            pytest.fail(f"Timed out waiting for trade result for trade_id: {trade_id}")
+        except Exception as e:
+            print(f"Error during check_win: {e}")
+            pytest.fail(f"Error during check_win: {e}")
+
+    except Exception as e:
+        print(f"Trade failed: {e}")
+        pytest.fail(f"Trade failed: {e}")
+
+
+@pytest.mark.asyncio
+async def test_buy_without_waiting(api):
+    """Test buying an asset without waiting for the result (faster test)."""
+    if not api.is_demo():
+        pytest.skip("Skipping trade test on real account to avoid losing money")
+
+    asset = "EURUSD_otc"
+    amount = 1.0
+    duration = 5
+
+    # Check if we can get payout for this asset to ensure it's valid
+    try:
+        payout = await api.payout(asset)
+        if not payout:
+            pytest.skip(f"Asset {asset} not available or no payout")
+    except Exception:
+        pytest.skip(f"Could not check payout for {asset}")
+
+    print(f"Buying {asset} without waiting for result...")
+    try:
+        # Buy with check_win=False to not wait for result
+        trade_id, trade_info = await api.buy(asset, amount, duration, check_win=False)
+        assert trade_id
+        assert isinstance(trade_info, dict)
+        print(f"Trade placed: {trade_id}, Info: {trade_info}")
+
+    except Exception as e:
+        pytest.fail(f"Trade placement failed: {e}")
+
+
+@pytest.mark.asyncio
+async def test_get_candles(api):
+    """Test retrieving historical candle data."""
+    asset = "EURUSD_otc"
+    period = 60  # 1-minute candles
+
+    print(f"Fetching candles for {asset} with period {period}...")
+    try:
+        # Some assets might not be available, so we check payout first
+        payout = await api.payout(asset)
+        if not payout:
+            pytest.skip(f"Asset {asset} not available")
+
+        # api.candles() uses HistoricalDataApiModule
+        candles = await asyncio.wait_for(api.candles(asset, period), timeout=20.0)
+        assert isinstance(candles, list)
+        assert len(candles) > 0
+        print(f"Received {len(candles)} candles.")
+        for candle in candles[:2]:  # Print first 2 for verification
+            print(f"Candle: {candle}")
+            assert "time" in candle or "timestamp" in candle
+            assert "open" in candle
+            assert "close" in candle
+    except asyncio.TimeoutError:
+        pytest.fail("Timed out waiting for candles")
+    except Exception as e:
+        pytest.fail(f"Failed to get candles: {e}")
+
+
+@pytest.mark.asyncio
+async def test_history(api):
+    """Test retrieving historical candle data using the history method."""
+    asset = "EURUSD_otc"
+    period = 60
+
+    print(f"Fetching history for {asset} with period {period}...")
+    try:
+        payout = await api.payout(asset)
+        if not payout:
+            pytest.skip(f"Asset {asset} not available")
+
+        # api.history() is a wrapper for candles()
+        history = await asyncio.wait_for(api.history(asset, period), timeout=20.0)
+        assert isinstance(history, list)
+        assert len(history) > 0
+        print(f"Received {len(history)} candles from history.")
+    except asyncio.TimeoutError:
+        pytest.fail("Timed out waiting for history")
+    except Exception as e:
+        pytest.fail(f"Failed to get history: {e}")
+
+
+if __name__ == "__main__":
+    sys.exit(pytest.main(["-v", __file__]))

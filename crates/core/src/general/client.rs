@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use async_channel::{Receiver, RecvError};
 use futures_util::future::try_join3;
-use futures_util::stream::{SplitSink, SplitStream, select_all};
+use futures_util::stream::{select_all, SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
 use tokio::task::JoinHandle;
@@ -547,13 +547,13 @@ where
 mod tests {
     use std::time::Duration;
 
-    use async_channel::{Receiver, Sender, bounded};
+    use async_channel::{bounded, Receiver, Sender};
     use futures_util::{
-        Stream, StreamExt,
         future::try_join,
         stream::{select_all, unfold},
+        Stream, StreamExt,
     };
-    use rand::{Rng, distr::Alphanumeric};
+    use rand::{distr::Alphanumeric, Rng};
     use tokio::time::sleep;
     use tracing::info;
 
@@ -666,10 +666,10 @@ mod tests {
     #[tokio::test]
     async fn test_reconnection_limit_reached_error() {
         use crate::error::BinaryOptionsToolsError;
-        
+
         let max_loops = 3;
         let mut loops = 0;
-        
+
         // We simulate the logic of the reconnection loop
         for _ in 0..max_loops {
             loops += 1;

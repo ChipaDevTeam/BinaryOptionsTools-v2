@@ -3172,7 +3172,10 @@ class RawHandler(RawHandlerProtocol):
             self._uniffi_clone_handle(),
             _UniffiFfiConverterBytes.lower(data),
         )
-        _uniffi_lift_return = lambda val: None
+
+        def _uniffi_lift_return(val):
+            return None
+
         _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
             _UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_binary(
@@ -3206,7 +3209,10 @@ class RawHandler(RawHandlerProtocol):
             self._uniffi_clone_handle(),
             _UniffiFfiConverterString.lower(message),
         )
-        _uniffi_lift_return = lambda val: None
+
+        def _uniffi_lift_return(val):
+            return None
+
         _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
             _UniffiLib.uniffi_binary_options_tools_uni_fn_method_rawhandler_send_text(
@@ -4000,7 +4006,10 @@ class PocketOption(PocketOptionProtocol):
         Clears the list of closed deals from the client's state.
         """
         _uniffi_lowered_args = (self._uniffi_clone_handle(),)
-        _uniffi_lift_return = lambda val: None
+
+        def _uniffi_lift_return(val):
+            return None
+
         _uniffi_error_converter = None
         return await _uniffi_rust_call_async(
             _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_clear_closed_deals(
@@ -4274,7 +4283,10 @@ class PocketOption(PocketOptionProtocol):
         Disconnects and reconnects the client.
         """
         _uniffi_lowered_args = (self._uniffi_clone_handle(),)
-        _uniffi_lift_return = lambda val: None
+
+        def _uniffi_lift_return(val):
+            return None
+
         _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
             _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_reconnect(
@@ -4414,7 +4426,10 @@ class PocketOption(PocketOptionProtocol):
         to ensure a graceful shutdown.
         """
         _uniffi_lowered_args = (self._uniffi_clone_handle(),)
-        _uniffi_lift_return = lambda val: None
+
+        def _uniffi_lift_return(val):
+            return None
+
         _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
             _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_shutdown(
@@ -4517,7 +4532,10 @@ class PocketOption(PocketOptionProtocol):
             self._uniffi_clone_handle(),
             _UniffiFfiConverterString.lower(asset),
         )
-        _uniffi_lift_return = lambda val: None
+
+        def _uniffi_lift_return(val):
+            return None
+
         _uniffi_error_converter = _UniffiFfiConverterTypeUniError
         return await _uniffi_rust_call_async(
             _UniffiLib.uniffi_binary_options_tools_uni_fn_method_pocketoption_unsubscribe(

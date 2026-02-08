@@ -223,7 +223,7 @@ println!("CSV Stats:\n{}", csv_stats);
 
 ## Examples
 
-- `examples/testing_echo_client.rs` - Complete example with performance testing
+- `docs/examples/testing_echo_client.rs` - Complete example with performance testing
 - `tests/testing_wrapper_tests.rs` - Unit tests demonstrating usage
 
 ## Future Enhancements

@@ -45,14 +45,12 @@ impl Strategy for StrategyWrapper {
                     client: Some(client),
                     market: market,
                 };
-                inner
-                    .call_method1(py, "on_start", (py_ctx,))
-                    .map_err(|e| {
-                        binary_options_tools::pocketoption::error::PocketError::General(format!(
-                            "Python on_start error: {}",
-                            e
-                        ))
-                    })
+                inner.call_method1(py, "on_start", (py_ctx,)).map_err(|e| {
+                    binary_options_tools::pocketoption::error::PocketError::General(format!(
+                        "Python on_start error: {}",
+                        e
+                    ))
+                })
             })
             .map(|_| ())
         })
@@ -67,7 +65,9 @@ impl Strategy for StrategyWrapper {
     }
 
     async fn on_candle(&self, ctx: &Context, asset: &str, candle: &Candle) -> PocketResult<()> {
-        let candle_json = serde_json::to_string(candle).map_err(|e| binary_options_tools::pocketoption::error::PocketError::General(e.to_string()))?;
+        let candle_json = serde_json::to_string(candle).map_err(|e| {
+            binary_options_tools::pocketoption::error::PocketError::General(e.to_string())
+        })?;
         let asset = asset.to_string();
         let inner = Python::attach(|py| self.inner.clone_ref(py));
         let client = ctx.client.clone();
@@ -187,10 +187,11 @@ impl PyBot {
 
     pub fn add_asset(&mut self, asset: String, period: u32) -> PyResult<()> {
         if let Some(bot) = &mut self.inner {
-            let subscription = binary_options_tools::pocketoption::candle::SubscriptionType::time_aligned(
-                std::time::Duration::from_secs(period as u64),
-            )
-            .map_err(BinaryErrorPy::from)?;
+            let subscription =
+                binary_options_tools::pocketoption::candle::SubscriptionType::time_aligned(
+                    std::time::Duration::from_secs(period as u64),
+                )
+                .map_err(BinaryErrorPy::from)?;
 
             bot.add_asset(asset, subscription);
             Ok(())

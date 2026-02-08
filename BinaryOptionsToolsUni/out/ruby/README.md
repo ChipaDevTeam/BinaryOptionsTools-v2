@@ -154,6 +154,7 @@ sleep 5  # Critical!
 ### Supported Assets
 
 Common assets include:
+
 - `EURUSD_otc` - Euro/US Dollar (OTC)
 - `GBPUSD_otc` - British Pound/US Dollar (OTC)
 - `USDJPY_otc` - US Dollar/Japanese Yen (OTC)

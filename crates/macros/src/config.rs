@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream as TokenStream2;
 
-use darling::{FromDeriveInput, FromField, FromMeta, ast, util};
-use quote::{ToTokens, quote};
+use darling::{ast, util, FromDeriveInput, FromField, FromMeta};
+use quote::{quote, ToTokens};
 use syn::{Generics, Ident, Type};
 
 // Step 1: Parsing attributes into intermediate structs.

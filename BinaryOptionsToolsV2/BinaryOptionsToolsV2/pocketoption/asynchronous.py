@@ -1,12 +1,15 @@
 import asyncio
 import json
+import re
 import sys
 from datetime import timedelta
-from typing import Optional, Union, List, Dict, Tuple
+from typing import Optional, Union, List, Dict, Tuple, TYPE_CHECKING
 
 from ..config import Config
 from ..validator import Validator
 
+if TYPE_CHECKING:
+    from ..BinaryOptionsToolsV2 import RawPocketOption
 
 if sys.version_info < (3, 10):
 
@@ -120,7 +123,7 @@ class RawHandler:
                 print(f"Update: {data}")
             ```
         """
-        return await self._handler.subscribe()
+        return self._handler.subscribe()
 
     def id(self) -> str:
         """
@@ -189,6 +192,29 @@ class PocketOptionAsync:
             from BinaryOptionsToolsV2 import RawPocketOption
         from ..tracing import Logger
 
+        # Handle case where shell stripped quotes from the SSID (e.g. export SSID=42[auth,{session:...}])
+        if ssid.startswith("42[auth,"):
+            # 1. Fix the prefix
+            ssid = ssid.replace("42[auth,", '42["auth",', 1)
+
+            # 2. Quote keys in the JSON object (alphanumeric keys followed by colon)
+            ssid = re.sub(r"(?<=[{,])\s*([a-zA-Z0-9_]+)\s*:", r'"\1":', ssid)
+
+            # 3. Quote values (quoted strings, numbers, bools, or unquoted strings)
+            def fix_value(match):
+                val = match.group(1).strip()
+                # If already quoted, leave it
+                if val.startswith('"') and val.endswith('"'):
+                    return f":{val}"
+                # If number/bool/null, leave it
+                if val.isdigit() or val in ["true", "false", "null"]:
+                    return f":{val}"
+                # Otherwise, quote it
+                return f':"{val}"'
+
+            # Regex: Match colon, then (quoted string OR unquoted chars), lookahead for separator
+            ssid = re.sub(r':\s*("(?:[^"\\]|\\.)*"|[^,}\]]+?)(?=\s*[,}\]])', fix_value, ssid)
+
         if config is not None:
             if isinstance(config, dict):
                 self.config = Config.from_dict(config)
@@ -201,13 +227,26 @@ class PocketOptionAsync:
 
             if url is not None:
                 self.config.urls.insert(0, url)
-            self.client = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
+            self.client: "RawPocketOption" = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
         else:
             self.config = Config()
             if url is not None:
                 self.config.urls.insert(0, url)
-            self.client = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
+            self.client: "RawPocketOption" = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
         self.logger = Logger()
+
+    async def __aenter__(self):
+        """
+        Context manager entry. Waits for assets to be loaded.
+        """
+        await self.wait_for_assets()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """
+        Context manager exit. Disconnects the client.
+        """
+        await self.disconnect()
 
     async def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
@@ -291,21 +330,23 @@ class PocketOptionAsync:
             ValueError: If trade_id is invalid
             TimeoutError: If result check times out
         """
-        end_time = await self.client.get_deal_end_time(id)
 
-        if end_time is not None:
-            # Import time here since it might not be at top level
-            import time as py_time
+        # Set a reasonable timeout to prevent hanging
+        timeout_seconds = 60  # Increased timeout to accommodate longer trade durations
 
-            duration = end_time - int(py_time.time())
-            if duration <= 0:
-                duration = 5  # If duration is less than 0 then the trade is closed and the function should take less than 5 seconds to run
-        else:
-            duration = self.config.timeout_secs
-        duration += self.config.extra_duration
+        try:
+            # Use asyncio.wait_for as additional protection against hanging
+            import asyncio
 
-        # self.logger.debug(f"Timeout set to: {duration} (extra seconds included)")
-        async def check(id):
+            trade = await asyncio.wait_for(self._get_trade_result(id), timeout=timeout_seconds)
+            return trade
+        except asyncio.TimeoutError:
+            raise TimeoutError(f"Timeout waiting for trade result for ID: {id}")
+
+    async def _get_trade_result(self, id: str) -> dict:
+        """Internal method to get trade result with timeout protection"""
+        try:
+            # The Rust client should handle its own timeout, but we'll add a safeguard
             trade = await self.client.check_win(id)
             trade = json.loads(trade)
             win = trade["profit"]
@@ -316,8 +357,28 @@ class PocketOptionAsync:
             else:
                 trade["result"] = "loss"
             return trade
+        except Exception as e:
+            # Catch any other errors from the Rust client
+            raise Exception(f"Error getting trade result for ID {id}: {str(e)}")
 
-        return await _timeout(check(id), duration)
+    async def candles(self, asset: str, period: int) -> List[Dict]:
+        """
+        Retrieves historical candle data for an asset.
+
+        Args:
+            asset (str): Trading asset (e.g., "EURUSD_otc")
+            period (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
+
+        Returns:
+            List[Dict]: List of candles, each containing:
+                - time: Candle timestamp
+                - open: Opening price
+                - high: Highest price
+                - low: Lowest price
+                - close: Closing price
+        """
+        candles = await self.client.candles(asset, period)
+        return json.loads(candles)
 
     async def get_candles(self, asset: str, period: int, offset: int) -> List[Dict]:
         """

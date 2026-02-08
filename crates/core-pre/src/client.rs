@@ -4,17 +4,17 @@ use crate::error::CoreResult;
 use crate::middleware::{MiddlewareContext, MiddlewareStack};
 use crate::signals::Signals;
 use crate::traits::{ApiModule, AppState, ReconnectCallback, Rule};
-use futures_util::{SinkExt, stream::StreamExt};
+use futures_util::{stream::StreamExt, SinkExt};
 use kanal::{AsyncReceiver, AsyncSender};
+use rand::Rng;
 use std::any::{Any, TypeId};
-use std::future::Future;
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, error, info, warn};
-use rand::Rng;
 
 /// A lightweight handler is a function that can process messages without being tied to a specific module.
 /// It can be used for quick, non-blocking operations that don't require a full module lifecycle
@@ -313,11 +313,13 @@ impl<S: AppState> ClientRunner<S> {
                 Ok(stream) => {
                     self.reconnect_attempts = 0; // Reset attempts on success
                     stream
-                },
+                }
                 Err(e) => {
                     self.reconnect_attempts += 1;
 
-                    if self.max_allowed_loops > 0 && self.reconnect_attempts >= self.max_allowed_loops {
+                    if self.max_allowed_loops > 0
+                        && self.reconnect_attempts >= self.max_allowed_loops
+                    {
                         error!(target: "Runner", "Maximum reconnection attempts ({}) reached. Shutting down.", self.max_allowed_loops);
                         self.shutdown_requested = true;
                         break;
@@ -330,7 +332,11 @@ impl<S: AppState> ClientRunner<S> {
                         5
                     };
 
-                    let delay_secs = std::cmp::min(base_delay.saturating_mul(2u64.saturating_pow(self.reconnect_attempts.min(10))), 300);
+                    let delay_secs = std::cmp::min(
+                        base_delay
+                            .saturating_mul(2u64.saturating_pow(self.reconnect_attempts.min(10))),
+                        300,
+                    );
                     // Add jitter
                     let jitter = rand::rng().random_range(0.8..1.2);
                     let delay = std::time::Duration::from_secs_f64(delay_secs as f64 * jitter);

@@ -29,14 +29,14 @@ class Program
     {
         // Initialize client with your session ID
         var client = await PocketOption.NewAsync("your-session-id");
-        
+
         // IMPORTANT: Wait for connection to establish
         await Task.Delay(5000);
-        
+
         // Get account balance
         var balance = await client.BalanceAsync();
         Console.WriteLine($"Account Balance: ${balance}");
-        
+
         // Place a buy trade
         var deal = await client.BuyAsync("EURUSD_otc", 60, 1.0);
         Console.WriteLine($"Trade placed: {deal}");
@@ -58,14 +58,14 @@ public class BuyTradeExample
         // Initialize client
         var client = await PocketOption.NewAsync("your-session-id");
         await Task.Delay(5000);  // Wait for connection
-        
+
         // Place a buy trade on EURUSD for 60 seconds with $1
         var deal = await client.BuyAsync(
             asset: "EURUSD_otc",
             time: 60,
             amount: 1.0
         );
-        
+
         Console.WriteLine("Trade placed successfully!");
         Console.WriteLine($"Deal data: {deal}");
     }
@@ -84,14 +84,14 @@ public class SellTradeExample
         // Initialize client
         var client = await PocketOption.NewAsync("your-session-id");
         await Task.Delay(5000);  // Wait for connection
-        
+
         // Place a sell trade on EURUSD for 60 seconds with $1
         var deal = await client.SellAsync(
             asset: "EURUSD_otc",
             time: 60,
             amount: 1.0
         );
-        
+
         Console.WriteLine("Trade placed successfully!");
         Console.WriteLine($"Deal data: {deal}");
     }
@@ -110,7 +110,7 @@ public class BalanceExample
         // Initialize client
         var client = await PocketOption.NewAsync("your-session-id");
         await Task.Delay(5000);  // Wait for connection
-        
+
         // Get current balance
         var balance = await client.BalanceAsync();
         Console.WriteLine($"Your current balance is: ${balance}");
@@ -130,14 +130,14 @@ public class CheckWinExample
         // Initialize client
         var client = await PocketOption.NewAsync("your-session-id");
         await Task.Delay(5000);  // Wait for connection
-        
+
         // Place a trade
         var deal = await client.BuyAsync("EURUSD_otc", 60, 1.0);
         var tradeId = deal.Id;  // Extract trade ID from deal
-        
+
         // Wait for trade to complete
         await Task.Delay(65000);
-        
+
         // Check the result
         var result = await client.CheckWinAsync(tradeId);
         Console.WriteLine($"Trade result: {result}");
@@ -157,11 +157,11 @@ public class SubscribeExample
         // Initialize client
         var client = await PocketOption.NewAsync("your-session-id");
         await Task.Delay(5000);  // Wait for connection
-        
+
         // Subscribe to real-time candle data for EURUSD
         // Duration in seconds for each candle
         var subscription = await client.SubscribeAsync("EURUSD_otc", 60);
-        
+
         Console.WriteLine("Listening for real-time candles...");
         // Process subscription stream
     }
@@ -190,6 +190,7 @@ await Task.Delay(5000);  // Critical!
 ### Supported Assets
 
 Common assets include:
+
 - `EURUSD_otc` - Euro/US Dollar (OTC)
 - `GBPUSD_otc` - British Pound/US Dollar (OTC)
 - `USDJPY_otc` - US Dollar/Japanese Yen (OTC)

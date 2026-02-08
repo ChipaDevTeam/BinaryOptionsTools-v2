@@ -212,9 +212,23 @@ class PocketOption:
         """
         self.loop = asyncio.new_event_loop()
         self._client = PocketOptionAsync(ssid, url=url, config=config)
+        # Wait for assets to ensure connection is ready
+        self.loop.run_until_complete(self._client.wait_for_assets())
 
     def __del__(self):
         self.loop.close()
+
+    def __enter__(self):
+        """
+        Context manager entry.
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Context manager exit. Disconnects the client.
+        """
+        self.disconnect()
 
     def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
@@ -289,7 +303,9 @@ class PocketOption:
         "Removes all the closed deals from memory, this function doesn't return anything"
         self.loop.run_until_complete(self._client.clear_closed_deals())
 
-    def payout(self, asset: Optional[Union[str, List[str]]] = None) -> Union[Dict[str, Optional[int]], List[Optional[int]], int, None]:
+    def payout(
+        self, asset: Optional[Union[str, List[str]]] = None
+    ) -> Union[Dict[str, Optional[int]], List[Optional[int]], int, None]:
         "Returns a dict of asset | payout for each asset, if 'asset' is not None then it will return the payout of the asset or a list of the payouts for each asset it was passed"
         return self.loop.run_until_complete(self._client.payout(asset))
 

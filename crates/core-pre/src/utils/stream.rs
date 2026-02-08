@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use futures_util::{Stream, stream::unfold};
+use futures_util::{stream::unfold, Stream};
 use kanal::{AsyncReceiver, ReceiveError};
 use tokio_tungstenite::tungstenite::Message;
 

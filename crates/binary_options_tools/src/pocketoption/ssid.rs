@@ -9,17 +9,17 @@ use super::regions::Regions;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SessionData {
-    session_id: String,
-    ip_address: String,
-    user_agent: String,
-    last_activity: u64,
+    pub session_id: String,
+    pub ip_address: String,
+    pub user_agent: String,
+    pub last_activity: u64,
 }
 
 impl fmt::Debug for SessionData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SessionData")
             .field("session_id", &"REDACTED")
-            .field("ip_address", &"REDACTED") // Consider partial redaction like self.ip_address.chars().take(3).collect::<String>() + ".***.***"
+            .field("ip_address", &"REDACTED") // Consider partial redaction
             .field("user_agent", &self.user_agent)
             .field("last_activity", &self.last_activity)
             .finish()
@@ -168,9 +168,27 @@ impl Ssid {
             let real = Real {
                 raw: data_str,
                 is_demo: ssid.is_demo,
-                session: php_serde::from_bytes(ssid.session.as_bytes()).map_err(|e| {
-                    CoreError::SsidParsing(format!("Error parsing session data: {e}"))
-                })?,
+                session: {
+                    let session_bytes = ssid.session.as_bytes();
+                    match php_serde::from_bytes(session_bytes) {
+                        Ok(s) => s,
+                        Err(_) => {
+                            // Try stripping the trailing hash (assuming 32 chars for MD5)
+                            if session_bytes.len() > 32 {
+                                let stripped = &session_bytes[..session_bytes.len() - 32];
+                                php_serde::from_bytes(stripped).map_err(|e| {
+                                    CoreError::SsidParsing(format!(
+                                        "Error parsing session data: {e}"
+                                    ))
+                                })?
+                            } else {
+                                return Err(CoreError::SsidParsing(
+                                    "Error parsing session data".into(),
+                                ));
+                            }
+                        }
+                    }
+                },
                 uid: ssid.uid,
                 platform: ssid.platform,
                 is_fast_history: ssid.is_fast_history,

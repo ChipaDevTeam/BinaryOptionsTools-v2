@@ -3,11 +3,13 @@
 ## Core Team
 
 ### ChipaDevTeam
+
 - **GitHub**: [@ChipaDevTeam](https://github.com/ChipaDevTeam)
 - **Role**: Project maintainer and lead developer
 - **Contributions**: Architecture design, Rust core implementation, project management
 
 ### Rick-29
+
 - **GitHub**: [@Rick-29](https://github.com/Rick-29)
 - **Role**: Core developer
 - **Contributions**: Python bindings, API design, testing infrastructure
@@ -19,6 +21,7 @@ We welcome contributions from the community! This project wouldn't be possible w
 ### How to Become a Contributor
 
 We appreciate all contributions, whether it's:
+
 - 🐛 Bug reports and fixes
 - 📝 Documentation improvements
 - ✨ New features
@@ -30,6 +33,7 @@ See our [CONTRIBUTING.md](CONTRIBUTING.md) guide to get started.
 ## Community
 
 Special thanks to our community members who:
+
 - Report issues and bugs
 - Provide feedback and suggestions
 - Answer questions on Discord

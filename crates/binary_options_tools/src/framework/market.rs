@@ -1,7 +1,7 @@
-use async_trait::async_trait;
-use uuid::Uuid;
 use crate::pocketoption::error::PocketResult;
 use crate::pocketoption::types::Deal;
+use async_trait::async_trait;
+use uuid::Uuid;
 
 /// The Market trait abstracts trading operations.
 /// This allows strategies to run against live accounts, demo accounts, or local simulations (backtesting).

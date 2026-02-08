@@ -183,15 +183,12 @@ impl ApiModule<State> for TradesApiModule {
                           self.failure_matching.entry(key).or_default().push_back(req_id);
 
                           // Create OpenOrder and send to WebSocket.
-                          // We need the asset string for error handling cleanup if send fails, so we clone it or use the tracker's copy
                           let asset_for_error = asset.clone();
                           let order = OpenOrder::new(amount, asset, action, time, self.state.is_demo() as u32, req_id);
                           if let Err(e) = self.to_ws_sender.send(Message::text(order.to_string())).await {
-                              // If sending fails, we should notify the responder immediately
                               if let Some(tracker) = self.pending_orders.remove(&req_id) {
                                   let _ = tracker.responder.send(Err(CoreError::from(e).into()));
                               }
-                              // Clean up failure queue
                               let key = (asset_for_error, Self::float_key(amount));
                               if let Some(queue) = self.failure_matching.get_mut(&key) {
                                   queue.retain(|&id| id != req_id);
@@ -201,57 +198,59 @@ impl ApiModule<State> for TradesApiModule {
                   }
               },
               Ok(msg) = self.message_receiver.recv() => {
-                  if let Message::Binary(data) = &*msg {
-                      // Parse the message as a server response.
-                      if let Ok(response) = serde_json::from_slice::<ServerResponse>(data) {
-                          match response {
-                              ServerResponse::Success(deal) => {
-                                  self.state.trade_state.add_opened_deal(*deal.clone()).await;
-                                  info!(target: "TradesApiModule", "Trade opened: {}", deal.id);
+                  let response_result = match msg.as_ref() {
+                      Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data),
+                      Message::Text(text) => serde_json::from_str::<ServerResponse>(text),
+                      _ => {
+                          // Ignore other message types
+                          continue;
+                      }
+                  };
 
-                                  let req_id = deal.request_id.unwrap_or_default();
+                  if let Ok(response) = response_result {
+                      match response {
+                          ServerResponse::Success(deal) => {
+                              self.state.trade_state.add_opened_deal(*deal.clone()).await;
+                              info!(target: "TradesApiModule", "Trade opened: {}", deal.id);
 
-                                  // Find and remove the pending order
-                                  if let Some(tracker) = self.pending_orders.remove(&req_id) {
-                                      let _ = tracker.responder.send(Ok(*deal.clone()));
+                              let req_id = deal.request_id.unwrap_or_default();
 
-                                      // Clean up failure matching queue
-                                      let key = (tracker.asset, Self::float_key(tracker.amount));
-                                      if let Some(queue) = self.failure_matching.get_mut(&key) {
-                                          queue.retain(|&id| id != req_id);
-                                      }
-                                  } else {
-                                      warn!(target: "TradesApiModule", "Received success for unknown request ID: {}", req_id);
+                              if let Some(tracker) = self.pending_orders.remove(&req_id) {
+                                  let _ = tracker.responder.send(Ok(*deal.clone()));
+
+                                  let key = (tracker.asset, Self::float_key(tracker.amount));
+                                  if let Some(queue) = self.failure_matching.get_mut(&key) {
+                                      queue.retain(|&id| id != req_id);
                                   }
-                              }
-                              ServerResponse::Fail(fail) => {
-                                  // Handle failopenOrder.
-                                  // Strategy: Match based on asset and amount (FIFO) since req_id is missing
-                                  let key = (fail.asset.clone(), Self::float_key(fail.amount));
-
-                                  let found_req_id = if let Some(queue) = self.failure_matching.get_mut(&key) {
-                                      queue.pop_front()
-                                  } else {
-                                      None
-                                  };
-
-                                  if let Some(req_id) = found_req_id {
-                                      if let Some(tracker) = self.pending_orders.remove(&req_id) {
-                                          let _ = tracker.responder.send(Err(PocketError::FailOpenOrder {
-                                              error: fail.error.clone(),
-                                              amount: fail.amount,
-                                              asset: fail.asset.clone(),
-                                          }));
-                                      }
-                                  } else {
-                                       warn!(target: "TradesApiModule", "Received failure for unknown order: {} {}", fail.asset, fail.amount);
-                                  }
+                              } else {
+                                  warn!(target: "TradesApiModule", "Received success for unknown request ID: {}", req_id);
                               }
                           }
-                      } else {
-                          // Handle other messages or errors.
-                          // warn!(target: "TradesApiModule", "Received unrecognized message: {:?}", msg);
+                          ServerResponse::Fail(fail) => {
+                              let key = (fail.asset.clone(), Self::float_key(fail.amount));
+
+                              let found_req_id = if let Some(queue) = self.failure_matching.get_mut(&key) {
+                                  queue.pop_front()
+                              } else {
+                                  None
+                              };
+
+                              if let Some(req_id) = found_req_id {
+                                  if let Some(tracker) = self.pending_orders.remove(&req_id) {
+                                      let _ = tracker.responder.send(Err(PocketError::FailOpenOrder {
+                                          error: fail.error.clone(),
+                                          amount: fail.amount,
+                                          asset: fail.asset.clone(),
+                                      }));
+                                  }
+                              } else {
+                                   warn!(target: "TradesApiModule", "Received failure for unknown order: {} {}", fail.asset, fail.amount);
+                              }
+                          }
                       }
+                  } else {
+                      // Warn if parsing failed, but don't crash
+                      warn!(target: "TradesApiModule", "Failed to parse ServerResponse from message");
                   }
               }
             }
@@ -263,8 +262,8 @@ impl ApiModule<State> for TradesApiModule {
         // 451-["successopenOrder",...]
         // 451-["failopenOrder",...]
         Box::new(MultiPatternRule::new(vec![
-            "451-[\"successopenOrder\"",
-            "451-[\"failopenOrder\"",
+            "successopenOrder",
+            "failopenOrder",
         ]))
     }
 }

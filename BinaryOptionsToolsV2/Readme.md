@@ -54,12 +54,12 @@ Currently, only Python 3.9 to 3.12 is supported.
 - Install [`maturin`](https://www.maturin.rs/installation) in order to compile the library
 
 - Once the source is downloaded (using `git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git`) execute the following commands:
-To create the `.whl` file
+  To create the `.whl` file
 
 ```bash
 // Inside the root folder
 cd BinaryOptionsToolsV2
-maturin build -r 
+maturin build -r
 
 // Once the command is executed it should print a path to a .whl file, copy it and then run
 pip install path/to/file.whl
@@ -71,7 +71,7 @@ To install the library in a local virtual environment
 // Inside the root folder
 cd BinaryOptionsToolsV2
 
-// Activate the virtual environment if not done already 
+// Activate the virtual environment if not done already
 
 // Execute the following command and it should automatically install the library in the VM
 maturin develop
@@ -131,31 +131,31 @@ Facilitates asynchronous iteration over live data streams, enabling non-blocking
 Example Usage
 
 ```python
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync 
-import asyncio 
- 
-async def main(): 
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main():
     # Initialize the client
     client = PocketOptionAsync(ssid="your-session-id")
-    
+
     # Get account balance
-    balance = await client.balance() 
+    balance = await client.balance()
     print(f"Account Balance: ${balance}")
-    
+
     # Place a buy trade
     trade_id, deal = await client.buy("EURUSD_otc", 60, 1.0)
     print(f"Trade placed: {deal}")
-    
+
     # Check result
     result = await client.check_win(trade_id)
     print(f"Trade result: {result}")
-    
+
     # Subscribe to real-time data
     async for candle in client.subscribe_symbol("EURUSD_otc"):
         print(f"New candle: {candle}")
         break  # Just print one candle for demo
- 
-asyncio.run(main()) 
+
+asyncio.run(main())
 ```
 
 1. `synchronous.py`
@@ -193,14 +193,14 @@ Allows synchronous iteration over real-time data streams for compatibility with 
 Example Usage
 
 ```python
-from BinaryOptionsToolsV2.pocketoption import PocketOption 
+from BinaryOptionsToolsV2.pocketoption import PocketOption
 import time
 
 # Initialize the client
 client = PocketOption(ssid="your-session-id")
 
 # Get account balance
-balance = client.balance() 
+balance = client.balance()
 print(f"Account Balance: ${balance}")
 
 # Place a buy trade
@@ -220,11 +220,11 @@ for candle in stream:
 
 1. Differences Between PocketOption and PocketOptionAsync
 
-| Feature                | PocketOption (Synchronous) | PocketOptionAsync (Asynchronous) |
-|------------------------|----------------------------|----------------------------------|
-| **Execution Type**     | Blocking                  | Non-blocking                    |
-| **Use Case**           | Simpler scripts           | High-frequency or real-time tasks |
-| **Performance**        | Slower for concurrent tasks | Scales well with concurrent operations |
+| Feature            | PocketOption (Synchronous)  | PocketOptionAsync (Asynchronous)       |
+| ------------------ | --------------------------- | -------------------------------------- |
+| **Execution Type** | Blocking                    | Non-blocking                           |
+| **Use Case**       | Simpler scripts             | High-frequency or real-time tasks      |
+| **Performance**    | Slower for concurrent tasks | Scales well with concurrent operations |
 
 ### Tracing
 
@@ -261,19 +261,19 @@ import time
 def main():
     # Initialize client
     client = PocketOption(ssid="your-session-id")
-    
+
     # Get balance
     balance = client.balance()
     print(f"Current Balance: ${balance}")
-    
+
     # Place a buy trade on EURUSD for 60 seconds with $1
     trade_id, deal = client.buy(asset="EURUSD_otc", time=60, amount=1.0)
     print(f"Trade ID: {trade_id}")
     print(f"Deal Data: {deal}")
-    
+
     # Wait for trade to complete (60 seconds)
     time.sleep(65)
-    
+
     # Check the result
     result = client.check_win(trade_id)
     print(f"Trade Result: {result['result']}")  # 'win', 'loss', or 'draw'
@@ -292,23 +292,52 @@ import asyncio
 async def main():
     # Initialize client
     client = PocketOptionAsync(ssid="your-session-id")
-    
+
     # Get balance
     balance = await client.balance()
     print(f"Current Balance: ${balance}")
-    
+
     # Place a buy trade on EURUSD for 60 seconds with $1
     trade_id, deal = await client.buy(asset="EURUSD_otc", time=60, amount=1.0)
     print(f"Trade ID: {trade_id}")
     print(f"Deal Data: {deal}")
-    
+
     # Wait for trade to complete (60 seconds)
     await asyncio.sleep(65)
-    
+
     # Check the result
     result = await client.check_win(trade_id)
     print(f"Trade Result: {result['result']}")  # 'win', 'loss', or 'draw'
     print(f"Profit: ${result.get('profit', 0)}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Retrieving Historical Data
+
+```python
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main():
+    client = PocketOptionAsync(ssid="your-session-id")
+
+    # Fetch historical data (60s candles, starting from now)
+    # Note: get_candles takes (asset, period, offset)
+    candles = await client.get_candles("EURUSD_otc", 60, 0)
+
+    print(f"Retrieved {len(candles)} candles")
+    if candles:
+        print("Last candle:", candles[-1])
+        # Output format:
+        # {
+        #     'time': 1770428373,
+        #     'open': 1.22354,
+        #     'high': 1.22355,
+        #     'low': 1.22354,
+        #     'close': 1.22355
+        # }
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -322,10 +351,10 @@ import time
 
 def main():
     client = PocketOption(ssid="your-session-id")
-    
+
     # Subscribe to real-time candle data
     stream = client.subscribe_symbol("EURUSD_otc")
-    
+
     print("Listening for real-time candles...")
     for candle in stream:
         print(f"Time: {candle.get('time')}")
@@ -347,7 +376,7 @@ import asyncio
 
 async def main():
     client = PocketOptionAsync(ssid="your-session-id")
-    
+
     # Subscribe to real-time candle data
     async for candle in client.subscribe_symbol("EURUSD_otc"):
         print(f"Time: {candle.get('time')}")
@@ -369,10 +398,10 @@ import time
 
 def main():
     client = PocketOption(ssid="your-session-id")
-    
+
     # Get all opened deals
     opened_deals = client.opened_deals()
-    
+
     if opened_deals:
         print(f"You have {len(opened_deals)} opened deals:")
         for deal in opened_deals:
@@ -422,6 +451,7 @@ client_sync.connect()
 ### Supported Assets
 
 Common assets include:
+
 - `EURUSD_otc` - Euro/US Dollar (OTC)
 - `GBPUSD_otc` - British Pound/US Dollar (OTC)
 - `USDJPY_otc` - US Dollar/Japanese Yen (OTC)
@@ -432,7 +462,7 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 
 ## 📚 Additional Resources
 
-- **Full Examples**: [examples/python](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/examples/python)
+- **Full Examples**: [docs/examples/python](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/docs/examples/python)
 - **API Documentation**: [https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html](https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html)
 - **Discord Community**: [Join us](https://discord.gg/T3FGXcmd)
 

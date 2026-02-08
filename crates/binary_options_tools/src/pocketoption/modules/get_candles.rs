@@ -23,10 +23,7 @@ use crate::{
     },
 };
 
-const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = [
-    r#"451-["loadHistoryPeriodFast","#,
-    r#"451-["loadHistoryPeriod","#,
-];
+const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = ["loadHistoryPeriodFast", "loadHistoryPeriod"];
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoadHistoryPeriod {
@@ -244,34 +241,22 @@ impl ApiModule<State> for GetCandlesApiModule {
         loop {
             select! {
                 Ok(msg) = self.ws_receiver.recv() => {
-                    if let Message::Binary(data) = msg.as_ref() {
-                        match serde_json::from_slice::<LoadHistoryPeriodResult>(data) {
-                            Ok(result) => {
-                                // Find the pending request by index
-                                if let Some((req_id, asset)) = self.pending_requests.remove(&result.index) {
-                                    let candles: Vec<Candle> = result.data
-                                        .into_iter()
-                                        .map(|candle_data| {
-                                            Candle::try_from(candle_data).map_err(|e| CoreError::Other(e.to_string())).map(|mut c| {c.symbol = asset.clone();
-                                            c})
-                                        })
-                                        .collect::<Result<Vec<Candle>, _>>()?;
-
-                                    // Send the response
-                                    if let Err(e) = self.command_responder.send(CommandResponse::CandlesResult {
-                                        req_id,
-                                        candles,
-                                    }).await {
-                                        warn!("Failed to send candles result: {}", e);
-                                    }
-                                } else {
-                                    warn!("Received candles for unknown request index: {}", result.index);
-                                }
-                            }
-                            Err(e) => {
-                                warn!("Failed to parse LoadHistoryPeriodResult: {}", e);
+                    match msg.as_ref() {
+                        Message::Binary(data) => {
+                            if let Ok(result) = serde_json::from_slice::<LoadHistoryPeriodResult>(data) {
+                                self.process_candle_result(result).await?;
+                            } else {
+                                warn!("Failed to parse LoadHistoryPeriodResult (binary)");
                             }
                         }
+                        Message::Text(text) => {
+                            if let Ok(result) = serde_json::from_str::<LoadHistoryPeriodResult>(text) {
+                                self.process_candle_result(result).await?;
+                            } else {
+                                // Ignore potential header messages
+                            }
+                        }
+                        _ => {}
                     }
                 }
                 Ok(cmd) = self.command_receiver.recv() => {
@@ -316,5 +301,40 @@ impl ApiModule<State> for GetCandlesApiModule {
         Box::new(MultiPatternRule::new(Vec::from(
             LOAD_HISTORY_PERIOD_PATTERNS,
         )))
+    }
+}
+
+impl GetCandlesApiModule {
+    async fn process_candle_result(&mut self, result: LoadHistoryPeriodResult) -> CoreResult<()> {
+        // Find the pending request by index
+        if let Some((req_id, asset)) = self.pending_requests.remove(&result.index) {
+            let candles: Vec<Candle> = result
+                .data
+                .into_iter()
+                .map(|candle_data| {
+                    Candle::try_from(candle_data)
+                        .map_err(|e| CoreError::Other(e.to_string()))
+                        .map(|mut c| {
+                            c.symbol = asset.clone();
+                            c
+                        })
+                })
+                .collect::<Result<Vec<Candle>, _>>()?;
+
+            // Send the response
+            if let Err(e) = self
+                .command_responder
+                .send(CommandResponse::CandlesResult { req_id, candles })
+                .await
+            {
+                warn!("Failed to send candles result: {}", e);
+            }
+        } else {
+            warn!(
+                "Received candles for unknown request index: {}",
+                result.index
+            );
+        }
+        Ok(())
     }
 }
