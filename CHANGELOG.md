@@ -5,19 +5,37 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Bleeding Edge / Unreleased]
 
 ### Added
 
-- CONTRIBUTING.md with detailed contribution guidelines
-- CODE_OF_CONDUCT.md for community standards
-- SECURITY.md with security policy and best practices
-- CHANGELOG.md for tracking version history
-- CITATION.cff for academic citations
-- AUTHORS.md listing all contributors
-- ACKNOWLEDGMENTS.md for credits and thanks
+- N/a
 
-## [0.2.4] - 2024-01-XX
+### Changed
+
+- N/a
+
+### Fixed
+
+- N/a
+
+## [0.2.5] - 2024-02-08
+
+### Added
+
+- Files to sort into respective folders - /SortLaterOr_rm/
+
+### Changed
+
+- Organized - Merged `/examples/` to `/docs/examples/`
+- Added more rules within `.gitignore`
+
+### Fixed
+
+- Prettier format
+- SSID parsing errors within demo vs real differences
+
+## [0.2.4] - 2024-02-03
 
 ### Added
 
@@ -116,7 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [PyPI Package](https://pypi.org/project/binaryoptionstoolsv2/)
 - [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/)
 
-[Unreleased]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/compare/BinaryOptionsToolsV2-0.2.4...HEAD
+[0.2.5]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.5
 [0.2.4]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.4
 [0.2.3]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.3
 [0.2.0]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.0

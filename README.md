@@ -103,13 +103,13 @@ We're working to restore all functionality with improved stability and performan
 
 ```bash
 # Windows
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.4/binaryoptionstoolsv2-0.2.4-cp38-abi3-win_amd64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.5/binaryoptionstoolsv2-0.2.5-cp38-abi3-win_amd64.whl"
 
 # Linux
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.4/BinaryOptionsToolsV2-0.2.4-cp38-abi3-manylinux_2_34_x86_64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.5/BinaryOptionsToolsV2-0.2.5-cp38-abi3-manylinux_2_34_x86_64.whl"
 
 # Mac
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.4/BinaryOptionsToolsV2-0.2.4-cp38-abi3-macosx_11_0_arm64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.5/BinaryOptionsToolsV2-0.2.5-cp38-abi3-macosx_11_0_arm64.whl"
 ```
 
 **Requirements**:
