@@ -1,9 +1,9 @@
 ---
 name: Documentation Issue
 about: Report an issue with documentation
-title: '[DOCS] '
+title: "[DOCS] "
 labels: documentation
-assignees: ''
+assignees: ""
 ---
 
 ## Documentation Issue
@@ -18,7 +18,7 @@ Where is the problematic documentation located?
 - [ ] API Documentation (docs/)
 - [ ] Code comments/docstrings
 - [ ] Examples
-- [ ] Other: _____
+- [ ] Other: **\_**
 
 **File/URL**: Provide the specific file or URL
 
@@ -30,7 +30,7 @@ Where is the problematic documentation located?
 - [ ] Typo or grammar error
 - [ ] Broken link
 - [ ] Outdated information
-- [ ] Other: _____
+- [ ] Other: **\_**
 
 ## Current Content
 
