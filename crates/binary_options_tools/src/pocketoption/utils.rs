@@ -23,7 +23,7 @@ const WEBSOCKET_VERSION: &str = "13";
 
 pub fn get_index() -> PocketResult<u64> {
     let mut rng = rand::thread_rng();
-    
+
     let rand = rng.gen_range(10..99);
     let time = (Utc::now() + Duration::hours(2)).timestamp();
     format!("{time}{rand}")
@@ -135,7 +135,7 @@ pub mod float_time {
         let f = f64::deserialize(deserializer)?;
         let secs = f.trunc() as i64;
         let nanos = (f.fract() * 1_000_000_000.0).round() as u32;
-        
+
         DateTime::from_timestamp(secs, nanos)
             .ok_or(serde::de::Error::custom("Error parsing float to time"))
     }

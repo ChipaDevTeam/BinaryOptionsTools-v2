@@ -1,16 +1,16 @@
 pub mod market;
 pub mod virtual_market;
 
-use std::sync::Arc;
-use async_trait::async_trait;
-use futures_util::StreamExt;
-use futures_util::stream::select_all;
-use crate::pocketoption::candle::{Candle, SubscriptionType};
-use crate::pocketoption::pocket_client::PocketOption;
-use crate::pocketoption::error::PocketResult;
-use crate::pocketoption::types::Deal;
 use crate::framework::market::Market;
-use tracing::{info, error};
+use crate::pocketoption::candle::{Candle, SubscriptionType};
+use crate::pocketoption::error::PocketResult;
+use crate::pocketoption::pocket_client::PocketOption;
+use crate::pocketoption::types::Deal;
+use async_trait::async_trait;
+use futures_util::stream::select_all;
+use futures_util::StreamExt;
+use std::sync::Arc;
+use tracing::{error, info};
 
 /// The Context provides strategies with access to the trading market and other utilities.
 pub struct Context {
@@ -92,7 +92,11 @@ impl Bot {
 
         for (asset, sub_type) in &self.assets {
             info!("Subscribing to {}...", asset);
-            let stream = self.ctx.client.subscribe(asset.clone(), sub_type.clone()).await?;
+            let stream = self
+                .ctx
+                .client
+                .subscribe(asset.clone(), sub_type.clone())
+                .await?;
             streams.push(stream.to_stream().map({
                 let asset = asset.clone();
                 move |res| (asset.clone(), res)
@@ -123,4 +127,3 @@ impl Bot {
         Ok(())
     }
 }
-

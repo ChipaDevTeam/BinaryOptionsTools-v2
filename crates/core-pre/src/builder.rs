@@ -1,6 +1,6 @@
 // src/builder.rs
 
-use kanal::{AsyncSender, bounded_async};
+use kanal::{bounded_async, AsyncSender};
 use std::any::type_name;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
@@ -72,12 +72,12 @@ impl<S: AppState> ClientBuilder<S> {
     pub fn on_connect(
         mut self,
         callback: impl Fn(
-            Arc<S>,
-            &AsyncSender<Message>,
-        ) -> futures_util::future::BoxFuture<'static, CoreResult<()>>
-        + Send
-        + Sync
-        + 'static,
+                Arc<S>,
+                &AsyncSender<Message>,
+            ) -> futures_util::future::BoxFuture<'static, CoreResult<()>>
+            + Send
+            + Sync
+            + 'static,
     ) -> Self {
         self.connection_callback.on_connect = Box::new(callback);
         self
@@ -96,13 +96,13 @@ impl<S: AppState> ClientBuilder<S> {
     pub fn with_lightweight_handler(
         mut self,
         handler: impl Fn(
-            Arc<Message>,
-            Arc<S>,
-            &AsyncSender<Message>,
-        ) -> futures_util::future::BoxFuture<'static, CoreResult<()>>
-        + Send
-        + Sync
-        + 'static,
+                Arc<Message>,
+                Arc<S>,
+                &AsyncSender<Message>,
+            ) -> futures_util::future::BoxFuture<'static, CoreResult<()>>
+            + Send
+            + Sync
+            + 'static,
     ) -> Self {
         self.lightweight_handlers.push(Box::new(handler));
         self

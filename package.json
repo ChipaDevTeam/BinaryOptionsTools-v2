@@ -17,6 +17,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "markdownlint-cli": "^0.47.0",
+    "markdownlint-cli2": "^0.20.0",
     "prettier": "3.8.1"
   },
   "lint-staged": {

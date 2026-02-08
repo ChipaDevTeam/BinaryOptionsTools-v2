@@ -357,7 +357,7 @@ impl Rule for DealsUpdateRule {
                         return true;
                     }
                 }
-                
+
                 if self.valid.load(Ordering::SeqCst) {
                     self.valid.store(false, Ordering::SeqCst);
                     return true;
