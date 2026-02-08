@@ -67,6 +67,5 @@ parts/
 sdist/
 var/
 bin/
-*.egg-info/
 lib64
 pyvenv.cfg
