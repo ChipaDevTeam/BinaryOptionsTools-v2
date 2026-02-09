@@ -1,5 +1,5 @@
 # BinaryOptionsTools V2:
-## A high-performance, cross-platform library for binary options trading automation. Built with Rust for speed and reliability, with Python bindings for ease of use.
+### A high-performance, cross-platform library for binary options trading automation. Built with Rust for speed and reliability, with Python bindings for ease of use.
 **Need help?** Join us on [Discord](https://discord.gg/p7YyFqSmAz) for support and discussions.
 
 ## Support Chipa
@@ -441,6 +441,7 @@ See the full [LICENSE](LICENSE) file for complete terms and conditions.
 - Use this software at your own risk
 
 By using this software, you acknowledge and accept these terms.
+
 
 
 
