@@ -1,443 +1,261 @@
-# BinaryOptionsTools v2
+# BinaryOptionsTools V2
 
-**Need help?** Join us on [Discord](https://discord.gg/p7YyFqSmAz) for support and discussions.
+[![Discord](https://img.shields.io/discord/1261483112991555665?label=Discord&logo=discord&color=7289da)](https://discord.com/invite/p7YyFqSmAz)
+[![Python Version](https://img.shields.io/badge/python-3.8%20|%203.9%20|%203.10%20|%203.11%20|%203.12-blue)](https://www.python.org/)
+[![Rust](https://img.shields.io/badge/built%20with-Rust-orange)](https://www.rust-lang.org/)
+[![License](https://img.shields.io/badge/license-Personal-green)](LICENSE)
 
-## Support us
-Join PocketOption with Six's affiliate link: [Six PocketOption Affiliate link](https://poaffiliate.onelink.me/t5P7/9y34jkp3)
-<br>
-Join PocketOption with Chipas affiliate link: [Chipas PocketOption Affiliate link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) <br>
-Support ChipaDevTeam with [Paypal](https://www.paypal.me/ChipaCL)
+**A high-performance, cross-platform package for automating binary options trading.**
+Built with **Rust** for speed and memory safety, featuring **Python** bindings for ease of use.
 
-A high-performance, cross-platform library for binary options trading automation. Built with Rust for speed and reliability, with Python bindings for ease of use.
+---
+
+## Support the Development
+
+This project is maintained by the **ChipaDevTeam**. Your support helps keep the updates coming.
+
+| Support Channel | Link |
+| :--- | :--- |
+| **PayPal** | [Support ChipaDevTeam](https://www.paypal.me/ChipaCL) |
+| **PocketOption (Six)** | [Join via Six's Affiliate Link](https://poaffiliate.onelink.me/t5P7/9y34jkp3) |
+| **PocketOption (Chipa)** | [Join via Chipa's Affiliate Link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) |
+
+---
+
+## 📋 Table of Contents
+- [Overview](#overview)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+  - [Async API](#async-api-recommended)
+  - [Sync API](#sync-api)
+  - [Data Streaming](#real-time-data-streaming)
+- [Advanced Usage](#advanced-usage)
+- [Roadmap](#roadmap)
+- [Legal & Disclaimer](#legal--disclaimer)
+
+---
 
 ## Overview
 
-BinaryOptionsTools v2 is a complete rewrite of the original library, featuring:
+**BinaryOptionsTools v2** is a complete rewrite of the original library. It bridges the gap between low-level performance and high-level usability.
 
-- **Rust Core**: Built with Rust for maximum performance and memory safety
-- **Python Bindings**: Easy-to-use Python API via PyO3
-- **WebSocket Support**: Real-time market data streaming and trade execution
-- **Type Safety**: Strong typing across both Rust and Python interfaces
-- **Connection Management**: Automatic reconnection and error handling
-- **Raw API Access**: Low-level WebSocket control for advanced use cases
+### Key Highlights
+*   ** Rust Core**: Maximum performance, concurrency, and memory safety.
+*   ** Python Bindings**: seamless integration with the Python ecosystem via PyO3.
+*   ** WebSocket Native**: Real-time market data streaming and instant trade execution.
+*   ** Robust Connectivity**: Automatic reconnection, keep-alive monitoring, and error handling.
+*   ** Type Safety**: Strong typing across both Rust and Python interfaces.
 
-## Supported Platforms
+### Supported Platforms
+*   **PocketOption** (Quick Trading Mode & Pending Orders BETA)
+    *   *Real & Demo Accounts Supported*
 
-Currently supporting **PocketOption** (Quick Trading Mode) with both real and demo accounts.
-
-## Current Status
-
-**Available Features**:
-
-- Authentication and secure connection
-- Buy/Sell trading operations
-- Balance retrieval
-- Server time synchronization
-- Symbol subscriptions with different types (real-time, time-aligned, chunked)
-- Trade result checking
-- Opened deals management
-- Asset information and validation
-- Automatic reconnection handling
-- Historical candle data (`get_candles`, `get_candles_advanced`)
-- Advanced validators
-
-We're working to restore all functionality with improved stability and performance.
+---
 
 ## Features
 
-### Trading Operations
-
-- **Trade Execution**: Place buy/sell orders on any available asset
-- **Trade Monitoring**: Check trade results with configurable timeouts
-- **Balance Management**: Real-time account balance retrieval
-- **Open/Closed Deals**: Access active positions and closed deals
+### Trading & Account
+*   **Execution**: Place Buy/Sell orders instantly.
+*   **Monitoring**: Check trade results (Win/Loss) with configurable timeouts.
+*   **Balances**: Real-time account balance retrieval.
+*   **Portfolio**: Access active positions and closed deal history.
 
 ### Market Data
+*   **Live Stream**: Subscribe to real-time candles (1s, 5s, 15s, 30s, 60s, 300s).
+*   **Historical**: Fetch OHLC data (`get_candles`) for backtesting.
+*   **Payouts**: Retrieve current payout percentages for assets.
+*   **Sync**: Server time synchronization for precision timing.
 
-- **Real-time Candle Streaming**: Subscribe to live price data with multiple timeframes (1s, 5s, 15s, 30s, 60s, 300s)
-- **Historical Candles**: Fetch historical OHLC data for backtesting and analysis
-- **Time-Aligned Subscriptions**: Get perfectly aligned candle data for strategy execution
-- **Payout Information**: Retrieve current payout percentages for all assets
+### Framework Utilities
+*   **Raw Handler API**: Low-level WebSocket access for custom protocols.
+*   **Validators**: Built-in message filtering system.
+*   **Asset Logic**: Automatic verification of trading pairs and OTC availability.
 
-### Connection Management
-
-- **Automatic Reconnection**: Built-in connection recovery with exponential backoff
-- **Connection Control**: Manual connect/disconnect/reconnect methods
-- **Subscription Management**: Unsubscribe from specific assets or handlers
-- **WebSocket Health Monitoring**: Automatic ping/pong keepalive
-
-### Framework Features
-
-- **Raw Handler API**: Low-level WebSocket access for custom protocol implementations
-- **Message Validation**: Built-in validator system for response filtering
-- **Async/Sync Support**: Both asynchronous and synchronous Python APIs
-- **Asset Validation**: Automatic verification of trading pairs and OTC availability
-- **Server Time Sync**: Accurate server timestamp synchronization
+---
 
 ## Architecture
 
-```text
-┌─────────────────────────────────────────┐
-│         User Application                │
-│      (Python/Rust/JavaScript)           │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│      Language Bindings (PyO3)           │
-│    Python Async/Sync API Wrappers       │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│         Rust Core Library               │
-│  binary_options_tools / core-pre        │
-│  • WebSocket Client (tungstenite)       │
-│  • Connection Manager                   │
-│  • Message Router & Validators          │
-│  • Raw Handler System                   │
-└─────────────────┬───────────────────────┘
-                  │
-┌─────────────────▼───────────────────────┐
-│      PocketOption WebSocket API         │
-└─────────────────────────────────────────┘
+The system uses a layered architecture to ensure stability and speed.
+
+```mermaid
+graph TD
+    User[User Application <br/> Python/Rust/JS] --> Bindings[Language Bindings <br/> PyO3 Async/Sync Wrappers]
+    Bindings --> Core[Rust Core Library]
+    
+    subgraph Rust Core
+    Core --> WS[WebSocket Client <br/> Tungstenite]
+    Core --> Mgr[Connection Manager]
+    Core --> Router[Message Router & Validators]
+    end
+    
+    WS <--> API[PocketOption WebSocket API]
 ```
+
+---
 
 ## Installation
 
 ### Python
 
-#### Using pip (Prebuilt Wheels)
+#### Option A: Prebuilt Wheels (Recommended)
+Install directly from our GitHub releases. Ensure you have **Python 3.8 - 3.12**.
 
+**Windows**
 ```bash
-# Windows
 pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.5/binaryoptionstoolsv2-0.2.5-cp38-abi3-win_amd64.whl"
+```
 
-# Linux
+**Linux**
+```bash
 pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.5/BinaryOptionsToolsV2-0.2.5-cp38-abi3-manylinux_2_34_x86_64.whl"
+```
 
-# Mac
+**macOS (Apple Silicon)**
+```bash
 pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.5/BinaryOptionsToolsV2-0.2.5-cp38-abi3-macosx_11_0_arm64.whl"
 ```
 
-**Requirements**:
-
-- **OS**: Windows, Linux, macOS
-- **Python**: 3.8 - 3.12
-
-#### Building from Source
+#### Option B: Build from Source
+Requires `rustc`, `cargo`, and `maturin`.
 
 ```bash
-# Clone the repository
 git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git
 cd BinaryOptionsTools-v2/BinaryOptionsToolsV2
-
-# Install maturin (if not already installed)
 pip install maturin
-
-# Build and install
 maturin develop --release
 ```
 
 ### Rust
-
-Add to your `Cargo.toml`:
-
+Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 binary_options_tools = { path = "crates/binary_options_tools" }
 ```
 
+---
+
 ## Quick Start
 
-### Python - Async API
-
-Using the asynchronous API with a context manager ensures proper connection handling and resource cleanup.
+### Async API (Recommended)
+Best for building trading bots that need to handle streams and trades simultaneously.
 
 ```python
-from BinaryOptionsToolsV2 import PocketOptionAsync
 import asyncio
 import os
+from BinaryOptionsToolsV2 import PocketOptionAsync
 
 async def main():
-    # Initialize client with SSID from environment variable
+    # 1. Get SSID (Session ID)
     ssid = os.getenv("POCKET_OPTION_SSID")
-    if not ssid:
-        raise ValueError("Please set POCKET_OPTION_SSID environment variable")
-
-    # Use context manager for automatic connection and cleanup
+    
+    # 2. Initialize with Context Manager
     async with PocketOptionAsync(ssid=ssid) as client:
-        # Get account balance
+        # Get Balance
         balance = await client.balance()
-        print(f"Balance: ${balance}")
+        print(f"Current Balance: ${balance}")
 
-        # Place a trade
-        asset = "EURUSD_otc"
-        amount = 1.0   # $1
-        duration = 60  # 60 seconds
+        # Place Trade: Asset, Amount, Duration
+        trade_id, deal = await client.buy("EURUSD_otc", 1.0, 60)
+        print(f"Trade Placed: {deal}")
 
-        # 'buy' for call, 'sell' for put
-        trade_id, deal = await client.buy(asset, amount, duration)
-        print(f"Trade placed: {deal}")
-
-        # Check result (waits for trade expiry)
+        # Wait for Result
         result = await client.check_win(trade_id)
-        print(f"Trade result: {result['result']}")
+        print(f"Outcome: {result['result']}")
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-### Python - Sync API
-
-For simple scripts, the synchronous API provides a straightforward blocking interface.
+### Sync API
+Best for simple scripts or data fetching.
 
 ```python
 from BinaryOptionsToolsV2 import PocketOption
 import os
 
-ssid = os.getenv("POCKET_OPTION_SSID")
-
-# The sync client also supports context managers
-with PocketOption(ssid=ssid) as client:
-    balance = client.balance()
-    print(f"Balance: ${balance}")
-
-    trade_id, deal = client.buy("EURUSD_otc", 1.0, 60)
-    print(f"Trade result: {client.check_win(trade_id)['result']}")
+with PocketOption(ssid=os.getenv("POCKET_OPTION_SSID")) as client:
+    print(f"Balance: ${client.balance()}")
+    trade_id, _ = client.buy("EURUSD_otc", 1.0, 60)
+    print(f"Result: {client.check_win(trade_id)['result']}")
 ```
 
 ### Real-time Data Streaming
 
-BinaryOptionsTools-v2 provides high-performance data streams with multiple aggregation strategies.
+```python
+async with PocketOptionAsync(ssid="...") as client:
+    # Subscribe to 1-minute candles
+    subscription = await client.subscribe_symbol("EURUSD_otc", 60)
+
+    print("Streaming data...")
+    async for candle in subscription:
+        print(f"Timestamp: {candle['time']} | Close: {candle['close']}")
+```
+
+---
+
+## Advanced Usage
+
+For complex implementations, you can access the **Raw Handler API**. This allows you to construct custom WebSocket messages and filter responses.
 
 ```python
-import asyncio
-from BinaryOptionsToolsV2 import PocketOptionAsync
+# Create a validator to filter messages containing "balance"
+validator = Validator.contains("balance")
+handler = await client.create_raw_handler(validator)
 
-async def main():
-    async with PocketOptionAsync(ssid="your_ssid") as client:
-        # Subscribe to 60-second candles
-        subscription = await client.subscribe_symbol("EURUSD_otc", 60)
+# Send raw JSON request
+await handler.send_text('42["getBalance"]')
 
-        print("Waiting for candles...")
-        async for candle in subscription:
-            print(f"Time: {candle['time']}, Close: {candle['close']}")
-
-            # Use 'index' or your own logic to break
-            if candle.get('index', 0) >= 10:
-                break
-
-asyncio.run(main())
+# Listen to the filtered stream
+async for message in await handler.subscribe():
+    print(f"Raw Update: {message}")
 ```
 
-## Advanced Usage & Raw API
+> **Note on Authentication**: Authentication is handled via the `SSID` cookie. See our [Tutorials Directory](tutorials/) for instructions on how to extract this from your browser.
 
-### Raw Handler API
-
-The Raw Handler API allows low-level access to the WebSocket protocol while providing powerful filtering using the `Validator` system.
-
-```python
-import asyncio
-from BinaryOptionsToolsV2 import PocketOptionAsync, Validator
-
-async def main():
-    async with PocketOptionAsync(ssid="your_ssid") as client:
-        # 1. Create a validator for messages we care about
-        # Matches any message containing "balance"
-        validator = Validator.contains("balance")
-
-        # 2. Create the handler
-        handler = await client.create_raw_handler(validator)
-
-        # 3. Use send_and_wait for Request-Response patterns
-        print("Requesting balance via raw protocol...")
-        response = await handler.send_and_wait('42["getBalance"]')
-        print(f"Raw Response: {response}")
-
-        # 4. Or use subscribe() for a filtered stream
-        stream = await handler.subscribe()
-
-        # Trigger another update
-        await handler.send_text('42["getBalance"]')
-
-        async for message in stream:
-            print(f"Stream Update: {message}")
-            break # Exit after one message
-
-asyncio.run(main())
-```
-
-### Connection Control
-
-You can manually control the underlying WebSocket connection for complex lifecycle management.
-
-```python
-async with PocketOptionAsync(ssid) as client:
-    # Manually disconnect
-    await client.disconnect()
-    print("Offline")
-
-    # ... do some offline work ...
-
-    # Re-establish connection
-    await client.connect()
-
-    # Force a full reset (disconnect + reconnect)
-    await client.reconnect()
-```
-
-### SSID Authentication
-
-Authentication is handled via the `SSID` cookie value from a logged-in PocketOption session.
-
-**Format**: `42["auth",{"session":"...","uid":...}]`
-
-Refer to the [tutorials directory](tutorials/) for detailed guides on how to extract your SSID using browser developer tools.
-
-## Error Handling
-
-Proper error handling is crucial for trading bots. Here are common scenarios:
-
-```python
-import asyncio
-from BinaryOptionsToolsV2 import PocketOptionAsync
-
-async def main():
-    try:
-        async with PocketOptionAsync(ssid="invalid_ssid") as client:
-            await client.balance()
-
-    except ValueError as e:
-        print(f"Configuration Error: {e}")
-        # e.g., Missing SSID or invalid format
-
-    except TimeoutError as e:
-        print(f"Operation Timed Out: {e}")
-        # Network lag or server unresponsiveness
-
-    except Exception as e:
-        print(f"Unexpected Error: {e}")
-        # General catch-all
-
-asyncio.run(main())
-```
-
-## Documentation
-
-- **Official Documentation**: [Explore the documentation site](https://chipadevteam.github.io/BinaryOptionsTools-v2/) (Powered by MkDocs)
-- **API Reference**: Comprehensive [multi-language API guide](https://chipadevteam.github.io/BinaryOptionsTools-v2/API_REFERENCE/)
-- **Examples**: Browse the [examples directory](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/examples) for comprehensive code samples
-- **Architecture**: See the [Architecture section](https://chipadevteam.github.io/BinaryOptionsTools-v2/architecture-dataflow/) for technical details
-
-## Development
-
-### Project Structure
-
-```text
-BinaryOptionsTools-v2/
-├── crates/
-│   ├── binary_options_tools/    # Main Rust library
-│   ├── core/                    # Core WebSocket client
-│   ├── core-pre/                # Low-level protocol handlers
-│   └── macros/                  # Procedural macros
-├── BinaryOptionsToolsV2/
-│   ├── src/                     # Rust PyO3 bindings
-│   └── BinaryOptionsToolsV2/    # Python wrapper layer
-├── docs/examples/
-│   ├── python/                  # Python examples
-│   └── javascript/              # Node.js examples (experimental)
-└── docs/                        # Documentation
-```
-
-### Building the Rust Library
-
-```bash
-cd crates/binary_options_tools
-cargo build --release
-cargo test
-```
-
-### Building Python Bindings
-
-```bash
-cd BinaryOptionsToolsV2
-maturin build --release
-```
-
-### Running Tests
-
-```bash
-# Rust tests
-cargo test
-
-# Python tests
-cd BinaryOptionsToolsV2
-pytest tests/
-```
+---
 
 ## Roadmap
 
-### Planned Features
+- [x] **PocketOption**: Quick Trading
+- [x] **PocketOption**: Pending Orders (BETA)
+- [ ] **Platform**: Expert Options Integration
+- [ ] **Platform**: IQ Option Integration
+- [ ] **Core**: JavaScript/TypeScript Bindings
+- [ ] **Core**: WebAssembly (WASM) Support
+- [ ] **Tools**: Historical Data Export & Backtesting Framework
 
-- [ ] Expert Options platform integration
-- [ ] JavaScript/TypeScript native bindings
-- [ ] WebAssembly support for browser usage
-- [ ] Advanced order types (stop-loss, take-profit) - Only available for Forex accounts, not Quick Trading (QT) accounts
-- [ ] Historical data export tools
-- [ ] Strategy backtesting framework
-
-### Platform Support
-
-- [x] PocketOption Quick Trading
-- [x] PocketOption Pending Orders (BETA)
-- [ ] Expert Options
-- [ ] IQ Option (planned)
+---
 
 ## Contributing
 
-Contributions are welcome! Please ensure:
+We welcome contributions!
+1.  Fork the repo.
+2.  Ensure tests pass (`cargo test` & `pytest`).
+3.  Submit a Pull Request with clear descriptions.
 
-1. Code follows Rust and Python best practices
-2. All tests pass (`cargo test` and `pytest`)
-3. New features include documentation and examples
-4. Commit messages are clear and descriptive
+---
 
-## License
+## Legal & Disclaimer
 
-**Personal Use License** - Free for personal, educational, and non-commercial use.
+### License
+*   **Personal Use**: Free for personal, educational, and non-commercial use.
+*   **Commercial Use**: Requires explicit written permission. Contact us on Discord.
+*   See [LICENSE](LICENSE) for details.
 
-**Commercial Use** - Requires explicit written permission from ChipaDevTeam. Contact us on [Discord](https://discord.gg/p7YyFqSmAz) for commercial licensing.
+### ⚠️ Risk Warning ⚠️
+**This software is provided "AS IS" without warranty of any kind.**
 
-See the full [LICENSE](LICENSE) file for complete terms and conditions.
+*   Binary options trading involves high risk and may result in the loss of capital.
+*   The authors and ChipaDevTeam are **NOT** responsible for any financial losses, trading errors, or software bugs.
+*   Use this software entirely at your own risk.
 
-### Key Points
+***
 
-- ✅ **Free** for personal use, learning, and private trading
-- ✅ **Open source** - modify and distribute for personal use
-- ⚠️ **Commercial use requires permission** - Contact us first
-- ⚠️ **No warranty** - Software provided "as is"
-- ⚠️ **No liability** - Use at your own risk
+[Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/) | [API Reference](https://chipadevteam.github.io/BinaryOptionsTools-v2/API_REFERENCE/) | [Discord Community](https://discord.com/invite/p7YyFqSmAz)
 
-## Support
 
-- **Discord**: [Join our community](https://discord.gg/p7YyFqSmAz) for help, discussions, and updates
-- **Issues**: Report bugs or request features via [GitHub Issues](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues)
-
-## Disclaimer
-
-**IMPORTANT**: This software is provided "AS IS" without any warranty. The authors and ChipaDevTeam are NOT responsible for:
-
-- Any financial losses incurred from using this software
-- Any trading decisions made using this software
-- Any bugs, errors, or issues in the software
-- Any consequences of using this software for trading
-
-**Risk Warning**: Binary options trading carries significant financial risk. This software is for educational and personal use only. You should:
-
-- Never risk more than you can afford to lose
-- Understand the risks involved in binary options trading
-- Comply with all applicable laws and regulations in your jurisdiction
-- Use this software at your own risk
-
-By using this software, you acknowledge and accept these terms.
 
 
 
