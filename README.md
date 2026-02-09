@@ -3,7 +3,7 @@
 **Need help?** Join us on [Discord](https://discord.gg/p7YyFqSmAz) for support and discussions.
 
 ## Support us
-Join PocketOption with Six's affiliate link: [Six PocketOption Affiliate link](https://u3.shortink.io/main?utm_campaign=821725&utm_source=affiliate&utm_medium=sr&a=IqeAmBtFTrEWbh&ac=api&code=DLN960)
+Join PocketOption with Six's affiliate link: [Six PocketOption Affiliate link](https://poaffiliate.onelink.me/t5P7/9y34jkp3)
 <br>
 Join PocketOption with Chipas affiliate link: [Chipas PocketOption Affiliate link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) <br>
 Support ChipaDevTeam with [Paypal](https://www.paypal.me/ChipaCL)
@@ -438,5 +438,6 @@ See the full [LICENSE](LICENSE) file for complete terms and conditions.
 - Use this software at your own risk
 
 By using this software, you acknowledge and accept these terms.
+
 
 
