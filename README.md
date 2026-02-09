@@ -1,7 +1,3 @@
-Here is an optimized version of your README. It focuses on **visual hierarchy**, **readability**, and **standard open-source formatting**. I have added status badges, a table of contents, and reorganized the sections to make the project look more professional while keeping your affiliate and donation links prominent.
-
-***
-
 # BinaryOptionsTools V2
 
 [![Discord](https://img.shields.io/discord/1126346736417734737?label=Discord&logo=discord&color=7289da)](https://discord.gg/p7YyFqSmAz)
@@ -258,3 +254,4 @@ We welcome contributions!
 ***
 
 [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/) | [API Reference](https://chipadevteam.github.io/BinaryOptionsTools-v2/API_REFERENCE/) | [Discord Community](https://discord.gg/p7YyFqSmAz)
+
