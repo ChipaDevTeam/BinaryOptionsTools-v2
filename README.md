@@ -1,6 +1,6 @@
 # BinaryOptionsTools V2
 
-[![Discord](https://img.shields.io/discord/1126346736417734737?label=Discord&logo=discord&color=7289da)](https://discord.gg/p7YyFqSmAz)
+[![Discord](https://img.shields.io/discord/1126346736417734737?label=Discord&logo=discord&color=7289da)](https://discord.com/invite/p7YyFqSmAz)
 [![Python Version](https://img.shields.io/badge/python-3.8%20|%203.9%20|%203.10%20|%203.11%20|%203.12-blue)](https://www.python.org/)
 [![Rust](https://img.shields.io/badge/built%20with-Rust-orange)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-Personal-green)](LICENSE)
@@ -253,7 +253,8 @@ We welcome contributions!
 
 ***
 
-[Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/) | [API Reference](https://chipadevteam.github.io/BinaryOptionsTools-v2/API_REFERENCE/) | [Discord Community](https://discord.gg/p7YyFqSmAz)
+[Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/) | [API Reference](https://chipadevteam.github.io/BinaryOptionsTools-v2/API_REFERENCE/) | [Discord Community](https://discord.com/invite/p7YyFqSmAz)
+
 
 
 
