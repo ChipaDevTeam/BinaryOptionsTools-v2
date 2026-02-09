@@ -2,7 +2,7 @@
 
 **Need help?** Join us on [Discord](https://discord.gg/p7YyFqSmAz) for support and discussions.
 
-## Support Us
+## Support Chipa
 
 Support ChipaDevTeam with [Paypal](https://www.paypal.me/ChipaCL) <br> 
 
@@ -441,4 +441,5 @@ See the full [LICENSE](LICENSE) file for complete terms and conditions.
 - Use this software at your own risk
 
 By using this software, you acknowledge and accept these terms.
+
 
