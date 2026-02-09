@@ -10,13 +10,13 @@ Built with **Rust** for speed and memory safety, featuring **Python** bindings f
 
 ---
 
-## 🤝 Support the Development
+## Support the Development
 
 This project is maintained by the **ChipaDevTeam**. Your support helps keep the updates coming.
 
 | Support Channel | Link |
 | :--- | :--- |
-| **💰 PayPal** | [Support ChipaDevTeam](https://www.paypal.me/ChipaCL) |
+| **PayPal** | [Support ChipaDevTeam](https://www.paypal.me/ChipaCL) |
 | **PocketOption (Six)** | [Join via Six's Affiliate Link](https://poaffiliate.onelink.me/t5P7/9y34jkp3) |
 | **PocketOption (Chipa)** | [Join via Chipa's Affiliate Link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) |
 
@@ -244,14 +244,15 @@ We welcome contributions!
 *   **Commercial Use**: Requires explicit written permission. Contact us on Discord.
 *   See [LICENSE](LICENSE) for details.
 
-### ⚠️ Risk Warning
+### ⚠️ Risk Warning ⚠️
 **This software is provided "AS IS" without warranty of any kind.**
 
-*   Binary options trading involves high risk and may result in the loss of all your capital.
+*   Binary options trading involves high risk and may result in the loss of capital.
 *   The authors and ChipaDevTeam are **NOT** responsible for any financial losses, trading errors, or software bugs.
 *   Use this software entirely at your own risk.
 
 ***
 
 [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/) | [API Reference](https://chipadevteam.github.io/BinaryOptionsTools-v2/API_REFERENCE/) | [Discord Community](https://discord.gg/p7YyFqSmAz)
+
 
