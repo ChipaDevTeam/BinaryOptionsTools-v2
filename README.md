@@ -6,7 +6,7 @@
 Join PocketOption with Six's affiliate link: [Six PocketOption Affiliate link](https://u3.shortink.io/main?utm_campaign=821725&utm_source=affiliate&utm_medium=sr&a=IqeAmBtFTrEWbh&ac=api&code=DLN960)
 <br>
 Join PocketOption with Chipas affiliate link: [Chipas PocketOption Affiliate link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) <br>
-support ChipaDevTeam with a small donation in [paypal here](https://www.paypal.me/ChipaCL)
+Support ChipaDevTeam with [Paypal](https://www.paypal.me/ChipaCL)
 
 A high-performance, cross-platform library for binary options trading automation. Built with Rust for speed and reliability, with Python bindings for ease of use.
 
@@ -438,4 +438,5 @@ See the full [LICENSE](LICENSE) file for complete terms and conditions.
 - Use this software at your own risk
 
 By using this software, you acknowledge and accept these terms.
+
 
