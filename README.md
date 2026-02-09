@@ -256,3 +256,4 @@ We welcome contributions!
 [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/) | [API Reference](https://chipadevteam.github.io/BinaryOptionsTools-v2/API_REFERENCE/) | [Discord Community](https://discord.gg/p7YyFqSmAz)
 
 
+
