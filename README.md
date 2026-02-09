@@ -42,11 +42,11 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 **BinaryOptionsTools v2** is a complete rewrite of the original library. It bridges the gap between low-level performance and high-level usability.
 
 ### Key Highlights
-*   ** Rust Core**: Maximum performance, concurrency, and memory safety.
-*   ** Python Bindings**: seamless integration with the Python ecosystem via PyO3.
-*   ** WebSocket Native**: Real-time market data streaming and instant trade execution.
-*   ** Robust Connectivity**: Automatic reconnection, keep-alive monitoring, and error handling.
-*   ** Type Safety**: Strong typing across both Rust and Python interfaces.
+*   **Rust Core**: Maximum performance, concurrency, and memory safety.
+*   **Python Bindings**: seamless integration with the Python ecosystem via PyO3.
+*   **WebSocket Native**: Real-time market data streaming and instant trade execution.
+*   **Robust Connectivity**: Automatic reconnection, keep-alive monitoring, and error handling.
+*   **Type Safety**: Strong typing across both Rust and Python interfaces.
 
 ### Supported Platforms
 *   **PocketOption** (Quick Trading Mode & Pending Orders BETA)
@@ -254,6 +254,7 @@ We welcome contributions!
 ***
 
 [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/) | [API Reference](https://chipadevteam.github.io/BinaryOptionsTools-v2/API_REFERENCE/) | [Discord Community](https://discord.com/invite/p7YyFqSmAz)
+
 
 
 
