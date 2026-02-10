@@ -130,7 +130,7 @@ maturin develop --release
 #### Option B: Build from Source Automatically
 
 ```bash
-# pip install git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git#subdirectory=BinaryOptionsToolsV2
+pip install git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git#subdirectory=BinaryOptionsToolsV2
 ```
 
 ### Rust
@@ -260,6 +260,7 @@ We welcome contributions!
 ***
 
 [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/) | [API Reference](https://chipadevteam.github.io/BinaryOptionsTools-v2/API_REFERENCE/) | [Discord Community](https://discord.com/invite/p7YyFqSmAz)
+
 
 
 
