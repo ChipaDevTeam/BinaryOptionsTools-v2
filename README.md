@@ -63,7 +63,7 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 *   **Portfolio**: Access active positions and closed deal history.
 
 ### Market Data
-*   **Live Stream**: Subscribe to real-time candles (1s, 5s, 15s, 30s, 60s, 300s).
+*   **Live Stream**: Subscribe to real-time candles (tick, 5s, 15s, 30s, 60s, 300s).
 *   **Historical**: Fetch OHLC data (`get_candles`) for backtesting.
 *   **Payouts**: Retrieve current payout percentages for assets.
 *   **Sync**: Server time synchronization for precision timing.
@@ -260,6 +260,7 @@ We welcome contributions!
 ***
 
 [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/) | [API Reference](https://chipadevteam.github.io/BinaryOptionsTools-v2/API_REFERENCE/) | [Discord Community](https://discord.com/invite/p7YyFqSmAz)
+
 
 
 
