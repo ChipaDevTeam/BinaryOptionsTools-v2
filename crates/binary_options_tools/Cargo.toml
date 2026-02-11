@@ -1,6 +1,6 @@
 [package]
 name = "binary_options_tools"
-version = "0.1.9"
+version = "0.2.0"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 description = "High-level library for binary options trading automation. Supports PocketOption and ExpertOption with real-time data streaming, WebSocket API access, and automated trading strategies."
@@ -27,8 +27,8 @@ tokio = { version = "1.49.0", features = ["full"] }
 tokio-tungstenite = { version = "0.21.0", default-features = false, features = ["rustls-tls-webpki-roots", "connect", "handshake"] }
 url = "2.5.0"
 uuid = { version = "1.7.0", features = ["v4", "fast-rng", "serde"] }
-binary-options-tools-core-pre = { path = "../core-pre", version = "0.1.1" }
-binary-options-tools-macros = { path = "../macros", version = "0.1.4" }
+binary-options-tools-core-pre = { path = "../core-pre", version = "0.2.0" }
+binary-options-tools-macros = { path = "../macros", version = "0.2.0" }
 rand = "0.8.5"
 tracing = "0.1.40"
 rust_decimal = { version = "1.35.0", features = ["serde", "macros"] }

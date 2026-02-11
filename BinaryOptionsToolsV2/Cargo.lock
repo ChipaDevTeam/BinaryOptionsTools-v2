@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "BinaryOptionsToolsV2"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -141,7 +141,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "binary-options-tools-core-pre"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -158,7 +158,7 @@ dependencies = [
 
 [[package]]
 name = "binary-options-tools-macros"
-version = "0.1.4"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "darling",
@@ -174,7 +174,7 @@ dependencies = [
 
 [[package]]
 name = "binary_options_tools"
-version = "0.1.9"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",

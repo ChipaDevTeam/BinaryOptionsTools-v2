@@ -104,17 +104,17 @@ Install directly from our GitHub releases. Ensure you have **Python 3.8 - 3.12**
 
 **Windows**
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.5/binaryoptionstoolsv2-0.2.5-cp38-abi3-win_amd64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.6/binaryoptionstoolsv2-0.2.6-cp38-abi3-win_amd64.whl"
 ```
 
 **Linux**
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.5/BinaryOptionsToolsV2-0.2.5-cp38-abi3-manylinux_2_34_x86_64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.6/BinaryOptionsToolsV2-0.2.6-cp38-abi3-manylinux_2_34_x86_64.whl"
 ```
 
 **macOS (Apple Silicon)**
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.5/BinaryOptionsToolsV2-0.2.5-cp38-abi3-macosx_11_0_arm64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.6/BinaryOptionsToolsV2-0.2.6-cp38-abi3-macosx_11_0_arm64.whl"
 ```
 
 #### Option B: Build from Source

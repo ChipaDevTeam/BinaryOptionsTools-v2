@@ -5,36 +5,20 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Bleeding Edge / Unreleased]
+## [0.2.6] - 2026-02-11
 
 ### Added
-
-- N/a
-
-### Changed
-
-- N/a
-
-### Fixed
-
-- N/a
-
-## [0.2.5] - 2024-02-08
-
-### Added
-
-- Files to sort into respective folders - /SortLaterOr_rm/
-
-### Changed
 
 - Organized - Merged `/examples/` to `/docs/examples/`
 - Added more rules within `.gitignore`
+- Files to sort into respective folders - /SortLaterOr_rm/
 
 ### Fixed
 
 - Prettier format
 - SSID parsing errors within demo vs real differences
 
+## [0.2.5] - 2024-02-08
 ## [0.2.4] - 2024-02-03
 
 ### Added
@@ -134,6 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [PyPI Package](https://pypi.org/project/binaryoptionstoolsv2/)
 - [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/)
 
+[0.2.6]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.6
 [0.2.5]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.5
 [0.2.4]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.4
 [0.2.3]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.3
