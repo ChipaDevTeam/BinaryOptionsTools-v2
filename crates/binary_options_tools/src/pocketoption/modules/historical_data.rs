@@ -19,7 +19,7 @@ use crate::pocketoption::{
     types::MultiPatternRule,
 };
 
-const HISTORICAL_DATA_TIMEOUT: Duration = Duration::from_secs(10);
+const HISTORICAL_DATA_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_MISMATCH_RETRIES: usize = 5;
 
 #[derive(Debug, Clone)]
@@ -40,7 +40,7 @@ pub enum Command {
 pub enum CommandResponse {
     Ticks {
         req_id: Uuid,
-        ticks: Vec<(f64, f64)>,
+        ticks: Vec<(i64, f64)>,
     },
     Candles {
         req_id: Uuid,
@@ -67,7 +67,7 @@ pub struct HistoryResponse {
     #[serde(default)]
     pub c: Option<Vec<f64>>,
     #[serde(alias = "t", default)]
-    pub timestamps: Option<Vec<u64>>,
+    pub timestamps: Option<Vec<f64>>,
     #[serde(default)]
     pub v: Option<Vec<f64>>,
 }
@@ -100,7 +100,7 @@ impl HistoricalDataHandle {
     ///     println!("Time: {}, Price: {}", timestamp, price);
     /// }
     /// ```
-    pub async fn ticks(&self, asset: String, period: u32) -> PocketResult<Vec<(f64, f64)>> {
+    pub async fn ticks(&self, asset: String, period: u32) -> PocketResult<Vec<(i64, f64)>> {
         let _guard = self.call_lock.lock().await;
 
         let id = Uuid::new_v4();
@@ -320,11 +320,40 @@ impl ApiModule<State> for HistoricalDataApiModule {
                     }
                 },
                 Ok(msg) = self.message_receiver.recv() => {
+                    let mut is_binary_placeholder = false;
                     let response = match &*msg {
                         Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data).ok(),
-                        Message::Text(text) => serde_json::from_str::<ServerResponse>(text).ok(),
+                        Message::Text(text) => {
+                            if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
+                                Some(res)
+                            } else if let Some(start) = text.find('[') {
+                                // Try parsing as a 1-step Socket.IO message: 42["updateHistory", {...}]
+                                if let Ok(serde_json::Value::Array(arr)) = serde_json::from_str::<serde_json::Value>(&text[start..]) {
+                                    if arr.len() >= 2 && arr[0].as_str().map(|s| s.starts_with("updateHistory")).unwrap_or(false) {
+                                        // Check for binary placeholder
+                                        if arr[1].as_object().is_some_and(|obj| obj.contains_key("_placeholder")) {
+                                            is_binary_placeholder = true;
+                                            None
+                                        } else {
+                                            serde_json::from_value::<ServerResponse>(arr[1].clone()).ok()
+                                        }
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        },
                         _ => None,
                     };
+
+                    if is_binary_placeholder {
+                        // Wait for the next message (the binary payload)
+                        continue;
+                    }
 
                     if let Some(response) = response {
                         match response {
@@ -339,15 +368,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                         }
                                         RequestType::Ticks => {
                                             // Convert candles back to ticks (not ideal but better than nothing)
-                                            let ticks = candles.iter().filter_map(|c| {
-                                                match c.close.to_f64() {
-                                                    Some(price) => Some((c.timestamp, price)),
-                                                    None => {
-                                                        warn!(target: "HistoricalDataApiModule", "Failed to convert close price to f64 for timestamp {}", c.timestamp);
-                                                        None
-                                                    }
-                                                }
-                                            }).collect();
+                                            let ticks = candles.iter().map(|c| (c.timestamp, c.close.to_f64().unwrap_or_default())).collect();
                                             self.command_responder.send(CommandResponse::Ticks {
                                                 req_id,
                                                 ticks,
@@ -388,11 +409,11 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                         // If we only have candles, try to get ticks from them
                                         if ticks.is_empty() {
                                              if let Some(candle_items) = history_response.candles {
-                                                ticks = candle_items.iter().map(|item| (item.0, item.2)).collect(); // timestamp, close
+                                                ticks = candle_items.iter().map(|item| (item.0 as i64, item.2)).collect(); // timestamp, close
                                              } else if let (Some(timestamps), Some(c)) = (history_response.timestamps, history_response.c) {
                                                 let len = timestamps.len().min(c.len());
                                                 for i in 0..len {
-                                                    ticks.push((timestamps[i] as f64, c[i]));
+                                                    ticks.push((timestamps[i] as i64, c[i]));
                                                 }
                                              }
                                         }
@@ -412,7 +433,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                                 // Format: [timestamp, open, close, high, low, volume]
                                                 for item in candle_items {
                                                     let base_candle = BaseCandle {
-                                                        timestamp: item.0,
+                                                        timestamp: item.0 as i64,
                                                         open: item.1,
                                                         close: item.2,
                                                         high: item.3,
@@ -443,7 +464,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
 
                                                 for i in 0..min_len {
                                                     let base_candle = BaseCandle {
-                                                        timestamp: timestamps[i] as f64,
+                                                        timestamp: timestamps[i] as i64,
                                                         open: o[i],
                                                         close: c[i],
                                                         high: h[i],
@@ -589,7 +610,7 @@ mod tests {
             } => {
                 assert_eq!(r_id, req_id);
                 assert_eq!(candles.len(), 2);
-                assert_eq!(candles[0].timestamp, 1766378160.0);
+                assert_eq!(candles[0].timestamp, 1766378160);
                 // Use from_str to ensure precise decimal representation matching the input string
                 assert_eq!(
                     candles[0].open,
@@ -678,7 +699,7 @@ mod tests {
             } => {
                 assert_eq!(r_id, req_id);
                 assert_eq!(candles.len(), 1);
-                assert_eq!(candles[0].timestamp, 1766378160.0);
+                assert_eq!(candles[0].timestamp, 1766378160);
                 assert_eq!(
                     candles[0].close,
                     rust_decimal::Decimal::from_str_exact("0.59514").unwrap()

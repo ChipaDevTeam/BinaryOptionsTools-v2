@@ -3,6 +3,8 @@ use crate::pocketoption::error::PocketResult;
 use crate::pocketoption::types::Deal;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::Mutex;
@@ -13,8 +15,8 @@ struct VirtualTrade {
     id: Uuid,
     asset: String,
     action: Action,
-    amount: f64,
-    entry_price: f64,
+    amount: Decimal,
+    entry_price: Decimal,
     entry_time: i64,
     duration: u32,
     payout_percent: i32,
@@ -27,14 +29,14 @@ enum Action {
 }
 
 pub struct VirtualMarket {
-    balance: Mutex<f64>,
+    balance: Mutex<Decimal>,
     open_trades: Mutex<HashMap<Uuid, VirtualTrade>>,
-    current_prices: Mutex<HashMap<String, f64>>,
+    current_prices: Mutex<HashMap<String, Decimal>>,
     payouts: Mutex<HashMap<String, i32>>,
 }
 
 impl VirtualMarket {
-    pub fn new(initial_balance: f64) -> Self {
+    pub fn new(initial_balance: Decimal) -> Self {
         Self {
             balance: Mutex::new(initial_balance),
             open_trades: Mutex::new(HashMap::new()),
@@ -43,8 +45,11 @@ impl VirtualMarket {
         }
     }
 
-    pub async fn update_price(&self, asset: &str, price: f64) {
-        self.current_prices.lock().await.insert(asset.to_string(), price);
+    pub async fn update_price(&self, asset: &str, price: Decimal) {
+        self.current_prices
+            .lock()
+            .await
+            .insert(asset.to_string(), price);
     }
 
     pub async fn set_payout(&self, asset: &str, payout: i32) {
@@ -54,10 +59,10 @@ impl VirtualMarket {
 
 #[async_trait]
 impl Market for VirtualMarket {
-    async fn buy(&self, asset: &str, amount: f64, time: u32) -> PocketResult<(Uuid, Deal)> {
-        if !amount.is_finite() || amount <= 0.0 {
+    async fn buy(&self, asset: &str, amount: Decimal, time: u32) -> PocketResult<(Uuid, Deal)> {
+        if amount <= dec!(0.0) {
             return Err(crate::pocketoption::error::PocketError::General(
-                "Amount must be a positive, finite number".into(),
+                "Amount must be a positive number".into(),
             ));
         }
 
@@ -69,17 +74,12 @@ impl Market for VirtualMarket {
             ));
         }
 
-        let entry_price = *self
-            .current_prices
-            .lock()
-            .await
-            .get(asset)
-            .ok_or_else(|| {
-                crate::pocketoption::error::PocketError::General(format!(
-                    "Price not found for asset: {}",
-                    asset
-                ))
-            })?;
+        let entry_price = *self.current_prices.lock().await.get(asset).ok_or_else(|| {
+            crate::pocketoption::error::PocketError::General(format!(
+                "Price not found for asset: {}",
+                asset
+            ))
+        })?;
 
         let payout = *self.payouts.lock().await.get(asset).unwrap_or(&80);
 
@@ -107,10 +107,10 @@ impl Market for VirtualMarket {
             asset: asset.to_string(),
             amount,
             open_price: entry_price,
-            close_price: 0.0,
+            close_price: dec!(0.0),
             open_timestamp: entry_time,
             close_timestamp: entry_time + chrono::Duration::seconds(time as i64),
-            profit: 0.0,
+            profit: dec!(0.0),
             percent_profit: payout,
             percent_loss: 100,
             command: 0, // Call
@@ -136,10 +136,10 @@ impl Market for VirtualMarket {
         Ok((id, deal))
     }
 
-    async fn sell(&self, asset: &str, amount: f64, time: u32) -> PocketResult<(Uuid, Deal)> {
-        if !amount.is_finite() || amount <= 0.0 {
+    async fn sell(&self, asset: &str, amount: Decimal, time: u32) -> PocketResult<(Uuid, Deal)> {
+        if amount <= dec!(0.0) {
             return Err(crate::pocketoption::error::PocketError::General(
-                "Amount must be a positive, finite number".into(),
+                "Amount must be a positive number".into(),
             ));
         }
 
@@ -151,17 +151,12 @@ impl Market for VirtualMarket {
             ));
         }
 
-        let entry_price = *self
-            .current_prices
-            .lock()
-            .await
-            .get(asset)
-            .ok_or_else(|| {
-                crate::pocketoption::error::PocketError::General(format!(
-                    "Price not found for asset: {}",
-                    asset
-                ))
-            })?;
+        let entry_price = *self.current_prices.lock().await.get(asset).ok_or_else(|| {
+            crate::pocketoption::error::PocketError::General(format!(
+                "Price not found for asset: {}",
+                asset
+            ))
+        })?;
 
         let payout = *self.payouts.lock().await.get(asset).unwrap_or(&80);
 
@@ -189,10 +184,10 @@ impl Market for VirtualMarket {
             asset: asset.to_string(),
             amount,
             open_price: entry_price,
-            close_price: 0.0,
+            close_price: dec!(0.0),
             open_timestamp: entry_time,
             close_timestamp: entry_time + chrono::Duration::seconds(time as i64),
-            profit: 0.0,
+            profit: dec!(0.0),
             percent_profit: payout,
             percent_loss: 100,
             command: 1, // Put
@@ -218,7 +213,7 @@ impl Market for VirtualMarket {
         Ok((id, deal))
     }
 
-    async fn balance(&self) -> f64 {
+    async fn balance(&self) -> Decimal {
         *self.balance.lock().await
     }
 
@@ -258,10 +253,10 @@ impl Market for VirtualMarket {
                 asset: trade.asset.clone(),
                 amount: trade.amount,
                 open_price: trade.entry_price,
-                close_price: 0.0,
+                close_price: dec!(0.0),
                 open_timestamp: entry_timestamp,
                 close_timestamp,
-                profit: 0.0,
+                profit: dec!(0.0),
                 percent_profit: trade.payout_percent,
                 percent_loss: 100,
                 command: match trade.action {
@@ -311,16 +306,15 @@ impl Market for VirtualMarket {
             Action::Put => close_price < trade.entry_price,
         };
 
-        const EPSILON: f64 = 1e-9;
         let profit = if win {
-            trade.amount * (1.0 + trade.payout_percent as f64 / 100.0)
-        } else if (close_price - trade.entry_price).abs() < EPSILON {
+            trade.amount * (dec!(1.0) + Decimal::from(trade.payout_percent) / dec!(100.0))
+        } else if close_price == trade.entry_price {
             trade.amount // Draw
         } else {
-            0.0
+            dec!(0.0)
         };
 
-        if profit > 0.0 {
+        if profit > dec!(0.0) {
             *balance += profit;
         }
 

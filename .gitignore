@@ -69,3 +69,6 @@ var/
 bin/
 lib64
 pyvenv.cfg
+
+# burp suites WSL export file, contains sensitive data
+# websocket_history.xml

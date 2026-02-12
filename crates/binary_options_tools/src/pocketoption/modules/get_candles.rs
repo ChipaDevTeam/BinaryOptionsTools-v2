@@ -6,7 +6,6 @@ use binary_options_tools_core_pre::{
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, Rule},
 };
-use rust_decimal::{prelude::FromPrimitive, Decimal};
 use serde::{Deserialize, Serialize};
 use tokio::select;
 use tracing::{info, warn};
@@ -21,12 +20,10 @@ use crate::{
         types::MultiPatternRule,
         utils::get_index,
     },
+    utils::f64_to_decimal,
 };
 
-const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = [
-    "loadHistoryPeriodFast",
-    "loadHistoryPeriod",
-];
+const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = ["loadHistoryPeriodFast", "loadHistoryPeriod"];
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoadHistoryPeriod {
@@ -80,17 +77,17 @@ impl TryFrom<CandleData> for Candle {
     fn try_from(candle_data: CandleData) -> Result<Self, Self::Error> {
         Ok(Candle {
             symbol: String::new(), // Will be filled by the caller
-            timestamp: candle_data.time as f64,
-            open: Decimal::from_f64(candle_data.open).ok_or(BinaryOptionsError::General(
+            timestamp: candle_data.time,
+            open: f64_to_decimal(candle_data.open).ok_or(BinaryOptionsError::General(
                 "Couldn't parse f64 to Decimal".to_string(),
             ))?,
-            high: Decimal::from_f64(candle_data.high).ok_or(BinaryOptionsError::General(
+            high: f64_to_decimal(candle_data.high).ok_or(BinaryOptionsError::General(
                 "Couldn't parse f64 to Decimal".to_string(),
             ))?,
-            low: Decimal::from_f64(candle_data.low).ok_or(BinaryOptionsError::General(
+            low: f64_to_decimal(candle_data.low).ok_or(BinaryOptionsError::General(
                 "Couldn't parse f64 to Decimal".to_string(),
             ))?,
-            close: Decimal::from_f64(candle_data.close).ok_or(BinaryOptionsError::General(
+            close: f64_to_decimal(candle_data.close).ok_or(BinaryOptionsError::General(
                 "Couldn't parse f64 to Decimal".to_string(),
             ))?,
             volume: None,
@@ -255,8 +252,15 @@ impl ApiModule<State> for GetCandlesApiModule {
                         Message::Text(text) => {
                             if let Ok(result) = serde_json::from_str::<LoadHistoryPeriodResult>(text) {
                                 self.process_candle_result(result).await?;
-                            } else {
-                                // Ignore potential header messages
+                            } else if let Some(start) = text.find('[') {
+                                // Try parsing as a 1-step Socket.IO message: 42["loadHistoryPeriod", {...}]
+                                if let Ok(serde_json::Value::Array(arr)) = serde_json::from_str::<serde_json::Value>(&text[start..]) {
+                                    if arr.len() >= 2 && (arr[0] == "loadHistoryPeriod" || arr[0] == "loadHistoryPeriodFast") {
+                                        if let Ok(result) = serde_json::from_value::<LoadHistoryPeriodResult>(arr[1].clone()) {
+                                            self.process_candle_result(result).await?;
+                                        }
+                                    }
+                                }
                             }
                         }
                         _ => {}
@@ -311,25 +315,32 @@ impl GetCandlesApiModule {
     async fn process_candle_result(&mut self, result: LoadHistoryPeriodResult) -> CoreResult<()> {
         // Find the pending request by index
         if let Some((req_id, asset)) = self.pending_requests.remove(&result.index) {
-            let candles: Vec<Candle> = result.data
+            let candles: Vec<Candle> = result
+                .data
                 .into_iter()
                 .map(|candle_data| {
-                    Candle::try_from(candle_data).map_err(|e| CoreError::Other(e.to_string())).map(|mut c| {
-                        c.symbol = asset.clone();
-                        c
-                    })
+                    Candle::try_from(candle_data)
+                        .map_err(|e| CoreError::Other(e.to_string()))
+                        .map(|mut c| {
+                            c.symbol = asset.clone();
+                            c
+                        })
                 })
                 .collect::<Result<Vec<Candle>, _>>()?;
 
             // Send the response
-            if let Err(e) = self.command_responder.send(CommandResponse::CandlesResult {
-                req_id,
-                candles,
-            }).await {
+            if let Err(e) = self
+                .command_responder
+                .send(CommandResponse::CandlesResult { req_id, candles })
+                .await
+            {
                 warn!("Failed to send candles result: {}", e);
             }
         } else {
-            warn!("Received candles for unknown request index: {}", result.index);
+            warn!(
+                "Received candles for unknown request index: {}",
+                result.index
+            );
         }
         Ok(())
     }

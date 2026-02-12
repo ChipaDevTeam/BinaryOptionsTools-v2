@@ -1,9 +1,23 @@
 [
   {
+    "url": "wss://api.pocketoption.com/socket.io/?EIO=4&transport=websocket",
+    "name": "PRIMARY",
+    "latitude": 32.7,
+    "longitude": -96.8,
+    "demo": false
+  },
+  {
     "url": "wss://demo-api-eu.po.market/socket.io/?EIO=4&transport=websocket",
     "name": "DEMO",
     "latitude": 50.0,
     "longitude": 10.0,
+    "demo": true
+  },
+  {
+    "url": "wss://demo-api-us-south.po.market/socket.io/?EIO=4&transport=websocket",
+    "name": "DEMO_2",
+    "latitude": 32.7,
+    "longitude": -96.8,
     "demo": true
   },
   {
@@ -67,6 +81,13 @@
     "name": "US_NORTH",
     "latitude": 42.0,
     "longitude": -71.0,
+    "demo": false
+  },
+  {
+    "url": "wss://api-us-south.po.market/socket.io/?EIO=4&transport=websocket",
+    "name": "US_SOUTH",
+    "latitude": 32.7,
+    "longitude": -96.8,
     "demo": false
   },
   {

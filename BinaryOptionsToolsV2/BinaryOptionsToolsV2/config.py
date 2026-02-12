@@ -24,9 +24,13 @@ class Config:
     max_allowed_loops: int = 100
     sleep_interval: int = 100
     reconnect_time: int = 5
-    connection_initialization_timeout_secs: int = 30
+    connection_initialization_timeout_secs: int = 60
     timeout_secs: int = 30
     urls: List[str] = field(default_factory=list)
+
+    # Logging configuration
+    terminal_logging: bool = False
+    log_level: str = "INFO"
 
     # Extra duration, used by functions like `check_win`
     extra_duration: int = 5
@@ -111,6 +115,8 @@ class Config:
             "connection_initialization_timeout_secs": self.connection_initialization_timeout_secs,
             "timeout_secs": self.timeout_secs,
             "urls": self.urls,
+            "terminal_logging": self.terminal_logging,
+            "log_level": self.log_level,
         }
 
     def to_json(self) -> str:

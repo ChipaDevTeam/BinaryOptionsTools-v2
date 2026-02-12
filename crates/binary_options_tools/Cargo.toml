@@ -31,7 +31,9 @@ binary-options-tools-core-pre = { path = "../core-pre", version = "0.2.0" }
 binary-options-tools-macros = { path = "../macros", version = "0.2.0" }
 rand = "0.8.5"
 tracing = "0.1.40"
-rust_decimal = { version = "1.35.0", features = ["serde", "macros"] }
+rust_decimal = { version = "1.35.0", features = ["serde", "macros", "serde-with-float"] }
+rust_decimal_macros = "1.35.0"
+ryu = "1.0"
 thiserror = "1.0.63"
 regex = "1.10.5"
 rustls = { version = "0.23.10", features = ["ring"] }

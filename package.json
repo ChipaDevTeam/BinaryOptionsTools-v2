@@ -1,6 +1,6 @@
 {
   "name": "BinaryOptionsTools-v2",
-  "version": "0.2.6",
+  "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -27,9 +27,6 @@
     ],
     "*.rs": [
       "rustfmt"
-    ],
-    "*.md": [
-      "markdownlint --fix"
     ]
   }
 }

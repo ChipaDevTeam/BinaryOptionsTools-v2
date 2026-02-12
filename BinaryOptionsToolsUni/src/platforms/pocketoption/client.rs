@@ -4,6 +4,8 @@ use std::time::Duration as StdDuration;
 use binary_options_tools::pocketoption::{
     candle::SubscriptionType, types::Action as OriginalAction, PocketOption as OriginalPocketOption,
 };
+use binary_options_tools::utils::f64_to_decimal;
+use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
 
 use crate::error::UniError;
@@ -12,7 +14,7 @@ use binary_options_tools::error::BinaryOptionsError;
 use super::{
     raw_handler::RawHandler,
     stream::SubscriptionStream,
-    types::{Action, Asset, Candle, Deal},
+    types::{Action, Asset, Candle, Deal, PendingOrder},
     validator::Validator,
 };
 
@@ -125,7 +127,7 @@ impl PocketOption {
     /// The current balance as a floating-point number.
     #[uniffi::method]
     pub async fn balance(&self) -> f64 {
-        self.inner.balance().await
+        self.inner.balance().await.to_f64().unwrap_or_default()
     }
 
     /// Checks if the current session is a demo account.
@@ -165,9 +167,11 @@ impl PocketOption {
             Action::Call => OriginalAction::Call,
             Action::Put => OriginalAction::Put,
         };
+        let decimal_amount = f64_to_decimal(amount)
+            .ok_or_else(|| UniError::General(format!("Invalid amount: {}", amount)))?;
         let (_id, deal) = self
             .inner
-            .trade(asset, original_action, time, amount)
+            .trade(asset, original_action, time, decimal_amount)
             .await
             .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
         Ok(Deal::from(deal))
@@ -274,6 +278,53 @@ impl PocketOption {
             .await
             .into_values()
             .map(Deal::from)
+            .collect()
+    }
+
+    /// Opens a pending order.
+    #[allow(clippy::too_many_arguments)]
+    #[uniffi::method]
+    pub async fn open_pending_order(
+        &self,
+        open_type: u32,
+        amount: f64,
+        asset: String,
+        open_time: u32,
+        open_price: f64,
+        timeframe: u32,
+        min_payout: u32,
+        command: u32,
+    ) -> Result<PendingOrder, UniError> {
+        let decimal_amount = f64_to_decimal(amount)
+            .ok_or_else(|| UniError::General(format!("Invalid amount: {}", amount)))?;
+        let decimal_open_price = f64_to_decimal(open_price)
+            .ok_or_else(|| UniError::General(format!("Invalid open price: {}", open_price)))?;
+
+        let order = self
+            .inner
+            .open_pending_order(
+                open_type,
+                decimal_amount,
+                asset,
+                open_time,
+                decimal_open_price,
+                timeframe,
+                min_payout,
+                command,
+            )
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
+        Ok(PendingOrder::from(order))
+    }
+
+    /// Gets the list of currently pending deals.
+    #[uniffi::method]
+    pub async fn get_pending_deals(&self) -> Vec<PendingOrder> {
+        self.inner
+            .get_pending_deals()
+            .await
+            .into_values()
+            .map(PendingOrder::from)
             .collect()
     }
 

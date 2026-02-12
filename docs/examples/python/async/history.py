@@ -1,20 +1,26 @@
 import asyncio
 import pandas as pd
-
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
 
 # Main part of the code
 async def main(ssid: str):
-    # The api automatically detects if the 'ssid' is for real or demo account
-    api = PocketOptionAsync(ssid)
-    await asyncio.sleep(5)
+    # Use context manager for automatic connection and cleanup
+    async with PocketOptionAsync(ssid) as api:
+        # Get history for an asset (e.g., EURUSD_otc) with a specific period (e.g., 60 seconds)
+        asset = "EURUSD_otc"
+        period = 60
 
-    # Candles are returned in the format of a list of dictionaries
-    candles = await api.history("EURUSD_otc", 5)
-    print(f"Raw Candles: {candles}")
-    candles_pd = pd.DataFrame.from_dict(candles)
-    print(f"Candles: {candles_pd}")
+        print(f"Fetching history for {asset}...")
+        candles = await api.history(asset, period)
+
+        if candles:
+            print(f"Retrieved {len(candles)} candles.")
+            # Convert to pandas DataFrame for easier viewing
+            df = pd.DataFrame(candles)
+            print(df.tail(10))
+        else:
+            print("No candles retrieved.")
 
 
 if __name__ == "__main__":

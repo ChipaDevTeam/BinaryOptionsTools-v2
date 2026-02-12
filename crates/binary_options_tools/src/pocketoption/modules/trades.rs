@@ -10,6 +10,7 @@ use binary_options_tools_core_pre::{
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, Rule},
 };
+use rust_decimal::Decimal;
 use serde::Deserialize;
 use tokio::{select, sync::oneshot};
 use tracing::{info, warn};
@@ -28,7 +29,7 @@ pub enum Command {
     OpenOrder {
         asset: String,
         action: Action,
-        amount: f64,
+        amount: Decimal,
         time: u32,
         req_id: Uuid,
         responder: oneshot::Sender<PocketResult<Deal>>,
@@ -68,7 +69,7 @@ impl TradesHandle {
         &self,
         asset: String,
         action: Action,
-        amount: f64,
+        amount: Decimal,
         time: u32,
     ) -> PocketResult<Deal> {
         let id = Uuid::new_v4(); // Generate a unique request ID for this order
@@ -94,12 +95,12 @@ impl TradesHandle {
     }
 
     /// Places a new BUY trade.
-    pub async fn buy(&self, asset: String, amount: f64, time: u32) -> PocketResult<Deal> {
+    pub async fn buy(&self, asset: String, amount: Decimal, time: u32) -> PocketResult<Deal> {
         self.trade(asset, Action::Call, amount, time).await
     }
 
     /// Places a new SELL trade.
-    pub async fn sell(&self, asset: String, amount: f64, time: u32) -> PocketResult<Deal> {
+    pub async fn sell(&self, asset: String, amount: Decimal, time: u32) -> PocketResult<Deal> {
         self.trade(asset, Action::Put, amount, time).await
     }
 }
@@ -107,7 +108,7 @@ impl TradesHandle {
 /// Internal struct to track pending orders
 struct PendingOrderTracker {
     asset: String,
-    amount: f64,
+    amount: Decimal,
     responder: oneshot::Sender<PocketResult<Deal>>,
 }
 
@@ -121,13 +122,7 @@ pub struct TradesApiModule {
     pending_orders: HashMap<Uuid, PendingOrderTracker>,
     // Secondary index for matching failures (which lack UUID)
     // Map of (Asset, Amount) -> Queue of UUIDs (FIFO)
-    failure_matching: HashMap<(String, String), VecDeque<Uuid>>, // using String for amount key to avoid float keys
-}
-
-impl TradesApiModule {
-    fn float_key(f: f64) -> String {
-        format!("{:.2}", f)
-    }
+    failure_matching: HashMap<(String, Decimal), VecDeque<Uuid>>,
 }
 
 #[async_trait]
@@ -179,7 +174,7 @@ impl ApiModule<State> for TradesApiModule {
                           self.pending_orders.insert(req_id, tracker);
 
                           // Add to failure matching queue
-                          let key = (asset.clone(), Self::float_key(amount));
+                          let key = (asset.clone(), amount);
                           self.failure_matching.entry(key).or_default().push_back(req_id);
 
                           // Create OpenOrder and send to WebSocket.
@@ -189,7 +184,7 @@ impl ApiModule<State> for TradesApiModule {
                               if let Some(tracker) = self.pending_orders.remove(&req_id) {
                                   let _ = tracker.responder.send(Err(CoreError::from(e).into()));
                               }
-                              let key = (asset_for_error, Self::float_key(amount));
+                              let key = (asset_for_error, amount);
                               if let Some(queue) = self.failure_matching.get_mut(&key) {
                                   queue.retain(|&id| id != req_id);
                               }
@@ -200,7 +195,25 @@ impl ApiModule<State> for TradesApiModule {
               Ok(msg) = self.message_receiver.recv() => {
                   let response_result = match msg.as_ref() {
                       Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data),
-                      Message::Text(text) => serde_json::from_str::<ServerResponse>(text),
+                      Message::Text(text) => {
+                          if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
+                              Ok(res)
+                          } else if let Some(start) = text.find('[') {
+                              // Try parsing as a 1-step Socket.IO message: 42["successopenOrder", {...}]
+                              match serde_json::from_str::<serde_json::Value>(&text[start..]) {
+                                  Ok(serde_json::Value::Array(arr)) => {
+                                      if arr.len() >= 2 && (arr[0] == "successopenOrder" || arr[0] == "failopenOrder") {
+                                          serde_json::from_value::<ServerResponse>(arr[1].clone())
+                                      } else {
+                                          serde_json::from_str::<ServerResponse>(text)
+                                      }
+                                  }
+                                  _ => serde_json::from_str::<ServerResponse>(text),
+                              }
+                          } else {
+                              serde_json::from_str::<ServerResponse>(text)
+                          }
+                      },
                       _ => {
                           // Ignore other message types
                           continue;
@@ -218,7 +231,7 @@ impl ApiModule<State> for TradesApiModule {
                               if let Some(tracker) = self.pending_orders.remove(&req_id) {
                                   let _ = tracker.responder.send(Ok(*deal.clone()));
 
-                                  let key = (tracker.asset, Self::float_key(tracker.amount));
+                                  let key = (tracker.asset, tracker.amount);
                                   if let Some(queue) = self.failure_matching.get_mut(&key) {
                                       queue.retain(|&id| id != req_id);
                                   }
@@ -227,7 +240,7 @@ impl ApiModule<State> for TradesApiModule {
                               }
                           }
                           ServerResponse::Fail(fail) => {
-                              let key = (fail.asset.clone(), Self::float_key(fail.amount));
+                              let key = (fail.asset.clone(), fail.amount);
 
                               let found_req_id = if let Some(queue) = self.failure_matching.get_mut(&key) {
                                   queue.pop_front()

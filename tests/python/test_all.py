@@ -7,6 +7,7 @@ from BinaryOptionsToolsV2.pocketoption.asynchronous import PocketOptionAsync
 
 # Get SSID from environment variable
 SSID = os.getenv("POCKET_OPTION_SSID")
+URL = os.getenv("POCKET_OPTION_URL")
 
 
 @pytest.fixture
@@ -15,9 +16,16 @@ async def api():
         pytest.skip("POCKET_OPTION_SSID not set")
 
     # Use context manager which waits for assets automatically
-    # Add timeout for connection initialization
-    config = {"connection_initialization_timeout_secs": 60, "timeout_secs": 20}
-    async with PocketOptionAsync(SSID, config=config) as client:
+    # Increased timeouts for more resilient tests
+    config = {
+        "connection_initialization_timeout_secs": 20,
+        "timeout_secs": 60,
+        "terminal_logging": True,
+        "log_level": "INFO",
+    }
+    async with PocketOptionAsync(SSID, url=URL, config=config) as client:
+        # Give a small buffer for background modules to sync
+        await asyncio.sleep(1)
         yield client
 
 
@@ -36,8 +44,9 @@ async def test_balance(api):
 async def test_server_time(api):
     """Test retrieving server time."""
     try:
-        # Give the websocket 2 seconds to receive the time sync packet
-        await asyncio.sleep(2)
+        # Subscribe to an asset to trigger updateStream messages, which synchronize server time
+        async for _ in await api.subscribe_symbol("EURUSD_otc"):
+            break
 
         time = await asyncio.wait_for(api.get_server_time(), timeout=10.0)
         assert isinstance(time, (int, float))
@@ -192,6 +201,25 @@ async def test_history(api):
         pytest.fail("Timed out waiting for history")
     except Exception as e:
         pytest.fail(f"Failed to get history: {e}")
+
+
+@pytest.mark.asyncio
+async def test_active_assets(api):
+    """Test retrieving active assets."""
+    try:
+        active_assets = await api.active_assets()
+        assert isinstance(active_assets, list)
+        print(f"Received {len(active_assets)} active assets.")
+
+        # Verify each asset has required fields
+        for asset in active_assets:
+            assert "symbol" in asset
+            assert "name" in asset
+            assert "is_active" in asset
+            assert asset["is_active"] is True  # All returned assets should be active
+            print(f"Active asset: {asset['symbol']} - {asset['name']}")
+    except Exception as e:
+        pytest.fail(f"Failed to get active assets: {e}")
 
 
 if __name__ == "__main__":

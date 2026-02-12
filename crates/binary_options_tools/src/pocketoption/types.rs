@@ -7,12 +7,12 @@ use std::{
 
 use binary_options_tools_core_pre::{reimports::Message, traits::Rule};
 use chrono::{DateTime, Duration, Utc};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use uuid::Uuid;
 
 use crate::pocketoption::error::{PocketError, PocketResult};
-use crate::pocketoption::utils::float_time;
 
 // 🚨 CRITICAL AUDIT NOTE:
 // Financial values (amount, price, profit) are currently represented as `f64`.
@@ -29,8 +29,8 @@ use crate::pocketoption::utils::float_time;
 /// network delays.
 #[derive(Debug, Clone)]
 pub struct ServerTime {
-    /// Last received server timestamp (Unix timestamp as f64)
-    pub last_server_time: f64,
+    /// Last received server timestamp (Unix timestamp as i64)
+    pub last_server_time: i64,
     /// Local time when the server time was last updated
     pub last_updated: DateTime<Utc>,
     /// Calculated offset between server time and local time
@@ -40,7 +40,7 @@ pub struct ServerTime {
 impl Default for ServerTime {
     fn default() -> Self {
         Self {
-            last_server_time: 0.0,
+            last_server_time: 0,
             last_updated: Utc::now(),
             offset: Duration::zero(),
         }
@@ -54,56 +54,51 @@ impl ServerTime {
     /// to maintain accurate synchronization.
     ///
     /// # Arguments
-    /// * `server_timestamp` - Unix timestamp from the server as f64
-    pub fn update(&mut self, server_timestamp: f64) {
+    /// * `server_timestamp` - Unix timestamp from the server as i64
+    pub fn update(&mut self, server_timestamp: i64) {
         let now = Utc::now();
-        let local_timestamp = now.timestamp() as f64;
+        let local_timestamp = now.timestamp();
 
         self.last_server_time = server_timestamp;
         self.last_updated = now;
 
         // Calculate offset: server time - local time
         let offset_seconds = server_timestamp - local_timestamp;
-        // Convert to Duration, handling negative values properly
-        if offset_seconds >= 0.0 {
-            self.offset = Duration::milliseconds((offset_seconds * 1000.0) as i64);
-        } else {
-            self.offset = Duration::milliseconds(-((offset_seconds.abs() * 1000.0) as i64));
-        }
+        self.offset = Duration::seconds(offset_seconds);
     }
 
     /// Convert local time to estimated server time
     ///
     /// # Arguments
-    /// * `local_time` - Local DateTime<Utc> to convert
+    /// * `local_time` - Local `DateTime<Utc>` to convert
     ///
     /// # Returns
-    /// Estimated server timestamp as f64
-    pub fn local_to_server(&self, local_time: DateTime<Utc>) -> f64 {
-        let local_timestamp = local_time.timestamp() as f64;
-        local_timestamp + self.offset.num_seconds() as f64
+    /// Estimated server timestamp as i64
+    pub fn local_to_server(&self, local_time: DateTime<Utc>) -> i64 {
+        let local_timestamp = local_time.timestamp();
+        local_timestamp + self.offset.num_seconds()
     }
 
     /// Convert server time to local time
     ///
     /// # Arguments
-    /// * `server_timestamp` - Server timestamp as f64
+    /// * `server_timestamp` - Server timestamp as i64
     ///
     /// # Returns
-    /// Local DateTime<Utc>
-    pub fn server_to_local(&self, server_timestamp: f64) -> DateTime<Utc> {
-        let adjusted = server_timestamp - self.offset.num_seconds() as f64;
-        DateTime::from_timestamp(adjusted.max(0.0) as i64, 0).unwrap_or_else(Utc::now)
+    /// Local `DateTime<Utc>`
+    pub fn server_to_local(&self, server_timestamp: i64) -> DateTime<Utc> {
+        let adjusted = server_timestamp - self.offset.num_seconds();
+        DateTime::from_timestamp(adjusted.max(0), 0).unwrap_or_else(Utc::now)
     }
 
     /// Get current estimated server time
     ///
     /// # Returns
-    /// Current estimated server timestamp as f64
-    pub fn get_server_time(&self) -> f64 {
+    /// Current estimated server timestamp as i64
+    pub fn get_server_time(&self) -> i64 {
         let now = Utc::now();
         let elapsed = now.signed_duration_since(self.last_updated);
-        self.last_server_time + elapsed.num_seconds() as f64
+        self.last_server_time + elapsed.num_seconds()
     }
 
     /// Check if the server time data is stale (older than 30 seconds)
@@ -135,9 +130,9 @@ pub struct StreamData {
     /// Trading symbol (e.g., "EURUSD_otc")
     pub symbol: String,
     /// Unix timestamp from server
-    pub timestamp: f64,
+    pub timestamp: i64,
     /// Current price
-    pub price: f64,
+    pub price: Decimal,
 }
 
 /// Implement the custom deserialization for StreamData
@@ -154,10 +149,14 @@ impl<'de> Deserialize<'de> for StreamData {
         if vec[0].len() != 3 {
             return Err(serde::de::Error::custom("Invalid StreamData format"));
         }
+
+        let price_f64 = vec[0][2].as_f64().unwrap_or(0.0);
+        let price = Decimal::from_f64_retain(price_f64).unwrap_or_default();
+
         Ok(StreamData {
             symbol: vec[0][0].as_str().unwrap_or_default().to_string(),
-            timestamp: vec[0][1].as_f64().unwrap_or(0.0),
-            price: vec[0][2].as_f64().unwrap_or(0.0),
+            timestamp: vec[0][1].as_f64().unwrap_or(0.0) as i64,
+            price,
         })
     }
 }
@@ -169,7 +168,7 @@ impl StreamData {
     /// * `symbol` - Trading symbol
     /// * `timestamp` - Unix timestamp
     /// * `price` - Current price
-    pub fn new(symbol: String, timestamp: f64, price: f64) -> Self {
+    pub fn new(symbol: String, timestamp: i64, price: Decimal) -> Self {
         Self {
             symbol,
             timestamp,
@@ -177,12 +176,12 @@ impl StreamData {
         }
     }
 
-    /// Convert timestamp to DateTime<Utc>
+    /// Convert timestamp to `DateTime<Utc>`
     ///
     /// # Returns
-    /// DateTime<Utc> representation of the timestamp
+    /// `DateTime<Utc>` representation of the timestamp
     pub fn datetime(&self) -> DateTime<Utc> {
-        DateTime::from_timestamp(self.timestamp as i64, 0).unwrap_or_else(Utc::now)
+        DateTime::from_timestamp(self.timestamp, 0).unwrap_or_else(Utc::now)
     }
 }
 
@@ -287,7 +286,7 @@ impl Rule for MultiPatternRule {
                 if let Some(start) = text.find('[') {
                     if let Ok(value) = serde_json::from_str::<Value>(&text[start..]) {
                         if let Some(arr) = value.as_array() {
-                            if let Some(event_name) = arr.get(0).and_then(|v| v.as_str()) {
+                            if let Some(event_name) = arr.first().and_then(|v| v.as_str()) {
                                 for pattern in &self.patterns {
                                     if event_name == pattern {
                                         self.valid.store(true, Ordering::SeqCst);
@@ -323,7 +322,7 @@ impl Rule for MultiPatternRule {
 }
 
 /// CandleLength is a wrapper around u32 for allowed candle durations (in seconds)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct CandleLength {
     time: u32,
 }
@@ -355,7 +354,7 @@ impl From<CandleLength> for u32 {
 }
 
 /// Asset struct for processed asset data
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Asset {
     pub id: i32, // This field is not used in the current implementation but can be useful for debugging
     pub name: String,
@@ -367,7 +366,7 @@ pub struct Asset {
     pub asset_type: AssetType,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum AssetType {
     Stock,
@@ -428,13 +427,13 @@ impl<'de> Deserialize<'de> for Asset {
             i32,                   // 9: is_otc (used, 1 for true, 0 for false)
             serde::de::IgnoredAny, // 10: unused
             serde::de::IgnoredAny, // 11: unused
-            serde::de::IgnoredAny, // 12: unused (previously Vec<String>)
-            serde::de::IgnoredAny, // 13: unused (previously i64)
+            serde::de::IgnoredAny, // 12: unused
+            serde::de::IgnoredAny, // 13: unused
             bool,                  // 14: is_active (used)
             Vec<CandleLength>,     // 15: allowed_candles (used)
             serde::de::IgnoredAny, // 16: unused
             serde::de::IgnoredAny, // 17: unused
-            serde::de::IgnoredAny, // 18: unused (previously i64)
+            serde::de::IgnoredAny, // 18: unused
         );
 
         let raw: AssetRawTuple = AssetRawTuple::deserialize(deserializer)?;
@@ -452,7 +451,7 @@ impl<'de> Deserialize<'de> for Asset {
 }
 
 /// Wrapper around HashMap<String, Asset>
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Assets(pub HashMap<String, Asset>);
 
 impl Assets {
@@ -472,6 +471,24 @@ impl Assets {
 
     pub fn names(&self) -> Vec<&str> {
         self.0.values().map(|a| a.name.as_str()).collect()
+    }
+
+    pub fn active_count(&self) -> usize {
+        self.0.values().filter(|a| a.is_active).count()
+    }
+
+    pub fn active_iter(&self) -> impl Iterator<Item = &Asset> {
+        self.0.values().filter(|a| a.is_active)
+    }
+
+    pub fn active(&self) -> Self {
+        let active = self
+            .0
+            .iter()
+            .filter(|(_, a)| a.is_active)
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        Assets(active)
     }
 }
 
@@ -496,7 +513,7 @@ pub enum Action {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FailOpenOrder {
     pub error: String,
-    pub amount: f64,
+    pub amount: Decimal,
     pub asset: String,
 }
 
@@ -505,7 +522,8 @@ pub struct FailOpenOrder {
 pub struct OpenOrder {
     asset: String,
     action: Action,
-    amount: f64,
+    #[serde(with = "rust_decimal::serde::float")]
+    amount: Decimal,
     is_demo: u32,
     option_type: u32,
     request_id: Uuid,
@@ -518,20 +536,20 @@ pub struct Deal {
     pub id: Uuid,
     pub open_time: String,
     pub close_time: String,
-    #[serde(with = "float_time")]
+    #[serde(with = "crate::pocketoption::utils::unix_timestamp")]
     pub open_timestamp: DateTime<Utc>,
-    #[serde(with = "float_time")]
+    #[serde(with = "crate::pocketoption::utils::unix_timestamp")]
     pub close_timestamp: DateTime<Utc>,
     pub refund_time: Option<Value>,
     pub refund_timestamp: Option<Value>,
     pub uid: u64,
     pub request_id: Option<Uuid>,
-    pub amount: f64,
-    pub profit: f64,
+    pub amount: Decimal,
+    pub profit: Decimal,
     pub percent_profit: i32,
     pub percent_loss: i32,
-    pub open_price: f64,
-    pub close_price: f64,
+    pub open_price: Decimal,
+    pub close_price: Decimal,
     pub command: i32,
     pub asset: String,
     pub is_demo: u32,
@@ -544,9 +562,9 @@ pub struct Deal {
     #[serde(rename = "isAI")]
     pub is_ai: Option<bool>,
     pub currency: String,
-    pub amount_usd: Option<f64>,
+    pub amount_usd: Option<Decimal>,
     #[serde(rename = "amountUSD")]
-    pub amount_usd2: Option<f64>,
+    pub amount_usd2: Option<Decimal>,
 }
 
 impl Hash for Deal {
@@ -560,7 +578,7 @@ impl Eq for Deal {}
 
 impl OpenOrder {
     pub fn new(
-        amount: f64,
+        amount: Decimal,
         asset: String,
         action: Action,
         duration: u32,
@@ -608,10 +626,10 @@ impl fmt::Display for OpenOrder {
 pub struct PendingOrder {
     pub ticket: Uuid,
     pub open_type: u32,
-    pub amount: f64,
+    pub amount: Decimal,
     pub symbol: String,
     pub open_time: String,
-    pub open_price: f64,
+    pub open_price: Decimal,
     pub timeframe: u32,
     pub min_payout: u32,
     pub command: u32,
@@ -623,22 +641,23 @@ pub struct PendingOrder {
 #[serde(rename_all = "camelCase")]
 pub struct OpenPendingOrder {
     open_type: u32,
-    amount: f64,
+    amount: Decimal,
     asset: String,
     open_time: u32,
-    open_price: f64,
+    open_price: Decimal,
     timeframe: u32,
     min_payout: u32,
     command: u32,
 }
 
 impl OpenPendingOrder {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         open_type: u32,
-        amount: f64,
+        amount: Decimal,
         asset: String,
         open_time: u32,
-        open_price: f64,
+        open_price: Decimal,
         timeframe: u32,
         min_payout: u32,
         command: u32,
@@ -666,8 +685,8 @@ impl fmt::Display for OpenPendingOrder {
 pub enum SubscriptionEvent {
     Update {
         asset: String,
-        price: f64,
-        timestamp: f64,
+        price: Decimal,
+        timestamp: i64,
     },
     Terminated {
         reason: String,
@@ -685,9 +704,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_stream_data_deserialization() {
+        // Test with integer timestamp
+        let json_int = r#"[["EURUSD_otc",1770856131,1.19537]]"#;
+        let data_int: StreamData = serde_json::from_str(json_int).unwrap();
+        assert_eq!(data_int.symbol, "EURUSD_otc");
+        assert_eq!(data_int.timestamp, 1770856131);
+        assert_eq!(data_int.price, Decimal::from_f64_retain(1.19537).unwrap());
+
+        // Test with float timestamp (the case that was failing)
+        let json_float = r#"[["EURUSD_otc",1770856131.3,1.19537]]"#;
+        let data_float: StreamData = serde_json::from_str(json_float).unwrap();
+        assert_eq!(data_float.symbol, "EURUSD_otc");
+        assert_eq!(data_float.timestamp, 1770856131);
+        assert_eq!(data_float.price, Decimal::from_f64_retain(1.19537).unwrap());
+    }
+
+    #[test]
     fn test_open_order_format() {
         let order = OpenOrder::new(
-            1.0,
+            Decimal::from_f64_retain(1.0).unwrap(),
             "EURUSD_otc".to_string(),
             Action::Call,
             60,

@@ -13,6 +13,7 @@ use binary_options_tools_core_pre::{
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, Rule},
 };
+use rust_decimal::Decimal;
 use serde::Deserialize;
 use tokio::sync::oneshot;
 use tracing::{info, warn};
@@ -39,6 +40,7 @@ pub enum CommandResponse {
     DealNotFound(Uuid),
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum ExpectedMessage {
     UpdateClosedDeals,
     UpdateOpenedDeals,
@@ -49,7 +51,7 @@ enum ExpectedMessage {
 #[derive(Deserialize)]
 struct CloseOrder {
     #[serde(rename = "profit")]
-    _profit: f64,
+    _profit: Decimal,
     deals: Vec<Deal>,
 }
 
@@ -107,6 +109,76 @@ pub struct DealsApiModule {
     waiting_requests: HashMap<Uuid, Vec<oneshot::Sender<PocketResult<Deal>>>>,
 }
 
+impl DealsApiModule {
+    async fn process_text_data(&mut self, text: &str, expected: ExpectedMessage) {
+        match expected {
+            ExpectedMessage::UpdateOpenedDeals => match serde_json::from_str::<Vec<Deal>>(text) {
+                Ok(deals) => {
+                    self.state.trade_state.update_opened_deals(deals).await;
+                }
+                Err(e) => warn!("Failed to parse UpdateOpenedDeals (text): {:?}", e),
+            },
+            ExpectedMessage::UpdateClosedDeals => match serde_json::from_str::<Vec<Deal>>(text) {
+                Ok(deals) => {
+                    self.state
+                        .trade_state
+                        .update_closed_deals(deals.clone())
+                        .await;
+                    for deal in deals {
+                        if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
+                            info!("Trade closed: {:?}", deal);
+                            for tx in waiters {
+                                let _ = tx.send(Ok(deal.clone()));
+                            }
+                        }
+                    }
+                }
+                Err(e) => warn!("Failed to parse UpdateClosedDeals (text): {:?}", e),
+            },
+            ExpectedMessage::SuccessCloseOrder => {
+                // Try parsing as CloseOrder struct first
+                match serde_json::from_str::<CloseOrder>(text) {
+                    Ok(close_order) => {
+                        self.state
+                            .trade_state
+                            .update_closed_deals(close_order.deals.clone())
+                            .await;
+                        for deal in close_order.deals {
+                            if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
+                                info!("Trade closed: {:?}", deal);
+                                for tx in waiters {
+                                    let _ = tx.send(Ok(deal.clone()));
+                                }
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        // Fallback: Try parsing as Vec<Deal> (sometimes API sends just the list)
+                        match serde_json::from_str::<Vec<Deal>>(text) {
+                            Ok(deals) => {
+                                self.state
+                                    .trade_state
+                                    .update_closed_deals(deals.clone())
+                                    .await;
+                                for deal in deals {
+                                    if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
+                                        info!("Trade closed (fallback): {:?}", deal);
+                                        for tx in waiters {
+                                            let _ = tx.send(Ok(deal.clone()));
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => warn!("Failed to parse SuccessCloseOrder (text): {:?}", e),
+                        }
+                    }
+                }
+            }
+            ExpectedMessage::None => {}
+        }
+    }
+}
+
 #[async_trait]
 impl ApiModule<State> for DealsApiModule {
     type Command = Command;
@@ -147,77 +219,46 @@ impl ApiModule<State> for DealsApiModule {
                     tracing::debug!("Received message: {:?}", msg);
                     match msg.as_ref() {
                         Message::Text(text) => {
+                            let mut data_text = None;
+                            let mut current_expected = ExpectedMessage::None;
                             if text.starts_with(UPDATE_OPENED_DEALS) {
-                                expected = ExpectedMessage::UpdateOpenedDeals;
+                                current_expected = ExpectedMessage::UpdateOpenedDeals;
+                                data_text = text.strip_prefix(UPDATE_OPENED_DEALS);
                             } else if text.starts_with(UPDATE_CLOSED_DEALS) {
-                                expected = ExpectedMessage::UpdateClosedDeals;
+                                current_expected = ExpectedMessage::UpdateClosedDeals;
+                                data_text = text.strip_prefix(UPDATE_CLOSED_DEALS);
                             } else if text.starts_with(SUCCESS_CLOSE_ORDER) {
-                                expected = ExpectedMessage::SuccessCloseOrder;
-                            } else {
-                                // Handle data as text if expected is set
-                                match expected {
-                                    ExpectedMessage::UpdateOpenedDeals => {
-                                        match serde_json::from_str::<Vec<Deal>>(text) {
-                                            Ok(deals) => {
-                                                self.state.trade_state.update_opened_deals(deals).await;
-                                            },
-                                            Err(e) => warn!("Failed to parse UpdateOpenedDeals (text): {:?}", e),
-                                        }
-                                        expected = ExpectedMessage::None;
-                                    }
-                                    ExpectedMessage::UpdateClosedDeals => {
-                                        match serde_json::from_str::<Vec<Deal>>(text) {
-                                            Ok(deals) => {
-                                                self.state.trade_state.update_closed_deals(deals.clone()).await;
-                                                for deal in deals {
-                                                    if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
-                                                        info!("Trade closed: {:?}", deal);
-                                                        for tx in waiters {
-                                                            let _ = tx.send(Ok(deal.clone()));
-                                                        }
-                                                    }
-                                                }
-                                            },
-                                            Err(e) => warn!("Failed to parse UpdateClosedDeals (text): {:?}", e),
-                                        }
-                                        expected = ExpectedMessage::None;
-                                    }
-                                    ExpectedMessage::SuccessCloseOrder => {
-                                        // Try parsing as CloseOrder struct first
-                                        match serde_json::from_str::<CloseOrder>(text) {
-                                            Ok(close_order) => {
-                                                self.state.trade_state.update_closed_deals(close_order.deals.clone()).await;
-                                                for deal in close_order.deals {
-                                                    if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
-                                                        info!("Trade closed: {:?}", deal);
-                                                        for tx in waiters {
-                                                            let _ = tx.send(Ok(deal.clone()));
-                                                        }
-                                                    }
-                                                }
-                                            },
-                                            Err(_) => {
-                                                // Fallback: Try parsing as Vec<Deal> (sometimes API sends just the list)
-                                                match serde_json::from_str::<Vec<Deal>>(text) {
-                                                    Ok(deals) => {
-                                                        self.state.trade_state.update_closed_deals(deals.clone()).await;
-                                                        for deal in deals {
-                                                            if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
-                                                                info!("Trade closed (fallback): {:?}", deal);
-                                                                for tx in waiters {
-                                                                    let _ = tx.send(Ok(deal.clone()));
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                    Err(e) => warn!("Failed to parse SuccessCloseOrder (text): {:?}", e),
-                                                }
-                                            }
-                                        }
-                                        expected = ExpectedMessage::None;
-                                    },
-                                    ExpectedMessage::None => {}
+                                current_expected = ExpectedMessage::SuccessCloseOrder;
+                                data_text = text.strip_prefix(SUCCESS_CLOSE_ORDER);
+                            }
+
+                            if let Some(data) = data_text {
+                                let trimmed = data.trim();
+
+                                // Socket.IO 4.x binary placeholder check
+                                if trimmed.contains(r#""_placeholder":true"#) {
+                                    tracing::debug!(target: "DealsApiModule", "Detected binary placeholder, waiting for binary payload for {:?}", current_expected);
+                                    expected = current_expected;
+                                    continue;
                                 }
+
+                                if !trimmed.is_empty() && trimmed != "]" && trimmed != ",]" {
+                                    // It's a 1-step message, process the data now
+                                    let json_data = trimmed.strip_suffix(']').unwrap_or(trimmed);
+                                    self.process_text_data(json_data, current_expected).await;
+                                    expected = ExpectedMessage::None;
+                                    continue;
+                                } else {
+                                    // Header-only, wait for data
+                                    expected = current_expected;
+                                    continue;
+                                }
+                            }
+
+                            if expected != ExpectedMessage::None {
+                                // Handle data as text if expected is set and this is not a header
+                                self.process_text_data(text, expected).await;
+                                expected = ExpectedMessage::None;
                             }
                         },
                         Message::Binary(data) => {
@@ -353,8 +394,33 @@ impl Rule for DealsUpdateRule {
             Message::Text(text) => {
                 for pattern in &self.patterns {
                     if text.starts_with(pattern) {
-                        self.valid.store(true, Ordering::SeqCst);
-                        return true;
+                        let remaining = &text[pattern.len()..];
+                        let trimmed_rem = remaining.trim();
+                        let has_placeholder = trimmed_rem.contains(r#""_placeholder":true"#);
+                        let is_header_only = trimmed_rem.is_empty()
+                            || trimmed_rem == "]"
+                            || trimmed_rem == ",]"
+                            || has_placeholder;
+
+                        if is_header_only {
+                            self.valid.store(true, Ordering::SeqCst);
+                            return true;
+                        } else {
+                            self.valid.store(false, Ordering::SeqCst);
+                            return true;
+                        }
+                    }
+                }
+
+                if let Some(start) = text.find('[') {
+                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text[start..]) {
+                        if let Some(arr) = value.as_array() {
+                            if arr.first().and_then(|v| v.as_str()).is_some() {
+                                // It's an event, but doesn't match our pattern.
+                                // Ignore it and don't consume 'valid'.
+                                return false;
+                            }
+                        }
                     }
                 }
 

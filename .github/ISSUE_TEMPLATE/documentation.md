@@ -1,65 +1,22 @@
 ---
 name: Documentation Issue
-about: Report an issue with documentation
+about: Report missing or incorrect documentation
 title: "[DOCS] "
 labels: documentation
-assignees: ""
 ---
 
-## Documentation Issue
+## Description
 
-Describe the issue with the documentation.
+Identify the documentation issue.
 
 ## Location
 
-Where is the problematic documentation located?
+Provide the file path or URL.
 
-- [ ] README.md
-- [ ] API Documentation (docs/)
-- [ ] Code comments/docstrings
-- [ ] Examples
-- [ ] Other: **\_**
+## Proposed Correction
 
-**File/URL**: Provide the specific file or URL
-
-## Issue Type
-
-- [ ] Missing documentation
-- [ ] Incorrect information
-- [ ] Unclear explanation
-- [ ] Typo or grammar error
-- [ ] Broken link
-- [ ] Outdated information
-- [ ] Other: **\_**
-
-## Current Content
-
-What does the documentation currently say?
-
-```
-Paste the current content here
-```
-
-## Expected Content
-
-What should it say instead?
-
-```
-Describe or paste the corrected content here
-```
+What should the documentation say instead?
 
 ## Additional Context
 
-Add any other context about the documentation issue here.
-
-## Suggested Fix
-
-If you have a suggestion for how to fix this, please provide it here.
-
----
-
-**Before submitting:**
-
-- [ ] I have checked if this is already reported
-- [ ] I have specified the exact location
-- [ ] I have suggested a fix or improvement
+Any other information relevant to this issue.

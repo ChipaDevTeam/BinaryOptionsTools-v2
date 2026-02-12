@@ -65,7 +65,7 @@ async def test_async_raw_handler():
         # Wait for any EURUSD_otc message
         print("Waiting for EURUSD_otc update...")
         try:
-            response = await asyncio.wait_for(handler.wait_next(), timeout=10.0)
+            response = await asyncio.wait_for(handler.wait_next(), timeout=30.0)
             print(f"✓ Received response: {response[:200]}...")
             assert "EURUSD_otc" in response
         except asyncio.TimeoutError:
@@ -80,7 +80,7 @@ async def test_async_raw_handler():
         print("Waiting for messages from stream...")
         for i in range(3):
             try:
-                message = await asyncio.wait_for(stream.__anext__(), timeout=10.0)
+                message = await asyncio.wait_for(stream.__anext__(), timeout=30.0)
                 print(f"✓ Stream message {i + 1}: {message[:100]}...")
                 assert "EURUSD_otc" in message
             except asyncio.TimeoutError:
@@ -129,7 +129,7 @@ def test_sync_connection_control():
         return
 
     # Use custom config with increased timeout
-    config = {"connection_initialization_timeout_secs": 30}
+    config = {"connection_initialization_timeout_secs": 20}
     client = PocketOption(ssid, config=config)
 
     # Test disconnect and connect
@@ -161,7 +161,7 @@ def test_sync_raw_handler():
         return
 
     # Use custom config with increased timeout
-    config = {"connection_initialization_timeout_secs": 30}
+    config = {"connection_initialization_timeout_secs": 20}
     with PocketOption(ssid, config=config) as client:
         # Use EURUSD_otc validator as it's reliable
         validator = Validator.contains("EURUSD_otc")
@@ -205,7 +205,7 @@ def test_sync_unsubscribe():
         return
 
     # Use custom config with increased timeout
-    config = {"connection_initialization_timeout_secs": 30}
+    config = {"connection_initialization_timeout_secs": 20}
     client = PocketOption(ssid, config=config)
 
     # Subscribe to an asset

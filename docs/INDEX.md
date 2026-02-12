@@ -1,8 +1,8 @@
-# 📚 BinaryOptionsToolsUni Documentation
+# BinaryOptionsToolsUni Documentation
 
 Complete multi-language documentation for the BinaryOptionsTools library.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. View API Reference
 
@@ -16,18 +16,18 @@ Read the [Trading Guide](guides/trading.md) for comprehensive trading strategies
 
 Understand the internal workings via the [Data Flow](architecture/dataflow.md) and [Project Structure](architecture/structure.md) guides.
 
-## 🌍 Supported Languages
+## Supported Languages
 
 All documentation includes code examples in:
 
-- 🐍 **Python** - Async/await with asyncio
-- 🟣 **Kotlin** - Coroutines support
-- 🍎 **Swift** - Modern async/await
-- 🔷 **Go** - Goroutines and channels
-- 💎 **Ruby** - Async Fiber support
-- 🔵 **C#** - Task-based async/await
+- **Python** - Async/await with asyncio
+- **Kotlin** - Coroutines support
+- **Swift** - Modern async/await
+- **Go** - Goroutines and channels
+- **Ruby** - Async Fiber support
+- **C#** - Task-based async/await
 
-## ✨ Modern Documentation
+## Modern Documentation
 
 This site uses **MkDocs Material** to provide:
 
@@ -36,7 +36,7 @@ This site uses **MkDocs Material** to provide:
 - **Responsive Layout**: Works on desktop and mobile.
 - **Dark/Light Mode**: Choose your preferred viewing theme.
 
-## 📖 Documentation Structure
+## Documentation Structure
 
 ```
 docs/

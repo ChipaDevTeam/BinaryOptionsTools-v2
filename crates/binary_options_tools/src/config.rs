@@ -17,7 +17,7 @@ impl Default for Config {
             max_allowed_loops: 100,
             sleep_interval: Duration::from_millis(100),
             reconnect_time: Duration::from_secs(5),
-            connection_initialization_timeout: Duration::from_secs(30),
+            connection_initialization_timeout: Duration::from_secs(60),
             timeout: Duration::from_secs(30),
             urls: Vec::new(),
         }

@@ -216,7 +216,9 @@ impl LogBuilder {
             .layers
             .drain(..)
             .collect::<Vec<Box<dyn Layer<Registry> + Send + Sync>>>();
-        tracing_subscriber::registry().with(layers).init();
+
+        // Use try_init and ignore errors to prevent panics if already initialized
+        let _ = tracing_subscriber::registry().with(layers).try_init();
         Ok(())
     }
 }

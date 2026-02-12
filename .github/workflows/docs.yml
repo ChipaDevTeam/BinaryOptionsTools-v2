@@ -23,9 +23,9 @@ jobs:
       - run: echo "cache_id=$(date --utc +%V)" >> $GITHUB_ENV
       - uses: actions/cache@v4
         with:
-          key: mkdocs-material-${{ env.cache_id }} # cache_id context access might be invalid
+          key: mkdocs-material-${{ env.cache_id }}
           path: .cache
           restore-keys: |
             mkdocs-material-
-      - run: pip install mkdocs-material
+      - run: pip install mkdocs-material "mkdocstrings[python]"
       - run: mkdocs gh-deploy --force

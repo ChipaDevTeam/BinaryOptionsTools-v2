@@ -9,6 +9,8 @@ use binary_options_tools_core_pre::{
 };
 use core::fmt;
 use futures_util::{future::join_all, stream::unfold};
+use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -480,90 +482,79 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                 }).await {
                                      warn!(target: "SubscriptionsApiModule", "Failed to send history failed response: {}", e);
                                 }
-                            } else {
-                                if let Err(e) = self.send_subscribe_message(&asset, period).await {
-                                     if let Err(e2) = self.command_responder.send(CommandResponse::HistoryFailed {
-                                         command_id,
-                                         error: Box::new(e.into()),
-                                     }).await {
-                                         warn!(target: "SubscriptionsApiModule", "Failed to send history failed response: {}", e2);
-                                     }
-                                } else {
-                                    self.state.histories.write().await.push((asset, period, command_id));
-                                }
-                            }
-                        }
+                                                                } else if let Err(e) = self.send_subscribe_message(&asset, period).await {
+                                                                    if let Err(e2) = self.command_responder.send(CommandResponse::HistoryFailed {
+                                                                        command_id,
+                                                                        error: Box::new(e.into()),
+                                                                    }).await {
+                                                                        warn!(target: "SubscriptionsApiModule", "Failed to send history failed response: {}", e2);
+                                                                    }
+                                                                } else {
+                                                                    self.state.histories.write().await.push((asset, period, command_id));
+                                                                }                        }
                     }
                 },
                 Ok(msg) = self.message_receiver.recv() => {
-                    // TODO: Handle incoming WebSocket messages
-                    // 1. Parse message for asset data
-                    // 2. Find corresponding subscription
-                    // 3. Forward data to stream
-                    // 4. Handle subscription confirmations/errors
-                    match msg.as_ref() {
-                        Message::Binary(data) => {
-                            // Parse the message for asset data
-                            match serde_json::from_slice::<ServerResponse>(data) {
-                                Ok(ServerResponse::Candle(data)) => {
-                                    // Forward data to stream
-                                    if let Err(e) = self.forward_data_to_stream(&data.symbol, data.price, data.timestamp).await {
-                                        warn!(target: "SubscriptionsApiModule", "Failed to forward data: {}", e);
-                                    }
-                                },
-                                Ok(ServerResponse::History(data)) => {
-                                    let mut id = None;
-                                    self.state.histories.write().await.retain(|(asset, period, c_id)| {
-                                        if asset == &data.asset && *period == data.period {
-                                            id = Some(*c_id);
-                                            false
-                                        } else {
-                                            true
-                                        }
-                                    });
-                                    if let Some(command_id) = id {
-                                        let symbol = data.asset.clone();
-                                        let candles_res = if let Some(candles) = data.candles {
-                                            candles.into_iter()
-                                                .map(|c| Candle::try_from((c, symbol.clone())))
-                                                .collect::<Result<Vec<_>, _>>()
-                                                .map_err(|e| PocketError::General(e.to_string()))
-                                        } else if let Some(history) = data.history {
-                                            Ok(compile_candles_from_ticks(&history, data.period, &symbol))
-                                        } else {
-                                            Ok(Vec::new())
-                                        };
+                    let response = match msg.as_ref() {
+                        Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data).ok(),
+                        Message::Text(text) => serde_json::from_str::<ServerResponse>(text).ok(),
+                        _ => None,
+                    };
 
-                                        match candles_res {
-                                            Ok(candles) => {
-                                                if let Err(e) = self.command_responder.send(CommandResponse::History {
-                                                    command_id,
-                                                    data: candles
-                                                }).await {
-                                                    warn!(target: "SubscriptionsApiModule", "Failed to send history response: {}", e);
-                                                }
+                    if let Some(response) = response {
+                        match response {
+                            ServerResponse::Candle(data) => {
+                                // Forward data to stream
+                                if let Err(e) = self.forward_data_to_stream(&data.symbol, data.price, data.timestamp).await {
+                                    warn!(target: "SubscriptionsApiModule", "Failed to forward data: {}", e);
+                                }
+                            },
+                            ServerResponse::History(data) => {
+                                let mut id = None;
+                                self.state.histories.write().await.retain(|(asset, period, c_id)| {
+                                    if asset == &data.asset && *period == data.period {
+                                        id = Some(*c_id);
+                                        false
+                                    } else {
+                                        true
+                                    }
+                                });
+                                if let Some(command_id) = id {
+                                    let symbol = data.asset.clone();
+                                    let candles_res = if let Some(candles) = data.candles {
+                                        candles.into_iter()
+                                            .map(|c| Candle::try_from((c, symbol.clone())))
+                                            .collect::<Result<Vec<_>, _>>()
+                                            .map_err(|e| PocketError::General(e.to_string()))
+                                    } else if let Some(history) = data.history {
+                                        Ok(compile_candles_from_ticks(&history, data.period, &symbol))
+                                    } else {
+                                        Ok(Vec::new())
+                                    };
+
+                                    match candles_res {
+                                        Ok(candles) => {
+                                            if let Err(e) = self.command_responder.send(CommandResponse::History {
+                                                command_id,
+                                                data: candles
+                                            }).await {
+                                                warn!(target: "SubscriptionsApiModule", "Failed to send history response: {}", e);
                                             }
-                                            Err(e) => {
-                                                if let Err(e) = self.command_responder.send(CommandResponse::HistoryFailed {
-                                                    command_id,
-                                                    error: Box::new(e)
-                                                }).await {
-                                                    warn!(target: "SubscriptionsApiModule", "Failed to send history failed response: {}", e);
-                                                }
+                                        }
+                                        Err(e) => {
+                                            if let Err(e) = self.command_responder.send(CommandResponse::HistoryFailed {
+                                                command_id,
+                                                error: Box::new(e)
+                                            }).await {
+                                                warn!(target: "SubscriptionsApiModule", "Failed to send history failed response: {}", e);
                                             }
                                         }
                                     }
-                                }
-                                Err(e) => {
-                                    warn!(target: "SubscriptionsApiModule", "Received data: {:?}",  String::from_utf8(data.to_vec()));
-                                    warn!(target: "SubscriptionsApiModule", "Failed to parse message: {}", e);
                                 }
                             }
-                        },
-                        _ => {
-                            warn!(target: "SubscriptionsApiModule", "Received unsupported message type");
-                            debug!(target: "SubscriptionsApiModule", "Message: {:?}", msg);
                         }
+                    } else {
+                        debug!(target: "SubscriptionsApiModule", "Received message that didn't match ServerResponse: {:?}", msg);
                     }
                 }
             }
@@ -654,7 +645,9 @@ impl SubscriptionsApiModule {
         // 1. Remove from active_subscriptions
         // 2. Remove from asset_to_subscription
         // 3. Return removed subscription info
-        if let Some((stream_sender, _)) = self.state.active_subscriptions.write().await.remove(asset) {
+        if let Some((stream_sender, _)) =
+            self.state.active_subscriptions.write().await.remove(asset)
+        {
             stream_sender.send(SubscriptionEvent::Terminated { reason: "Unsubscribed from main module".to_string() })
                 .await.inspect_err(|e| warn!(target: "SubscriptionsApiModule", "Failed to send termination signal: {}", e))?;
             return Ok(true);
@@ -691,8 +684,8 @@ impl SubscriptionsApiModule {
     async fn forward_data_to_stream(
         &self,
         asset: &str,
-        price: f64,
-        timestamp: f64,
+        price: Decimal,
+        timestamp: i64,
     ) -> CoreResult<()> {
         // TODO: Implement data forwarding
         // 1. Find subscription by asset
@@ -786,11 +779,12 @@ impl SubscriptionStream {
     }
 
     /// Process an incoming price update based on subscription type
-    fn process_update(&mut self, timestamp: f64, price: f64) -> PocketResult<Option<Candle>> {
+    fn process_update(&mut self, timestamp: i64, price: Decimal) -> PocketResult<Option<Candle>> {
         let asset = self.asset().to_string();
+        let price_f64 = price.to_f64().unwrap_or_default();
         if let Some(c) = self
             .sub_type
-            .update(&BaseCandle::from((timestamp, price)))?
+            .update(&BaseCandle::from((timestamp, price_f64)))?
         {
             // Successfully updated candle
             Ok(Some(Candle::try_from((c, asset)).map_err(|e| {

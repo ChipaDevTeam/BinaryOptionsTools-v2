@@ -186,6 +186,7 @@ pub struct RawApiModule {
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
+    #[allow(clippy::type_complexity)]
     sinks: Arc<RwLock<HashMap<Uuid, Arc<AsyncSender<Arc<Message>>>>>>,
     keep_alive_msgs: Arc<RwLock<HashMap<Uuid, Outgoing>>>,
 }

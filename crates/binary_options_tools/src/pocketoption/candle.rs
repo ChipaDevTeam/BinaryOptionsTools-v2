@@ -23,7 +23,7 @@ pub struct Candle {
     /// Trading symbol (e.g., "EURUSD_otc")
     pub symbol: String,
     /// Unix timestamp of the candle start time
-    pub timestamp: f64,
+    pub timestamp: i64,
     /// Opening price
     pub open: Decimal,
     /// Highest price in the candle period
@@ -49,7 +49,7 @@ pub struct Candle {
 /// [1754529180, 0.92124, 0.92155, 0.92162, 0.92124]
 /// ```
 pub struct BaseCandle {
-    pub timestamp: f64,
+    pub timestamp: i64,
     pub open: f64,
     pub close: f64,
     pub high: f64,
@@ -68,16 +68,17 @@ impl<'de> Deserialize<'de> for BaseCandle {
             type Value = BaseCandle;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a sequence of 5 or 6 floats")
+                formatter.write_str("a sequence of 5 or 6 elements")
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
             where
                 A: serde::de::SeqAccess<'de>,
             {
-                let timestamp = seq
+                let timestamp_raw: f64 = seq
                     .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
+                let timestamp = timestamp_raw as i64;
                 let open = seq
                     .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
@@ -111,15 +112,21 @@ impl<'de> Deserialize<'de> for BaseCandle {
 #[derive(serde::Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum HistoryItem {
-    Tick([f64; 2]),                                    // [timestamp, price]
-    TickWithNull([f64; 2], Option<serde_json::Value>), // [timestamp, price, null]
+    Tick([serde_json::Value; 2]),
+    TickWithNull([serde_json::Value; 3]),
 }
 
 impl HistoryItem {
-    pub fn to_tick(&self) -> (f64, f64) {
+    pub fn to_tick(&self) -> (i64, f64) {
         match self {
-            HistoryItem::Tick([t, p]) => (*t, *p),
-            HistoryItem::TickWithNull([t, p], _) => (*t, *p),
+            HistoryItem::Tick([t, p]) => (
+                t.as_f64().unwrap_or_default() as i64,
+                p.as_f64().unwrap_or_default(),
+            ),
+            HistoryItem::TickWithNull([t, p, _]) => (
+                t.as_f64().unwrap_or_default() as i64,
+                p.as_f64().unwrap_or_default(),
+            ),
         }
     }
 }
@@ -137,7 +144,7 @@ impl Candle {
     ///
     /// # Returns
     /// New Candle instance with all OHLC values set to the initial price
-    pub fn new(symbol: String, timestamp: f64, price: f64) -> BinaryOptionsResult<Self> {
+    pub fn new(symbol: String, timestamp: i64, price: f64) -> BinaryOptionsResult<Self> {
         let price = Decimal::from_f64(price).ok_or(BinaryOptionsError::General(
             "Couldn't parse f64 to Decimal".to_string(),
         ))?;
@@ -178,7 +185,7 @@ impl Candle {
     /// # Arguments
     /// * `timestamp` - New timestamp for the candle
     /// * `price` - New price to incorporate into the candle
-    pub fn update(&mut self, timestamp: f64, price: f64) -> BinaryOptionsResult<()> {
+    pub fn update(&mut self, timestamp: i64, price: f64) -> BinaryOptionsResult<()> {
         let price = Decimal::from_f64(price).ok_or(BinaryOptionsError::General(
             "Couldn't parse f64 to Decimal".to_string(),
         ))?;
@@ -305,12 +312,12 @@ impl Candle {
             ))
     }
 
-    /// Convert timestamp to DateTime<Utc>
+    /// Convert timestamp to `DateTime<Utc>`
     ///
     /// # Returns
-    /// DateTime<Utc> representation of the candle timestamp
+    /// `DateTime<Utc>` representation of the candle timestamp
     pub fn datetime(&self) -> DateTime<Utc> {
-        DateTime::from_timestamp(self.timestamp as i64, 0).unwrap_or_else(Utc::now)
+        DateTime::from_timestamp(self.timestamp, 0).unwrap_or_else(Utc::now)
     }
 }
 
@@ -324,7 +331,7 @@ pub enum SubscriptionType {
         candle: BaseCandle, // Current aggregated candle
     },
     Time {
-        start_time: Option<f64>,
+        start_time: Option<i64>,
         duration: Duration,
         candle: BaseCandle,
     },
@@ -332,13 +339,13 @@ pub enum SubscriptionType {
         duration: Duration,
         candle: BaseCandle,
         /// Stores the timestamp for the end of the current aggregation window.
-        next_boundary: Option<f64>,
+        next_boundary: Option<i64>,
     },
 }
 
 impl BaseCandle {
     pub fn new(
-        timestamp: f64,
+        timestamp: i64,
         open: f64,
         high: f64,
         low: f64,
@@ -356,7 +363,7 @@ impl BaseCandle {
     }
 
     pub fn timestamp(&self) -> DateTime<Utc> {
-        DateTime::from_timestamp(self.timestamp as i64, 0).unwrap_or_else(Utc::now)
+        DateTime::from_timestamp(self.timestamp, 0).unwrap_or_else(Utc::now)
     }
 }
 
@@ -377,18 +384,18 @@ pub fn compile_candles_from_ticks(ticks: &[HistoryItem], period: u32, symbol: &s
     }
 
     let mut candles = Vec::new();
-    let period_secs = period as f64;
+    let period_i64 = period as i64;
 
     // Sort ticks by timestamp just in case
-    let mut sorted_ticks: Vec<(f64, f64)> = ticks.iter().map(|t| t.to_tick()).collect();
-    sorted_ticks.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    let mut sorted_ticks: Vec<(i64, f64)> = ticks.iter().map(|t| t.to_tick()).collect();
+    sorted_ticks.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut current_candle: Option<BaseCandle> = None;
-    let mut current_boundary_idx: Option<u64> = None;
+    let mut current_boundary_idx: Option<i64> = None;
 
     for (timestamp, price) in sorted_ticks {
-        let boundary_idx = (timestamp / period_secs).floor() as u64;
-        let boundary = boundary_idx as f64 * period_secs;
+        let boundary_idx = timestamp / period_i64;
+        let boundary = boundary_idx * period_i64;
 
         if let Some(mut candle) = current_candle.take() {
             if Some(boundary_idx) == current_boundary_idx {
@@ -399,9 +406,9 @@ pub fn compile_candles_from_ticks(ticks: &[HistoryItem], period: u32, symbol: &s
                 current_candle = Some(candle);
             } else {
                 // New candle, push old one
-        match Candle::try_from((candle, symbol.to_string())) {
-            Ok(c) => candles.push(c),
-            Err(e) => warn!("Failed to convert final candle for {}: {}", symbol, e),
+                match Candle::try_from((candle, symbol.to_string())) {
+                    Ok(c) => candles.push(c),
+                    Err(e) => warn!("Failed to convert final candle for {}: {}", symbol, e),
                 }
                 // Start new candle
                 current_boundary_idx = Some(boundary_idx);
@@ -463,7 +470,7 @@ impl SubscriptionType {
     ///
     /// Completed candle timestamps are set to the boundary start time (the beginning of the aggregation window).
     pub fn time_aligned(duration: Duration) -> PocketResult<Self> {
-        if !(24 * 60 * 60 % duration.as_secs() == 0) {
+        if 24 * 60 * 60 % duration.as_secs() != 0 {
             warn!(
                 "Unsupported duration for time-aligned subscription: {:?}",
                 duration
@@ -532,8 +539,7 @@ impl SubscriptionType {
                 candle.close = new_candle.close;
 
                 let elapsed = (new_candle.timestamp()
-                    - DateTime::from_timestamp(start_time.unwrap() as i64, 0)
-                        .unwrap_or_else(Utc::now))
+                    - DateTime::from_timestamp(start_time.unwrap(), 0).unwrap_or_else(Utc::now))
                 .to_std()
                 .map_err(|_| {
                     PocketError::General("Time calculation error in conditional update".to_string())
@@ -557,9 +563,9 @@ impl SubscriptionType {
                     None => {
                         // First candle ever processed. Initialize the state.
                         *candle = new_candle.clone();
-                        let duration_secs = duration.as_secs_f64();
-                        let bucket_id = (new_candle.timestamp / duration_secs).floor();
-                        let new_boundary = (bucket_id + 1.0) * duration_secs;
+                        let duration_secs = duration.as_secs() as i64;
+                        let bucket_id = new_candle.timestamp / duration_secs;
+                        let new_boundary = (bucket_id + 1) * duration_secs;
                         *next_boundary = Some(new_boundary);
 
                         // It's the first candle, so the window can't be complete yet.
@@ -583,7 +589,8 @@ impl SubscriptionType {
                     // The new candle's timestamp is at or after the boundary.
                     // The current aggregation window is now complete.
                     // Set timestamp to the start of the period (boundary - duration)
-                    candle.timestamp = boundary - duration.as_secs_f64();
+                    let duration_secs = duration.as_secs() as i64;
+                    candle.timestamp = boundary - duration_secs;
                     // 1. Clone the completed candle to return it later.
                     let completed_candle = candle.clone();
 
@@ -591,9 +598,8 @@ impl SubscriptionType {
                     *candle = new_candle.clone();
 
                     // 3. Calculate the boundary for this new period.
-                    let duration_secs = duration.as_secs_f64();
-                    let bucket_id = (new_candle.timestamp / duration_secs).floor();
-                    let new_boundary = (bucket_id + 1.0) * duration_secs;
+                    let bucket_id = new_candle.timestamp / duration_secs;
+                    let new_boundary = (bucket_id + 1) * duration_secs;
                     *next_boundary = Some(new_boundary);
 
                     // 4. Return the candle that was just completed.
@@ -604,8 +610,8 @@ impl SubscriptionType {
     }
 }
 
-impl From<(f64, f64)> for BaseCandle {
-    fn from((timestamp, price): (f64, f64)) -> Self {
+impl From<(i64, f64)> for BaseCandle {
+    fn from((timestamp, price): (i64, f64)) -> Self {
         BaseCandle {
             timestamp,
             open: price,
@@ -654,7 +660,7 @@ mod tests {
         // Format: [timestamp, open, close, high, low]
         let data = r#"[1754529180,0.92124,0.92155,0.92162,0.92124]"#;
         let candle: BaseCandle = serde_json::from_str(data).unwrap();
-        assert_eq!(candle.timestamp, 1754529180.0);
+        assert_eq!(candle.timestamp, 1754529180);
         assert_eq!(candle.open, 0.92124);
         assert_eq!(candle.close, 0.92155);
         assert_eq!(candle.high, 0.92162);
@@ -681,8 +687,8 @@ mod tests {
     #[test]
     fn test_compile_candles_zero_period() {
         let ticks = vec![
-            HistoryItem::Tick([1000.0, 1.0]),
-            HistoryItem::Tick([1001.0, 1.1]),
+            HistoryItem::Tick([1000.into(), 1.0.into()]),
+            HistoryItem::Tick([1001.into(), 1.1.into()]),
         ];
         let candles = compile_candles_from_ticks(&ticks, 0, "TEST");
         assert!(candles.is_empty());
@@ -697,13 +703,13 @@ mod tests {
 
     #[test]
     fn test_compile_candles_single_tick() {
-        let ticks = vec![HistoryItem::Tick([1000.0, 1.5])];
+        let ticks = vec![HistoryItem::Tick([1000.into(), 1.5.into()])];
         let candles = compile_candles_from_ticks(&ticks, 60, "TEST");
         assert_eq!(candles.len(), 1);
         let c = &candles[0];
         // 1000 / 60 = 16.66.. -> floor 16. 16 * 60 = 960.
         // So timestamp should be 960.
-        assert_eq!(c.timestamp, 960.0);
+        assert_eq!(c.timestamp, 960);
         assert_eq!(c.open.to_string(), "1.5");
         assert_eq!(c.high.to_string(), "1.5");
         assert_eq!(c.low.to_string(), "1.5");

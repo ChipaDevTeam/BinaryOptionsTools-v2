@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use binary_options_tools_core_pre::error::CoreError;
+use rust_decimal::Decimal;
 use uuid::Uuid;
 
 use crate::error::BinaryOptionsError;
@@ -19,7 +20,7 @@ pub enum PocketError {
     #[error("Failed to open order: {error}, amount: {amount}, asset: {asset}")]
     FailOpenOrder {
         error: String,
-        amount: f64,
+        amount: Decimal,
         asset: String,
     },
 

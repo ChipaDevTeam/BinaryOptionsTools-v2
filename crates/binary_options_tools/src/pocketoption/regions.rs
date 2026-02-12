@@ -34,7 +34,7 @@ impl Regions {
                 )
             })
             .collect::<Vec<(&str, f64)>>();
-        distances.sort_by(|(_, a), (_, b)| b.total_cmp(a));
+        distances.sort_by(|(_, a), (_, b)| a.total_cmp(b));
         Ok(distances.into_iter().map(|(s, _)| s).collect())
     }
 

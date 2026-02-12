@@ -5,10 +5,13 @@ use binary_options_tools_core_pre::{
     client::Client,
     error::CoreResult,
     reimports::AsyncSender,
-    testing::{TestingWrapper, TestingWrapperBuilder},
+    testing::TestingWrapper,
+    testing::TestingWrapperBuilder,
     traits::{ApiModule, ReconnectCallback},
 };
 use chrono::{DateTime, Utc};
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use uuid::Uuid;
 
 use crate::config::Config;
@@ -39,8 +42,8 @@ use crate::{
     utils::print_handler,
 };
 
-const MINIMUM_TRADE_AMOUNT: f64 = 1.0;
-const MAXIMUM_TRADE_AMOUNT: f64 = 20000.0;
+const MINIMUM_TRADE_AMOUNT: Decimal = dec!(1.0);
+const MAXIMUM_TRADE_AMOUNT: Decimal = dec!(20000.0);
 
 /// Reconnection callback to verify potential lost trades
 struct TradeReconciliationCallback;
@@ -75,15 +78,15 @@ use crate::framework::market::Market;
 
 #[async_trait::async_trait]
 impl Market for PocketOption {
-    async fn buy(&self, asset: &str, amount: f64, time: u32) -> PocketResult<(Uuid, Deal)> {
+    async fn buy(&self, asset: &str, amount: Decimal, time: u32) -> PocketResult<(Uuid, Deal)> {
         self.buy(asset, time, amount).await
     }
 
-    async fn sell(&self, asset: &str, amount: f64, time: u32) -> PocketResult<(Uuid, Deal)> {
+    async fn sell(&self, asset: &str, amount: Decimal, time: u32) -> PocketResult<(Uuid, Deal)> {
         self.sell(asset, time, amount).await
     }
 
-    async fn balance(&self) -> f64 {
+    async fn balance(&self) -> Decimal {
         self.balance().await
     }
 
@@ -204,10 +207,15 @@ impl PocketOption {
 
     /// Creates a new PocketOption client with the provided configuration.
     pub async fn new_with_config(ssid: impl ToString, config: Config) -> PocketResult<Self> {
-        let mut builder = StateBuilder::default().ssid(Ssid::parse(ssid)?);
+        let parsed_ssid = Ssid::parse(ssid)?;
+        let mut builder = StateBuilder::default().ssid(parsed_ssid.clone());
 
-        // Use the first URL from config as default if available
-        if let Some(url) = config.urls.first() {
+        // Priority 1: Use SSID's current_url if available (the server the session is tied to)
+        if let Some(url) = parsed_ssid.current_url() {
+            builder = builder.default_connection_url(url);
+        }
+        // Priority 2: Use the first URL from config as default if available
+        else if let Some(url) = config.urls.first() {
             builder = builder.default_connection_url(url.to_string());
         }
 
@@ -260,16 +268,13 @@ impl PocketOption {
         keep_alive: Option<Outgoing>,
     ) -> PocketResult<InnerRawHandler> {
         let handle = self.require_handle::<RawApiModule>("RawApiModule").await?;
-        handle
-            .create(validator, keep_alive)
-            .await
-            .map_err(|e| e.into())
+        handle.create(validator, keep_alive).await
     }
 
     /// Gets the current balance of the user.
     /// If the balance is not set, it returns -1.
     ///
-    pub async fn balance(&self) -> f64 {
+    pub async fn balance(&self) -> Decimal {
         let state = &self.client.state;
         let start = std::time::Instant::now();
         loop {
@@ -284,7 +289,7 @@ impl PocketOption {
             }
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
-        -1.0
+        dec!(-1.0)
     }
 
     /// Checks if the account is a demo account.
@@ -355,17 +360,11 @@ impl PocketOption {
         asset: impl ToString,
         action: Action,
         time: u32,
-        amount: f64,
+        amount: Decimal,
     ) -> PocketResult<(Uuid, Deal)> {
         let asset_str = asset.to_string();
 
-        // Fix #6: Input Validation
-        if !amount.is_finite() {
-            return Err(PocketError::General(
-                "Amount must be a finite number".into(),
-            ));
-        }
-        if amount <= 0.0 {
+        if amount <= dec!(0.0) {
             return Err(PocketError::General("Amount must be positive".into()));
         }
 
@@ -383,8 +382,7 @@ impl PocketOption {
         }
 
         // Fix #4: Duplicate Trade Prevention
-        let amount_cents = (amount * 100.0).round() as u64;
-        let fingerprint = (asset_str.clone(), action, time, amount_cents);
+        let fingerprint = (asset_str.clone(), action, time, amount);
 
         {
             let recent = self.client.state.trade_state.recent_trades.read().await;
@@ -429,7 +427,7 @@ impl PocketOption {
         &self,
         asset: impl ToString,
         time: u32,
-        amount: f64,
+        amount: Decimal,
     ) -> PocketResult<(Uuid, Deal)> {
         self.trade(asset, Action::Call, time, amount).await
     }
@@ -446,7 +444,7 @@ impl PocketOption {
         &self,
         asset: impl ToString,
         time: u32,
-        amount: f64,
+        amount: Decimal,
     ) -> PocketResult<(Uuid, Deal)> {
         self.trade(asset, Action::Put, time, amount).await
     }
@@ -467,6 +465,20 @@ impl PocketOption {
         None
     }
 
+    /// Gets the current active assets only.
+    /// This filters out inactive assets from the available assets.
+    ///
+    /// # Returns
+    /// `Some(Assets)` containing only active assets if assets are loaded, `None` otherwise.
+    pub async fn active_assets(&self) -> Option<Assets> {
+        let state = &self.client.state;
+        let assets = state.assets.read().await;
+        if let Some(assets) = assets.as_ref() {
+            return Some(assets.active());
+        }
+        None
+    }
+
     /// Waits for the assets to be loaded from the server.
     /// # Arguments
     /// * `timeout` - The maximum time to wait for assets to be loaded.
@@ -479,11 +491,17 @@ impl PocketOption {
                 return Ok(());
             }
             if start.elapsed() > timeout {
-                return Err(PocketError::General(
-                    "Timeout waiting for assets".to_string(),
-                ));
+                let state = &self.client.state;
+                let balance = state.get_balance().await;
+                let ssid_type = if state.ssid.demo() { "demo" } else { "real" };
+                return Err(PocketError::General(format!(
+                    "Timeout waiting for assets (timeout: {:?}, account: {}, balance set: {})",
+                    timeout,
+                    ssid_type,
+                    balance.is_some()
+                )));
             }
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            tokio::time::sleep(Duration::from_millis(200)).await;
         }
     }
 
@@ -548,13 +566,14 @@ impl PocketOption {
     /// * `command` - The trade direction (0 for Call, 1 for Put).
     /// # Returns
     /// A `PocketResult` containing the `PendingOrder` if successful, or an error if the trade fails.
+    #[allow(clippy::too_many_arguments)]
     pub async fn open_pending_order(
         &self,
         open_type: u32,
-        amount: f64,
+        amount: Decimal,
         asset: String,
         open_time: u32,
-        open_price: f64,
+        open_price: Decimal,
         timeframe: u32,
         min_payout: u32,
         command: u32,
@@ -707,7 +726,7 @@ impl PocketOption {
     /// * `period` - The time period for each tick in seconds.
     /// # Returns
     /// A `PocketResult` containing a vector of `(timestamp, price)` if successful, or an error if the request fails.
-    pub async fn ticks(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<(f64, f64)>> {
+    pub async fn ticks(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<(i64, f64)>> {
         let handle = self
             .require_handle::<HistoricalDataApiModule>("HistoricalDataApiModule")
             .await?;
@@ -794,6 +813,7 @@ mod tests {
     use crate::pocketoption::candle::SubscriptionType;
     use core::time::Duration;
     use futures_util::StreamExt;
+    use rust_decimal_macros::dec;
 
     use super::PocketOption;
 
@@ -825,11 +845,12 @@ mod tests {
         };
         let api = PocketOption::new(ssid).await.unwrap();
         // Wait for assets as a proxy for full initialization
-        if let Err(_) = tokio::time::timeout(
+        if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
         )
         .await
+        .is_err()
         {
             println!("Timed out waiting for assets");
             return;
@@ -850,11 +871,12 @@ mod tests {
             }
         };
         let api = PocketOption::new(ssid).await.unwrap();
-        if let Err(_) = tokio::time::timeout(
+        if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
         )
         .await
+        .is_err()
         {
             println!("Timed out waiting for assets");
             return;
@@ -879,23 +901,31 @@ mod tests {
             }
         };
         let api = PocketOption::new(ssid).await.unwrap();
-        if let Err(_) = tokio::time::timeout(
+        if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
         )
         .await
+        .is_err()
         {
             println!("Timed out waiting for assets");
             return;
         }
 
-        match tokio::time::timeout(Duration::from_secs(15), api.buy("EURUSD_otc", 3, 1.0)).await {
+        match tokio::time::timeout(Duration::from_secs(15), api.buy("EURUSD_otc", 3, dec!(1.0)))
+            .await
+        {
             Ok(Ok(buy_result)) => println!("Buy Result: {buy_result:?}"),
             Ok(Err(e)) => println!("Buy Failed: {e}"),
             Err(_) => println!("Buy Timed out"),
         }
 
-        match tokio::time::timeout(Duration::from_secs(15), api.sell("EURUSD_otc", 3, 1.0)).await {
+        match tokio::time::timeout(
+            Duration::from_secs(15),
+            api.sell("EURUSD_otc", 3, dec!(1.0)),
+        )
+        .await
+        {
             Ok(Ok(sell_result)) => println!("Sell Result: {sell_result:?}"),
             Ok(Err(e)) => println!("Sell Failed: {e}"),
             Err(_) => println!("Sell Timed out"),
@@ -914,31 +944,32 @@ mod tests {
             }
         };
         let api = PocketOption::new(ssid).await.unwrap();
-        if let Err(_) = tokio::time::timeout(
+        if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
         )
         .await
+        .is_err()
         {
             println!("Timed out waiting for assets");
             return;
         }
 
         let buy_id =
-            match tokio::time::timeout(Duration::from_secs(15), api.buy("EURUSD", 60, 1.0)).await {
+            match tokio::time::timeout(Duration::from_secs(15), api.buy("EURUSD", 60, dec!(1.0)))
+                .await
+            {
                 Ok(Ok((id, _))) => Some(id),
                 _ => None,
             };
 
-        let sell_id = match tokio::time::timeout(
-            Duration::from_secs(15),
-            api.sell("EURUSD", 60, 1.0),
-        )
-        .await
-        {
-            Ok(Ok((id, _))) => Some(id),
-            _ => None,
-        };
+        let sell_id =
+            match tokio::time::timeout(Duration::from_secs(15), api.sell("EURUSD", 60, dec!(1.0)))
+                .await
+            {
+                Ok(Ok((id, _))) => Some(id),
+                _ => None,
+            };
 
         if let Some(id) = buy_id {
             match tokio::time::timeout(Duration::from_secs(15), api.result(id)).await {
@@ -967,11 +998,12 @@ mod tests {
             }
         };
         let api = PocketOption::new(ssid).await.unwrap();
-        if let Err(_) = tokio::time::timeout(
+        if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
         )
         .await
+        .is_err()
         {
             println!("Timed out waiting for assets");
             return;
@@ -1020,11 +1052,12 @@ mod tests {
             }
         };
         let api = PocketOption::new(ssid).await.unwrap();
-        if let Err(_) = tokio::time::timeout(
+        if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
         )
         .await
+        .is_err()
         {
             println!("Timed out waiting for assets");
             return;
@@ -1072,11 +1105,12 @@ mod tests {
             }
         };
         let api = PocketOption::new(ssid).await.unwrap();
-        if let Err(_) = tokio::time::timeout(
+        if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
         )
         .await
+        .is_err()
         {
             println!("Timed out waiting for assets");
             return;

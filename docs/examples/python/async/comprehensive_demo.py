@@ -79,7 +79,7 @@ async def main():
                 # Try history method as alternative
                 logger.info(f"Fetching history for {asset}...")
                 history_data = await asyncio.wait_for(
-                    client.history(asset, 60), timeout=10.0
+                    client.history(asset, 60), timeout=30.0
                 )
                 logger.info(f"Retrieved {len(history_data)} history items for {asset}")
             except asyncio.TimeoutError:

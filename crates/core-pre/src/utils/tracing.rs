@@ -1,14 +1,14 @@
 use std::{fs::OpenOptions, io::Write, time::Duration};
 
-use kanal::{Sender, bounded_async};
+use kanal::{bounded_async, Sender};
 use serde_json::Value;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{
-    Layer, Registry,
     fmt::{self, MakeWriter},
     layer::SubscriberExt,
     util::SubscriberInitExt,
+    Layer, Registry,
 };
 
 use crate::{
@@ -99,10 +99,10 @@ impl<'a> MakeWriter<'a> for StreamWriter {
 
 pub fn stream_logs_layer(
     level: LevelFilter,
-    timout: Option<Duration>,
+    timeout: Option<Duration>,
 ) -> (Box<dyn Layer<Registry> + Send + Sync>, RecieverStream) {
     let (sender, receiver) = bounded_async(128);
-    let receiver = RecieverStream::new_timed(receiver, timout);
+    let receiver = RecieverStream::new_timed(receiver, timeout);
     let writer = StreamWriter {
         sender: sender.to_sync(),
     };

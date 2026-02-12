@@ -18,7 +18,7 @@ pub enum BinaryErrorPy {
     UuidParsingError(#[from] uuid::Error),
     #[error("Trade not found, haven't found trade for id '{0}'")]
     TradeNotFound(Uuid),
-    #[error("Operation not allowed")]
+    #[error("Operation not allowed: {0}")]
     NotAllowed(String),
     #[error("Invalid Regex pattern, {0}")]
     InvalidRegexError(#[from] regex::Error),

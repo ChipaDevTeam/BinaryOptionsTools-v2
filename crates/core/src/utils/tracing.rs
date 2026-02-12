@@ -1,13 +1,13 @@
 use std::{fs::OpenOptions, io::Write, time::Duration};
 
-use async_channel::{Sender, bounded};
+use async_channel::{bounded, Sender};
 use serde_json::Value;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{
-    Layer, Registry,
     fmt::{self, MakeWriter},
     layer::SubscriberExt,
     util::SubscriberInitExt,
+    Layer, Registry,
 };
 
 use crate::{constants::MAX_LOGGING_CHANNEL_CAPACITY, general::stream::RecieverStream};
@@ -91,13 +91,13 @@ impl<'a> MakeWriter<'a> for StreamWriter {
 
 pub fn stream_logs_layer(
     level: LevelFilter,
-    timout: Option<Duration>,
+    timeout: Option<Duration>,
 ) -> (
     Box<dyn Layer<Registry> + Send + Sync>,
     RecieverStream<String>,
 ) {
     let (sender, receiver) = bounded(MAX_LOGGING_CHANNEL_CAPACITY);
-    let receiver = RecieverStream::new_timed(receiver, timout);
+    let receiver = RecieverStream::new_timed(receiver, timeout);
     let writer = StreamWriter { sender };
     let layer = tracing_subscriber::fmt::layer::<Registry>()
         .json()

@@ -16,7 +16,7 @@ use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use quote::quote;
 use serialize::Serializer;
-use syn::{DeriveInput, parse_macro_input};
+use syn::{parse_macro_input, DeriveInput};
 
 #[proc_macro]
 pub fn deserialize(input: TokenStream) -> TokenStream {
@@ -31,7 +31,7 @@ pub fn serialize(input: TokenStream) -> TokenStream {
 }
 
 /// This macro wraps any async function and transforms it's output `T` into `anyhow::Result<T>`,
-/// if the function doesn't end before the timout it will rais an error
+/// if the function doesn't end before the timeout it will raise an error
 /// The macro also supports creating a `#[tracing::instrument]` macro with all the params inside `tracing(args)`
 /// Example:
 ///     #[timeout(10, tracing(skip(non_debug_input)))]

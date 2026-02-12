@@ -41,3 +41,5 @@ regex = "1.12.2"
 async-stream = "0.3.6"
 async-trait = "0.1.86"
 tungstenite = { version = "0.28.0", default-features = false, features = ["rustls-tls-webpki-roots", "handshake"] }
+rust_decimal = "1.40.0"
+rust_decimal_macros = "1.40.0"

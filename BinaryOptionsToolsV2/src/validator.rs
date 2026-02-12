@@ -212,12 +212,7 @@ impl RawValidator {
             RawValidator::Custom(py_custom) => Python::attach(|py| {
                 let func = py_custom.custom.as_ref();
                 match func.call1(py, (data,)) {
-                    Ok(result) => {
-                        match result.extract::<bool>(py) {
-                            Ok(b) => b,
-                            Err(_) => false, // If we can't extract a bool, return false
-                        }
-                    }
+                    Ok(result) => result.extract::<bool>(py).unwrap_or_default(),
                     Err(_) => false, // If the function call fails, return false
                 }
             }),
@@ -267,12 +262,7 @@ impl ValidatorTrait for PyCustomValidator {
         Python::attach(|py| {
             let func = self.func.as_ref();
             match func.call1(py, (data,)) {
-                Ok(result) => {
-                    match result.extract::<bool>(py) {
-                        Ok(b) => b,
-                        Err(_) => false, // If we can't extract a bool, return false
-                    }
-                }
+                Ok(result) => result.extract::<bool>(py).unwrap_or_default(),
                 Err(_) => false, // If the function call fails, return false
             }
         })

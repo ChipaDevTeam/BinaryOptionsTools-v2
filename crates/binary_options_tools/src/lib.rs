@@ -24,7 +24,7 @@
 //! // Use the streaming utilities for real-time data processing
 //! // Serialize and deserialize data with the provided macros
 //! // Apply timeouts to async operations
-//! ```
+//! ```text
 pub mod config;
 pub mod error;
 pub mod expertoptions;

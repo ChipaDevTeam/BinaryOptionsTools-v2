@@ -127,7 +127,7 @@ class LogBuilder:
         """
         return LogSubscription(self.builder.create_logs_iterator(level, timeout))
 
-    def log_file(self, path: str = "logs.log", level: str = "DEBUG"):
+    def log_file(self, path: str = "logs.log", level: str = "DEBUG") -> "LogBuilder":
         """
         Configure logging to a file.
 
@@ -136,8 +136,9 @@ class LogBuilder:
             level (str): The minimum log level for this file handler.
         """
         self.builder.log_file(path, level)
+        return self
 
-    def terminal(self, level: str = "DEBUG"):
+    def terminal(self, level: str = "DEBUG") -> "LogBuilder":
         """
         Configure logging to the terminal.
 
@@ -145,6 +146,7 @@ class LogBuilder:
             level (str): The minimum log level for this terminal handler.
         """
         self.builder.terminal(level)
+        return self
 
     def build(self):
         """
