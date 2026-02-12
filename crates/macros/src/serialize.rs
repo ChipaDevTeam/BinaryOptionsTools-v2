@@ -1,5 +1,5 @@
-use quote::{ToTokens, quote};
-use syn::{Expr, parse::Parse};
+use quote::{quote, ToTokens};
+use syn::{parse::Parse, Expr};
 
 pub struct Serializer {
     value: Expr,
