@@ -5,10 +5,10 @@ use std::{
     sync::Arc,
 };
 
-use async_channel::{bounded, Receiver, Sender};
+use async_channel::{Receiver, Sender, bounded};
 use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::RwLock;
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::error::BinaryOptionsResult;
 
@@ -104,7 +104,7 @@ where
 {
     pub fn new(buffer_size: usize) -> Self {
         let (event_sender, event_receiver) = bounded(buffer_size);
-
+        
         Self {
             handlers: Arc::new(RwLock::new(HashMap::new())),
             event_sender,
@@ -142,11 +142,11 @@ where
         self.background_task = Some(tokio::spawn(async move {
             while let Ok(event) = receiver.recv().await {
                 let handlers_guard = handlers.read().await;
-
+                
                 if let Some(event_handlers) = handlers_guard.get(&event.event_type) {
                     // Process handlers concurrently
                     let mut tasks = Vec::new();
-
+                    
                     for handler in event_handlers {
                         let handler = handler.clone();
                         let event = event.clone();
@@ -156,7 +156,7 @@ where
                             }
                         }));
                     }
-
+                    
                     // Wait for all handlers to complete
                     futures_util::future::join_all(tasks).await;
                 }
@@ -208,7 +208,7 @@ mod tests {
     async fn test_event_manager() {
         let mut manager = EventManager::<String>::new(100);
         let counter = Arc::new(AtomicUsize::new(0));
-
+        
         let counter_clone = counter.clone();
         let handler = Arc::new(move |_event: &Event<String>| {
             let counter = counter_clone.clone();
@@ -217,21 +217,18 @@ mod tests {
                 Ok(())
             }
         });
-
+        
         manager.add_handler(EventType::Connected, handler).await;
         manager.start_background_processor();
-
+        
         // Emit some events
         for i in 0..5 {
-            manager
-                .emit(Event::new(EventType::Connected, format!("test {}", i)))
-                .await
-                .unwrap();
+            manager.emit(Event::new(EventType::Connected, format!("test {}", i))).await.unwrap();
         }
-
+        
         // Wait for processing
         sleep(Duration::from_millis(100)).await;
-
+        
         assert_eq!(counter.load(Ordering::SeqCst), 5);
     }
 }

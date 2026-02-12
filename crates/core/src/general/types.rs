@@ -1,8 +1,8 @@
 use std::{collections::HashMap, ops::Deref, sync::Arc};
 
-use async_channel::bounded;
 use async_channel::Receiver;
 use async_channel::Sender;
+use async_channel::bounded;
 use async_trait::async_trait;
 use tokio::sync::Mutex;
 

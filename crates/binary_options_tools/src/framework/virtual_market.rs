@@ -44,10 +44,7 @@ impl VirtualMarket {
     }
 
     pub async fn update_price(&self, asset: &str, price: f64) {
-        self.current_prices
-            .lock()
-            .await
-            .insert(asset.to_string(), price);
+        self.current_prices.lock().await.insert(asset.to_string(), price);
     }
 
     pub async fn set_payout(&self, asset: &str, payout: i32) {
@@ -72,12 +69,17 @@ impl Market for VirtualMarket {
             ));
         }
 
-        let entry_price = *self.current_prices.lock().await.get(asset).ok_or_else(|| {
-            crate::pocketoption::error::PocketError::General(format!(
-                "Price not found for asset: {}",
-                asset
-            ))
-        })?;
+        let entry_price = *self
+            .current_prices
+            .lock()
+            .await
+            .get(asset)
+            .ok_or_else(|| {
+                crate::pocketoption::error::PocketError::General(format!(
+                    "Price not found for asset: {}",
+                    asset
+                ))
+            })?;
 
         let payout = *self.payouts.lock().await.get(asset).unwrap_or(&80);
 
@@ -149,12 +151,17 @@ impl Market for VirtualMarket {
             ));
         }
 
-        let entry_price = *self.current_prices.lock().await.get(asset).ok_or_else(|| {
-            crate::pocketoption::error::PocketError::General(format!(
-                "Price not found for asset: {}",
-                asset
-            ))
-        })?;
+        let entry_price = *self
+            .current_prices
+            .lock()
+            .await
+            .get(asset)
+            .ok_or_else(|| {
+                crate::pocketoption::error::PocketError::General(format!(
+                    "Price not found for asset: {}",
+                    asset
+                ))
+            })?;
 
         let payout = *self.payouts.lock().await.get(asset).unwrap_or(&80);
 

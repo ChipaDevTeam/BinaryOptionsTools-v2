@@ -1,7 +1,6 @@
 pub use tokio_tungstenite::{
-    connect_async_tls_with_config,
-    tungstenite::{handshake::client::generate_key, http::Request, Bytes, Message},
-    Connector, MaybeTlsStream, WebSocketStream,
+    Connector, MaybeTlsStream, WebSocketStream, connect_async_tls_with_config,
+    tungstenite::{Bytes, Message, handshake::client::generate_key, http::Request},
 };
 
-pub use kanal::{bounded_async, AsyncReceiver, AsyncSender};
+pub use kanal::{AsyncReceiver, AsyncSender, bounded_async};

@@ -161,20 +161,18 @@ async def login_and_get_ssid(email_str: str, password_str: str) -> str | None:
             # Wait for a condition that indicates successful login
             # e.g., URL change from /login, or presence of a dashboard/cabinet element
             WebDriverWait(driver, 60).until(
-                lambda d: (
-                    d.current_url != "https://po.trade/login/"
-                    and (
-                        expected_conditions.url_contains("cabinet")(d)
-                        or expected_conditions.presence_of_element_located(
-                            (By.ID, "crm-widget-wrapper")
-                        )(d)  # Element from PO live trading
-                        or expected_conditions.presence_of_element_located(
-                            (By.CSS_SELECTOR, ".is_real")
-                        )(d)  # Real account indicator
-                        or expected_conditions.presence_of_element_located(
-                            (By.CSS_SELECTOR, ".is_demo")
-                        )(d)
-                    )
+                lambda d: d.current_url != "https://po.trade/login/"
+                and (
+                    expected_conditions.url_contains("cabinet")(d)
+                    or expected_conditions.presence_of_element_located(
+                        (By.ID, "crm-widget-wrapper")
+                    )(d)  # Element from PO live trading
+                    or expected_conditions.presence_of_element_located(
+                        (By.CSS_SELECTOR, ".is_real")
+                    )(d)  # Real account indicator
+                    or expected_conditions.presence_of_element_located(
+                        (By.CSS_SELECTOR, ".is_demo")
+                    )(d)
                 )  # Demo account indicator
             )
             print(

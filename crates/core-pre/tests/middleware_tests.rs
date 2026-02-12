@@ -4,8 +4,8 @@ use binary_options_tools_core_pre::middleware::{
     MiddlewareContext, MiddlewareStack, WebSocketMiddleware,
 };
 use binary_options_tools_core_pre::traits::AppState;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio_tungstenite::tungstenite::Message;
 
 #[derive(Debug)]

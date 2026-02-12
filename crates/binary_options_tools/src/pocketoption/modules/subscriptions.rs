@@ -654,9 +654,7 @@ impl SubscriptionsApiModule {
         // 1. Remove from active_subscriptions
         // 2. Remove from asset_to_subscription
         // 3. Return removed subscription info
-        if let Some((stream_sender, _)) =
-            self.state.active_subscriptions.write().await.remove(asset)
-        {
+        if let Some((stream_sender, _)) = self.state.active_subscriptions.write().await.remove(asset) {
             stream_sender.send(SubscriptionEvent::Terminated { reason: "Unsubscribed from main module".to_string() })
                 .await.inspect_err(|e| warn!(target: "SubscriptionsApiModule", "Failed to send termination signal: {}", e))?;
             return Ok(true);

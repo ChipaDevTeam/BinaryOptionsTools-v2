@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use thiserror::Error;
 
-use tokio_tungstenite::tungstenite::{http, Error as TungsteniteError, Message};
+use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message, http};
 
 use crate::general::traits::MessageTransfer;
 

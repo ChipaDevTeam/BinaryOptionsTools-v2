@@ -1,14 +1,14 @@
 use std::{fs::OpenOptions, io::Write, time::Duration};
 
-use kanal::{bounded_async, Sender};
+use kanal::{Sender, bounded_async};
 use serde_json::Value;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{
+    Layer, Registry,
     fmt::{self, MakeWriter},
     layer::SubscriberExt,
     util::SubscriberInitExt,
-    Layer, Registry,
 };
 
 use crate::{

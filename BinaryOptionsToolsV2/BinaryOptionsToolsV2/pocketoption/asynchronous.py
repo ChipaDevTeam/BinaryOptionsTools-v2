@@ -198,33 +198,18 @@ class PocketOptionAsync:
             ssid = ssid.replace("42[auth,", '42["auth",', 1)
 
             # 2. Quote keys in the JSON object (alphanumeric keys followed by colon)
-            # This is safe because keys generally don't contain complex serialized data
             ssid = re.sub(r"(?<=[{,])\s*([a-zA-Z0-9_]+)\s*:", r'"\1":', ssid)
 
-            # 3. Quote values SAFELY (The Fix)
-            # We use a pattern that matches Quoted Strings FIRST to protect them.
-            # Group 1: ("(?:[^"\\]|\\.)*") -> Matches full double-quoted strings (including escapes)
-            # Group 2: :\s*([^",}\]\s]+)   -> Matches colon + unquoted value
-            pattern = r'("(?:[^"\\]|\\.)*")|:\s*([^",}\]\s]+)(?=\s*[,}\]])'
+            # 3. Quote values (alphanumeric values followed by comma or closing bracket)
+            def quote_value(match):
+                val = match.group(1).strip()
+                # Keep numbers and booleans/null unquoted
+                if val.isdigit() or val in ["true", "false", "null"]:
+                    return f":{val}"
+                # Quote everything else
+                return f':"{val}"'
 
-            def fix_mixed_values(match):
-                # If we matched a quoted string (Group 1), return it EXACTLY as is.
-                # This protects the PHP session string (e.g. "session":"a:4:{s:10...}")
-                # from having its internal colons modified.
-                if match.group(1):
-                    return match.group(1)
-
-                # If we matched an unquoted value (Group 2), process it.
-                val = match.group(2)
-                if val:
-                    # Keep numbers, booleans, and null unquoted
-                    if val.isdigit() or val in ["true", "false", "null"]:
-                        return f":{val}"
-                    # Quote everything else
-                    return f':"{val}"'
-                return match.group(0)
-
-            ssid = re.sub(pattern, fix_mixed_values, ssid)
+            ssid = re.sub(r":\s*([^,}\]]+?)(?=\s*[,}\]])", quote_value, ssid)
 
         if config is not None:
             if isinstance(config, dict):

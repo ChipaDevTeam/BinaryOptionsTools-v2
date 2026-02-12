@@ -3,6 +3,15 @@ import os
 from datetime import timedelta
 from typing import Optional
 
+try:
+    from BinaryOptionsToolsV2.BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
+    from BinaryOptionsToolsV2.BinaryOptionsToolsV2 import Logger as RustLogger
+    from BinaryOptionsToolsV2.BinaryOptionsToolsV2 import start_tracing
+except ImportError:
+    from BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
+    from BinaryOptionsToolsV2 import Logger as RustLogger
+    from BinaryOptionsToolsV2 import start_tracing
+
 
 class LogSubscription:
     def __init__(self, subscription):
@@ -40,8 +49,6 @@ def start_logs(path: str, level: str = "DEBUG", terminal: bool = True, layers: l
         layers = []
 
     try:
-        from BinaryOptionsToolsV2 import start_tracing
-
         os.makedirs(path, exist_ok=True)
         start_tracing(path, level, terminal, layers)
     except Exception as e:
@@ -57,8 +64,6 @@ class Logger:
     """
 
     def __init__(self):
-        from BinaryOptionsToolsV2 import Logger as RustLogger
-
         self.logger = RustLogger()
 
     def debug(self, message):
@@ -107,8 +112,6 @@ class LogBuilder:
     """
 
     def __init__(self):
-        from BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
-
         self.builder = RustLogBuilder()
 
     def create_logs_iterator(self, level: str = "DEBUG", timeout: Optional[timedelta] = None) -> LogSubscription:

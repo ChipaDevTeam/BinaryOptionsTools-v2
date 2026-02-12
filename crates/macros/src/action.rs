@@ -1,5 +1,5 @@
 use darling::FromDeriveInput;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::Ident;
 
 /// Auto implement the ActionName trait for types on the ExpertOptions API.

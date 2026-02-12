@@ -23,7 +23,10 @@ use crate::{
     },
 };
 
-const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = ["loadHistoryPeriodFast", "loadHistoryPeriod"];
+const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = [
+    "loadHistoryPeriodFast",
+    "loadHistoryPeriod",
+];
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoadHistoryPeriod {
@@ -308,32 +311,25 @@ impl GetCandlesApiModule {
     async fn process_candle_result(&mut self, result: LoadHistoryPeriodResult) -> CoreResult<()> {
         // Find the pending request by index
         if let Some((req_id, asset)) = self.pending_requests.remove(&result.index) {
-            let candles: Vec<Candle> = result
-                .data
+            let candles: Vec<Candle> = result.data
                 .into_iter()
                 .map(|candle_data| {
-                    Candle::try_from(candle_data)
-                        .map_err(|e| CoreError::Other(e.to_string()))
-                        .map(|mut c| {
-                            c.symbol = asset.clone();
-                            c
-                        })
+                    Candle::try_from(candle_data).map_err(|e| CoreError::Other(e.to_string())).map(|mut c| {
+                        c.symbol = asset.clone();
+                        c
+                    })
                 })
                 .collect::<Result<Vec<Candle>, _>>()?;
 
             // Send the response
-            if let Err(e) = self
-                .command_responder
-                .send(CommandResponse::CandlesResult { req_id, candles })
-                .await
-            {
+            if let Err(e) = self.command_responder.send(CommandResponse::CandlesResult {
+                req_id,
+                candles,
+            }).await {
                 warn!("Failed to send candles result: {}", e);
             }
         } else {
-            warn!(
-                "Received candles for unknown request index: {}",
-                result.index
-            );
+            warn!("Received candles for unknown request index: {}", result.index);
         }
         Ok(())
     }
