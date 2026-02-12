@@ -34,16 +34,6 @@ pub type LightweightHandler<S> = Box<
 >;
 
 type RuleTp = (Box<dyn Rule + Send + Sync>, AsyncSender<Arc<Message>>);
-// --- Control Commands for the Runner ---
-
-#[derive(Debug)]
-pub enum RunnerCommand {
-    Disconnect,
-    Shutdown, // This can be used to gracefully shut down the runner
-    Connect,
-    Reconnect,
-    // You can add more commands like Shutdown in the future
-}
 
 // --- Internal Router ---
 pub struct Router<S: AppState> {

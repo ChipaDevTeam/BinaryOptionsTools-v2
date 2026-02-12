@@ -17,7 +17,7 @@ use crate::connector::Connector;
 use crate::error::{CoreError, CoreResult};
 use crate::middleware::{MiddlewareStack, WebSocketMiddleware};
 use crate::signals::Signals;
-use crate::traits::{ApiModule, AppState, LightweightModule, ReconnectCallback};
+use crate::traits::{ApiModule, AppState, LightweightModule, ReconnectCallback, RunnerCommand};
 
 type HandlerMap = Arc<RwLock<HashMap<TypeId, Box<dyn Any + Send + Sync>>>>;
 type HandlersFn<S> = Box<
@@ -26,12 +26,14 @@ type HandlersFn<S> = Box<
             &mut JoinSet<()>,
             HandlerMap,
             AsyncSender<Message>,
+            AsyncSender<RunnerCommand>,
             &mut ReconnectCallbackStack<S>,
         ) + Send
         + Sync,
 >;
 
-type LightweightHandlersFn<S> = Box<dyn FnOnce(&mut Router<S>, AsyncSender<Message>) + Send + Sync>;
+type LightweightHandlersFn<S> =
+    Box<dyn FnOnce(&mut Router<S>, AsyncSender<Message>, AsyncSender<RunnerCommand>) + Send + Sync>;
 
 pub struct ClientBuilder<S: AppState> {
     state: Arc<S>,
@@ -110,51 +112,59 @@ impl<S: AppState> ClientBuilder<S> {
 
     /// Registers a lightweight module
     pub fn with_lightweight_module<M: LightweightModule<S>>(mut self) -> Self {
-        let factory = |router: &mut Router<S>, to_ws_tx: AsyncSender<Message>| {
-            let (msg_tx, msg_rx) = bounded_async(256);
+        let factory =
+            |router: &mut Router<S>, to_ws_tx: AsyncSender<Message>, runner_tx: AsyncSender<RunnerCommand>| {
+                let (msg_tx, msg_rx) = bounded_async(256);
 
-            let state = router.state.clone();
-            // Spawn the lightweight module task.
-            router.spawn_lightweight_module(async move {
-                let mut failures = 0;
-                // make the first timestamp far enough in the past
-                let mut last_fail = Instant::now().checked_sub(Duration::from_secs(3600)).unwrap_or(Instant::now());
+                let state = router.state.clone();
+                // Spawn the lightweight module task.
+                router.spawn_lightweight_module(async move {
+                    let mut failures = 0;
+                    // make the first timestamp far enough in the past
+                    let mut last_fail = Instant::now()
+                        .checked_sub(Duration::from_secs(3600))
+                        .unwrap_or(Instant::now());
 
-                loop {
-                    // create the module once
-                    let mut module = M::new(state.clone(), to_ws_tx.clone(), msg_rx.clone());
-                    match module.run().await {
-                        Ok(()) => {
-                            info!(target: "LightweightModule", "[Lightweight {}] exited cleanly", type_name::<M>());
-                            break;
-                        }
-                        Err(e) => {
-                            let now = Instant::now();
-                            if now.duration_since(last_fail) < Duration::from_secs(30) {
-                                failures += 1;
-                            } else {
-                                failures = 1;
+                    loop {
+                        // create the module once
+                        let mut module = M::new(
+                            state.clone(),
+                            to_ws_tx.clone(),
+                            msg_rx.clone(),
+                            runner_tx.clone(),
+                        );
+                        match module.run().await {
+                            Ok(()) => {
+                                info!(target: "LightweightModule", "[Lightweight {}] exited cleanly", type_name::<M>());
+                                break;
                             }
-                            last_fail = now;
+                            Err(e) => {
+                                let now = Instant::now();
+                                if now.duration_since(last_fail) < Duration::from_secs(30) {
+                                    failures += 1;
+                                } else {
+                                    failures = 1;
+                                }
+                                last_fail = now;
 
-                            if failures >= 5 {
-                                error!(target: "LightweightModule",
+                                if failures >= 5 {
+                                    error!(target: "LightweightModule",
                                     "[Lightweight {}] failing {}× rapidly: {:?}, backing off 60s",
                                     type_name::<M>(),
                                     failures,
                                     e
                                 );
-                                tokio::time::sleep(Duration::from_secs(60)).await;
-                            } else {
-                                warn!(target: "LightweightModule", "[Lightweight {}] error: {:?}", type_name::<M>(), e);
-                                tokio::time::sleep(Duration::from_secs(1)).await;
+                                    tokio::time::sleep(Duration::from_secs(60)).await;
+                                } else {
+                                    warn!(target: "LightweightModule", "[Lightweight {}] error: {:?}", type_name::<M>(), e);
+                                    tokio::time::sleep(Duration::from_secs(1)).await;
+                                }
                             }
                         }
                     }
-                }
-            });
-            router.add_lightweight_rule(M::rule(), msg_tx);
-        };
+                });
+                router.add_lightweight_rule(M::rule(), msg_tx);
+            };
 
         self.lightweight_factories.push(Box::new(factory));
         self
@@ -162,48 +172,50 @@ impl<S: AppState> ClientBuilder<S> {
 
     /// Registers a full API module with the client.
     pub fn with_module<M: ApiModule<S>>(mut self) -> Self {
-        let factory =
-            |router: &mut Router<S>,
-             join_set: &mut JoinSet<()>,
-             handles: Arc<RwLock<HashMap<TypeId, Box<dyn Any + Send + Sync>>>>,
-             to_ws_tx: AsyncSender<Message>,
-             reconnect_callback_stack: &mut ReconnectCallbackStack<S>| {
-                let (cmd_tx, cmd_rx) = bounded_async(32);
-                let (cmd_ret_tx, cmd_ret_rx) = bounded_async(32);
-                let (msg_tx, msg_rx) = bounded_async(256);
+        let factory = |router: &mut Router<S>,
+                       join_set: &mut JoinSet<()>,
+                       handles: Arc<RwLock<HashMap<TypeId, Box<dyn Any + Send + Sync>>>>,
+                       to_ws_tx: AsyncSender<Message>,
+                       runner_tx: AsyncSender<RunnerCommand>,
+                       reconnect_callback_stack: &mut ReconnectCallbackStack<S>| {
+            let (cmd_tx, cmd_rx) = bounded_async(32);
+            let (cmd_ret_tx, cmd_ret_rx) = bounded_async(32);
+            let (msg_tx, msg_rx) = bounded_async(256);
 
-                let state = router.state.clone();
-                let handle = M::create_handle(cmd_tx, cmd_ret_rx);
+            let state = router.state.clone();
+            let handle = M::create_handle(cmd_tx, cmd_ret_rx);
 
-                // Must spawn this write to avoid blocking if called from an async context.
-                join_set.spawn(async move {
-                    handles
-                        .write()
-                        .await
-                        .insert(TypeId::of::<M>(), Box::new(handle));
-                });
+            // Must spawn this write to avoid blocking if called from an async context.
+            join_set.spawn(async move {
+                handles
+                    .write()
+                    .await
+                    .insert(TypeId::of::<M>(), Box::new(handle));
+            });
 
-                match M::callback(
-                    state.clone(),
-                    cmd_rx.clone(),
-                    cmd_ret_tx.clone(),
-                    msg_rx.clone(),
-                    to_ws_tx.clone(),
-                ) {
-                    Ok(Some(callback)) => {
-                        reconnect_callback_stack.add_layer(callback);
-                    }
-                    Ok(None) => {
-                        // No callback needed, continue.
-                    }
-                    Err(e) => {
-                        error!(target: "ApiModule", "Failed to get callback for module {}: {:?}", type_name::<M>(), e);
-                    }
+            match M::callback(
+                state.clone(),
+                cmd_rx.clone(),
+                cmd_ret_tx.clone(),
+                msg_rx.clone(),
+                to_ws_tx.clone(),
+            ) {
+                Ok(Some(callback)) => {
+                    reconnect_callback_stack.add_layer(callback);
                 }
-                let state_clone = state.clone();
-                router.spawn_module(async move {
+                Ok(None) => {
+                    // No callback needed, continue.
+                }
+                Err(e) => {
+                    error!(target: "ApiModule", "Failed to get callback for module {}: {:?}", type_name::<M>(), e);
+                }
+            }
+            let state_clone = state.clone();
+            router.spawn_module(async move {
                 let mut failures = 0;
-                let mut last_fail = Instant::now().checked_sub(Duration::from_secs(3600)).unwrap_or(Instant::now());
+                let mut last_fail = Instant::now()
+                    .checked_sub(Duration::from_secs(3600))
+                    .unwrap_or(Instant::now());
                 loop {
                     let mut module = M::new(
                         state.clone(),
@@ -211,12 +223,13 @@ impl<S: AppState> ClientBuilder<S> {
                         cmd_ret_tx.clone(),
                         msg_rx.clone(),
                         to_ws_tx.clone(),
+                        runner_tx.clone(),
                     );
                     match module.run().await {
                         Ok(_) => {
-                          info!(target: "ApiModule", "[Module {}] exited cleanly", type_name::<M>());
-                          break;
-                      },
+                            info!(target: "ApiModule", "[Module {}] exited cleanly", type_name::<M>());
+                            break;
+                        }
                         Err(e) => {
                             let now = Instant::now();
                             if now.duration_since(last_fail) < Duration::from_secs(30) {
@@ -239,8 +252,8 @@ impl<S: AppState> ClientBuilder<S> {
                 }
             });
 
-                router.add_module_rule(M::rule(state_clone), msg_tx);
-            };
+            router.add_module_rule(M::rule(state_clone), msg_tx);
+        };
 
         self.module_factories.push(Box::new(factory));
         self
@@ -410,12 +423,13 @@ impl<S: AppState> ClientBuilder<S> {
                 &mut join_set,
                 client.module_handles.clone(),
                 to_ws_tx.clone(),
+                runner_cmd_tx.clone(),
                 &mut connection_callback.on_reconnect,
             );
         }
 
         for factory in self.lightweight_factories {
-            factory(&mut router, to_ws_tx.clone());
+            factory(&mut router, to_ws_tx.clone(), runner_cmd_tx.clone());
         }
 
         // Wait for all the handles to be added to the handles hashmap.

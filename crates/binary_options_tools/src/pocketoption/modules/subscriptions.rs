@@ -5,7 +5,7 @@ use binary_options_tools_core_pre::traits::ReconnectCallback;
 use binary_options_tools_core_pre::{
     error::CoreResult,
     reimports::{AsyncReceiver, AsyncSender, Message},
-    traits::{ApiModule, Rule},
+    traits::{ApiModule, Rule, RunnerCommand},
 };
 use core::fmt;
 use futures_util::{future::join_all, stream::unfold};
@@ -375,6 +375,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
         command_responder: AsyncSender<Self::CommandResponse>,
         message_receiver: AsyncReceiver<Arc<Message>>,
         to_ws_sender: AsyncSender<Message>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self {
             state,

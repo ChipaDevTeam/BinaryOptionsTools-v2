@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use binary_options_tools_core_pre::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
-    traits::{LightweightModule, Rule},
+    traits::{LightweightModule, Rule, RunnerCommand},
 };
 use tracing::{debug, warn};
 
@@ -24,6 +24,7 @@ impl LightweightModule<State> for AssetsModule {
         state: Arc<State>,
         _: AsyncSender<Message>,
         receiver: AsyncReceiver<Arc<Message>>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self { state, receiver }
     }

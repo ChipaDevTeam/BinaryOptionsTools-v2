@@ -6,6 +6,14 @@ use tokio_tungstenite::tungstenite::Message;
 
 use crate::error::CoreResult;
 
+#[derive(Debug, Clone, Copy)]
+pub enum RunnerCommand {
+    Disconnect,
+    Shutdown, // This can be used to gracefully shut down the runner
+    Connect,
+    Reconnect,
+}
+
 /// The contract for the application's shared state.
 #[async_trait]
 pub trait AppState: Send + Sync + 'static {
@@ -38,6 +46,7 @@ pub trait ApiModule<S: AppState>: Send + 'static {
         command_responder: AsyncSender<Self::CommandResponse>,
         message_receiver: AsyncReceiver<Arc<Message>>,
         to_ws_sender: AsyncSender<Message>,
+        runner_command_tx: AsyncSender<RunnerCommand>,
     ) -> Self
     where
         Self: Sized;
@@ -61,6 +70,7 @@ pub trait ApiModule<S: AppState>: Send + 'static {
         command_response_responder: AsyncSender<Self::CommandResponse>,
         message_receiver: AsyncReceiver<Arc<Message>>,
         to_ws_sender: AsyncSender<Message>,
+        runner_command_tx: AsyncSender<RunnerCommand>,
     ) -> (Self, Self::Handle)
     where
         Self: Sized,
@@ -71,6 +81,7 @@ pub trait ApiModule<S: AppState>: Send + 'static {
             command_response_responder,
             message_receiver,
             to_ws_sender,
+            runner_command_tx,
         );
         let handle = Self::create_handle(command_responder, command_response_receiver);
         (module, handle)
@@ -134,6 +145,7 @@ pub trait LightweightModule<S: AppState>: Send + 'static {
         state: Arc<S>,
         ws_sender: AsyncSender<Message>,
         ws_receiver: AsyncReceiver<Arc<Message>>,
+        runner_command_tx: AsyncSender<RunnerCommand>,
     ) -> Self
     where
         Self: Sized;

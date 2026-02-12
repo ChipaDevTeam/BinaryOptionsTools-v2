@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use binary_options_tools_core_pre::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
-    traits::{LightweightModule, Rule},
+    traits::{LightweightModule, Rule, RunnerCommand},
 };
 use tracing::{debug, warn};
 
@@ -18,6 +18,7 @@ pub struct InitModule {
     ws_sender: AsyncSender<Message>,
     ws_receiver: AsyncReceiver<Arc<Message>>,
     state: Arc<State>,
+    runner_command_tx: AsyncSender<RunnerCommand>,
 }
 
 pub struct KeepAliveModule {
@@ -30,6 +31,7 @@ impl LightweightModule<State> for InitModule {
         state: Arc<State>,
         ws_sender: AsyncSender<Message>,
         ws_receiver: AsyncReceiver<Arc<Message>>,
+        runner_command_tx: AsyncSender<RunnerCommand>,
     ) -> Self
     where
         Self: Sized,
@@ -38,6 +40,7 @@ impl LightweightModule<State> for InitModule {
             ws_sender,
             ws_receiver,
             state,
+            runner_command_tx,
         }
     }
 
@@ -103,6 +106,11 @@ impl LightweightModule<State> for InitModule {
                             // Log public IP on rejection to help user identify IP mismatch issues
                             if let Ok(ip) = crate::pocketoption::utils::get_public_ip().await {
                                 tracing::warn!(target: "InitModule", "Session rejected while connecting from public IP: {}", ip);
+                            }
+
+                            // Signal shutdown to the runner because auth failed
+                            if let Err(e) = self.runner_command_tx.send(RunnerCommand::Shutdown).await {
+                                warn!(target: "InitModule", "Failed to send shutdown command to runner: {}", e);
                             }
 
                             // If we get 41, it's a permanent rejection for this session
@@ -253,7 +261,12 @@ impl Rule for InitRule {
 
 #[async_trait]
 impl LightweightModule<State> for KeepAliveModule {
-    fn new(_: Arc<State>, ws_sender: AsyncSender<Message>, _: AsyncReceiver<Arc<Message>>) -> Self {
+    fn new(
+        _: Arc<State>,
+        ws_sender: AsyncSender<Message>,
+        _: AsyncReceiver<Arc<Message>>,
+        _: AsyncSender<RunnerCommand>,
+    ) -> Self {
         Self { ws_sender }
     }
 

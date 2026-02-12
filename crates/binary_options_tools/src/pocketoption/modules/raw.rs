@@ -6,7 +6,7 @@ use binary_options_tools_core_pre::error::CoreError;
 use binary_options_tools_core_pre::reimports::{
     bounded_async, AsyncReceiver, AsyncSender, Message,
 };
-use binary_options_tools_core_pre::traits::{ApiModule, Rule};
+use binary_options_tools_core_pre::traits::{ApiModule, Rule, RunnerCommand};
 use tokio::select;
 use tokio::sync::RwLock;
 use uuid::Uuid;

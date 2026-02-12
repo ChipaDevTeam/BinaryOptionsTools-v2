@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use binary_options_tools_core_pre::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
-    traits::{LightweightModule, Rule},
+    traits::{LightweightModule, Rule, RunnerCommand},
 };
 use tracing::debug;
 
@@ -24,6 +24,7 @@ impl LightweightModule<State> for ServerTimeModule {
         state: Arc<State>,
         _: AsyncSender<Message>,
         ws_receiver: AsyncReceiver<Arc<Message>>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self
     where
         Self: Sized,
