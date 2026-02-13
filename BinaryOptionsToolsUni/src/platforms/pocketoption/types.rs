@@ -321,7 +321,7 @@ impl From<OriginalCandle> for Candle {
     fn from(candle: OriginalCandle) -> Self {
         Self {
             symbol: candle.symbol,
-            timestamp: candle.timestamp as i64,
+            timestamp: candle.timestamp,
             open: candle.open.to_f64().unwrap_or_default(),
             high: candle.high.to_f64().unwrap_or_default(),
             low: candle.low.to_f64().unwrap_or_default(),

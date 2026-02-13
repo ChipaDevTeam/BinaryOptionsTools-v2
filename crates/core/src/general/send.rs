@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use async_channel::{bounded, Receiver, RecvError, Sender};
 use tokio_tungstenite::tungstenite::Message;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use crate::{
     error::{BinaryOptionsResult, BinaryOptionsToolsError},

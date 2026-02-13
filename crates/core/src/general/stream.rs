@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use async_channel::{Receiver, RecvError};
-use futures_util::{Stream, stream::unfold};
+use futures_util::{stream::unfold, Stream};
 
 use crate::{
     error::{BinaryOptionsResult, BinaryOptionsToolsError},

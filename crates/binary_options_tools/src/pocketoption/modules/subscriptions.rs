@@ -12,9 +12,12 @@ use futures_util::{future::join_all, stream::unfold};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::select;
+use tokio::sync::oneshot;
+use tokio::sync::Mutex as TokioMutex;
 
 use tracing::{debug, warn};
 use uuid::Uuid;
@@ -29,6 +32,50 @@ use crate::pocketoption::{
     error::PocketResult,
     state::State,
 };
+
+/// Internal router to distribute command responses to multiple waiters.
+pub struct ResponseRouter {
+    pending: TokioMutex<HashMap<Uuid, oneshot::Sender<CommandResponse>>>,
+}
+
+impl ResponseRouter {
+    pub fn new(receiver: AsyncReceiver<CommandResponse>) -> Arc<Self> {
+        let router = Arc::new(Self {
+            pending: TokioMutex::new(HashMap::new()),
+        });
+        let router_clone = router.clone();
+        tokio::spawn(async move {
+            while let Ok(resp) = receiver.recv().await {
+                if let Some(id) = get_command_id(&resp) {
+                    let mut pending = router_clone.pending.lock().await;
+                    if let Some(tx) = pending.remove(&id) {
+                        let _ = tx.send(resp);
+                    }
+                }
+            }
+        });
+        router
+    }
+
+    pub async fn wait_for(&self, id: Uuid) -> PocketResult<CommandResponse> {
+        let (tx, rx) = oneshot::channel();
+        self.pending.lock().await.insert(id, tx);
+        rx.await
+            .map_err(|_| PocketError::General("Response router channel closed".into()))
+    }
+}
+
+fn get_command_id(resp: &CommandResponse) -> Option<Uuid> {
+    match resp {
+        CommandResponse::SubscriptionSuccess { command_id, .. } => Some(*command_id),
+        CommandResponse::SubscriptionFailed { command_id, .. } => Some(*command_id),
+        CommandResponse::History { command_id, .. } => Some(*command_id),
+        CommandResponse::UnsubscriptionSuccess { command_id } => Some(*command_id),
+        CommandResponse::UnsubscriptionFailed { command_id, .. } => Some(*command_id),
+        CommandResponse::SubscriptionCount { command_id, .. } => Some(*command_id),
+        CommandResponse::HistoryFailed { command_id, .. } => Some(*command_id),
+    }
+}
 
 #[derive(Serialize)]
 pub struct ChangeSymbol {
@@ -95,7 +142,7 @@ pub enum Command {
         command_id: Uuid,
     },
     /// Requests the number of active subscriptions
-    SubscriptionCount,
+    SubscriptionCount { command_id: Uuid },
 }
 
 /// Response enum for subscription commands
@@ -121,7 +168,7 @@ pub enum CommandResponse {
         error: Box<PocketError>,
     },
     /// Returns the number of active subscriptions
-    SubscriptionCount(u32),
+    SubscriptionCount { command_id: Uuid, count: u32 },
     /// History failed
     HistoryFailed {
         command_id: Uuid,
@@ -133,7 +180,7 @@ pub enum CommandResponse {
 pub struct SubscriptionStream {
     receiver: AsyncReceiver<SubscriptionEvent>,
     sender: Option<AsyncSender<Command>>,
-    command_receiver: AsyncReceiver<CommandResponse>,
+    router: Arc<ResponseRouter>,
     asset: String,
     sub_type: SubscriptionType,
 }
@@ -169,7 +216,7 @@ impl ReconnectCallback<State> for SubscriptionCallback {
 #[derive(Clone)]
 pub struct SubscriptionsHandle {
     sender: AsyncSender<Command>,
-    receiver: AsyncReceiver<CommandResponse>,
+    router: Arc<ResponseRouter>,
 }
 
 impl SubscriptionsHandle {
@@ -189,11 +236,6 @@ impl SubscriptionsHandle {
         asset: String,
         sub_type: SubscriptionType,
     ) -> PocketResult<SubscriptionStream> {
-        // TODO: Implement subscription logic
-        // 1. Generate subscription ID
-        // 2. Send Command::Subscribe
-        // 3. Wait for CommandResponse::SubscriptionSuccess
-        // 4. Return subscription ID and stream receiver
         let id = Uuid::new_v4();
         self.sender
             .send(Command::Subscribe {
@@ -205,34 +247,21 @@ impl SubscriptionsHandle {
             .map_err(CoreError::from)?;
         // Wait for the subscription response
 
-        loop {
-            match self.receiver.recv().await {
-                Ok(CommandResponse::SubscriptionSuccess {
-                    command_id,
-                    stream_receiver,
-                }) => {
-                    if command_id == id {
-                        return Ok(SubscriptionStream {
-                            receiver: stream_receiver,
-                            sender: Some(self.sender.clone()),
-                            command_receiver: self.receiver.clone(),
-                            asset,
-                            sub_type,
-                        });
-                    } else {
-                        // If the request ID does not match, continue waiting for the correct response
-                        continue;
-                    }
-                }
-                Ok(CommandResponse::SubscriptionFailed { command_id, error }) => {
-                    if command_id == id {
-                        return Err(*error);
-                    }
-                    continue;
-                }
-                Ok(_) => continue,
-                Err(e) => return Err(CoreError::from(e).into()),
-            }
+        match self.router.wait_for(id).await? {
+            CommandResponse::SubscriptionSuccess {
+                command_id: _,
+                stream_receiver,
+            } => Ok(SubscriptionStream {
+                receiver: stream_receiver,
+                sender: Some(self.sender.clone()),
+                router: self.router.clone(),
+                asset,
+                sub_type,
+            }),
+            CommandResponse::SubscriptionFailed { error, .. } => Err(*error),
+            _ => Err(PocketError::General(
+                "Unexpected response to subscribe command".into(),
+            )),
         }
     }
 
@@ -244,9 +273,6 @@ impl SubscriptionsHandle {
     /// # Returns
     /// * `PocketResult<()>` - Success or error
     pub async fn unsubscribe(&self, asset: String) -> PocketResult<()> {
-        // TODO: Implement unsubscription logic
-        // 1. Send Command::Unsubscribe
-        // 2. Wait for CommandResponse::UnsubscriptionSuccess
         let id = Uuid::new_v4();
         self.sender
             .send(Command::Unsubscribe {
@@ -256,25 +282,12 @@ impl SubscriptionsHandle {
             .await
             .map_err(CoreError::from)?;
         // Wait for the unsubscription response
-        loop {
-            match self.receiver.recv().await {
-                Ok(CommandResponse::UnsubscriptionSuccess { command_id }) => {
-                    if command_id == id {
-                        return Ok(());
-                    } else {
-                        // If the request ID does not match, continue waiting for the correct response
-                        continue;
-                    }
-                }
-                Ok(CommandResponse::UnsubscriptionFailed { command_id, error }) => {
-                    if command_id == id {
-                        return Err(*error);
-                    }
-                    continue;
-                }
-                Ok(_) => continue,
-                Err(e) => return Err(CoreError::from(e).into()),
-            }
+        match self.router.wait_for(id).await? {
+            CommandResponse::UnsubscriptionSuccess { .. } => Ok(()),
+            CommandResponse::UnsubscriptionFailed { error, .. } => Err(*error),
+            _ => Err(PocketError::General(
+                "Unexpected response to unsubscribe command".into(),
+            )),
         }
     }
 
@@ -283,19 +296,17 @@ impl SubscriptionsHandle {
     /// # Returns
     /// * `PocketResult<usize>` - Number of active subscriptions
     pub async fn get_active_subscriptions_count(&self) -> PocketResult<u32> {
+        let id = Uuid::new_v4();
         self.sender
-            .send(Command::SubscriptionCount)
+            .send(Command::SubscriptionCount { command_id: id })
             .await
             .map_err(CoreError::from)?;
         // Wait for the subscription count response
-        loop {
-            match self.receiver.recv().await {
-                Ok(CommandResponse::SubscriptionCount(count)) => {
-                    return Ok(count);
-                }
-                Ok(_) => continue,
-                Err(e) => return Err(CoreError::from(e).into()),
-            }
+        match self.router.wait_for(id).await? {
+            CommandResponse::SubscriptionCount { count, .. } => Ok(count),
+            _ => Err(PocketError::General(
+                "Unexpected response to subscription count command".into(),
+            )),
         }
     }
 
@@ -331,25 +342,12 @@ impl SubscriptionsHandle {
             .await
             .map_err(CoreError::from)?;
         // Wait for the history response
-        loop {
-            match self.receiver.recv().await {
-                Ok(CommandResponse::History { command_id, data }) => {
-                    if command_id == id {
-                        return Ok(data);
-                    } else {
-                        // If the request ID does not match, continue waiting for the correct response
-                        continue;
-                    }
-                }
-                Ok(CommandResponse::HistoryFailed { command_id, error }) => {
-                    if command_id == id {
-                        return Err(*error);
-                    }
-                    continue;
-                }
-                Ok(_) => continue,
-                Err(e) => return Err(CoreError::from(e).into()),
-            }
+        match self.router.wait_for(id).await? {
+            CommandResponse::History { data, .. } => Ok(data),
+            CommandResponse::HistoryFailed { error, .. } => Err(*error),
+            _ => Err(PocketError::General(
+                "Unexpected response to history command".into(),
+            )),
         }
     }
 }
@@ -390,7 +388,10 @@ impl ApiModule<State> for SubscriptionsApiModule {
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
     ) -> Self::Handle {
-        SubscriptionsHandle { sender, receiver }
+        SubscriptionsHandle {
+            sender,
+            router: ResponseRouter::new(receiver),
+        }
     }
 
     async fn run(&mut self) -> CoreResult<()> {
@@ -473,9 +474,9 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                 }
                             }
                         },
-                        Command::SubscriptionCount => {
+                        Command::SubscriptionCount { command_id } => {
                             let count = self.state.active_subscriptions.read().await.len() as u32;
-                            self.command_responder.send(CommandResponse::SubscriptionCount(count)).await?;
+                            self.command_responder.send(CommandResponse::SubscriptionCount { command_id, count }).await?;
                         },
                         Command::History { asset, period, command_id } => {
                             // Enforce single request
@@ -738,24 +739,12 @@ impl SubscriptionStream {
         }
 
         // Wait for response
-        loop {
-            match self.command_receiver.recv().await {
-                Ok(CommandResponse::UnsubscriptionSuccess { command_id: id }) => {
-                    if id == command_id {
-                        return Ok(());
-                    }
-                }
-                Ok(CommandResponse::UnsubscriptionFailed {
-                    command_id: id,
-                    error,
-                }) => {
-                    if id == command_id {
-                        return Err(*error);
-                    }
-                }
-                Ok(_) => continue,
-                Err(e) => return Err(CoreError::from(e).into()),
-            }
+        match self.router.wait_for(command_id).await? {
+            CommandResponse::UnsubscriptionSuccess { .. } => Ok(()),
+            CommandResponse::UnsubscriptionFailed { error, .. } => Err(*error),
+            _ => Err(PocketError::General(
+                "Unexpected response to unsubscribe command".into(),
+            )),
         }
     }
 
@@ -841,7 +830,7 @@ impl Clone for SubscriptionStream {
         Self {
             receiver: self.receiver.clone(),
             sender: self.sender.clone(),
-            command_receiver: self.command_receiver.clone(),
+            router: self.router.clone(),
             asset: self.asset.clone(),
             sub_type: self.sub_type.clone(),
         }
