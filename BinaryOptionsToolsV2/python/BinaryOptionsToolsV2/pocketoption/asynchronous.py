@@ -191,15 +191,18 @@ class PocketOptionAsync:
         except ImportError:
             from BinaryOptionsToolsV2 import RawPocketOption
         # SSID Sanitizer: fix common shell-stripping issues (missing quotes around "auth")
-        ssid = re.sub(r"42\[['\"]?auth['\"]?,", '42["auth",', ssid, count=1)
+        if ssid is not None:
+            ssid = re.sub(r"42\[['\"]?auth['\"]?,", '42["auth",', ssid, count=1)
 
         from ..tracing import Logger
 
         self.logger = Logger()
 
         # Ensure it looks like a Socket.IO message
-        if not ssid.startswith("42["):
+        if ssid is not None and not ssid.startswith("42["):
             self.logger.warn(f"SSID does not start with '42[': {ssid[:20]}...")
+        elif ssid is None:
+            self.logger.warn("SSID is None, connection will likely fail")
 
         # Enforce configuration and instantiation
         if config is not None:

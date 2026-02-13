@@ -20,8 +20,7 @@ async def test_async_connection_control():
 
     ssid = os.getenv("POCKET_OPTION_SSID")
     if not ssid:
-        print("Error: POCKET_OPTION_SSID environment variable not set")
-        return
+        pytest.skip("POCKET_OPTION_SSID not set")
 
     # Use context manager or manual
     async with PocketOptionAsync(ssid) as client:
@@ -113,8 +112,7 @@ def test_sync_connection_control():
 
     ssid = os.getenv("POCKET_OPTION_SSID")
     if not ssid:
-        print("Error: POCKET_OPTION_SSID environment variable not set")
-        return
+        pytest.skip("POCKET_OPTION_SSID not set")
 
     # Use custom config with reduced timeout
     config = {"connection_initialization_timeout_secs": 30}

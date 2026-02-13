@@ -42,6 +42,8 @@ async def test_manual_connect_shutdown(api_no_context):
 @pytest.mark.asyncio
 async def test_config_variations():
     ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        pytest.skip("POCKET_OPTION_SSID not set")
 
     # Test Config from dict
     config_dict = {"terminal_logging": False, "log_level": "INFO"}
@@ -82,6 +84,8 @@ async def test_raw_operations(api):
 @pytest.mark.asyncio
 async def test_context_manager():
     ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        pytest.skip("POCKET_OPTION_SSID not set")
     async with PocketOption(ssid) as api:
         assert api.client is not None
         # Should already be connected and assets loaded due to __aenter__
@@ -92,6 +96,8 @@ async def test_context_manager():
 @pytest.mark.asyncio
 async def test_config_json_and_trades():
     ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        pytest.skip("POCKET_OPTION_SSID not set")
 
     # Test Config from JSON string (Line 143)
     config_json = '{"terminal_logging": false, "log_level": "DEBUG"}'

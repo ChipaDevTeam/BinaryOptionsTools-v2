@@ -5,6 +5,8 @@ from BinaryOptionsToolsV2.pocketoption.synchronous import PocketOption
 
 def test_sync_manual_connect_shutdown():
     ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        pytest.skip("POCKET_OPTION_SSID not set")
     api = PocketOption(ssid)
     api.connect()
 
@@ -16,6 +18,8 @@ def test_sync_manual_connect_shutdown():
 
 def test_sync_config_variations():
     ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        pytest.skip("POCKET_OPTION_SSID not set")
 
     # Test Config from dict
     config_dict = {"terminal_logging": False}
@@ -30,12 +34,16 @@ def test_sync_config_variations():
 
 def test_sync_context_manager():
     ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        pytest.skip("POCKET_OPTION_SSID not set")
     with PocketOption(ssid) as api:
         assert api.balance() >= 0
 
 
 def test_sync_raw_operations():
     ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        pytest.skip("POCKET_OPTION_SSID not set")
     with PocketOption(ssid) as api:
         api.send_raw_message('42["ping"]')
 
@@ -50,6 +58,8 @@ def test_sync_raw_operations():
 
 def test_sync_subscription():
     ssid = os.getenv("POCKET_OPTION_SSID")
+    if not ssid:
+        pytest.skip("POCKET_OPTION_SSID not set")
     with PocketOption(ssid) as api:
         # Just check if we can create it
         sub = api.subscribe_symbol("EURUSD_otc")
