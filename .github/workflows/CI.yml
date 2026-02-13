@@ -154,11 +154,9 @@ jobs:
           path: BinaryOptionsToolsV2/dist
       - name: pytest
         if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
-        uses: addnab/docker-run-action@v3
-        with:
-          image: alpine:latest
-          options: -v ${{ github.workspace }}:/io -w /io/BinaryOptionsToolsV2
-          run: |
+        shell: bash
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/io -w /io/BinaryOptionsToolsV2 alpine:latest sh -c "
             set -e
             apk add py3-pip py3-virtualenv
             python3 -m virtualenv .venv
@@ -168,6 +166,7 @@ jobs:
             mkdir test_run
             cd test_run
             pytest ../../tests
+          "
       - name: pytest
         if: ${{ !startsWith(matrix.platform.target, 'x86') }}
         uses: uraimo/run-on-arch-action@v2
