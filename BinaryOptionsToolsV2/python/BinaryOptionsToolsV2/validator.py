@@ -51,7 +51,7 @@ class Validator:
         Example:
             ```python
             # Match messages starting with a number
-            validator = Validator.regex(r"^\\d+")
+            validator = Validator.regex(r"^\d+")
             assert validator.check("123 message") == True
             assert validator.check("abc") == False
             ```
