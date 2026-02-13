@@ -71,6 +71,34 @@ pub enum WebSocketEvent<Transfer: MessageTransfer> {
     PongReceived(Instant),
 }
 
+impl<Transfer: MessageTransfer> WebSocketEvent<Transfer> {
+    pub fn event_type(&self) -> EventType {
+        match self {
+            WebSocketEvent::Connected => EventType::Connected,
+            WebSocketEvent::Disconnected(_) => EventType::Disconnected,
+            WebSocketEvent::Authenticated(_) => EventType::Custom("authenticated".to_string()),
+            WebSocketEvent::BalanceUpdated(_, _) => {
+                EventType::Custom("balance_updated".to_string())
+            }
+            WebSocketEvent::OrderOpened(_, _) => EventType::Custom("order_opened".to_string()),
+            WebSocketEvent::OrderClosed(_, _) => EventType::Custom("order_closed".to_string()),
+            WebSocketEvent::StreamUpdate(_, _) => EventType::Custom("stream_update".to_string()),
+            WebSocketEvent::CandlesReceived(_, _) => {
+                EventType::Custom("candles_received".to_string())
+            }
+            WebSocketEvent::MessageReceived(_) => EventType::MessageReceived,
+            WebSocketEvent::RawMessageReceived(_) => {
+                EventType::Custom("raw_message_received".to_string())
+            }
+            WebSocketEvent::MessageSent(_) => EventType::MessageSent,
+            WebSocketEvent::Error(_) => EventType::Error,
+            WebSocketEvent::Closing => EventType::Custom("closing".to_string()),
+            WebSocketEvent::PingSent(_) => EventType::Custom("ping_sent".to_string()),
+            WebSocketEvent::PongReceived(_) => EventType::Custom("pong_received".to_string()),
+        }
+    }
+}
+
 /// Connection statistics and state tracking (inspired by Python implementation)
 #[derive(Debug, Default, Clone)]
 pub struct ConnectionState {
@@ -271,25 +299,23 @@ impl<T: DataHandler> SharedState<T> {
             return;
         }
 
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(config.max_concurrent_handlers));
         let mut tasks = Vec::new();
 
         for handler in handlers.iter() {
-            // Simplified handling: we don't have handles_event in EventHandler by default
             let handler = handler.clone();
             let event = event.clone();
+            let semaphore = semaphore.clone();
 
             let task = tokio::spawn(async move {
-                let e = Event::new(EventType::Custom("ws_event".to_string()), event);
+                let _permit = semaphore.acquire().await.ok();
+                let event_type = event.event_type();
+                let e = Event::new(event_type, event);
                 if let Err(e) = handler.handle(&e).await {
                     error!("Event handler failed: {}", e);
                 }
             });
             tasks.push(task);
-
-            // Limit concurrent handlers
-            if tasks.len() >= config.max_concurrent_handlers {
-                break;
-            }
         }
 
         // Wait for all handlers to complete (with timeout like Python)
@@ -358,8 +384,10 @@ impl<T: DataHandler> SharedState<T> {
 
     /// Remove an event handler by name
     pub async fn remove_handler(&self, name: &str) -> bool {
-        // Placeholder as EventHandler doesn't have a name method by default
-        false
+        let mut handlers = self.event_handlers.write().await;
+        let initial_len = handlers.len();
+        handlers.retain(|h| h.name() != name);
+        handlers.len() < initial_len
     }
 
     /// Get current connection statistics

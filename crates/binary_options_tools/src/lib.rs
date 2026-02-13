@@ -21,10 +21,11 @@
 //! - Timeout handling with custom macros
 //! - Stream processing capabilities
 //!
-//! // Use the streaming utilities for real-time data processing
-//! // Serialize and deserialize data with the provided macros
-//! // Apply timeouts to async operations
-//! ```text
+//! ## Usage
+//!
+//! - Use the streaming utilities for real-time data processing
+//! - Serialize and deserialize data with the provided macros
+//! - Apply timeouts to async operations
 pub mod config;
 pub mod error;
 pub mod expertoptions;

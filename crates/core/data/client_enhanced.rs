@@ -589,12 +589,24 @@ where
         let event_manager = self.event_manager.clone();
 
         let task = tokio::spawn(async move {
-            let stream1 = crate::general::stream::RecieverStream::new(message_receiver);
-            let stream2 = crate::general::stream::RecieverStream::new(message_receiver_priority);
-            let mut fused_streams =
-                futures_util::stream::select_all([stream1.to_stream(), stream2.to_stream()]);
+            let mut stream1 =
+                crate::general::stream::RecieverStream::new(message_receiver).to_stream();
+            let mut stream2 =
+                crate::general::stream::RecieverStream::new(message_receiver_priority).to_stream();
 
-            while let Some(Ok(message)) = fused_streams.next().await {
+            loop {
+                let message = tokio::select! {
+                    biased;
+                    Some(Ok(msg)) = stream2.next() => Some(msg),
+                    Some(Ok(msg)) = stream1.next() => Some(msg),
+                    else => None,
+                };
+
+                let message = match message {
+                    Some(msg) => msg,
+                    None => break,
+                };
+
                 match write.send(message.clone()).await {
                     Ok(_) => {
                         debug!("Message sent to WebSocket");

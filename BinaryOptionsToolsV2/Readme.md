@@ -93,12 +93,12 @@ Key Features of PocketOptionAsync
   - `check_win()`: Checks the outcome of a trade ('win', 'draw', or 'loss').
 - **Market Data**:
   - `get_candles()`: Fetches historical candle data.
-  - ~~`history()`: Retrieves recent data for a specific asset.~~ (Work in Progress)
+  - `history()`: Retrieves recent data for a specific asset.
 - **Account Management**:
   - `balance()`: Returns the current account balance.
   - `opened_deals()`: Lists all open trades.
-  - ~~`closed_deals()`: Lists all closed trades.~~ (Work in Progress)
-  - ~~`payout()`: Returns payout percentages.~~ (Work in Progress)
+  - `closed_deals()`: Lists all closed trades.
+  - `payout()`: Returns payout percentages.
 - **Real-Time Data**:
   - `subscribe_symbol()`: Provides an asynchronous iterator for real-time candle updates.
   - `subscribe_symbol_timed()`: Provides an asynchronous iterator for timed real-time candle updates.
@@ -155,12 +155,12 @@ Key Features of PocketOption
   - `check_win()`: Checks the trade outcome synchronously.
 - **Market Data**:
   - `get_candles()`: Fetches historical candle data.
-  - ~~`history()`: Retrieves recent data for a specific asset.~~ (Work in Progress)
+  - `history()`: Retrieves recent data for a specific asset.
 - **Account Management**:
   - `balance()`: Retrieves account balance.
   - `opened_deals()`: Lists all open trades.
-  - ~~`closed_deals()`: Lists all closed trades.~~ (Work in Progress)
-  - ~~`payout()`: Returns payout percentages.~~ (Work in Progress)
+  - `closed_deals()`: Lists all closed trades.
+  - `payout()`: Returns payout percentages.
 - **Real-Time Data**:
   - `subscribe_symbol()`: Provides a synchronous iterator for live data updates.
   - `subscribe_symbol_timed()`: Provides a synchronous iterator for timed real-time candle updates.

@@ -248,6 +248,8 @@ impl ConnectionManager for EnhancedConnectionManager {
             }));
         }
 
+        let mut last_error = None;
+
         // Wait for first successful connection
         while !handles.is_empty() {
             let (result, _index, remaining) = futures_util::future::select_all(handles).await;
@@ -261,13 +263,16 @@ impl ConnectionManager for EnhancedConnectionManager {
                     }
                     return Ok((stream, url));
                 }
-                Ok(Err(_)) => continue, // Try next connection
-                Err(_) => continue,     // Handle join error
+                Ok(Err(e)) => {
+                    last_error = Some(e);
+                    continue;
+                } // Try next connection
+                Err(_) => continue, // Handle join error
             }
         }
 
         Err(BinaryOptionsToolsError::WebsocketConnectionError(Box::new(
-            tokio_tungstenite::tungstenite::Error::ConnectionClosed,
+            last_error.unwrap_or(tokio_tungstenite::tungstenite::Error::ConnectionClosed),
         )))
     }
 

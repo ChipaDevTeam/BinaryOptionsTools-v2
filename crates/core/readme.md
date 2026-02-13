@@ -15,22 +15,22 @@
 - Add functions to clean closed trades history
 - Add support for testing for multiple different connections, like passing an iterable
 - Add error handling in case there is an error parsing some data, to return an error and not keep waiting (It is for the `send_message` function) --> Done
-- Add support for pending requests by `time` and by `price`
+- Add support for pending requests by `time` and by `price` --> Done
 - Replace the `tokio::sync::oneshot` channels to `async_channel::channel` and id so it works properly
 - Create an example folder with examples for `async` and `sync` versions of the library and for each language supported
 
 ### General
 
 - Make `WebSocketClient` struct more general and create some traits like:
-  - `Connect` --> How to connect to websocket
-  - `Processor` --> How to process every `tokio_tungstenite::tungstenite::Message`
-  - `Sender` --> Struct Or class that will work be shared between threads
-  - `Data` --> All the possible data management
+  - `Connect` --> How to connect to websocket --> Done
+  - `Processor` --> How to process every `tokio_tungstenite::tungstenite::Message` --> Done
+  - `Sender` --> Struct Or class that will work be shared between threads --> Done
+  - `Data` --> All the possible data management --> Done
 
 ### Pocket Option
 
 - Add support for Signals (No clue how to start)
-- Add support for pending trades (Seems easy and will add a lot new features to the api)
+- Add support for pending trades (Seems easy and will add a lot new features to the api) --> Done
 
 ### Important
 

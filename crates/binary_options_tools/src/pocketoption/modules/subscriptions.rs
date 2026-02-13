@@ -804,7 +804,12 @@ impl SubscriptionStream {
     /// Process an incoming price update based on subscription type
     fn process_update(&mut self, timestamp: i64, price: Decimal) -> PocketResult<Option<Candle>> {
         let asset = self.asset().to_string();
-        let price_f64 = price.to_f64().unwrap_or_default();
+        let price_f64 = price.to_f64().ok_or_else(|| {
+            PocketError::General(format!(
+                "Failed to convert price {} to f64 for asset {} at timestamp {}",
+                price, asset, timestamp
+            ))
+        })?;
         if let Some(c) = self
             .sub_type
             .update(&BaseCandle::from((timestamp, price_f64)))?
