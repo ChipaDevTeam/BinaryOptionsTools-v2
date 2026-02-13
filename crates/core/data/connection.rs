@@ -203,7 +203,9 @@ impl EnhancedConnectionManager {
                 self.pool
                     .update_stats(url.as_str(), start.elapsed(), false)
                     .await;
-                Err(BinaryOptionsToolsError::WebsocketConnectionError(e))
+                Err(BinaryOptionsToolsError::WebsocketConnectionError(Box::new(
+                    e,
+                )))
             }
             Err(_) => {
                 self.pool
@@ -246,6 +248,8 @@ impl ConnectionManager for EnhancedConnectionManager {
             }));
         }
 
+        let mut last_error = None;
+
         // Wait for first successful connection
         while !handles.is_empty() {
             let (result, _index, remaining) = futures_util::future::select_all(handles).await;
@@ -259,14 +263,17 @@ impl ConnectionManager for EnhancedConnectionManager {
                     }
                     return Ok((stream, url));
                 }
-                Ok(Err(_)) => continue, // Try next connection
-                Err(_) => continue,     // Handle join error
+                Ok(Err(e)) => {
+                    last_error = Some(e);
+                    continue;
+                } // Try next connection
+                Err(_) => continue, // Handle join error
             }
         }
 
-        Err(BinaryOptionsToolsError::WebsocketConnectionError(
-            tokio_tungstenite::tungstenite::Error::ConnectionClosed,
-        ))
+        Err(BinaryOptionsToolsError::WebsocketConnectionError(Box::new(
+            last_error.unwrap_or(tokio_tungstenite::tungstenite::Error::ConnectionClosed),
+        )))
     }
 
     async fn test_connection(&self, url: &Url) -> BinaryOptionsResult<Duration> {

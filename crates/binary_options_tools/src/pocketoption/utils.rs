@@ -3,8 +3,10 @@ use binary_options_tools_core_pre::reimports::{
     connect_async_tls_with_config, generate_key, Connector, MaybeTlsStream, Request,
     WebSocketStream,
 };
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use rand::Rng;
+use std::sync::OnceLock;
+use std::time::Duration as StdDuration;
 
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
@@ -13,36 +15,90 @@ use crate::pocketoption::{
 use crate::utils::init_crypto_provider;
 use serde_json::Value;
 use tokio::net::TcpStream;
+
 use url::Url;
 
-const IP_API_URL: &str = "http://ip-api.com/json/";
-const IPIFY_URL: &str = "https://i.pn/json/";
+static CONNECTOR: OnceLock<Connector> = OnceLock::new();
+
+fn get_connector() -> ConnectorResult<&'static Connector> {
+    if let Some(connector) = CONNECTOR.get() {
+        return Ok(connector);
+    }
+
+    let mut root_store = rustls::RootCertStore::empty();
+    let certs = rustls_native_certs::load_native_certs().certs;
+    if certs.is_empty() {
+        return Err(ConnectorError::Custom(
+            "Could not load any native certificates".to_string(),
+        ));
+    }
+    for cert in certs {
+        root_store.add(cert).ok();
+    }
+    let tls_config = rustls::ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
+
+    let connector = Connector::Rustls(std::sync::Arc::new(tls_config));
+    let _ = CONNECTOR.set(connector);
+    Ok(CONNECTOR.get().unwrap())
+}
+
+const IP_PROVIDERS: &[&str] = &[
+    "https://i.pn/json/",
+    "https://ip.pn/json/",
+    "https://ipv4.myip.coffee",
+    "https://api.ipify.org?format=json",
+    "https://httpbin.org/ip",
+    "https://ifconfig.co/json",
+    "https://ipapi.co/",
+    "https://ipwho.is/",
+];
 const EARTH_RADIUS_KM: f64 = 6371.0;
-const POCKET_OPTION_ORIGIN: &str = "https://pocketoption.com";
-const WEBSOCKET_VERSION: &str = "13";
 
 pub fn get_index() -> PocketResult<u64> {
     let mut rng = rand::thread_rng();
 
     let rand = rng.gen_range(10..99);
-    let time = (Utc::now() + Duration::hours(2)).timestamp();
+    let time = Utc::now().timestamp();
     format!("{time}{rand}")
         .parse::<u64>()
         .map_err(|e| PocketError::General(e.to_string()))
 }
 
 pub async fn get_user_location(ip_address: &str) -> PocketResult<(f64, f64)> {
-    let response = reqwest::get(format!("{IP_API_URL}{ip_address}")).await?;
-    let json: Value = response.json().await?;
+    let client = reqwest::Client::builder()
+        .timeout(StdDuration::from_secs(2))
+        .build()
+        .map_err(|e| PocketError::General(format!("Failed to build HTTP client: {e}")))?;
 
-    let lat = json["lat"]
-        .as_f64()
-        .ok_or_else(|| PocketError::General("Missing latitude in IP API response".into()))?;
-    let lon = json["lon"]
-        .as_f64()
-        .ok_or_else(|| PocketError::General("Missing longitude in IP API response".into()))?;
+    // Try providers that give geolocation data
+    for url in IP_PROVIDERS {
+        let target = if url.contains("ipapi.co") {
+            format!("{}{}/json/", url, ip_address)
+        } else if url.contains("ipwho.is") || url.contains("i.pn") || url.contains("ip.pn") {
+            format!("{}{}", url, ip_address)
+        } else {
+            continue;
+        };
 
-    Ok((lat, lon))
+        tracing::debug!(target: "PocketUtils", "Trying geo provider: {}", target);
+        if let Ok(response) = client.get(&target).send().await {
+            if let Ok(json) = response.json::<Value>().await {
+                let lat = json["lat"].as_f64().or_else(|| json["latitude"].as_f64());
+                let lon = json["lon"].as_f64().or_else(|| json["longitude"].as_f64());
+
+                if let (Some(lat), Some(lon)) = (lat, lon) {
+                    tracing::debug!(target: "PocketUtils", "Found location via {}: {}, {}", target, lat, lon);
+                    return Ok((lat, lon));
+                }
+            }
+        }
+    }
+
+    tracing::warn!(target: "PocketUtils", "All geo providers failed for IP {}. Using fallback location.", ip_address);
+    // Default or fallback location (e.g. US Central) if all fail
+    Ok((37.0902, -95.7129))
 }
 
 pub fn calculate_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
@@ -60,15 +116,37 @@ pub fn calculate_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 }
 
 pub async fn get_public_ip() -> PocketResult<String> {
-    let response = reqwest::get(IPIFY_URL).await?;
-    let json: serde_json::Value = response.json().await?;
-    match json["ip"].as_str().or(json["query"].as_str()) {
-        Some(ip) => Ok(ip.to_string()),
-        None => Err(PocketError::General(format!(
-            "Failed to retrieve public IP from {}. Response: {:?}",
-            IPIFY_URL, json
-        ))),
+    let client = reqwest::Client::builder()
+        .timeout(StdDuration::from_secs(2))
+        .build()
+        .map_err(|e| PocketError::General(format!("Failed to build HTTP client: {e}")))?;
+
+    for url in IP_PROVIDERS {
+        let target = url.to_string();
+        tracing::debug!(target: "PocketUtils", "Trying IP provider: {}", target);
+        match client.get(&target).send().await {
+            Ok(response) => {
+                if let Ok(json) = response.json::<Value>().await {
+                    if let Some(ip) = json["ip"]
+                        .as_str()
+                        .or_else(|| json["query"].as_str())
+                        .or_else(|| json["origin"].as_str())
+                    {
+                        tracing::debug!(target: "PocketUtils", "Found public IP via {}: {}", target, ip);
+                        return Ok(ip.to_string());
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::debug!(target: "PocketUtils", "Provider {} failed: {}", target, e);
+                continue;
+            }
+        }
     }
+
+    Err(PocketError::General(
+        "Failed to retrieve public IP from any provider".into(),
+    ))
 }
 
 pub async fn try_connect(
@@ -76,67 +154,70 @@ pub async fn try_connect(
     url: String,
 ) -> ConnectorResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
     init_crypto_provider();
-    let mut root_store = rustls::RootCertStore::empty();
-    let certs = rustls_native_certs::load_native_certs().certs;
-    if certs.is_empty() {
-        return Err(ConnectorError::Custom(
-            "Could not load any native certificates".to_string(),
-        ));
-    }
-    for cert in certs {
-        root_store.add(cert).ok();
-    }
-    let tls_config = rustls::ClientConfig::builder()
-        .with_root_certificates(root_store)
-        .with_no_client_auth();
-
-    let connector = Connector::Rustls(std::sync::Arc::new(tls_config));
+    let connector = get_connector()?;
 
     let user_agent = ssid.user_agent();
+
     let t_url = Url::parse(&url).map_err(|e| ConnectorError::UrlParsing(e.to_string()))?;
     let host = t_url
         .host_str()
         .ok_or(ConnectorError::UrlParsing("Host not found".into()))?;
+
+    tracing::debug!(target: "PocketConnect", "Connecting to {} with UA: {} and Origin: https://pocketoption.com", host, user_agent);
+
     let request = Request::builder()
         .uri(t_url.to_string())
-        .header("Origin", POCKET_OPTION_ORIGIN)
-        .header("Cache-Control", "no-cache")
+        .header("Host", host)
         .header("User-Agent", user_agent)
+        .header("Origin", "https://pocketoption.com")
         .header("Upgrade", "websocket")
         .header("Connection", "upgrade")
         .header("Sec-Websocket-Key", generate_key())
-        .header("Sec-Websocket-Version", WEBSOCKET_VERSION)
-        .header("Host", host)
+        .header("Sec-Websocket-Version", "13")
         .body(())
         .map_err(|e| ConnectorError::HttpRequestBuild(e.to_string()))?;
 
-    let (ws, _) = connect_async_tls_with_config(request, None, false, Some(connector))
-        .await
-        .map_err(|e| ConnectorError::Custom(e.to_string()))?;
+    let (ws, _) = tokio::time::timeout(
+        StdDuration::from_secs(10),
+        connect_async_tls_with_config(request, None, false, Some(connector.clone())),
+    )
+    .await
+    .map_err(|_| ConnectorError::Timeout)?
+    .map_err(|e| ConnectorError::Custom(e.to_string()))?;
     Ok(ws)
 }
 
-pub mod float_time {
+pub mod unix_timestamp {
+
     use chrono::{DateTime, Utc};
+
     use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let s = date.timestamp_millis() as f64 / 1000.0;
-        serializer.serialize_f64(s)
+        serializer.serialize_i64(date.timestamp())
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let f = f64::deserialize(deserializer)?;
-        let secs = f.trunc() as i64;
-        let nanos = (f.fract() * 1_000_000_000.0).round() as u32;
+        let value = serde_json::Value::deserialize(deserializer)?;
 
-        DateTime::from_timestamp(secs, nanos)
-            .ok_or(serde::de::Error::custom("Error parsing float to time"))
+        let timestamp = if let Some(i) = value.as_i64() {
+            i
+        } else if let Some(f) = value.as_f64() {
+            f.trunc() as i64
+        } else {
+            return Err(serde::de::Error::custom(
+                "Error parsing timestamp: expected number",
+            ));
+        };
+
+        DateTime::from_timestamp(timestamp, 0).ok_or(serde::de::Error::custom(
+            "Error parsing timestamp to DateTime",
+        ))
     }
 }

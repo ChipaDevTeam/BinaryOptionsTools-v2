@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use rust_decimal::Decimal;
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock as SyncRwLock},
@@ -42,7 +43,7 @@ pub struct State {
     /// Default symbol to use if none is specified.
     pub default_symbol: String,
     /// Current balance, if available.
-    pub balance: RwLock<Option<f64>>,
+    pub balance: RwLock<Option<Decimal>>,
     /// Server time synchronization state
     pub server_time: ServerTimeState,
     /// Assets information
@@ -174,7 +175,7 @@ impl State {
     ///
     /// # Returns
     /// Result indicating success or failure
-    pub async fn set_balance(&self, balance: f64) {
+    pub async fn set_balance(&self, balance: Decimal) {
         let mut state = self.balance.write().await;
         *state = Some(balance);
     }
@@ -183,7 +184,7 @@ impl State {
     ///
     /// # Returns
     /// Current balance if available
-    pub async fn get_balance(&self) -> Option<f64> {
+    pub async fn get_balance(&self) -> Option<Decimal> {
         let state = self.balance.read().await;
         *state
     }
@@ -200,7 +201,7 @@ impl State {
     ///
     /// # Returns
     /// Current estimated server time as Unix timestamp
-    pub async fn get_server_time(&self) -> f64 {
+    pub async fn get_server_time(&self) -> i64 {
         self.server_time.read().await.get_server_time()
     }
 
@@ -208,7 +209,7 @@ impl State {
     ///
     /// # Arguments
     /// * `timestamp` - New server timestamp to synchronize with
-    pub async fn update_server_time(&self, timestamp: f64) {
+    pub async fn update_server_time(&self, timestamp: i64) {
         self.server_time.write().await.update(timestamp);
     }
 
@@ -220,32 +221,23 @@ impl State {
         self.server_time.read().await.is_stale()
     }
 
-    /// Get server time as DateTime<Utc>
+    /// Get server time as `DateTime<Utc>`
     ///
     /// # Returns
-    /// Current server time as DateTime<Utc>
+    /// Current server time as `DateTime<Utc>`
     pub async fn get_server_datetime(&self) -> DateTime<Utc> {
         let timestamp = self.get_server_time().await;
-        match DateTime::from_timestamp(timestamp as i64, 0) {
-            Some(dt) => dt,
-            None => {
-                tracing::warn!(
-                    "Failed to convert server timestamp {} to DateTime<Utc>. Defaulting to Utc::now().",
-                    timestamp
-                );
-                Utc::now()
-            }
-        }
+        DateTime::from_timestamp(timestamp, 0).unwrap_or_else(Utc::now)
     }
 
     /// Convert local time to server time
     ///
     /// # Arguments
-    /// * `local_time` - Local DateTime<Utc> to convert
+    /// * `local_time` - Local `DateTime<Utc>` to convert
     ///
     /// # Returns
     /// Estimated server timestamp
-    pub async fn local_to_server(&self, local_time: DateTime<Utc>) -> f64 {
+    pub async fn local_to_server(&self, local_time: DateTime<Utc>) -> i64 {
         self.server_time.read().await.local_to_server(local_time)
     }
 
@@ -255,8 +247,8 @@ impl State {
     /// * `server_timestamp` - Server timestamp to convert
     ///
     /// # Returns
-    /// Local DateTime<Utc>
-    pub async fn server_to_local(&self, server_timestamp: f64) -> DateTime<Utc> {
+    /// Local `DateTime<Utc>`
+    pub async fn server_to_local(&self, server_timestamp: i64) -> DateTime<Utc> {
         self.server_time
             .read()
             .await
@@ -294,6 +286,8 @@ impl State {
 }
 
 /// Holds all state related to trades and deals.
+type RecentTradeKey = (String, Action, u32, Decimal);
+
 #[derive(Debug, Default)]
 pub struct TradeState {
     /// A map of currently opened deals, keyed by their UUID.
@@ -306,8 +300,8 @@ pub struct TradeState {
     /// Key: Request UUID. Value: (OpenOrder, Timestamp sent)
     pub pending_market_orders: RwLock<HashMap<Uuid, (OpenOrder, Instant)>>,
     /// Cache of recent trades to prevent duplicates.
-    /// Key: (Asset, Action, Time, Amount*100). Value: (Trade ID, Timestamp)
-    pub recent_trades: RwLock<HashMap<(String, Action, u32, u64), (Uuid, Instant)>>,
+    /// Key: (Asset, Action, Time, Amount). Value: (Trade ID, Timestamp)
+    pub recent_trades: RwLock<HashMap<RecentTradeKey, (Uuid, Instant)>>,
 }
 
 impl TradeState {

@@ -23,7 +23,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 uniffi = { version = "0.30.0", features = ["cli"] }
-binary_options_tools = { path = "../crates/binary_options_tools" }
+binary_options_tools = { path = "../crates/binary_options_tools", version = "0.2.0" }
 tokio = { version = "1.47.1", features = ["full"] }
 thiserror = "2.0.14"
 rust_decimal = "1.37.2"

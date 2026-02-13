@@ -1,6 +1,6 @@
 [package]
 name = "BinaryOptionsToolsV2"
-version = "0.2.5"
+version = "0.2.6"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 description = "Python bindings for binary-options-tools. High-performance library for PocketOption trading automation with async/sync support, real-time data streaming, and WebSocket API access."
@@ -25,7 +25,7 @@ pyo3 = { version = "0.27.1", features = [
 ] }
 pyo3-async-runtimes = { version = "0.27.0", features = ["tokio-runtime"] }
 
-binary_options_tools = { path = "../crates/binary_options_tools", version = "0.1.9" }
+binary_options_tools = { path = "../crates/binary_options_tools", version = "0.2.0" }
 
 thiserror = "2.0.17"
 serde = { version = "1.0.228", features = ["derive"] }
@@ -41,3 +41,5 @@ regex = "1.12.2"
 async-stream = "0.3.6"
 async-trait = "0.1.86"
 tungstenite = { version = "0.28.0", default-features = false, features = ["rustls-tls-webpki-roots", "handshake"] }
+rust_decimal = "1.40.0"
+rust_decimal_macros = "1.40.0"

@@ -12,6 +12,8 @@ pub enum UniError {
     Uuid(String),
     #[error("An error occurred with validator: {0}")]
     Validator(String),
+    #[error("General error: {0}")]
+    General(String),
 }
 
 impl From<BinaryOptionsError> for UniError {

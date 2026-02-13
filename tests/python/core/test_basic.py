@@ -7,6 +7,7 @@ def test_module_import():
     # Check for some expected classes or modules based on __init__.py and lib.rs
     assert hasattr(BinaryOptionsToolsV2, "PocketOption")
     assert hasattr(BinaryOptionsToolsV2, "PocketOptionAsync")
+    assert hasattr(BinaryOptionsToolsV2, "RawPocketOption")
 
 
 def test_simple_math():

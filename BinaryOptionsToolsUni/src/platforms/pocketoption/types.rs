@@ -3,6 +3,7 @@ use binary_options_tools::pocketoption::{
     types::{
         Action as OriginalAction, Asset as OriginalAsset, AssetType as OriginalAssetType,
         CandleLength as OriginalCandleLength, Deal as OriginalDeal,
+        PendingOrder as OriginalPendingOrder,
     },
 };
 use rust_decimal::prelude::ToPrimitive;
@@ -232,12 +233,12 @@ impl From<OriginalDeal> for Deal {
             close_timestamp: deal.close_timestamp.timestamp(),
             uid: deal.uid,
             request_id: deal.request_id.map(|id| id.to_string()),
-            amount: deal.amount,
-            profit: deal.profit,
+            amount: deal.amount.to_f64().unwrap_or_default(),
+            profit: deal.profit.to_f64().unwrap_or_default(),
             percent_profit: deal.percent_profit,
             percent_loss: deal.percent_loss,
-            open_price: deal.open_price,
-            close_price: deal.close_price,
+            open_price: deal.open_price.to_f64().unwrap_or_default(),
+            close_price: deal.close_price.to_f64().unwrap_or_default(),
             command: deal.command,
             asset: deal.asset,
             is_demo: deal.is_demo,
@@ -249,8 +250,42 @@ impl From<OriginalDeal> for Deal {
             is_copy_signal: deal.is_copy_signal,
             is_ai: deal.is_ai,
             currency: deal.currency,
-            amount_usd: deal.amount_usd,
-            amount_usd2: deal.amount_usd2,
+            amount_usd: deal.amount_usd.and_then(|v| v.to_f64()),
+            amount_usd2: deal.amount_usd2.and_then(|v| v.to_f64()),
+        }
+    }
+}
+
+/// Represents a pending trade order.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct PendingOrder {
+    pub ticket: String,
+    pub open_type: u32,
+    pub amount: f64,
+    pub symbol: String,
+    pub open_time: String,
+    pub open_price: f64,
+    pub timeframe: u32,
+    pub min_payout: u32,
+    pub command: u32,
+    pub date_created: String,
+    pub id: u64,
+}
+
+impl From<OriginalPendingOrder> for PendingOrder {
+    fn from(order: OriginalPendingOrder) -> Self {
+        Self {
+            ticket: order.ticket.to_string(),
+            open_type: order.open_type,
+            amount: order.amount.to_f64().unwrap_or_default(),
+            symbol: order.symbol,
+            open_time: order.open_time,
+            open_price: order.open_price.to_f64().unwrap_or_default(),
+            timeframe: order.timeframe,
+            min_payout: order.min_payout,
+            command: order.command,
+            date_created: order.date_created,
+            id: order.id,
         }
     }
 }
@@ -286,7 +321,7 @@ impl From<OriginalCandle> for Candle {
     fn from(candle: OriginalCandle) -> Self {
         Self {
             symbol: candle.symbol,
-            timestamp: candle.timestamp as i64,
+            timestamp: candle.timestamp,
             open: candle.open.to_f64().unwrap_or_default(),
             high: candle.high.to_f64().unwrap_or_default(),
             low: candle.low.to_f64().unwrap_or_default(),

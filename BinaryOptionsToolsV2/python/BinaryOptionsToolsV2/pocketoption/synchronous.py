@@ -215,9 +215,6 @@ class PocketOption:
         # Wait for assets to ensure connection is ready
         self.loop.run_until_complete(self._client.wait_for_assets())
 
-    def __del__(self):
-        self.loop.close()
-
     def __enter__(self):
         """
         Context manager entry.
@@ -226,9 +223,17 @@ class PocketOption:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
-        Context manager exit. Disconnects the client.
+        Context manager exit. Shuts down the client and its runner.
         """
-        self.disconnect()
+        self.close()
+
+    def close(self) -> None:
+        """
+        Explicitly closes the client and its event loop.
+        """
+        self.shutdown()
+        if self.loop is not None and not self.loop.is_closed():
+            self.loop.close()
 
     def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
@@ -249,6 +254,13 @@ class PocketOption:
     def check_win(self, id: str) -> dict:
         """Returns a dictionary containing the trade data and the result of the trade ("win", "draw", "loss)"""
         return self.loop.run_until_complete(self._client.check_win(id))
+
+    def get_deal_end_time(self, trade_id: str) -> Optional[int]:
+        """
+        Returns the expected close time of a deal as a Unix timestamp.
+        Returns None if the deal is not found.
+        """
+        return self.loop.run_until_complete(self._client.get_deal_end_time(trade_id))
 
     def get_candles(self, asset: str, period: int, offset: int) -> List[Dict]:
         """
@@ -294,6 +306,48 @@ class PocketOption:
     def opened_deals(self) -> List[Dict]:
         "Returns a list of all the opened deals as dictionaries"
         return self.loop.run_until_complete(self._client.opened_deals())
+
+    def get_pending_deals(self) -> List[Dict]:
+        """
+        Retrieves a list of all currently pending trade orders.
+
+        Returns:
+            List[Dict]: List of pending orders, each containing order details.
+        """
+        return self.loop.run_until_complete(self._client.get_pending_deals())
+
+    def open_pending_order(
+        self,
+        open_type: int,
+        amount: float,
+        asset: str,
+        open_time: int,
+        open_price: float,
+        timeframe: int,
+        min_payout: int,
+        command: int,
+    ) -> Dict:
+        """
+        Opens a pending order on the PocketOption platform.
+
+        Args:
+            open_type (int): The type of the pending order.
+            amount (float): The amount to trade.
+            asset (str): The asset symbol (e.g., "EURUSD_otc").
+            open_time (int): The server time to open the trade (Unix timestamp).
+            open_price (float): The price to open the trade at.
+            timeframe (int): The duration of the trade in seconds.
+            min_payout (int): The minimum payout percentage required.
+            command (int): The trade direction (0 for Call, 1 for Put).
+
+        Returns:
+            Dict: The created pending order details.
+        """
+        return self.loop.run_until_complete(
+            self._client.open_pending_order(
+                open_type, amount, asset, open_time, open_price, timeframe, min_payout, command
+            )
+        )
 
     def closed_deals(self) -> List[Dict]:
         "Returns a list of all the closed deals as dictionaries"
@@ -376,15 +430,15 @@ class PocketOption:
     def disconnect(self) -> None:
         """
         Disconnects the client while keeping the configuration intact.
-        The connection can be re-established later using connect().
+        The connection will automatically try to re-establish if max_allowed_loops > 0.
+        To completely stop the client and its runner, use shutdown().
 
         Example:
             ```python
             client = PocketOption(ssid)
             # Use client...
             client.disconnect()
-            # Do other work...
-            client.connect()
+            # The client will try to reconnect in the background...
             ```
         """
         self.loop.run_until_complete(self._client.disconnect())
@@ -433,6 +487,13 @@ class PocketOption:
         """
         self.loop.run_until_complete(self._client.unsubscribe(asset))
 
+    def shutdown(self) -> None:
+        """
+        Completely shuts down the client and its background runner.
+        Once shut down, the client cannot be used anymore.
+        """
+        self.loop.run_until_complete(self._client.shutdown())
+
     def create_raw_handler(self, validator: Validator, keep_alive: Optional[str] = None) -> "RawHandlerSync":
         """
         Creates a raw handler for advanced WebSocket message handling.
@@ -461,3 +522,51 @@ class PocketOption:
         """
         async_handler = self.loop.run_until_complete(self._client.create_raw_handler(validator, keep_alive))
         return RawHandlerSync(async_handler, self.loop)
+
+    def send_raw_message(self, message: str) -> None:
+        """Sends a raw message through the websocket without waiting for a response"""
+        self.loop.run_until_complete(self._client.send_raw_message(message))
+
+    def create_raw_order(self, message: str, validator: Validator) -> str:
+        """Sends a raw message and waits for a response that matches the validator"""
+        return self.loop.run_until_complete(self._client.create_raw_order(message, validator))
+
+    def create_raw_order_with_timeout(self, message: str, validator: Validator, timeout: timedelta) -> str:
+        """Sends a raw message and waits for a response that matches the validator with a timeout"""
+        return self.loop.run_until_complete(self._client.create_raw_order_with_timeout(message, validator, timeout))
+
+    def create_raw_order_with_timeout_and_retry(self, message: str, validator: Validator, timeout: timedelta) -> str:
+        """Sends a raw message and waits for a response that matches the validator with a timeout and retry logic"""
+        return self.loop.run_until_complete(
+            self._client.create_raw_order_with_timeout_and_retry(message, validator, timeout)
+        )
+
+    def create_raw_iterator(self, message: str, validator: Validator, timeout: Optional[timedelta] = None):
+        """Returns a sync iterator that yields messages matching the validator after sending the initial message"""
+        async_iterator = self.loop.run_until_complete(self._client.create_raw_iterator(message, validator, timeout))
+        return SyncRawSubscription(async_iterator)
+
+    def active_assets(self) -> List[Dict]:
+        """
+        Retrieves a list of all active assets.
+
+        Returns:
+            List[Dict]: List of active assets, each containing:
+                - id: Asset ID
+                - symbol: Asset symbol (e.g., "EURUSD_otc")
+                - name: Human-readable name
+                - asset_type: Type of asset (stock, currency, commodity, cryptocurrency, index)
+                - payout: Payout percentage
+                - is_otc: Whether this is an OTC asset
+                - is_active: Whether the asset is currently active for trading
+                - allowed_candles: List of allowed timeframe durations in seconds
+
+        Example:
+            ```python
+            client = PocketOption(ssid)
+            active = client.active_assets()
+            for asset in active:
+                print(f"{asset['symbol']}: {asset['name']} (payout: {asset['payout']}%)")
+            ```
+        """
+        return self.loop.run_until_complete(self._client.active_assets())

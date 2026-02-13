@@ -4,9 +4,8 @@ use async_trait::async_trait;
 use binary_options_tools_core_pre::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
-    traits::{ApiModule, Rule},
+    traits::{ApiModule, Rule, RunnerCommand},
 };
-use rust_decimal::{prelude::FromPrimitive, Decimal};
 use serde::{Deserialize, Serialize};
 use tokio::select;
 use tracing::{info, warn};
@@ -21,6 +20,7 @@ use crate::{
         types::MultiPatternRule,
         utils::get_index,
     },
+    utils::f64_to_decimal,
 };
 
 const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = ["loadHistoryPeriodFast", "loadHistoryPeriod"];
@@ -77,17 +77,17 @@ impl TryFrom<CandleData> for Candle {
     fn try_from(candle_data: CandleData) -> Result<Self, Self::Error> {
         Ok(Candle {
             symbol: String::new(), // Will be filled by the caller
-            timestamp: candle_data.time as f64,
-            open: Decimal::from_f64(candle_data.open).ok_or(BinaryOptionsError::General(
+            timestamp: candle_data.time,
+            open: f64_to_decimal(candle_data.open).ok_or(BinaryOptionsError::General(
                 "Couldn't parse f64 to Decimal".to_string(),
             ))?,
-            high: Decimal::from_f64(candle_data.high).ok_or(BinaryOptionsError::General(
+            high: f64_to_decimal(candle_data.high).ok_or(BinaryOptionsError::General(
                 "Couldn't parse f64 to Decimal".to_string(),
             ))?,
-            low: Decimal::from_f64(candle_data.low).ok_or(BinaryOptionsError::General(
+            low: f64_to_decimal(candle_data.low).ok_or(BinaryOptionsError::General(
                 "Couldn't parse f64 to Decimal".to_string(),
             ))?,
-            close: Decimal::from_f64(candle_data.close).ok_or(BinaryOptionsError::General(
+            close: f64_to_decimal(candle_data.close).ok_or(BinaryOptionsError::General(
                 "Couldn't parse f64 to Decimal".to_string(),
             ))?,
             volume: None,
@@ -219,6 +219,7 @@ impl ApiModule<State> for GetCandlesApiModule {
         command_responder: AsyncSender<Self::CommandResponse>,
         ws_receiver: AsyncReceiver<Arc<Message>>,
         ws_sender: AsyncSender<Message>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self {
             state,
@@ -252,8 +253,15 @@ impl ApiModule<State> for GetCandlesApiModule {
                         Message::Text(text) => {
                             if let Ok(result) = serde_json::from_str::<LoadHistoryPeriodResult>(text) {
                                 self.process_candle_result(result).await?;
-                            } else {
-                                // Ignore potential header messages
+                            } else if let Some(start) = text.find('[') {
+                                // Try parsing as a 1-step Socket.IO message: 42["loadHistoryPeriod", {...}]
+                                if let Ok(serde_json::Value::Array(arr)) = serde_json::from_str::<serde_json::Value>(&text[start..]) {
+                                    if arr.len() >= 2 && (arr[0] == "loadHistoryPeriod" || arr[0] == "loadHistoryPeriodFast") {
+                                        if let Ok(result) = serde_json::from_value::<LoadHistoryPeriodResult>(arr[1].clone()) {
+                                            self.process_candle_result(result).await?;
+                                        }
+                                    }
+                                }
                             }
                         }
                         _ => {}

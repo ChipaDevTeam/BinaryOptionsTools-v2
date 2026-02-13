@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use binary_options_tools_core_pre::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
-    traits::{LightweightModule, Rule},
+    traits::{LightweightModule, Rule, RunnerCommand},
 };
 use tracing::debug;
 
@@ -24,6 +24,7 @@ impl LightweightModule<State> for ServerTimeModule {
         state: Arc<State>,
         _: AsyncSender<Message>,
         ws_receiver: AsyncReceiver<Arc<Message>>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self
     where
         Self: Sized,
@@ -37,12 +38,20 @@ impl LightweightModule<State> for ServerTimeModule {
     /// The module's asynchronous run loop.
     async fn run(&mut self) -> CoreResult<()> {
         while let Ok(msg) = self.receiver.recv().await {
-            if let Message::Binary(data) = &*msg {
-                if let Ok(candle) = serde_json::from_slice::<StreamData>(data) {
-                    // Process the candle data
-                    debug!("Received candle data: {:?}", candle);
-                    self.state.update_server_time(candle.timestamp).await;
+            match msg.as_ref() {
+                Message::Binary(data) => {
+                    if let Ok(candle) = serde_json::from_slice::<StreamData>(data) {
+                        debug!("Received candle data (binary): {:?}", candle);
+                        self.state.update_server_time(candle.timestamp).await;
+                    }
                 }
+                Message::Text(text) => {
+                    if let Ok(candle) = serde_json::from_str::<StreamData>(text) {
+                        debug!("Received candle data (text): {:?}", candle);
+                        self.state.update_server_time(candle.timestamp).await;
+                    }
+                }
+                _ => {}
             }
         }
         Err(CoreError::LightweightModuleLoop(

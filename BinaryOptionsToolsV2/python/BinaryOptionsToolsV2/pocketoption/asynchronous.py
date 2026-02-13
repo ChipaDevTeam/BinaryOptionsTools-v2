@@ -190,42 +190,21 @@ class PocketOptionAsync:
             from ..BinaryOptionsToolsV2 import RawPocketOption
         except ImportError:
             from BinaryOptionsToolsV2 import RawPocketOption
+        # SSID Sanitizer: fix common shell-stripping issues (missing quotes around "auth")
+        if ssid is not None:
+            ssid = re.sub(r"42\[['\"]?auth['\"]?,", '42["auth",', ssid, count=1)
+
         from ..tracing import Logger
 
-        # Handle case where shell stripped quotes from the SSID (e.g. export SSID=42[auth,{session:...}])
-        if ssid.startswith("42[auth,"):
-            # 1. Fix the prefix
-            ssid = ssid.replace("42[auth,", '42["auth",', 1)
+        self.logger = Logger()
 
-            # 2. Quote keys in the JSON object (alphanumeric keys followed by colon)
-            # This is safe because keys generally don't contain complex serialized data
-            ssid = re.sub(r"(?<=[{,])\s*([a-zA-Z0-9_]+)\s*:", r'"\1":', ssid)
+        # Ensure it looks like a Socket.IO message
+        if ssid is not None and not ssid.startswith("42["):
+            self.logger.warn(f"SSID does not start with '42[': {ssid[:20]}...")
+        elif ssid is None:
+            self.logger.warn("SSID is None, connection will likely fail")
 
-            # 3. Quote values SAFELY (The Fix)
-            # We use a pattern that matches Quoted Strings FIRST to protect them.
-            # Group 1: ("(?:[^"\\]|\\.)*") -> Matches full double-quoted strings (including escapes)
-            # Group 2: :\s*([^",}\]\s]+)   -> Matches colon + unquoted value
-            pattern = r'("(?:[^"\\]|\\.)*")|:\s*([^",}\]\s]+)(?=\s*[,}\]])'
-
-            def fix_mixed_values(match):
-                # If we matched a quoted string (Group 1), return it EXACTLY as is.
-                # This protects the PHP session string (e.g. "session":"a:4:{s:10...}")
-                # from having its internal colons modified.
-                if match.group(1):
-                    return match.group(1)
-
-                # If we matched an unquoted value (Group 2), process it.
-                val = match.group(2)
-                if val:
-                    # Keep numbers, booleans, and null unquoted
-                    if val.isdigit() or val in ["true", "false", "null"]:
-                        return f":{val}"
-                    # Quote everything else
-                    return f':"{val}"'
-                return match.group(0)
-
-            ssid = re.sub(pattern, fix_mixed_values, ssid)
-
+        # Enforce configuration and instantiation
         if config is not None:
             if isinstance(config, dict):
                 self.config = Config.from_dict(config)
@@ -234,30 +213,41 @@ class PocketOptionAsync:
             elif isinstance(config, Config):
                 self.config = config
             else:
-                raise ValueError("Config must be either a Config object, dictionary, or JSON string")
+                raise ValueError("Config type mismatch")
 
             if url is not None:
                 self.config.urls.insert(0, url)
-            self.client: "RawPocketOption" = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
         else:
             self.config = Config()
             if url is not None:
                 self.config.urls.insert(0, url)
-            self.client: "RawPocketOption" = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
-        self.logger = Logger()
+
+        from ..tracing import LogBuilder
+
+        # Enable terminal logging only if explicitly requested in config
+        if self.config.terminal_logging:
+            try:
+                lb = LogBuilder()
+                lb.terminal(level=self.config.log_level)
+                lb.build()
+            except Exception:
+                pass
+
+        # Link to Rust Backend
+        self.client: "RawPocketOption" = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
 
     async def __aenter__(self):
         """
         Context manager entry. Waits for assets to be loaded.
         """
-        await self.wait_for_assets()
+        await self.wait_for_assets(timeout=60.0)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """
-        Context manager exit. Disconnects the client.
+        Context manager exit. Shuts down the client and its runner.
         """
-        await self.disconnect()
+        await self.shutdown()
 
     async def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
@@ -347,12 +337,17 @@ class PocketOptionAsync:
 
         try:
             # Use asyncio.wait_for as additional protection against hanging
-            import asyncio
-
             trade = await asyncio.wait_for(self._get_trade_result(id), timeout=timeout_seconds)
             return trade
         except asyncio.TimeoutError:
             raise TimeoutError(f"Timeout waiting for trade result for ID: {id}")
+
+    async def get_deal_end_time(self, trade_id: str) -> Optional[int]:
+        """
+        Returns the expected close time of a deal as a Unix timestamp.
+        Returns None if the deal is not found.
+        """
+        return await self.client.get_deal_end_time(trade_id)
 
     async def _get_trade_result(self, id: str) -> dict:
         """Internal method to get trade result with timeout protection"""
@@ -360,7 +355,7 @@ class PocketOptionAsync:
             # The Rust client should handle its own timeout, but we'll add a safeguard
             trade = await self.client.check_win(id)
             trade = json.loads(trade)
-            win = trade["profit"]
+            win = float(trade["profit"])
             if win > 0:
                 trade["result"] = "win"
             elif win == 0:
@@ -414,9 +409,6 @@ class PocketOptionAsync:
         """
         candles = await self.client.get_candles(asset, period, offset)
         return json.loads(candles)
-        # raise NotImplementedError(
-        #     "The get_candles method is not implemented in the PocketOptionAsync class. "
-        # )
 
     async def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> List[Dict]:
         """
@@ -442,9 +434,6 @@ class PocketOptionAsync:
         """
         candles = await self.client.get_candles_advanced(asset, period, offset, time)
         return json.loads(candles)
-        # raise NotImplementedError(
-        #     "The get_candles_advanced method is not implemented in the PocketOptionAsync class. "
-        # )
 
     async def balance(self) -> float:
         """
@@ -461,16 +450,51 @@ class PocketOptionAsync:
     async def opened_deals(self) -> List[Dict]:
         "Returns a list of all the opened deals as dictionaries"
         return json.loads(await self.client.opened_deals())
-        # raise NotImplementedError(
-        #     "The opened_deals method is not implemented in the PocketOptionAsync class. "
-        # )
+
+    async def get_pending_deals(self) -> List[Dict]:
+        """
+        Retrieves a list of all currently pending trade orders.
+
+        Returns:
+            List[Dict]: List of pending orders, each containing order details.
+        """
+        return json.loads(await self.client.get_pending_deals())
+
+    async def open_pending_order(
+        self,
+        open_type: int,
+        amount: float,
+        asset: str,
+        open_time: int,
+        open_price: float,
+        timeframe: int,
+        min_payout: int,
+        command: int,
+    ) -> Dict:
+        """
+        Opens a pending order on the PocketOption platform.
+
+        Args:
+            open_type (int): The type of the pending order.
+            amount (float): The amount to trade.
+            asset (str): The asset symbol (e.g., "EURUSD_otc").
+            open_time (int): The server time to open the trade (Unix timestamp).
+            open_price (float): The price to open the trade at.
+            timeframe (int): The duration of the trade in seconds.
+            min_payout (int): The minimum payout percentage required.
+            command (int): The trade direction (0 for Call, 1 for Put).
+
+        Returns:
+            Dict: The created pending order details.
+        """
+        order = await self.client.open_pending_order(
+            open_type, amount, asset, open_time, open_price, timeframe, min_payout, command
+        )
+        return json.loads(order)
 
     async def closed_deals(self) -> List[Dict]:
         "Returns a list of all the closed deals as dictionaries"
         return json.loads(await self.client.closed_deals())
-        # raise NotImplementedError(
-        #     "The closed_deals method is not implemented in the PocketOptionAsync class. "
-        # )
 
     async def clear_closed_deals(self) -> None:
         "Removes all the closed deals from memory, this function doesn't return anything"
@@ -498,7 +522,33 @@ class PocketOptionAsync:
             return payout.get(asset)
         elif isinstance(asset, list):
             return [payout.get(ast) for ast in asset]
-        return payout
+
+    async def active_assets(self) -> List[Dict]:
+        """
+        Retrieves a list of all active assets.
+
+        Returns:
+            List[Dict]: List of active assets, each containing:
+                - id: Asset ID
+                - symbol: Asset symbol (e.g., "EURUSD_otc")
+                - name: Human-readable name
+                - asset_type: Type of asset (stock, currency, commodity, cryptocurrency, index)
+                - payout: Payout percentage
+                - is_otc: Whether this is an OTC asset
+                - is_active: Whether the asset is currently active for trading
+                - allowed_candles: List of allowed timeframe durations in seconds
+
+        Example:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                active = await client.active_assets()
+                for asset in active:
+                    print(f"{asset['symbol']}: {asset['name']} (payout: {asset['payout']}%)")
+            ```
+        """
+        assets_json = await self.client.active_assets()
+        assets = json.loads(assets_json)
+        return list(assets.values()) if isinstance(assets, dict) else assets
 
     async def history(self, asset: str, period: int) -> List[Dict]:
         "Returns a list of dictionaries containing the latest data available for the specified asset starting from 'period', the data is in the same format as the returned data of the 'get_candles' function."
@@ -585,12 +635,12 @@ class PocketOptionAsync:
         """Returns the current server time as a UNIX timestamp"""
         return await self.client.get_server_time()
 
-    async def wait_for_assets(self, timeout: float = 30.0) -> None:
+    async def wait_for_assets(self, timeout: float = 60.0) -> None:
         """
         Waits for the assets to be loaded from the server.
 
         Args:
-            timeout (float): The maximum time to wait in seconds. Default is 30.0.
+            timeout (float): The maximum time to wait in seconds. Default is 60.0.
 
         Raises:
             TimeoutError: If the assets are not loaded within the timeout period.
@@ -630,15 +680,15 @@ class PocketOptionAsync:
     async def disconnect(self) -> None:
         """
         Disconnects the client while keeping the configuration intact.
-        The connection can be re-established later using connect().
+        The connection will automatically try to re-establish if max_allowed_loops > 0.
+        To completely stop the client and its runner, use shutdown().
 
         Example:
             ```python
             client = PocketOptionAsync(ssid)
             # Use client...
             await client.disconnect()
-            # Do other work...
-            await client.connect()
+            # The client will try to reconnect in the background...
             ```
         """
         await self.client.disconnect()
@@ -687,6 +737,13 @@ class PocketOptionAsync:
         """
         await self.client.unsubscribe(asset)
 
+    async def shutdown(self) -> None:
+        """
+        Completely shuts down the client and its background runner.
+        Once shut down, the client cannot be used anymore.
+        """
+        await self.client.shutdown()
+
     async def create_raw_handler(self, validator: Validator, keep_alive: Optional[str] = None) -> "RawHandler":
         """
         Creates a raw handler for advanced WebSocket message handling.
@@ -715,6 +772,28 @@ class PocketOptionAsync:
         """
         rust_handler = await self.client.create_raw_handler(validator.raw_validator, keep_alive)
         return RawHandler(rust_handler)
+
+    async def send_raw_message(self, message: str) -> None:
+        """Sends a raw message through the websocket without waiting for a response"""
+        await self.client.send_raw_message(message)
+
+    async def create_raw_order(self, message: str, validator: Validator) -> str:
+        """Sends a raw message and waits for a response that matches the validator"""
+        return await self.client.create_raw_order(message, validator.raw_validator)
+
+    async def create_raw_order_with_timeout(self, message: str, validator: Validator, timeout: timedelta) -> str:
+        """Sends a raw message and waits for a response that matches the validator with a timeout"""
+        return await self.client.create_raw_order_with_timeout(message, validator.raw_validator, timeout)
+
+    async def create_raw_order_with_timeout_and_retry(
+        self, message: str, validator: Validator, timeout: timedelta
+    ) -> str:
+        """Sends a raw message and waits for a response that matches the validator with a timeout and retry logic"""
+        return await self.client.create_raw_order_with_timeout_and_retry(message, validator.raw_validator, timeout)
+
+    async def create_raw_iterator(self, message: str, validator: Validator, timeout: Optional[timedelta] = None):
+        """Returns an async iterator that yields messages matching the validator after sending the initial message"""
+        return await self.client.create_raw_iterator(message, validator.raw_validator, timeout)
 
 
 async def _timeout(future, timeout: int):

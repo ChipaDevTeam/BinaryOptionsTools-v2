@@ -91,13 +91,13 @@ impl<'a> MakeWriter<'a> for StreamWriter {
 
 pub fn stream_logs_layer(
     level: LevelFilter,
-    timout: Option<Duration>,
+    timeout: Option<Duration>,
 ) -> (
     Box<dyn Layer<Registry> + Send + Sync>,
     RecieverStream<String>,
 ) {
     let (sender, receiver) = bounded(MAX_LOGGING_CHANNEL_CAPACITY);
-    let receiver = RecieverStream::new_timed(receiver, timout);
+    let receiver = RecieverStream::new_timed(receiver, timeout);
     let writer = StreamWriter { sender };
     let layer = tracing_subscriber::fmt::layer::<Registry>()
         .json()

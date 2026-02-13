@@ -116,7 +116,7 @@ impl ValidatorTrait for Validator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RawValidator;
 
 impl RawValidator {

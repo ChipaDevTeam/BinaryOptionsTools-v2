@@ -1,6 +1,6 @@
 [package]
 name = "binary-options-tools-core"
-version = "0.1.7"
+version = "0.2.0"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
@@ -15,7 +15,7 @@ license-file = "../../LICENSE"
 [features]
 
 [dependencies]
-binary-options-tools-macros = { path = "../macros", version = "0.1.3" }
+binary-options-tools-macros = { path = "../macros", version = "0.2.0" }
 
 anyhow = "1.0.98"
 async-channel = "2.3.1"

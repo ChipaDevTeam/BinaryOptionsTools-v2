@@ -21,33 +21,6 @@ class LogSubscription:
         return json.loads(next(self.subscription))
 
 
-def start_logs(path: str, level: str = "DEBUG", terminal: bool = True, layers: list = None):
-    """
-    Initialize logging system for the application.
-
-    Args:
-        path (str): Path where log files will be stored.
-        level (str): Logging level (default is "DEBUG").
-        terminal (bool): Whether to display logs in the terminal (default is True).
-
-    Returns:
-        None
-
-    Raises:
-        Exception: If there's an error starting the logging system.
-    """
-    if layers is None:
-        layers = []
-
-    try:
-        from BinaryOptionsToolsV2 import start_tracing
-
-        os.makedirs(path, exist_ok=True)
-        start_tracing(path, level, terminal, layers)
-    except Exception as e:
-        print(f"Error starting logs: {e}")
-
-
 class Logger:
     """
     A logger class wrapping the RustLogger functionality.
@@ -57,8 +30,10 @@ class Logger:
     """
 
     def __init__(self):
-        from BinaryOptionsToolsV2 import Logger as RustLogger
-
+        try:
+            from .BinaryOptionsToolsV2 import Logger as RustLogger
+        except ImportError:
+            from BinaryOptionsToolsV2 import Logger as RustLogger
         self.logger = RustLogger()
 
     def debug(self, message):
@@ -107,8 +82,10 @@ class LogBuilder:
     """
 
     def __init__(self):
-        from BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
-
+        try:
+            from .BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
+        except ImportError:
+            from BinaryOptionsToolsV2 import LogBuilder as RustLogBuilder
         self.builder = RustLogBuilder()
 
     def create_logs_iterator(self, level: str = "DEBUG", timeout: Optional[timedelta] = None) -> LogSubscription:
@@ -124,7 +101,7 @@ class LogBuilder:
         """
         return LogSubscription(self.builder.create_logs_iterator(level, timeout))
 
-    def log_file(self, path: str = "logs.log", level: str = "DEBUG"):
+    def log_file(self, path: str = "logs.log", level: str = "DEBUG") -> "LogBuilder":
         """
         Configure logging to a file.
 
@@ -133,8 +110,9 @@ class LogBuilder:
             level (str): The minimum log level for this file handler.
         """
         self.builder.log_file(path, level)
+        return self
 
-    def terminal(self, level: str = "DEBUG"):
+    def terminal(self, level: str = "DEBUG") -> "LogBuilder":
         """
         Configure logging to the terminal.
 
@@ -142,9 +120,40 @@ class LogBuilder:
             level (str): The minimum log level for this terminal handler.
         """
         self.builder.terminal(level)
+        return self
 
     def build(self):
         """
         Build and initialize the logging configuration. This function should be called only once per execution.
         """
         self.builder.build()
+
+
+def start_logs(path: str, level: str = "DEBUG", terminal: bool = True, layers: list = None):
+    """
+    Initialize logging system for the application.
+
+    Args:
+        path (str): Path where log files will be stored.
+        level (str): Logging level (default is "DEBUG").
+        terminal (bool): Whether to display logs in the terminal (default is True).
+
+    Returns:
+        None
+
+    Raises:
+        Exception: If there's an error starting the logging system.
+    """
+    if layers is None:
+        layers = []
+
+    try:
+        from .BinaryOptionsToolsV2 import start_tracing
+    except ImportError:
+        from BinaryOptionsToolsV2 import start_tracing
+
+    try:
+        os.makedirs(path, exist_ok=True)
+        start_tracing(path, level, terminal, layers)
+    except Exception as e:
+        print(f"Error starting logs: {e}")

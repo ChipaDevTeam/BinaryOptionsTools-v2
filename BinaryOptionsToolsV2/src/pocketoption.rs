@@ -6,18 +6,18 @@ use std::time::Duration;
 use binary_options_tools::pocketoption::candle::{Candle, SubscriptionType};
 use binary_options_tools::pocketoption::error::PocketResult;
 use binary_options_tools::pocketoption::pocket_client::PocketOption;
+use binary_options_tools::utils::f64_to_decimal;
+use rust_decimal::prelude::ToPrimitive;
 // use binary_options_tools::pocketoption::types::base::RawWebsocketMessage;
 // use binary_options_tools::pocketoption::types::update::DataCandle;
 // use binary_options_tools::pocketoption::ws::stream::StreamAsset;
 // use binary_options_tools::reimports::FilteredRecieverStream;
-use async_stream;
 use binary_options_tools::validator::Validator as CrateValidator;
 use binary_options_tools::validator::Validator;
 use futures_util::stream::{BoxStream, Fuse};
 use futures_util::StreamExt;
 use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python};
 use pyo3_async_runtimes::tokio::future_into_py;
-use tungstenite;
 use uuid::Uuid;
 
 use crate::config::PyConfig;
@@ -99,7 +99,7 @@ impl RawPocketOption {
     pub fn new(ssid: String, py: Python<'_>) -> PyResult<Self> {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
-            let client = tokio::time::timeout(Duration::from_secs(10), PocketOption::new(ssid))
+            let client = tokio::time::timeout(Duration::from_secs(20), PocketOption::new(ssid))
                 .await
                 .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
                 .map_err(BinaryErrorPy::from)?;
@@ -110,7 +110,7 @@ impl RawPocketOption {
     #[staticmethod]
     pub fn create<'py>(ssid: String, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         future_into_py(py, async move {
-            let client = tokio::time::timeout(Duration::from_secs(10), PocketOption::new(ssid))
+            let client = tokio::time::timeout(Duration::from_secs(20), PocketOption::new(ssid))
                 .await
                 .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
                 .map_err(BinaryErrorPy::from)?;
@@ -124,7 +124,7 @@ impl RawPocketOption {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
             let client = tokio::time::timeout(
-                Duration::from_secs(10),
+                Duration::from_secs(20),
                 PocketOption::new_with_url(ssid, url),
             )
             .await
@@ -142,7 +142,7 @@ impl RawPocketOption {
     ) -> PyResult<Bound<'py, PyAny>> {
         future_into_py(py, async move {
             let client = tokio::time::timeout(
-                Duration::from_secs(10),
+                Duration::from_secs(20),
                 PocketOption::new_with_url(ssid, url),
             )
             .await
@@ -157,13 +157,10 @@ impl RawPocketOption {
     pub fn new_with_config(py: Python<'_>, ssid: String, config: PyConfig) -> PyResult<Self> {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
-            let timeout = config.inner.connection_initialization_timeout;
-            let client =
-                tokio::time::timeout(timeout, PocketOption::new_with_config(ssid, config.inner))
-                    .await
-                    .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
-                    .map_err(BinaryErrorPy::from)?;
-            Ok(Self { client })
+            PocketOption::new_with_config(ssid, config.inner)
+                .await
+                .map(|client| Self { client })
+                .map_err(|e| BinaryErrorPy::from(e).into())
         })
     }
 
@@ -174,13 +171,10 @@ impl RawPocketOption {
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
         future_into_py(py, async move {
-            let timeout = config.inner.connection_initialization_timeout;
-            let client =
-                tokio::time::timeout(timeout, PocketOption::new_with_config(ssid, config.inner))
-                    .await
-                    .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
-                    .map_err(BinaryErrorPy::from)?;
-            Ok(RawPocketOption { client })
+            PocketOption::new_with_config(ssid, config.inner)
+                .await
+                .map(|client| RawPocketOption { client })
+                .map_err(|e| BinaryErrorPy::from(e).into())
         })
     }
 
@@ -212,9 +206,11 @@ impl RawPocketOption {
         time: u32,
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
+        let decimal_amount = f64_to_decimal(amount)
+            .ok_or_else(|| BinaryErrorPy::NotAllowed(format!("Invalid amount: {}", amount)))?;
         future_into_py(py, async move {
             let res = client
-                .buy(asset, time, amount)
+                .buy(asset, time, decimal_amount)
                 .await
                 .map_err(BinaryErrorPy::from)?;
             let deal = serde_json::to_string(&res.1).map_err(BinaryErrorPy::from)?;
@@ -231,9 +227,11 @@ impl RawPocketOption {
         time: u32,
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
+        let decimal_amount = f64_to_decimal(amount)
+            .ok_or_else(|| BinaryErrorPy::NotAllowed(format!("Invalid amount: {}", amount)))?;
         future_into_py(py, async move {
             let res = client
-                .sell(asset, time, amount)
+                .sell(asset, time, decimal_amount)
                 .await
                 .map_err(BinaryErrorPy::from)?;
             let deal = serde_json::to_string(&res.1).map_err(BinaryErrorPy::from)?;
@@ -351,7 +349,45 @@ impl RawPocketOption {
         let client = self.client.clone();
         future_into_py(py, async move {
             let balance = client.balance().await;
-            Ok(balance)
+            Ok(balance.to_f64().unwrap_or_default())
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn open_pending_order<'py>(
+        &self,
+        py: Python<'py>,
+        open_type: u32,
+        amount: f64,
+        asset: String,
+        open_time: u32,
+        open_price: f64,
+        timeframe: u32,
+        min_payout: u32,
+        command: u32,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        let decimal_amount = f64_to_decimal(amount)
+            .ok_or_else(|| BinaryErrorPy::NotAllowed(format!("Invalid amount: {}", amount)))?;
+        let decimal_open_price = f64_to_decimal(open_price).ok_or_else(|| {
+            BinaryErrorPy::NotAllowed(format!("Invalid open price: {}", open_price))
+        })?;
+        future_into_py(py, async move {
+            let res = client
+                .open_pending_order(
+                    open_type,
+                    decimal_amount,
+                    asset,
+                    open_time,
+                    decimal_open_price,
+                    timeframe,
+                    min_payout,
+                    command,
+                )
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let order = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Ok(order)
         })
     }
 
@@ -402,6 +438,21 @@ impl RawPocketOption {
                         })
                         .collect();
                     let res = serde_json::to_string(&payouts).map_err(BinaryErrorPy::from)?;
+                    Ok(res)
+                }
+                None => {
+                    Err(BinaryErrorPy::Uninitialized("Assets not initialized yet.".into()).into())
+                }
+            }
+        })
+    }
+
+    pub fn active_assets<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            match client.active_assets().await {
+                Some(assets) => {
+                    let res = serde_json::to_string(&assets).map_err(BinaryErrorPy::from)?;
                     Ok(res)
                 }
                 None => {
@@ -696,6 +747,15 @@ impl RawPocketOption {
         )
     }
 
+    /// Commands the runner to shutdown.
+    pub fn shutdown<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            client.shutdown().await.map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| py.None().into_py_any(py))
+        })
+    }
+
     /// Disconnects the client while keeping the configuration intact.
     pub fn disconnect<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
@@ -746,8 +806,8 @@ impl RawPocketOption {
         let validator = validator.get().clone();
         future_into_py(py, async move {
             let crate_validator: CrateValidator = validator.into();
-            let keep_alive_msg = keep_alive
-                .map(|msg| binary_options_tools::pocketoption::modules::raw::Outgoing::Text(msg));
+            let keep_alive_msg =
+                keep_alive.map(binary_options_tools::pocketoption::modules::raw::Outgoing::Text);
             let handler = client
                 .create_raw_handler(crate_validator, keep_alive_msg)
                 .await
@@ -804,7 +864,7 @@ impl RawStreamIterator {
         let stream = self.stream.clone();
         future_into_py(py, async move {
             let res = next_stream(stream, false).await;
-            res.map(|s| s)
+            res
         })
     }
 
@@ -813,7 +873,7 @@ impl RawStreamIterator {
         let stream = self.stream.clone();
         runtime.block_on(async move {
             let res = next_stream(stream, true).await;
-            res.map(|s| s)
+            res
         })
     }
 }
@@ -832,7 +892,7 @@ impl RawHandle {
         future_into_py(py, async move {
             let crate_validator: CrateValidator = validator.into();
             let keep_alive = keep_alive_message
-                .map(|msg| binary_options_tools::pocketoption::modules::raw::Outgoing::Text(msg));
+                .map(binary_options_tools::pocketoption::modules::raw::Outgoing::Text);
             let handler = handle
                 .create(crate_validator, keep_alive)
                 .await

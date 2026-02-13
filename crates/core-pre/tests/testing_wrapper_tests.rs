@@ -5,7 +5,7 @@ use binary_options_tools_core_pre::error::CoreResult;
 use binary_options_tools_core_pre::testing::{
     TestingConfig, TestingWrapper, TestingWrapperBuilder,
 };
-use binary_options_tools_core_pre::traits::{ApiModule, Rule};
+use binary_options_tools_core_pre::traits::{ApiModule, Rule, RunnerCommand};
 use kanal::{AsyncReceiver, AsyncSender};
 use std::sync::Arc;
 use std::time::Duration;
@@ -48,6 +48,7 @@ impl ApiModule<()> for TestModule {
         _cmd_ret_tx: AsyncSender<Self::CommandResponse>,
         msg_rx: AsyncReceiver<Arc<Message>>,
         _to_ws: AsyncSender<Message>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self { _msg_rx: msg_rx }
     }

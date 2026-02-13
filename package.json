@@ -27,9 +27,6 @@
     ],
     "*.rs": [
       "rustfmt"
-    ],
-    "*.md": [
-      "markdownlint --fix"
     ]
   }
 }

@@ -4,8 +4,9 @@ use async_trait::async_trait;
 use binary_options_tools_core_pre::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
-    traits::{LightweightModule, Rule},
+    traits::{LightweightModule, Rule, RunnerCommand},
 };
+use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde_json::Value;
 use tracing::{debug, warn};
@@ -15,26 +16,10 @@ use crate::pocketoption::{state::State, types::TwoStepRule};
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BalanceMessage {
-    balance: f64,
+    balance: Decimal,
     #[serde(flatten)]
     _extra: HashMap<String, Value>,
 }
-
-// #[derive(Debug, Deserialize)]
-// #[serde(rename_all = "camelCase")]
-// struct DemoBalance {
-//     is_demo: u8,
-//     balance: f64,
-// }
-
-// #[derive(Debug, Deserialize)]
-// #[serde(rename_all = "camelCase")]
-// struct LiveBalance {
-//     uid: u64,
-//     login: u64,
-//     is_demo: u8,
-//     balance: f64,
-// }
 
 pub struct BalanceModule {
     state: Arc<State>,
@@ -47,26 +32,47 @@ impl LightweightModule<State> for BalanceModule {
         state: Arc<State>,
         _: AsyncSender<Message>,
         receiver: AsyncReceiver<Arc<Message>>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self { state, receiver }
     }
 
     async fn run(&mut self) -> CoreResult<()> {
         while let Ok(msg) = self.receiver.recv().await {
-            if let Message::Binary(text) = &*msg {
-                if let Ok(balance_msg) = serde_json::from_slice::<BalanceMessage>(text) {
-                    debug!("Received balance message: {:?}", balance_msg);
-                    self.state.set_balance(balance_msg.balance).await;
-                    // If you want to handle demo/live balance differently, you can add logic here
-                    // For example, if you had a field to distinguish between demo and live:
-                    // if balance_msg.is_demo == 1 {
-                    //     self.state.set_demo_balance(balance_msg.balance);
-                    // } else {
-                    //     self.state.set_live_balance(balance_msg.balance);
-                    // }
-                } else {
-                    warn!("Failed to parse balance message: {:?}", text);
+            match &*msg {
+                Message::Binary(data) => {
+                    if let Ok(balance_msg) = serde_json::from_slice::<BalanceMessage>(data) {
+                        debug!("Received balance message (binary): {:?}", balance_msg);
+                        self.state.set_balance(balance_msg.balance).await;
+                    } else {
+                        warn!("Failed to parse balance message (binary): {:?}", data);
+                    }
                 }
+                Message::Text(text) => {
+                    if let Ok(balance_msg) = serde_json::from_str::<BalanceMessage>(text) {
+                        debug!("Received balance message (text): {:?}", balance_msg);
+                        self.state.set_balance(balance_msg.balance).await;
+                    } else if let Some(start) = text.find('[') {
+                        // Try to parse as a 1-step Socket.IO message: 42["successupdateBalance", {...}]
+                        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text[start..])
+                        {
+                            if let Some(arr) = value.as_array() {
+                                if arr.len() >= 2 && arr[0] == "successupdateBalance" {
+                                    if let Ok(balance_msg) =
+                                        serde_json::from_value::<BalanceMessage>(arr[1].clone())
+                                    {
+                                        debug!(
+                                            "Received balance message (text 1-step): {:?}",
+                                            balance_msg
+                                        );
+                                        self.state.set_balance(balance_msg.balance).await;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
         }
         Err(CoreError::LightweightModuleLoop("BalanceModule".into()))

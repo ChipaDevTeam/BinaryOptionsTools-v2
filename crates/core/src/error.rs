@@ -21,7 +21,7 @@ pub enum BinaryOptionsToolsError {
     #[error("Websocket connection was closed by the server, {0}")]
     WebsocketConnectionClosed(String),
     #[error("Failed to connect to websocket server: {0}")]
-    WebsocketConnectionError(#[from] TungsteniteError),
+    WebsocketConnectionError(Box<TungsteniteError>),
     #[error("Failed to send message to websocket sender, {0}")]
     MessageSendingError(#[from] async_channel::SendError<Message>),
     #[error("Failed to send message using asynchronous channel, {0}")]
@@ -59,6 +59,12 @@ pub enum BinaryOptionsToolsError {
 }
 
 pub type BinaryOptionsResult<T> = Result<T, BinaryOptionsToolsError>;
+
+impl From<TungsteniteError> for BinaryOptionsToolsError {
+    fn from(e: TungsteniteError) -> Self {
+        Self::WebsocketConnectionError(Box::new(e))
+    }
+}
 
 impl<Transfer> From<Transfer> for BinaryOptionsToolsError
 where

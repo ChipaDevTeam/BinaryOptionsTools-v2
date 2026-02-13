@@ -60,6 +60,10 @@ pub struct Demo {
     pub is_fast_history: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_optimized: Option<bool>,
+    #[serde(skip)]
+    pub raw: String,
+    #[serde(skip)]
+    pub json_raw: String,
     #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
     pub extra: HashMap<String, Value>,
 }
@@ -83,10 +87,12 @@ impl fmt::Debug for Demo {
 #[serde(rename_all = "camelCase")]
 pub struct Real {
     pub session: SessionData,
+    pub session_raw: String,
     pub is_demo: u32,
     pub uid: u32,
     pub platform: u32,
     pub raw: String,
+    pub json_raw: String,
     pub is_fast_history: Option<bool>,
     pub is_optimized: Option<bool>,
     #[serde(flatten)]
@@ -97,6 +103,7 @@ impl fmt::Debug for Real {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Real")
             .field("session", &self.session)
+            .field("session_raw", &"REDACTED")
             .field("is_demo", &self.is_demo)
             .field("uid", &self.uid)
             .field("platform", &self.platform)
@@ -154,41 +161,61 @@ impl Ssid {
             trimmed
         };
 
-        let ssid: Demo = serde_json::from_str(parsed)
+        let mut ssid: Demo = serde_json::from_str(parsed)
             .map_err(|e| CoreError::SsidParsing(format!("JSON parsing error: {e}")))?;
+
+        ssid.raw = trimmed.to_string();
+        ssid.json_raw = parsed.to_string();
 
         let is_demo_url = ssid
             .current_url
             .as_deref()
-            .map_or(false, |s| s.contains("demo"));
+            .is_some_and(|s| s.contains("demo"));
 
         if ssid.is_demo == 1 || is_demo_url {
+            tracing::debug!(target: "Ssid", "Parsed Demo SSID. UID: {}", ssid.uid);
             Ok(Self::Demo(ssid))
         } else {
-            let real = Real {
-                raw: data_str,
-                is_demo: ssid.is_demo,
-                session: {
-                    let session_bytes = ssid.session.as_bytes();
-                    match php_serde::from_bytes(session_bytes) {
-                        Ok(s) => s,
-                        Err(_) => {
-                            // Try stripping the trailing hash (assuming 32 chars for MD5)
-                            if session_bytes.len() > 32 {
-                                let stripped = &session_bytes[..session_bytes.len() - 32];
-                                php_serde::from_bytes(stripped).map_err(|e| {
-                                    CoreError::SsidParsing(format!(
-                                        "Error parsing session data: {e}"
-                                    ))
-                                })?
-                            } else {
-                                return Err(CoreError::SsidParsing(
-                                    "Error parsing session data".into(),
-                                ));
-                            }
+            let session_raw = ssid.session.clone();
+            let json_raw = ssid.json_raw.clone();
+            let raw = ssid.raw.clone();
+            let session_data = {
+                let session_bytes = ssid.session.as_bytes();
+                match php_serde::from_bytes::<SessionData>(session_bytes) {
+                    Ok(s) => s,
+                    Err(_) => {
+                        // Try stripping the trailing hash (assuming 32 chars for MD5)
+                        if session_bytes.len() > 32 {
+                            let stripped = &session_bytes[..session_bytes.len() - 32];
+                            php_serde::from_bytes(stripped).map_err(|e| {
+                                CoreError::SsidParsing(format!("Error parsing session data: {e}"))
+                            })?
+                        } else {
+                            return Err(CoreError::SsidParsing(
+                                "Error parsing session data".into(),
+                            ));
                         }
                     }
-                },
+                }
+            };
+
+            let redacted_ip = if let Some(idx) = session_data.ip_address.rfind('.') {
+                format!("{}.xxx", &session_data.ip_address[..idx])
+            } else if let Some(idx) = session_data.ip_address.rfind(':') {
+                format!("{}:xxx", &session_data.ip_address[..idx])
+            } else {
+                "REDACTED".to_string()
+            };
+
+            tracing::debug!(target: "Ssid", "Parsed Real SSID. UID: {}, IP: {}, UA: {}", 
+                ssid.uid, redacted_ip, session_data.user_agent);
+
+            let real = Real {
+                raw,
+                is_demo: ssid.is_demo,
+                session_raw,
+                json_raw,
+                session: session_data,
                 uid: ssid.uid,
                 platform: ssid.platform,
                 is_fast_history: ssid.is_fast_history,
@@ -202,8 +229,8 @@ impl Ssid {
     pub async fn server(&self) -> CoreResult<String> {
         match self {
             Self::Demo(_) => Ok(Regions::DEMO.0.to_string()),
-            Self::Real(_) => Regions
-                .get_server()
+            Self::Real(real) => Regions
+                .get_server_for_ip(&real.session.ip_address)
                 .await
                 .map(|s| s.to_string())
                 .map_err(|e| CoreError::HttpRequest(e.to_string())),
@@ -216,8 +243,8 @@ impl Ssid {
                 .iter()
                 .map(|r| r.to_string())
                 .collect()),
-            Self::Real(_) => Ok(Regions
-                .get_servers()
+            Self::Real(real) => Ok(Regions
+                .get_servers_for_ip(&real.session.ip_address)
                 .await
                 .map_err(|e| CoreError::HttpRequest(e.to_string()))?
                 .iter()
@@ -228,8 +255,15 @@ impl Ssid {
 
     pub fn user_agent(&self) -> String {
         match self {
-            Self::Demo(_) => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36".into(),
-            Self::Real(real) => real.session.user_agent.clone()
+            Self::Demo(_) => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36".into(),
+            Self::Real(real) => real.session.user_agent.clone(),
+        }
+    }
+
+    pub fn ip_address(&self) -> Option<&str> {
+        match self {
+            Self::Demo(_) => None,
+            Self::Real(real) => Some(&real.session.ip_address),
         }
     }
 
@@ -240,11 +274,43 @@ impl Ssid {
             Self::Real(_) => false,
         }
     }
+
+    /// Get the current_url from the SSID if available.
+    /// For Demo accounts, this is stored directly.
+    /// For Real accounts, this may be in the extra field.
+    pub fn current_url(&self) -> Option<String> {
+        match self {
+            Self::Demo(demo) => demo.current_url.clone(),
+            Self::Real(real) => {
+                // Try to get current_url from the extra field
+                if let Some(url) = real
+                    .extra
+                    .get("currentUrl")
+                    .or_else(|| real.extra.get("current_url"))
+                {
+                    url.as_str().map(String::from)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    pub fn session_id(&self) -> String {
+        match self {
+            Self::Demo(demo) => demo.session.clone(),
+            Self::Real(real) => real.session_raw.clone(),
+        }
+    }
 }
 impl fmt::Display for Demo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let ssid = serde_json::to_string(&self).map_err(|_| fmt::Error)?;
-        write!(f, r#"42["auth",{ssid}]"#)
+        if !self.raw.is_empty() {
+            write!(f, "{}", self.raw)
+        } else {
+            let ssid = serde_json::to_string(&self).map_err(|_| fmt::Error)?;
+            write!(f, r#"42["auth",{ssid}]"#)
+        }
     }
 }
 
@@ -280,7 +346,7 @@ mod tests {
 
     #[test]
     fn test_descerialize_session() -> Result<(), Box<dyn Error>> {
-        let session_raw = b"a:4:{s:10:\"session_id\";s:32:\"ae3aa847add89c341ec18d8ae5bf8527\";s:10:\"ip_address\";s:15:\"191.113.157.139\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 OPR/114.\";s:13:\"last_activity\";i:1732926685;}31666d2dc07fdd866353937b97901e2b";
+        let session_raw = b"a:4:{s:10:\"session_id\";s:32:\"00000000000000000000000000000000\";s:10:\"ip_address\";s:7:\"0.0.0.0\";s:10:\"user_agent\";s:111:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36\";s:13:\"last_activity\";i:1732926685;}00000000000000000000000000000000";
         let session: SessionData = php_serde::from_bytes(session_raw)?;
         dbg!(&session);
         let session_php = php_serde::to_vec(&session)?;
@@ -291,18 +357,14 @@ mod tests {
     #[test]
     fn test_parse_ssid() -> Result<(), Box<dyn Error>> {
         let ssids = [
-            // r#"42["auth",{"session":"looc69ct294h546o368s0lct7d","isDemo":1,"uid":87742848,"platform":2}]	"#,
-            r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"ae3aa847add89c341ec18d8ae5bf8527\";s:10:\"ip_address\";s:15:\"191.113.157.139\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 OPR/114.\";s:13:\"last_activity\";i:1732926685;}31666d2dc07fdd866353937b97901e2b","isDemo":0,"uid":87742848,"platform":2}]	"#,
-            r#"42["auth",{"session":"vtftn12e6f5f5008moitsd6skl","isDemo":1,"uid":27658142,"platform":2}]"#,
-            r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"f10395d38f61039ea0a20ba26222895a\";s:10:\"ip_address\";s:12:\"79.177.168.1\";s:10:\"user_agent\";s:111:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36\";s:13:\"last_activity\";i:1740261136;}9bef184e52d025d1f07068eeaf555637","isDemo":0,"uid":89028022,"platform":2}]"#,
-            r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"bebb6bb272efc3b8be0e37ae5eb814c6\";s:10:\"ip_address\";s:14:\"191.113.152.39\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 OPR/117.\";s:13:\"last_activity\";i:1742420144;}56b1857cbcf8d66f9bd81900e36803d4","isDemo":0,"uid":87742848,"platform":2}]"#,
-            r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"f729997775af4ad480d5787c5bc94584\";s:10:\"ip_address\";s:14:\"191.113.152.39\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 OPR/117.\";s:13:\"last_activity\";i:1742422103;}20db11eee2b7f75a5244e9faf5cd4f4a","isDemo":0,"uid":96669015,"platform":2}]    "#,
-            r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"256a82f814e5a1ecca6f2c337262b4d6\";s:10:\"ip_address\";s:12:\"89.172.73.91\";s:10:\"user_agent\";s:80:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0\";s:13:\"last_activity\";i:1742422004;}a3e2ef2e4084593ec39d023337564e37","isDemo":0,"uid":96669015,"platform":2}]"#,
-            r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"be8de3a8cb5fed23efebb631902263e2\";s:10:\"ip_address\";s:15:\"191.113.139.200\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/119.\";s:13:\"last_activity\";i:1751057233;}b9d0db50cb32d406f935c63a41484f27","isDemo":0,"uid":104155994,"platform":2,"isFastHistory":true,"isOptimized":true}]	"#,
+            r#"42["auth",{"session":"a:4:{s:10:\"session_id\";s:32:\"00000000000000000000000000000000\";s:10:\"ip_address\";s:7:\"0.0.0.0\";s:10:\"user_agent\";s:111:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36\";s:13:\"last_activity\";i:1732926685;}00000000000000000000000000000000","isDemo":0,"uid":12345678,"platform":2}]"#,
+            r#"42["auth",{"session":"dummy_session_id","isDemo":1,"uid":87654321,"platform":2}]"#,
         ];
         for ssid in ssids {
-            let valid = Ssid::parse(ssid)?;
-            dbg!(valid);
+            let parsed = Ssid::parse(ssid)?;
+            let reconstructed = parsed.to_string();
+            let re_parsed = Ssid::parse(&reconstructed)?;
+            assert_eq!(format!("{:?}", parsed), format!("{:?}", re_parsed));
         }
         Ok(())
     }

@@ -1,4 +1,3 @@
-import asyncio
 import sys
 import os
 
@@ -44,12 +43,3 @@ async def main(ssid):
                 print(item["timestamp"], item.get("open"))
             else:
                 print("Received item:", item)
-
-
-if __name__ == "__main__":
-    import os
-
-    ssid = os.getenv("POCKET_OPTION_SSID")
-    if not ssid:
-        ssid = input("Write your ssid: ")
-    asyncio.run(main(ssid))

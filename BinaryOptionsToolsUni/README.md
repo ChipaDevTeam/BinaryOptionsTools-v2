@@ -165,7 +165,7 @@ Async do
 end
 ```
 
-### C#
+### C
 
 ```csharp
 using BinaryOptionsToolsUni;

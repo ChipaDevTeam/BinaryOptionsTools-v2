@@ -1,37 +1,72 @@
 [
   {
+    "url": "wss://fr24g1eu.expertoption.finance/ws/v40",
+    "name": "EUROPE_FINANCE",
+    "latitude": 50.0755,
+    "longitude": 14.4378,
+    "demo": false
+  },
+  {
     "url": "wss://fr24g1eu.expertoption.com/",
     "name": "EUROPE",
-    "latitude": 50.0,
-    "longitude": 10.0,
+    "latitude": 50.0755,
+    "longitude": 14.4378,
+    "demo": false
+  },
+  {
+    "url": "wss://fr24g1in.expertoption.finance/ws/v40",
+    "name": "INDIA_FINANCE",
+    "latitude": 19.076,
+    "longitude": 72.8777,
     "demo": false
   },
   {
     "url": "wss://fr24g1in.expertoption.com/",
     "name": "INDIA",
-    "latitude": 20.0,
-    "longitude": 77.0,
+    "latitude": 19.076,
+    "longitude": 72.8777,
+    "demo": false
+  },
+  {
+    "url": "wss://fr24g1hk.expertoption.finance/ws/v40",
+    "name": "HONG_KONG_FINANCE",
+    "latitude": 22.3193,
+    "longitude": 114.1694,
     "demo": false
   },
   {
     "url": "wss://fr24g1hk.expertoption.com/",
     "name": "HONG_KONG",
-    "latitude": 22.0,
-    "longitude": 114.0,
+    "latitude": 22.3193,
+    "longitude": 114.1694,
+    "demo": false
+  },
+  {
+    "url": "wss://fr24g1sg.expertoption.finance/ws/v40",
+    "name": "SINGAPORE_FINANCE",
+    "latitude": 1.3521,
+    "longitude": 103.8198,
     "demo": false
   },
   {
     "url": "wss://fr24g1sg.expertoption.com/",
     "name": "SINGAPORE",
-    "latitude": 1.35,
-    "longitude": 103.8,
+    "latitude": 1.3521,
+    "longitude": 103.8198,
+    "demo": false
+  },
+  {
+    "url": "wss://fr24g1us.expertoption.finance/ws/v40",
+    "name": "UNITED_STATES_FINANCE",
+    "latitude": 38.9072,
+    "longitude": -77.0369,
     "demo": false
   },
   {
     "url": "wss://fr24g1us.expertoption.com/",
     "name": "UNITED_STATES",
-    "latitude": 39.0,
-    "longitude": -98.0,
+    "latitude": 38.9072,
+    "longitude": -77.0369,
     "demo": false
   }
 ]

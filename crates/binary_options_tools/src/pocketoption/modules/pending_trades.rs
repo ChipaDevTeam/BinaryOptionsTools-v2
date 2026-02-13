@@ -4,8 +4,9 @@ use async_trait::async_trait;
 use binary_options_tools_core_pre::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
-    traits::{ApiModule, Rule},
+    traits::{ApiModule, Rule, RunnerCommand},
 };
+use rust_decimal::Decimal;
 use serde::Deserialize;
 use tokio::{select, time::timeout};
 use tracing::{info, warn};
@@ -17,17 +18,17 @@ use crate::pocketoption::{
     types::{FailOpenOrder, MultiPatternRule, OpenPendingOrder, PendingOrder},
 };
 
-const PENDING_ORDER_TIMEOUT: Duration = Duration::from_secs(10);
+const PENDING_ORDER_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_MISMATCH_RETRIES: usize = 5;
 
 #[derive(Debug)]
 pub enum Command {
     OpenPendingOrder {
         open_type: u32,
-        amount: f64,
+        amount: Decimal,
         asset: String,
         open_time: u32,
-        open_price: f64,
+        open_price: Decimal,
         timeframe: u32,
         min_payout: u32,
         command: u32,
@@ -72,13 +73,14 @@ impl PendingTradesHandle {
     ///
     /// This method is now thread-safe and will serialize requests to prevent
     /// concurrent access issues.
+    #[allow(clippy::too_many_arguments)]
     pub async fn open_pending_order(
         &self,
         open_type: u32,
-        amount: f64,
+        amount: Decimal,
         asset: String,
         open_time: u32,
-        open_price: f64,
+        open_price: Decimal,
         timeframe: u32,
         min_payout: u32,
         command: u32,
@@ -178,6 +180,7 @@ impl ApiModule<State> for PendingTradesApiModule {
         command_responder: AsyncSender<Self::CommandResponse>,
         message_receiver: AsyncReceiver<Arc<Message>>,
         to_ws_sender: AsyncSender<Message>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self {
             state: shared_state,
@@ -216,8 +219,32 @@ impl ApiModule<State> for PendingTradesApiModule {
                     }
                 },
                 Ok(msg) = self.message_receiver.recv() => {
-                    if let Message::Binary(data) = &*msg {
-                        if let Ok(response) = serde_json::from_slice::<ServerResponse>(data) {
+                    let response_result = match msg.as_ref() {
+                        Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data).map_err(|e| e.to_string()),
+                        Message::Text(text) => {
+                            if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
+                                Ok(res)
+                            } else if let Some(start) = text.find('[') {
+                                // Try parsing as a 1-step Socket.IO message: 42["successopenPendingOrder", {...}]
+                                match serde_json::from_str::<serde_json::Value>(&text[start..]) {
+                                    Ok(serde_json::Value::Array(arr)) => {
+                                        if arr.len() >= 2 && (arr[0] == "successopenPendingOrder" || arr[0] == "failopenPendingOrder") {
+                                            serde_json::from_value::<ServerResponse>(arr[1].clone()).map_err(|e| e.to_string())
+                                        } else {
+                                            serde_json::from_str::<ServerResponse>(text).map_err(|e| e.to_string())
+                                        }
+                                    }
+                                    _ => serde_json::from_str::<ServerResponse>(text).map_err(|e| e.to_string()),
+                                }
+                            } else {
+                                serde_json::from_str::<ServerResponse>(text).map_err(|e| e.to_string())
+                            }
+                        },
+                        _ => continue,
+                    };
+
+                    match response_result {
+                        Ok(response) => {
                             match response {
                                 ServerResponse::Success(pending_order) => {
                                     self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
@@ -236,11 +263,11 @@ impl ApiModule<State> for PendingTradesApiModule {
                                     self.command_responder.send(CommandResponse::Error(fail)).await?;
                                 }
                             }
-                        } else {
-                            let data_as_string = String::from_utf8_lossy(data);
+                        }
+                        Err(e) => {
                             warn!(
                                 target: "PendingTradesApiModule",
-                                "Failed to deserialize message. Data: {}", data_as_string
+                                "Failed to deserialize message. Error: {}", e
                             );
                         }
                     }

@@ -9,7 +9,7 @@ use binary_options_tools_core_pre::{
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use tokio::net::TcpStream;
-use tracing::{info, warn};
+use tracing::{debug, warn};
 use url::Url;
 
 use crate::expertoptions::{regions::Regions, state::State};
@@ -29,7 +29,7 @@ impl ConnectorTrait<State> for ExpertConnect {
         let url = Regions::regions_str().into_iter().map(String::from); // No demo region for ExpertOptions
         for u in url {
             futures.push(async {
-                info!(target: "ExpertConnectThread", "Connecting to ExpertOptions at {u}");
+                debug!(target: "ExpertConnectThread", "Connecting to ExpertOptions at {u}");
                 try_connect(state.user_agent().await, u.clone())
                     .await
                     .map_err(|e| (e, u))
@@ -38,7 +38,7 @@ impl ConnectorTrait<State> for ExpertConnect {
         while let Some(result) = futures.next().await {
             match result {
                 Ok(stream) => {
-                    info!(target: "PocketConnect", "Successfully connected to ExpertOptions");
+                    debug!(target: "PocketConnect", "Successfully connected to ExpertOptions");
                     return Ok(stream);
                 }
                 Err((e, u)) => warn!(target: "PocketConnect", "Failed to connect to {}: {}", u, e),

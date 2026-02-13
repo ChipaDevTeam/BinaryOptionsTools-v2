@@ -55,10 +55,3 @@ async def main(ssid: str):
             print(f"An error occurred while trading {asset}: {e}")
             write_asset(not_working_assets_file, asset)
         await asyncio.sleep(1)  # Add a small delay to avoid overwhelming the API
-
-
-if __name__ == "__main__":
-    ssid = os.getenv("POCKET_OPTION_SSID")
-    if not ssid:
-        ssid = input("Please enter your ssid: ")
-    asyncio.run(main(ssid))

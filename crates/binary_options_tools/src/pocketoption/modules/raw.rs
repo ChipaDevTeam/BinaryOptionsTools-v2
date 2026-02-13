@@ -6,7 +6,7 @@ use binary_options_tools_core_pre::error::CoreError;
 use binary_options_tools_core_pre::reimports::{
     bounded_async, AsyncReceiver, AsyncSender, Message,
 };
-use binary_options_tools_core_pre::traits::{ApiModule, Rule};
+use binary_options_tools_core_pre::traits::{ApiModule, Rule, RunnerCommand};
 use tokio::select;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -186,6 +186,7 @@ pub struct RawApiModule {
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
+    #[allow(clippy::type_complexity)]
     sinks: Arc<RwLock<HashMap<Uuid, Arc<AsyncSender<Arc<Message>>>>>>,
     keep_alive_msgs: Arc<RwLock<HashMap<Uuid, Outgoing>>>,
 }
@@ -232,6 +233,7 @@ impl ApiModule<State> for RawApiModule {
         command_responder: AsyncSender<Self::CommandResponse>,
         message_receiver: AsyncReceiver<Arc<Message>>,
         to_ws_sender: AsyncSender<Message>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self {
             state: shared_state,

@@ -6,7 +6,9 @@ use binary_options_tools::framework::virtual_market::VirtualMarket;
 use binary_options_tools::framework::{Bot, Context, Strategy};
 use binary_options_tools::pocketoption::candle::Candle;
 use binary_options_tools::pocketoption::error::PocketResult;
+use binary_options_tools::utils::f64_to_decimal;
 use pyo3::prelude::*;
+use rust_decimal::prelude::ToPrimitive;
 use std::sync::Arc;
 
 #[pyclass(subclass)]
@@ -43,7 +45,7 @@ impl Strategy for StrategyWrapper {
             Python::attach(|py| {
                 let py_ctx = PyContext {
                     client: Some(client),
-                    market: market,
+                    market,
                 };
                 inner.call_method1(py, "on_start", (py_ctx,)).map_err(|e| {
                     binary_options_tools::pocketoption::error::PocketError::General(format!(
@@ -77,7 +79,7 @@ impl Strategy for StrategyWrapper {
             Python::attach(|py| {
                 let py_ctx = PyContext {
                     client: Some(client),
-                    market: market,
+                    market,
                 };
                 inner
                     .call_method1(py, "on_candle", (py_ctx, asset, candle_json))
@@ -118,9 +120,11 @@ impl PyContext {
         time: u32,
     ) -> PyResult<Bound<'py, PyAny>> {
         let market = self.market.clone();
+        let decimal_amount = f64_to_decimal(amount)
+            .ok_or_else(|| BinaryErrorPy::NotAllowed(format!("Invalid amount: {}", amount)))?;
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             let res = market
-                .buy(&asset, amount, time)
+                .buy(&asset, decimal_amount, time)
                 .await
                 .map_err(BinaryErrorPy::from)?;
             let deal = serde_json::to_string(&res.1).map_err(BinaryErrorPy::from)?;
@@ -131,7 +135,9 @@ impl PyContext {
 
     pub fn balance<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let market = self.market.clone();
-        pyo3_async_runtimes::tokio::future_into_py(py, async move { Ok(market.balance().await) })
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            Ok(market.balance().await.to_f64().unwrap_or_default())
+        })
     }
 }
 
@@ -143,10 +149,16 @@ pub struct PyVirtualMarket {
 #[pymethods]
 impl PyVirtualMarket {
     #[new]
-    pub fn new(initial_balance: f64) -> Self {
-        Self {
-            inner: Arc::new(VirtualMarket::new(initial_balance)),
-        }
+    pub fn new(initial_balance: f64) -> PyResult<Self> {
+        let decimal_balance = f64_to_decimal(initial_balance).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Invalid initial balance: {}",
+                initial_balance
+            ))
+        })?;
+        Ok(Self {
+            inner: Arc::new(VirtualMarket::new(decimal_balance)),
+        })
     }
 
     pub fn update_price<'py>(
@@ -156,8 +168,10 @@ impl PyVirtualMarket {
         price: f64,
     ) -> PyResult<Bound<'py, PyAny>> {
         let inner = self.inner.clone();
+        let decimal_price = f64_to_decimal(price)
+            .ok_or_else(|| BinaryErrorPy::NotAllowed(format!("Invalid price: {}", price)))?;
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            inner.update_price(&asset, price).await;
+            inner.update_price(&asset, decimal_price).await;
             Ok(())
         })
     }

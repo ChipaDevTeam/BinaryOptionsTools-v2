@@ -99,9 +99,12 @@ impl WebSocketConfig {
         // Add PocketOption fallback URLs
         let fallback_urls = vec![
             "wss://api-eu.po.market/socket.io/?EIO=4&transport=websocket",
+            "wss://api-msk.po.market/socket.io/?EIO=4&transport=websocket",
+            "wss://api-us-south.po.market/socket.io/?EIO=4&transport=websocket",
+            "wss://api-spb.po.market/socket.io/?EIO=4&transport=websocket",
+            "wss://api-us-north.po.market/socket.io/?EIO=4&transport=websocket",
             "wss://api-sc.po.market/socket.io/?EIO=4&transport=websocket",
             "wss://api-hk.po.market/socket.io/?EIO=4&transport=websocket",
-            "wss://demo-api-eu.po.market/socket.io/?EIO=4&transport=websocket",
         ];
 
         for url_str in fallback_urls {

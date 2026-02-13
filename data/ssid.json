@@ -1,6 +1,6 @@
 {
-  "session": "a:4:{s:10:\"session_id\";s:32:\"ae3aa847add89c341ec18d8ae5bf8527\";s:10:\"ip_address\";s:15:\"191.113.157.139\";s:10:\"user_agent\";s:120:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 OPR/114.\";s:13:\"last_activity\";i:1732926685;}31666d2dc07fdd866353937b97901e2b",
-  "isDemo": 0,
-  "uid": 87742848,
+  "session": "a:4:{s:10:\"session_id\";s:32:\"00000000000000000000000000000000\";s:10:\"ip_address\";s:7:\"0.0.0.0\";s:10:\"user_agent\";s:111:\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36\";s:13:\"last_activity\";i:1732926685;}00000000000000000000000000000000",
+  "isDemo": 1,
+  "uid": 12345678,
   "platform": 2
 }

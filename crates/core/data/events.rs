@@ -73,6 +73,11 @@ where
     T: Clone + Send + Sync,
 {
     async fn handle(&self, event: &Event<T>) -> BinaryOptionsResult<()>;
+
+    /// Returns the name of the handler for identification
+    fn name(&self) -> &str {
+        "unnamed"
+    }
 }
 
 // Convenience trait for closures

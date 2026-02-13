@@ -1,6 +1,6 @@
 [package]
 name = "binary-options-tools-macros"
-version = "0.1.4"
+version = "0.2.0"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"

@@ -1,8 +1,8 @@
-# 📊 Documentation Overview
+# Documentation Overview
 
 BinaryOptionsTools v2 features a modern, comprehensive documentation system built with MkDocs and the Material theme. This system replaces the legacy static HTML files with a dynamic, searchable, and maintainable documentation site.
 
-## 📁 Documentation Structure
+## Documentation Structure
 
 The documentation is organized into logical sections for easier navigation:
 
@@ -11,7 +11,7 @@ The documentation is organized into logical sections for easier navigation:
 - **Architecture**: Deep dives into the internal data flow and project structure.
 - **Project Info**: Deployment guides, roadmaps, and documentation summaries.
 
-## ✨ Key Features
+## Key Features
 
 ### 1. Unified Search
 
@@ -33,7 +33,7 @@ Choose your preferred viewing experience with built-in dark and light mode suppo
 
 Integrated with GitHub Actions to automatically build and deploy the latest documentation on every push to the main branch.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### For Developers
 
@@ -47,9 +47,9 @@ Integrated with GitHub Actions to automatically build and deploy the latest docu
 2. Configuration is handled via `mkdocs.yml` in the root.
 3. Preview changes locally using `npm run docs:serve`.
 
-## 📈 Quality & Coverage
+## Quality and Coverage
 
-- ✅ **6 Languages** covered with equivalent examples.
-- ✅ **20+ API Methods** documented with parameters and return types.
-- ✅ **100+ Code Snippets** ready for copy-pasting.
-- ✅ **Interactive Guides** for complex features like Raw Handlers.
+- **6 Languages** covered with equivalent examples.
+- **20+ API Methods** documented with parameters and return types.
+- **100+ Code Snippets** ready for copy-pasting.
+- **Interactive Guides** for complex features like Raw Handlers.

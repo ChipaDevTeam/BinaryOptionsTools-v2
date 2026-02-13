@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use binary_options_tools_core_pre::error::{CoreError, CoreResult};
 use binary_options_tools_core_pre::reimports::{AsyncReceiver, AsyncSender, Message};
-use binary_options_tools_core_pre::traits::{ApiModule, ReconnectCallback, Rule};
+use binary_options_tools_core_pre::traits::{ApiModule, ReconnectCallback, Rule, RunnerCommand};
 use binary_options_tools_macros::ActionImpl;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -195,6 +195,7 @@ impl ApiModule<State> for ProfileModule {
         command_responder: AsyncSender<Self::CommandResponse>,
         message_receiver: AsyncReceiver<Arc<Message>>,
         to_ws_sender: AsyncSender<Message>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self
     where
         Self: Sized,
@@ -229,44 +230,56 @@ impl ApiModule<State> for ProfileModule {
 
         loop {
             select! {
-                Ok(msg) = self.ws_receiver.recv() => {
-            if let Message::Binary(data) = msg.as_ref() {
-                        // Handle specific profile response variants if needed
-                        match Action::from_json::<ProfileResponse>(data) {
-                            Ok(res) => {
-                                match res {
-                                    ProfileResponse::Change(res) => {
-                                        debug!(target: "ProfileModule", "Profile mode changed: {}", res.result);
-                                    }
-                                    ProfileResponse::Profile(profile) => {
-                                        debug!(target: "ProfileModule", "Profile received: {:?}", profile);
-                                        self.parse_profile(profile.actions).await?;
+                biased;
+                msg_res = self.ws_receiver.recv() => {
+                    match msg_res {
+                        Ok(msg) => {
+                            if let Message::Binary(data) = msg.as_ref() {
+                                // Handle specific profile response variants if needed
+                                match Action::from_json::<ProfileResponse>(data) {
+                                    Ok(res) => {
+                                        match res {
+                                            ProfileResponse::Change(res) => {
+                                                debug!(target: "ProfileModule", "Profile mode changed: {}", res.result);
+                                            }
+                                            ProfileResponse::Profile(profile) => {
+                                                debug!(target: "ProfileModule", "Profile received: {:?}", profile);
+                                                self.parse_profile(profile.actions).await?;
+                                            }
+                                        }
+                                    },
+                                    Err(e) => {
+                                        // Not all messages are Profile responses; keep quiet unless parse looked relevant
+                                        debug!(target: "ProfileModule", "Non-profile or unparsable message: {}", e);
                                     }
                                 }
-                            },
-                            Err(e) => {
-                                // Not all messages are Profile responses; keep quiet unless parse looked relevant
-                                debug!(target: "ProfileModule", "Non-profile or unparsable message: {}", e);
                             }
                         }
+                        Err(_) => break,
                     }
                 },
-                Ok(cmd) = self.command_receiver.recv() => {
-                    let id = cmd.id();
-                    match cmd.data() {
-                        Request::SetContext(demo) => {
-                            // Update state and send setContext
-                            self.state.set_demo(demo.clone()).await;
-                            let token = self.state.token.clone();
-                            let msg = demo.clone().action(token).map_err(|e| CoreError::Other(e.to_string()))?.to_message()?;
-                            self.ws_sender.send(msg).await?;
-                            // For now always respond with Success
-                            self.command_responder.send(Command::from_id(id, Response::Success)).await?;
+                cmd_res = self.command_receiver.recv() => {
+                    match cmd_res {
+                        Ok(cmd) => {
+                            let id = cmd.id();
+                            match cmd.data() {
+                                Request::SetContext(demo) => {
+                                    // Update state and send setContext
+                                    self.state.set_demo(demo.clone()).await;
+                                    let token = self.state.token.clone();
+                                    let msg = demo.clone().action(token).map_err(|e| CoreError::Other(e.to_string()))?.to_message()?;
+                                    self.ws_sender.send(msg).await?;
+                                    // For now always respond with Success
+                                    self.command_responder.send(Command::from_id(id, Response::Success)).await?;
+                                }
+                            }
                         }
+                        Err(_) => break,
                     }
                 }
             }
         }
+        Ok(())
     }
 
     fn rule(_: Arc<State>) -> Box<dyn Rule + Send + Sync> {

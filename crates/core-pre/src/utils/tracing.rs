@@ -99,10 +99,10 @@ impl<'a> MakeWriter<'a> for StreamWriter {
 
 pub fn stream_logs_layer(
     level: LevelFilter,
-    timout: Option<Duration>,
+    timeout: Option<Duration>,
 ) -> (Box<dyn Layer<Registry> + Send + Sync>, RecieverStream) {
     let (sender, receiver) = bounded_async(128);
-    let receiver = RecieverStream::new_timed(receiver, timout);
+    let receiver = RecieverStream::new_timed(receiver, timeout);
     let writer = StreamWriter {
         sender: sender.to_sync(),
     };

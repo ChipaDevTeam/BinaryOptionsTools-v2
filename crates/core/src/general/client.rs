@@ -458,7 +458,7 @@ where
             .await
     }
 
-    pub async fn send_message_with_timout(
+    pub async fn send_message_with_timeout(
         &self,
         timeout: Duration,
         task: impl ToString,
@@ -467,11 +467,11 @@ where
         validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
     ) -> BinaryOptionsResult<Transfer> {
         self.sender
-            .send_message_with_timout(timeout, task, &self.data, msg, response_type, validator)
+            .send_message_with_timeout(timeout, task, &self.data, msg, response_type, validator)
             .await
     }
 
-    pub async fn send_raw_message_with_timout(
+    pub async fn send_raw_message_with_timeout(
         &self,
         timeout: Duration,
         task: impl ToString,
@@ -479,7 +479,7 @@ where
         validator: Box<dyn ValidatorTrait<Transfer::Raw> + Send + Sync>,
     ) -> BinaryOptionsResult<Transfer::Raw> {
         self.sender
-            .send_raw_message_with_timout(timeout, task, &self.data, msg, validator)
+            .send_raw_message_with_timeout(timeout, task, &self.data, msg, validator)
             .await
     }
 
