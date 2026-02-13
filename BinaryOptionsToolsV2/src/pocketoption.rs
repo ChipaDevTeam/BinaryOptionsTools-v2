@@ -99,7 +99,7 @@ impl RawPocketOption {
     pub fn new(ssid: String, py: Python<'_>) -> PyResult<Self> {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
-            let client = tokio::time::timeout(Duration::from_secs(10), PocketOption::new(ssid))
+            let client = tokio::time::timeout(Duration::from_secs(20), PocketOption::new(ssid))
                 .await
                 .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
                 .map_err(BinaryErrorPy::from)?;
@@ -110,7 +110,7 @@ impl RawPocketOption {
     #[staticmethod]
     pub fn create<'py>(ssid: String, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         future_into_py(py, async move {
-            let client = tokio::time::timeout(Duration::from_secs(10), PocketOption::new(ssid))
+            let client = tokio::time::timeout(Duration::from_secs(20), PocketOption::new(ssid))
                 .await
                 .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
                 .map_err(BinaryErrorPy::from)?;
@@ -124,7 +124,7 @@ impl RawPocketOption {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
             let client = tokio::time::timeout(
-                Duration::from_secs(10),
+                Duration::from_secs(20),
                 PocketOption::new_with_url(ssid, url),
             )
             .await
@@ -142,7 +142,7 @@ impl RawPocketOption {
     ) -> PyResult<Bound<'py, PyAny>> {
         future_into_py(py, async move {
             let client = tokio::time::timeout(
-                Duration::from_secs(10),
+                Duration::from_secs(20),
                 PocketOption::new_with_url(ssid, url),
             )
             .await
@@ -745,6 +745,15 @@ impl RawPocketOption {
             py,
             async move { Ok(client.server_time().await.timestamp()) },
         )
+    }
+
+    /// Commands the runner to shutdown.
+    pub fn shutdown<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            client.shutdown().await.map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| py.None().into_py_any(py))
+        })
     }
 
     /// Disconnects the client while keeping the configuration intact.

@@ -403,7 +403,11 @@ impl ApiModule<State> for SubscriptionsApiModule {
         //
         loop {
             select! {
-                Ok(cmd) = self.command_receiver.recv() => {
+                cmd_res = self.command_receiver.recv() => {
+                    let cmd = match cmd_res {
+                        Ok(cmd) => cmd,
+                        Err(_) => return Ok(()), // Channel closed
+                    };
                     match cmd {
                         Command::Subscribe {
                             asset,
@@ -495,7 +499,11 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                                                 }                        }
                     }
                 },
-                Ok(msg) = self.message_receiver.recv() => {
+                msg_res = self.message_receiver.recv() => {
+                    let msg = match msg_res {
+                        Ok(msg) => msg,
+                        Err(_) => return Ok(()), // Channel closed
+                    };
                     let response = match msg.as_ref() {
                         Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data).ok(),
                         Message::Text(text) => serde_json::from_str::<ServerResponse>(text).ok(),

@@ -163,9 +163,9 @@ impl ApiModule<State> for TradesApiModule {
     async fn run(&mut self) -> CoreResult<()> {
         loop {
             select! {
-              Ok(cmd) = self.command_receiver.recv() => {
-                  match cmd {
-                      Command::OpenOrder { asset, action, amount, time, req_id, responder } => {
+              cmd_res = self.command_receiver.recv() => {
+                  match cmd_res {
+                      Ok(Command::OpenOrder { asset, action, amount, time, req_id, responder }) => {
                           // Register pending order
                           let tracker = PendingOrderTracker {
                               asset: asset.clone(),
@@ -191,9 +191,14 @@ impl ApiModule<State> for TradesApiModule {
                               }
                           }
                       }
+                      Err(_) => return Ok(()), // Channel closed
                   }
               },
-              Ok(msg) = self.message_receiver.recv() => {
+              msg_res = self.message_receiver.recv() => {
+                  let msg = match msg_res {
+                      Ok(msg) => msg,
+                      Err(_) => return Ok(()), // Channel closed
+                  };
                   let response_result = match msg.as_ref() {
                       Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data),
                       Message::Text(text) => {

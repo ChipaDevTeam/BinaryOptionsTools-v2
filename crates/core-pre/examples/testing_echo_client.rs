@@ -4,10 +4,10 @@ use binary_options_tools_core_pre::connector::ConnectorResult;
 use binary_options_tools_core_pre::connector::{Connector, WsStream};
 use binary_options_tools_core_pre::error::{CoreError, CoreResult};
 use binary_options_tools_core_pre::testing::{TestingWrapper, TestingWrapperBuilder};
-use binary_options_tools_core_pre::traits::{ApiModule, Rule};
+use binary_options_tools_core_pre::traits::{ApiModule, Rule, RunnerCommand};
 use kanal::{AsyncReceiver, AsyncSender};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
@@ -57,6 +57,7 @@ impl ApiModule<()> for EchoModule {
         cmd_ret_tx: AsyncSender<Self::CommandResponse>,
         msg_rx: AsyncReceiver<Arc<Message>>,
         to_ws: AsyncSender<Message>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self {
             to_ws,
@@ -82,9 +83,11 @@ impl ApiModule<()> for EchoModule {
                     self.echo.store(true, Ordering::SeqCst);
                 }
                 Ok(msg) = self.msg_rx.recv() => {
-                    if let Message::Text(txt) = &*msg && self.echo.load(Ordering::SeqCst) {
-                        let _ = self.cmd_tx.send(txt.to_string()).await;
-                        self.echo.store(false, Ordering::SeqCst);
+                    if let Message::Text(txt) = &*msg {
+                        if self.echo.load(Ordering::SeqCst) {
+                            let _ = self.cmd_tx.send(txt.to_string()).await;
+                            self.echo.store(false, Ordering::SeqCst);
+                        }
                     }
                 }
             }

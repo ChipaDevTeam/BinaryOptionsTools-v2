@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use binary_options_tools_core_pre::error::{CoreError, CoreResult};
 use binary_options_tools_core_pre::reimports::{AsyncReceiver, AsyncSender, Message};
-use binary_options_tools_core_pre::traits::{ApiModule, ReconnectCallback, Rule};
+use binary_options_tools_core_pre::traits::{ApiModule, ReconnectCallback, Rule, RunnerCommand};
 use binary_options_tools_macros::ActionImpl;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -195,6 +195,7 @@ impl ApiModule<State> for ProfileModule {
         command_responder: AsyncSender<Self::CommandResponse>,
         message_receiver: AsyncReceiver<Arc<Message>>,
         to_ws_sender: AsyncSender<Message>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self
     where
         Self: Sized,

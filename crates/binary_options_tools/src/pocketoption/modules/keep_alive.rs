@@ -46,6 +46,7 @@ impl LightweightModule<State> for InitModule {
 
     /// The module's asynchronous run loop.
     async fn run(&mut self) -> CoreResult<()> {
+        let mut authenticated = false;
         loop {
             let msg = self.ws_receiver.recv().await;
             match msg {
@@ -64,13 +65,19 @@ impl LightweightModule<State> for InitModule {
                                 process_text = Some(text);
                             }
                         }
+                        Message::Close(_) => {
+                            if !authenticated {
+                                tracing::error!(target: "InitModule", "Connection closed before authentication was completed. Session may be invalid.");
+                                let _ = self.runner_command_tx.send(RunnerCommand::Shutdown).await;
+                            }
+                        }
                         _ => {}
                     }
 
                     if let Some(text) = process_text {
                         // Handle simple Socket.IO control messages
                         if text.starts_with(SID_BASE) {
-                            tracing::info!(target: "InitModule", "Received Engine.IO handshake (0). Sending Socket.IO connect (40)...");
+                            tracing::debug!(target: "InitModule", "Received Engine.IO handshake (0). Sending Socket.IO connect (40)...");
 
                             if let Err(e) = self.ws_sender.send(Message::text("40")).await {
                                 warn!(target: "InitModule", "Failed to send 40: {}", e);
@@ -87,7 +94,7 @@ impl LightweightModule<State> for InitModule {
                             } else {
                                 "REDACTED".to_string()
                             };
-                            tracing::info!(target: "InitModule", "Socket.IO session established ({}). Sending auth SSID: {}", text, redacted_ssid);
+                            tracing::debug!(target: "InitModule", "Socket.IO session established ({}). Sending auth SSID: {}", text, redacted_ssid);
 
                             if let Err(e) = self.ws_sender.send(Message::text(ssid_str)).await {
                                 let err_str = e.to_string().to_lowercase();
@@ -109,7 +116,9 @@ impl LightweightModule<State> for InitModule {
                             }
 
                             // Signal shutdown to the runner because auth failed
-                            if let Err(e) = self.runner_command_tx.send(RunnerCommand::Shutdown).await {
+                            if let Err(e) =
+                                self.runner_command_tx.send(RunnerCommand::Shutdown).await
+                            {
                                 warn!(target: "InitModule", "Failed to send shutdown command to runner: {}", e);
                             }
 
@@ -144,7 +153,8 @@ impl LightweightModule<State> for InitModule {
                         }
 
                         if trigger_auth {
-                            tracing::info!(target: "InitModule", "Authentication successful! Triggering data load.");
+                            authenticated = true;
+                            tracing::debug!(target: "InitModule", "Authentication successful! Triggering data load.");
 
                             // Explicitly request everything needed for a full sync
                             let initialization_messages = vec![

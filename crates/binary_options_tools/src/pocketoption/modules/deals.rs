@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use binary_options_tools_core_pre::{
     error::CoreError,
     reimports::{AsyncReceiver, AsyncSender, Message},
-    traits::{ApiModule, Rule},
+    traits::{ApiModule, Rule, RunnerCommand},
 };
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -191,6 +191,7 @@ impl ApiModule<State> for DealsApiModule {
         command_responder: AsyncSender<Self::CommandResponse>,
         ws_receiver: AsyncReceiver<Arc<Message>>,
         _ws_sender: AsyncSender<Message>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self {
             state,

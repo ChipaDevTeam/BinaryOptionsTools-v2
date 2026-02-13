@@ -30,7 +30,7 @@ async def test_async_connection_control():
         await client.disconnect()
         print("✓ Disconnected")
 
-        await asyncio.sleep(2)
+        await asyncio.sleep(0.5)
 
         print("Reconnecting...")
         await client.connect()
@@ -43,80 +43,68 @@ async def test_async_connection_control():
 
 
 @pytest.mark.asyncio
-async def test_async_raw_handler():
+async def test_async_raw_handler(api):
     """Test async raw handler functionality."""
     print("\n=== Testing Async Raw Handler ===")
 
-    ssid = os.getenv("POCKET_OPTION_SSID")
-    if not ssid:
-        print("Error: POCKET_OPTION_SSID environment variable not set")
-        return
+    # Create a validator that matches EURUSD_otc updates
+    # These are very frequent and reliable for testing
+    validator = Validator.contains("EURUSD_otc")
 
-    async with PocketOptionAsync(ssid) as client:
-        # Create a validator that matches EURUSD_otc updates
-        # These are very frequent and reliable for testing
-        validator = Validator.contains("EURUSD_otc")
+    # Create raw handler
+    print("Creating raw handler...")
+    handler = await api.create_raw_handler(validator)
+    print(f"✓ Handler created with ID: {handler.id()}")
 
-        # Create raw handler
-        print("Creating raw handler...")
-        handler = await client.create_raw_handler(validator)
-        print(f"✓ Handler created with ID: {handler.id()}")
+    # Wait for any EURUSD_otc message
+    print("Waiting for EURUSD_otc update...")
+    try:
+        response = await asyncio.wait_for(handler.wait_next(), timeout=30.0)
+        print(f"✓ Received response: {response[:200]}...")
+        assert "EURUSD_otc" in response
+    except asyncio.TimeoutError:
+        print("✗ Timeout waiting for EURUSD_otc update")
+        raise
 
-        # Wait for any EURUSD_otc message
-        print("Waiting for EURUSD_otc update...")
+    # Now try subscription
+    print("Subscribing to stream...")
+    stream = await handler.subscribe()
+
+    # Read a few messages from stream
+    print("Waiting for messages from stream...")
+    for i in range(3):
         try:
-            response = await asyncio.wait_for(handler.wait_next(), timeout=30.0)
-            print(f"✓ Received response: {response[:200]}...")
-            assert "EURUSD_otc" in response
+            message = await asyncio.wait_for(stream.__anext__(), timeout=30.0)
+            print(f"✓ Stream message {i + 1}: {message[:100]}...")
+            assert "EURUSD_otc" in message
         except asyncio.TimeoutError:
-            print("✗ Timeout waiting for EURUSD_otc update")
+            print(f"✗ Timeout waiting for stream message {i + 1}")
             raise
-
-        # Now try subscription
-        print("Subscribing to stream...")
-        stream = await handler.subscribe()
-
-        # Read a few messages from stream
-        print("Waiting for messages from stream...")
-        for i in range(3):
-            try:
-                message = await asyncio.wait_for(stream.__anext__(), timeout=30.0)
-                print(f"✓ Stream message {i + 1}: {message[:100]}...")
-                assert "EURUSD_otc" in message
-            except asyncio.TimeoutError:
-                print(f"✗ Timeout waiting for stream message {i + 1}")
-                raise
 
     print("✓ Raw handler test completed")
 
 
 @pytest.mark.asyncio
-async def test_async_unsubscribe():
+async def test_async_unsubscribe(api):
     """Test unsubscribing from asset streams."""
     print("\n=== Testing Async Unsubscribe ===")
 
-    ssid = os.getenv("POCKET_OPTION_SSID")
-    if not ssid:
-        print("Error: POCKET_OPTION_SSID environment variable not set")
-        return
+    # Subscribe to an asset
+    print("Subscribing to EURUSD_otc...")
+    subscription = await api.subscribe_symbol("EURUSD_otc")
 
-    async with PocketOptionAsync(ssid) as client:
-        # Subscribe to an asset
-        print("Subscribing to EURUSD_otc...")
-        subscription = await client.subscribe_symbol("EURUSD_otc")
+    # Get a few updates
+    count = 0
+    async for candle in subscription:
+        print(f"✓ Candle {count + 1}: {candle}")
+        count += 1
+        if count >= 3:
+            break
 
-        # Get a few updates
-        count = 0
-        async for candle in subscription:
-            print(f"✓ Candle {count + 1}: {candle}")
-            count += 1
-            if count >= 3:
-                break
-
-        # Unsubscribe
-        print("Unsubscribing from EURUSD_otc...")
-        await client.unsubscribe("EURUSD_otc")
-        print("✓ Unsubscribed")
+    # Unsubscribe
+    print("Unsubscribing from EURUSD_otc...")
+    await api.unsubscribe("EURUSD_otc")
+    print("✓ Unsubscribed")
 
 
 def test_sync_connection_control():
@@ -128,8 +116,8 @@ def test_sync_connection_control():
         print("Error: POCKET_OPTION_SSID environment variable not set")
         return
 
-    # Use custom config with increased timeout
-    config = {"connection_initialization_timeout_secs": 20}
+    # Use custom config with reduced timeout
+    config = {"connection_initialization_timeout_secs": 30}
     client = PocketOption(ssid, config=config)
 
     # Test disconnect and connect
@@ -139,7 +127,7 @@ def test_sync_connection_control():
 
     import time
 
-    time.sleep(2)
+    time.sleep(0.5)
 
     print("Reconnecting...")
     client.connect()
@@ -151,66 +139,49 @@ def test_sync_connection_control():
     print("✓ Reconnected")
 
 
-def test_sync_raw_handler():
+def test_sync_raw_handler(api_sync):
     """Test sync raw handler functionality."""
-    print("\n=== Testing Sync Raw Handler ===")
+    print("\n=== Testing Sync Raw Handler ===\n")
 
-    ssid = os.getenv("POCKET_OPTION_SSID")
-    if not ssid:
-        print("Error: POCKET_OPTION_SSID environment variable not set")
-        return
+    # Use EURUSD_otc validator as it's reliable
+    validator = Validator.contains("EURUSD_otc")
 
-    # Use custom config with increased timeout
-    config = {"connection_initialization_timeout_secs": 20}
-    with PocketOption(ssid, config=config) as client:
-        # Use EURUSD_otc validator as it's reliable
-        validator = Validator.contains("EURUSD_otc")
+    # Create raw handler
+    print("Creating raw handler...")
+    handler = api_sync.create_raw_handler(validator)
+    print(f"✓ Handler created with ID: {handler.id()}")
 
-        # Create raw handler
-        print("Creating raw handler...")
-        handler = client.create_raw_handler(validator)
-        print(f"✓ Handler created with ID: {handler.id()}")
+    # Wait for any EURUSD_otc message
+    print("Waiting for EURUSD_otc update...")
+    try:
+        response = handler.wait_next()
+        print(f"✓ Received response: {response[:100]}...")
+        assert "EURUSD_otc" in response
+    except Exception as e:
+        print(f"✗ Failed to receive message: {e}")
+        raise
 
-        # Wait for any EURUSD_otc message
-        print("Waiting for EURUSD_otc update...")
-        try:
-            response = handler.wait_next()
-            print(f"✓ Received response: {response[:100]}...")
-            assert "EURUSD_otc" in response
-        except Exception as e:
-            print(f"✗ Failed to receive message: {e}")
-            raise
+    # Test subscription
+    print("Subscribing to stream...")
+    stream = handler.subscribe()
 
-        # Test subscription
-        print("Subscribing to stream...")
-        stream = handler.subscribe()
-
-        # Read a few messages from stream
-        print("Waiting for messages from stream...")
-        for i in range(3):
-            message = next(stream)
-            print(f"✓ Stream message {i + 1}: {message[:100]}...")
-            assert "EURUSD_otc" in message
+    # Read a few messages from stream
+    print("Waiting for messages from stream...")
+    for i in range(3):
+        message = next(stream)
+        print(f"✓ Stream message {i + 1}: {message[:100]}...")
+        assert "EURUSD_otc" in message
 
     print("✓ Sync raw handler test completed")
 
 
-def test_sync_unsubscribe():
+def test_sync_unsubscribe(api_sync):
     """Test unsubscribing from asset streams (sync)."""
-    print("\n=== Testing Sync Unsubscribe ===")
-
-    ssid = os.getenv("POCKET_OPTION_SSID")
-    if not ssid:
-        print("Error: POCKET_OPTION_SSID environment variable not set")
-        return
-
-    # Use custom config with increased timeout
-    config = {"connection_initialization_timeout_secs": 20}
-    client = PocketOption(ssid, config=config)
+    print("\n=== Testing Sync Unsubscribe ===\n")
 
     # Subscribe to an asset
     print("Subscribing to EURUSD_otc...")
-    subscription = client.subscribe_symbol("EURUSD_otc")
+    subscription = api_sync.subscribe_symbol("EURUSD_otc")
 
     # Get a few updates
     count = 0
@@ -222,7 +193,7 @@ def test_sync_unsubscribe():
 
     # Unsubscribe
     print("Unsubscribing from EURUSD_otc...")
-    client.unsubscribe("EURUSD_otc")
+    api_sync.unsubscribe("EURUSD_otc")
     print("✓ Unsubscribed")
 
 

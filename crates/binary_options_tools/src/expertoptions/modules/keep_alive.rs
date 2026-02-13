@@ -3,7 +3,7 @@ use std::sync::Arc;
 use binary_options_tools_core_pre::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
-    traits::{LightweightModule, Rule},
+    traits::{LightweightModule, Rule, RunnerCommand},
 };
 use serde_json::Value;
 use tracing::warn;
@@ -22,6 +22,7 @@ impl LightweightModule<State> for PongModule {
         state: Arc<State>,
         ws_sender: AsyncSender<Message>,
         ws_receiver: AsyncReceiver<Arc<Message>>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self
     where
         Self: Sized,

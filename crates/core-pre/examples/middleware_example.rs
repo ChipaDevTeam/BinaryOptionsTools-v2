@@ -3,10 +3,10 @@ use binary_options_tools_core_pre::builder::ClientBuilder;
 use binary_options_tools_core_pre::connector::{Connector, ConnectorResult, WsStream};
 use binary_options_tools_core_pre::error::CoreResult;
 use binary_options_tools_core_pre::middleware::{MiddlewareContext, WebSocketMiddleware};
-use binary_options_tools_core_pre::traits::{ApiModule, AppState, Rule};
+use binary_options_tools_core_pre::traits::{ApiModule, AppState, Rule, RunnerCommand};
 use kanal::{AsyncReceiver, AsyncSender};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::info;
@@ -184,6 +184,7 @@ impl ApiModule<ExampleState> for ExampleModule {
         _cmd_ret_tx: AsyncSender<Self::CommandResponse>,
         msg_rx: AsyncReceiver<Arc<Message>>,
         _to_ws: AsyncSender<Message>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self { _msg_rx: msg_rx }
     }

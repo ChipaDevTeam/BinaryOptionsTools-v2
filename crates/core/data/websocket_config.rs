@@ -105,8 +105,6 @@ impl WebSocketConfig {
             "wss://api-us-north.po.market/socket.io/?EIO=4&transport=websocket",
             "wss://api-sc.po.market/socket.io/?EIO=4&transport=websocket",
             "wss://api-hk.po.market/socket.io/?EIO=4&transport=websocket",
-            "wss://demo-api-eu.po.market/socket.io/?EIO=4&transport=websocket",
-            "wss://demo-api-us-south.po.market/socket.io/?EIO=4&transport=websocket",
         ];
 
         for url_str in fallback_urls {

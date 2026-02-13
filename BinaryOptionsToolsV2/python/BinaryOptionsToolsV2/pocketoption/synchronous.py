@@ -226,9 +226,9 @@ class PocketOption:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
-        Context manager exit. Disconnects the client.
+        Context manager exit. Shuts down the client and its runner.
         """
-        self.disconnect()
+        self.shutdown()
 
     def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
@@ -425,15 +425,15 @@ class PocketOption:
     def disconnect(self) -> None:
         """
         Disconnects the client while keeping the configuration intact.
-        The connection can be re-established later using connect().
+        The connection will automatically try to re-establish if max_allowed_loops > 0.
+        To completely stop the client and its runner, use shutdown().
 
         Example:
             ```python
             client = PocketOption(ssid)
             # Use client...
             client.disconnect()
-            # Do other work...
-            client.connect()
+            # The client will try to reconnect in the background...
             ```
         """
         self.loop.run_until_complete(self._client.disconnect())
@@ -447,7 +447,7 @@ class PocketOption:
             ```python
             client.disconnect()
             # Connection is closed
-            client.connect()
+            await client.connect()
             # Connection is re-established
             ```
         """
@@ -481,6 +481,13 @@ class PocketOption:
             ```
         """
         self.loop.run_until_complete(self._client.unsubscribe(asset))
+
+    def shutdown(self) -> None:
+        """
+        Completely shuts down the client and its background runner.
+        Once shut down, the client cannot be used anymore.
+        """
+        self.loop.run_until_complete(self._client.shutdown())
 
     def create_raw_handler(self, validator: Validator, keep_alive: Optional[str] = None) -> "RawHandlerSync":
         """

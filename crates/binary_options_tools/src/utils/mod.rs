@@ -47,7 +47,7 @@ pub fn init_crypto_provider() {
 /// client.with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)));
 /// ```
 pub async fn print_handler(msg: Arc<Message>) -> CoreResult<()> {
-    tracing::info!(target: "Lightweight", "Received: {msg:?}");
+    tracing::debug!(target: "Lightweight", "Received: {msg:?}");
     Ok(())
 }
 

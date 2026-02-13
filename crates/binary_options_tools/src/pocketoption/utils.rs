@@ -145,22 +145,12 @@ pub async fn try_connect(
 
     let user_agent = ssid.user_agent();
 
-    // Log public IP to help debug 41 rejections (which often happen due to IP mismatch)
-    if let Ok(ip) = get_public_ip().await {
-        let redacted_ip = if let Some(idx) = ip.rfind('.') {
-            format!("{}.xxx", &ip[..idx])
-        } else {
-            "REDACTED".to_string()
-        };
-        tracing::info!(target: "PocketConnect", "Connecting from IP: {}", redacted_ip);
-    }
-
     let t_url = Url::parse(&url).map_err(|e| ConnectorError::UrlParsing(e.to_string()))?;
     let host = t_url
         .host_str()
         .ok_or(ConnectorError::UrlParsing("Host not found".into()))?;
 
-    tracing::info!(target: "PocketConnect", "Connecting to {} with UA: {} and Origin: https://pocketoption.com", host, user_agent);
+    tracing::debug!(target: "PocketConnect", "Connecting to {} with UA: {} and Origin: https://pocketoption.com", host, user_agent);
 
     let request = Request::builder()
         .uri(t_url.to_string())
@@ -175,7 +165,7 @@ pub async fn try_connect(
         .map_err(|e| ConnectorError::HttpRequestBuild(e.to_string()))?;
 
     let (ws, _) = tokio::time::timeout(
-        StdDuration::from_secs(15),
+        StdDuration::from_secs(10),
         connect_async_tls_with_config(request, None, false, Some(connector)),
     )
     .await

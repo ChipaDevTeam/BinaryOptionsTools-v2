@@ -10,10 +10,9 @@ use rand::Rng;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 const FALLBACK_URLS: &[&str] = &[
-    "wss://api.pocketoption.com/socket.io/?EIO=4&transport=websocket",
     "wss://api-eu.po.market/socket.io/?EIO=4&transport=websocket",
     "wss://api-us-south.po.market/socket.io/?EIO=4&transport=websocket",
     "wss://api-asia.po.market/socket.io/?EIO=4&transport=websocket",
@@ -32,7 +31,7 @@ impl PocketConnect {
             info!(target: "PocketConnectThread", "Connecting to PocketOption at {}", u);
             match try_connect(ssid.clone(), u.clone()).await {
                 Ok(stream) => {
-                    info!(target: "PocketConnect", "Successfully connected to PocketOption");
+                    debug!(target: "PocketConnect", "Successfully connected to PocketOption");
                     return Ok(stream);
                 }
                 Err(e) => {
@@ -55,13 +54,10 @@ impl Connector<State> for PocketConnect {
         &self,
         state: Arc<State>,
     ) -> ConnectorResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
-        // Mandatory backoff to prevent spinning in tight loops when server kicks immediately
-        tokio::time::sleep(Duration::from_secs(2)).await;
-
         let creds = state.ssid.clone();
         let url = state.default_connection_url.clone();
         if let Some(url) = url {
-            info!(target: "PocketConnect", "Connecting to PocketOption at {}", url);
+            debug!(target: "PocketConnect", "Connecting to PocketOption at {}", url);
             match try_connect(creds.clone(), url.clone()).await {
                 Ok(stream) => return Ok(stream),
                 Err(e) => {
@@ -71,7 +67,7 @@ impl Connector<State> for PocketConnect {
         }
 
         if !state.urls.is_empty() {
-            info!(target: "PocketConnect", "Trying fallback URLs from config...");
+            debug!(target: "PocketConnect", "Trying fallback URLs from config...");
             if let Ok(stream) = self
                 .connect_multiple(state.urls.clone(), creds.clone())
                 .await
@@ -92,15 +88,14 @@ impl Connector<State> for PocketConnect {
 
     /// Gracefully disconnects from the PocketOption server.
     async fn disconnect(&self) -> ConnectorResult<()> {
-        info!(target: "PocketConnect", "Initiating graceful disconnect sequence...");
+        debug!(target: "PocketConnect", "Initiating graceful disconnect sequence...");
 
         // Note: The specific 41 disconnect packet is typically sent via the active
         // stream's Sink. In this trait implementation, 'disconnect' serves as
         // the high-level trigger for session cleanup.
 
-        info!(target: "PocketConnect", "Sent Socket.io disconnect signal (41).");
-        info!(target: "PocketConnect", "Closing WebSocket transport.");
-
+        debug!(target: "PocketConnect", "Sent Socket.io disconnect signal (41).");
+        debug!(target: "PocketConnect", "Closing WebSocket transport.");
         Ok(())
     }
 }

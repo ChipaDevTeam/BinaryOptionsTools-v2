@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use binary_options_tools_core_pre::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
-    traits::{ApiModule, Rule},
+    traits::{ApiModule, Rule, RunnerCommand},
 };
 use rust_decimal::prelude::ToPrimitive;
 use serde::Deserialize;
@@ -258,6 +258,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
         command_responder: AsyncSender<Self::CommandResponse>,
         message_receiver: AsyncReceiver<Arc<Message>>,
         to_ws_sender: AsyncSender<Message>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self {
             _state: shared_state, // Prefix with _ to mark as intentionally unused
@@ -544,8 +545,9 @@ mod tests {
         );
 
         // Initialize the module
+        let (runner_tx, _runner_rx) = bounded_async(1);
         let mut module =
-            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
         // Spawn the module loop in a separate task
         tokio::spawn(async move {
@@ -642,8 +644,9 @@ mod tests {
         );
 
         // Initialize the module
+        let (runner_tx, _runner_rx) = bounded_async(1);
         let mut module =
-            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
         // Spawn the module loop in a separate task
         tokio::spawn(async move {
@@ -730,8 +733,9 @@ mod tests {
         );
 
         // Initialize the module
+        let (runner_tx, _runner_rx) = bounded_async(1);
         let mut module =
-            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
         // Spawn the module loop
         tokio::spawn(async move {
@@ -814,8 +818,9 @@ mod tests {
                 .expect("Failed to build state"),
         );
 
+        let (runner_tx, _runner_rx) = bounded_async(1);
         let mut module =
-            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
         tokio::spawn(async move {
             let _ = module.run().await;
@@ -861,8 +866,9 @@ mod tests {
         );
 
         // Initialize the module
+        let (runner_tx, _runner_rx) = bounded_async(1);
         let mut module =
-            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
         // Spawn the module loop
         tokio::spawn(async move {
@@ -969,8 +975,9 @@ mod tests {
         );
 
         // Initialize the module
+        let (runner_tx, _runner_rx) = bounded_async(1);
         let mut module =
-            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+            HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
         // Spawn the module loop
         tokio::spawn(async move {

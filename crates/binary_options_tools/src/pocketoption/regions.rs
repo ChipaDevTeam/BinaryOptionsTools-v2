@@ -38,15 +38,23 @@ impl Regions {
         Ok(distances.into_iter().map(|(s, _)| s).collect())
     }
 
+    pub async fn get_server_for_ip(&self, ip: &str) -> PocketResult<&str> {
+        let server = self.get_closest_server(ip).await?;
+        Ok(server.0)
+    }
+
+    pub async fn get_servers_for_ip(&self, ip: &str) -> PocketResult<Vec<&str>> {
+        self.sort_servers(ip).await
+    }
+
     pub async fn get_server(&self) -> PocketResult<&str> {
         let ip = get_public_ip().await?;
-        let server = self.get_closest_server(&ip).await?;
-        Ok(server.0)
+        self.get_server_for_ip(&ip).await
     }
 
     pub async fn get_servers(&self) -> PocketResult<Vec<&str>> {
         let ip = get_public_ip().await?;
-        self.sort_servers(&ip).await
+        self.get_servers_for_ip(&ip).await
     }
 }
 

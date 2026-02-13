@@ -3,18 +3,18 @@ use crate::connector::Connector;
 use crate::error::CoreResult;
 use crate::middleware::{MiddlewareContext, MiddlewareStack};
 use crate::signals::Signals;
-use crate::traits::{ApiModule, AppState, ReconnectCallback, Rule};
-use futures_util::{SinkExt, stream::StreamExt};
+use crate::traits::{ApiModule, AppState, ReconnectCallback, Rule, RunnerCommand};
+use futures_util::{stream::StreamExt, SinkExt};
 use kanal::{AsyncReceiver, AsyncSender};
+use rand::Rng;
 use std::any::{Any, TypeId};
-use std::future::Future;
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, error, info, warn};
-use rand::Rng;
 
 /// A lightweight handler is a function that can process messages without being tied to a specific module.
 /// It can be used for quick, non-blocking operations that don't require a full module lifecycle
@@ -231,6 +231,18 @@ impl<S: AppState> Client<S> {
         Ok(())
     }
 
+    /// Commands the runner to shutdown without consuming the client.
+    pub async fn shutdown_ref(&self) -> CoreResult<()> {
+        self.runner_command_tx
+            .send(RunnerCommand::Shutdown)
+            .await
+            .inspect_err(|e| {
+                error!(target: "Client", "Failed to send shutdown command: {e}");
+            })?;
+        info!(target: "Client", "Runner shutdown command sent (via ref).");
+        Ok(())
+    }
+
     /// Send a message to the WebSocket
     pub async fn send_message(&self, message: Message) -> CoreResult<()> {
         self.to_ws_sender.send(message).await.inspect_err(|e| {
@@ -284,7 +296,7 @@ impl<S: AppState> ClientRunner<S> {
             // Execute middleware on_connect hook
             let middleware_context =
                 MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
-            info!(target: "Runner", "Starting connection cycle...");
+            debug!(target: "Runner", "Starting connection cycle...");
 
             // Call middleware to record connection attempt
             self.router
@@ -300,14 +312,13 @@ impl<S: AppState> ClientRunner<S> {
             };
 
             let ws_stream = match stream_result {
-                Ok(stream) => {
-                    self.reconnect_attempts = 0; // Reset attempts on success
-                    stream
-                },
+                Ok(stream) => stream,
                 Err(e) => {
                     self.reconnect_attempts += 1;
 
-                    if self.max_allowed_loops > 0 && self.reconnect_attempts >= self.max_allowed_loops {
+                    if self.max_allowed_loops > 0
+                        && self.reconnect_attempts >= self.max_allowed_loops
+                    {
                         error!(target: "Runner", "Maximum reconnection attempts ({}) reached. Shutting down.", self.max_allowed_loops);
                         self.shutdown_requested = true;
                         break;
@@ -320,7 +331,11 @@ impl<S: AppState> ClientRunner<S> {
                         5
                     };
 
-                    let delay_secs = std::cmp::min(base_delay.saturating_mul(2u64.saturating_pow(self.reconnect_attempts.min(10))), 300);
+                    let delay_secs = std::cmp::min(
+                        base_delay
+                            .saturating_mul(2u64.saturating_pow(self.reconnect_attempts.min(10))),
+                        300,
+                    );
                     // Add jitter
                     let jitter = rand::rng().random_range(0.8..1.2);
                     let delay = std::time::Duration::from_secs_f64(delay_secs as f64 * jitter);
@@ -338,8 +353,12 @@ impl<S: AppState> ClientRunner<S> {
 
             // 🎯 MIDDLEWARE HOOK: on_connect - called after successful connection
             // Location: After WebSocket connection is established
-            info!(target: "Runner", "Connection successful.");
+            debug!(target: "Runner", "Connection successful.");
             self.signal.set_connected();
+
+            // Track connection start time to reset attempts only if stable
+            let connection_start = std::time::Instant::now();
+            let mut attempts_reset = false;
             self.router
                 .middleware_stack
                 .on_connect(&middleware_context)
@@ -347,7 +366,7 @@ impl<S: AppState> ClientRunner<S> {
 
             // Execute the correct callback.
             if self.is_hard_disconnect {
-                info!(target: "Runner", "Executing on_connect callback.");
+                debug!(target: "Runner", "Executing on_connect callback.");
                 // Handle any error from on_connect
                 if let Err(err) =
                     (self.connection_callback.on_connect)(self.state.clone(), &self.to_ws_sender)
@@ -359,7 +378,7 @@ impl<S: AppState> ClientRunner<S> {
                     );
                 }
             } else {
-                info!(target: "Runner", "Executing on_reconnect callback.");
+                debug!(target: "Runner", "Executing on_reconnect callback.");
                 // Handle any error from on_reconnect
                 if let Err(err) = self
                     .connection_callback
@@ -421,6 +440,15 @@ impl<S: AppState> ClientRunner<S> {
             // Temporal timer so we i can check the duration of a connection
             // let temporal_timer = std::time::Instant::now();
             while session_active {
+                // Reset reconnect attempts if connection has been stable for > 10s
+                if !attempts_reset
+                    && connection_start.elapsed() > std::time::Duration::from_secs(10)
+                {
+                    self.reconnect_attempts = 0;
+                    attempts_reset = true;
+                    debug!(target: "Runner", "Connection stable, resetting reconnect attempts.");
+                }
+
                 tokio::select! {
                     biased;
 
@@ -429,7 +457,7 @@ impl<S: AppState> ClientRunner<S> {
                             RunnerCommand::Disconnect => {
                                 // 🎯 MIDDLEWARE HOOK: on_disconnect - manual disconnect
 
-                                info!(target: "Runner", "Disconnect command received.");
+                                debug!(target: "Runner", "Disconnect command received.");
 
                                 // Execute middleware on_disconnect hook
                                 let middleware_context = MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
@@ -455,7 +483,7 @@ impl<S: AppState> ClientRunner<S> {
                             RunnerCommand::Shutdown => {
                                 // 🎯 MIDDLEWARE HOOK: on_disconnect - shutdown
 
-                                info!(target: "Runner", "Shutdown command received.");
+                                debug!(target: "Runner", "Shutdown command received.");
 
                                 // Execute middleware on_disconnect hook
                                 let middleware_context = MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
@@ -506,7 +534,7 @@ impl<S: AppState> ClientRunner<S> {
             }
         }
 
-        info!(target: "Runner", "Shutdown complete.");
+        debug!(target: "Runner", "Shutdown complete.");
     }
 }
 

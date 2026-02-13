@@ -196,6 +196,7 @@ class PocketOptionAsync:
             ssid = ssid.replace("42['auth',", '42["auth",', 1)
 
         from ..tracing import Logger
+
         self.logger = Logger()
 
         # Ensure it looks like a Socket.IO message
@@ -222,7 +223,6 @@ class PocketOptionAsync:
 
         from ..tracing import LogBuilder
 
-
         # Enable terminal logging only if explicitly requested in config
         if self.config.terminal_logging:
             try:
@@ -244,9 +244,9 @@ class PocketOptionAsync:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """
-        Context manager exit. Disconnects the client.
+        Context manager exit. Shuts down the client and its runner.
         """
-        await self.disconnect()
+        await self.shutdown()
 
     async def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
@@ -681,15 +681,15 @@ class PocketOptionAsync:
     async def disconnect(self) -> None:
         """
         Disconnects the client while keeping the configuration intact.
-        The connection can be re-established later using connect().
+        The connection will automatically try to re-establish if max_allowed_loops > 0.
+        To completely stop the client and its runner, use shutdown().
 
         Example:
             ```python
             client = PocketOptionAsync(ssid)
             # Use client...
             await client.disconnect()
-            # Do other work...
-            await client.connect()
+            # The client will try to reconnect in the background...
             ```
         """
         await self.client.disconnect()
@@ -737,6 +737,13 @@ class PocketOptionAsync:
             ```
         """
         await self.client.unsubscribe(asset)
+
+    async def shutdown(self) -> None:
+        """
+        Completely shuts down the client and its background runner.
+        Once shut down, the client cannot be used anymore.
+        """
+        await self.client.shutdown()
 
     async def create_raw_handler(self, validator: Validator, keep_alive: Optional[str] = None) -> "RawHandler":
         """

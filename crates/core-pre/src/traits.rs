@@ -40,6 +40,7 @@ pub trait ApiModule<S: AppState>: Send + 'static {
     type Handle: Clone + Send + Sync + 'static;
 
     /// Creates a new instance of the module.
+    #[allow(clippy::too_many_arguments)]
     fn new(
         shared_state: Arc<S>,
         command_receiver: AsyncReceiver<Self::Command>,
@@ -62,6 +63,7 @@ pub trait ApiModule<S: AppState>: Send + 'static {
         receiver: AsyncReceiver<Self::CommandResponse>,
     ) -> Self::Handle;
 
+    #[allow(clippy::too_many_arguments)]
     fn new_combined(
         shared_state: Arc<S>,
         command_receiver: AsyncReceiver<Self::Command>,

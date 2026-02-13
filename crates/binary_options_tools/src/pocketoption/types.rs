@@ -289,8 +289,20 @@ impl Rule for MultiPatternRule {
                             if let Some(event_name) = arr.first().and_then(|v| v.as_str()) {
                                 for pattern in &self.patterns {
                                     if event_name == pattern {
-                                        self.valid.store(true, Ordering::SeqCst);
-                                        return false;
+                                        // Detect if this is a binary placeholder
+                                        let has_placeholder = arr.iter().skip(1).any(|v| {
+                                            v.as_object()
+                                                .is_some_and(|obj| obj.contains_key("_placeholder"))
+                                        });
+
+                                        if arr.len() == 1 || has_placeholder {
+                                            self.valid.store(true, Ordering::SeqCst);
+                                            return false;
+                                        } else {
+                                            // 1-step message, allow it through
+                                            self.valid.store(false, Ordering::SeqCst);
+                                            return true;
+                                        }
                                     }
                                 }
                             }

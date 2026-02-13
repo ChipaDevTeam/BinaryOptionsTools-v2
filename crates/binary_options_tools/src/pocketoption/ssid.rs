@@ -229,8 +229,8 @@ impl Ssid {
     pub async fn server(&self) -> CoreResult<String> {
         match self {
             Self::Demo(_) => Ok(Regions::DEMO.0.to_string()),
-            Self::Real(_) => Regions
-                .get_server()
+            Self::Real(real) => Regions
+                .get_server_for_ip(&real.session.ip_address)
                 .await
                 .map(|s| s.to_string())
                 .map_err(|e| CoreError::HttpRequest(e.to_string())),
@@ -243,8 +243,8 @@ impl Ssid {
                 .iter()
                 .map(|r| r.to_string())
                 .collect()),
-            Self::Real(_) => Ok(Regions
-                .get_servers()
+            Self::Real(real) => Ok(Regions
+                .get_servers_for_ip(&real.session.ip_address)
                 .await
                 .map_err(|e| CoreError::HttpRequest(e.to_string()))?
                 .iter()
@@ -255,8 +255,15 @@ impl Ssid {
 
     pub fn user_agent(&self) -> String {
         match self {
-            Self::Demo(_) => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36".into(),
-            Self::Real(real) => real.session.user_agent.clone()
+            Self::Demo(_) => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36".into(),
+            Self::Real(real) => real.session.user_agent.clone(),
+        }
+    }
+
+    pub fn ip_address(&self) -> Option<&str> {
+        match self {
+            Self::Demo(_) => None,
+            Self::Real(real) => Some(&real.session.ip_address),
         }
     }
 

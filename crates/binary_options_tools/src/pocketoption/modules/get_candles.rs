@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use binary_options_tools_core_pre::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
-    traits::{ApiModule, Rule},
+    traits::{ApiModule, Rule, RunnerCommand},
 };
 use serde::{Deserialize, Serialize};
 use tokio::select;
@@ -219,6 +219,7 @@ impl ApiModule<State> for GetCandlesApiModule {
         command_responder: AsyncSender<Self::CommandResponse>,
         ws_receiver: AsyncReceiver<Arc<Message>>,
         ws_sender: AsyncSender<Message>,
+        _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self {
             state,

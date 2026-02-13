@@ -3,6 +3,24 @@ import os
 from datetime import timedelta
 from typing import Optional
 
+
+class LogSubscription:
+    def __init__(self, subscription):
+        self.subscription = subscription
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        return json.loads(await self.subscription.__anext__())
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return json.loads(next(self.subscription))
+
+
 class Logger:
     """
     A logger class wrapping the RustLogger functionality.

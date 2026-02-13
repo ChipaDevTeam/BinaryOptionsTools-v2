@@ -786,8 +786,13 @@ impl PocketOption {
         self.client.reconnect().await.map_err(PocketError::from)
     }
 
+    /// Commands the runner to shutdown without consuming the client.
+    pub async fn shutdown(&self) -> PocketResult<()> {
+        self.client.shutdown_ref().await.map_err(PocketError::from)
+    }
+
     /// Shuts down the client and stops the runner.
-    pub async fn shutdown(self) -> PocketResult<()> {
+    pub async fn shutdown_owned(self) -> PocketResult<()> {
         self.client.shutdown().await.map_err(PocketError::from)
     }
 
