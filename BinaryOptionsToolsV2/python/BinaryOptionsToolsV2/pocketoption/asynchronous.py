@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import sys
 from datetime import timedelta
 from typing import Optional, Union, List, Dict, Tuple, TYPE_CHECKING
@@ -189,11 +190,8 @@ class PocketOptionAsync:
             from ..BinaryOptionsToolsV2 import RawPocketOption
         except ImportError:
             from BinaryOptionsToolsV2 import RawPocketOption
-        # Minimalist SSID Sanitizer: only fix the most common shell-stripping issue (missing quotes around "auth")
-        if ssid.startswith("42[auth,"):
-            ssid = ssid.replace("42[auth,", '42["auth",', 1)
-        elif ssid.startswith("42['auth',"):
-            ssid = ssid.replace("42['auth',", '42["auth",', 1)
+        # SSID Sanitizer: fix common shell-stripping issues (missing quotes around "auth")
+        ssid = re.sub(r"42\[['\"]?auth['\"]?,", '42["auth",', ssid, count=1)
 
         from ..tracing import Logger
 
@@ -336,8 +334,6 @@ class PocketOptionAsync:
 
         try:
             # Use asyncio.wait_for as additional protection against hanging
-            import asyncio
-
             trade = await asyncio.wait_for(self._get_trade_result(id), timeout=timeout_seconds)
             return trade
         except asyncio.TimeoutError:

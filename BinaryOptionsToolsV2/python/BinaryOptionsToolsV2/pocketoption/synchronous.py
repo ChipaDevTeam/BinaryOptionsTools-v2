@@ -215,9 +215,6 @@ class PocketOption:
         # Wait for assets to ensure connection is ready
         self.loop.run_until_complete(self._client.wait_for_assets())
 
-    def __del__(self):
-        self.loop.close()
-
     def __enter__(self):
         """
         Context manager entry.
@@ -229,6 +226,15 @@ class PocketOption:
         Context manager exit. Shuts down the client and its runner.
         """
         self.shutdown()
+
+    def close(self) -> None:
+        """
+        Explicitly closes the client and its event loop.
+        """
+        self.shutdown()
+        if self.loop.is_running():
+            self.loop.stop()
+        self.loop.close()
 
     def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """

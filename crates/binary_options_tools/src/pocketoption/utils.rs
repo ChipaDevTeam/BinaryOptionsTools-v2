@@ -3,8 +3,9 @@ use binary_options_tools_core_pre::reimports::{
     connect_async_tls_with_config, generate_key, Connector, MaybeTlsStream, Request,
     WebSocketStream,
 };
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use rand::Rng;
+use std::sync::OnceLock;
 use std::time::Duration as StdDuration;
 
 use crate::pocketoption::{
@@ -16,6 +17,32 @@ use serde_json::Value;
 use tokio::net::TcpStream;
 
 use url::Url;
+
+static CONNECTOR: OnceLock<Connector> = OnceLock::new();
+
+fn get_connector() -> ConnectorResult<&'static Connector> {
+    if let Some(connector) = CONNECTOR.get() {
+        return Ok(connector);
+    }
+
+    let mut root_store = rustls::RootCertStore::empty();
+    let certs = rustls_native_certs::load_native_certs().certs;
+    if certs.is_empty() {
+        return Err(ConnectorError::Custom(
+            "Could not load any native certificates".to_string(),
+        ));
+    }
+    for cert in certs {
+        root_store.add(cert).ok();
+    }
+    let tls_config = rustls::ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
+
+    let connector = Connector::Rustls(std::sync::Arc::new(tls_config));
+    let _ = CONNECTOR.set(connector);
+    Ok(CONNECTOR.get().unwrap())
+}
 
 const IP_PROVIDERS: &[&str] = &[
     "https://i.pn/json/",
@@ -33,7 +60,7 @@ pub fn get_index() -> PocketResult<u64> {
     let mut rng = rand::thread_rng();
 
     let rand = rng.gen_range(10..99);
-    let time = (Utc::now() + Duration::hours(2)).timestamp();
+    let time = Utc::now().timestamp();
     format!("{time}{rand}")
         .parse::<u64>()
         .map_err(|e| PocketError::General(e.to_string()))
@@ -127,21 +154,7 @@ pub async fn try_connect(
     url: String,
 ) -> ConnectorResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
     init_crypto_provider();
-    let mut root_store = rustls::RootCertStore::empty();
-    let certs = rustls_native_certs::load_native_certs().certs;
-    if certs.is_empty() {
-        return Err(ConnectorError::Custom(
-            "Could not load any native certificates".to_string(),
-        ));
-    }
-    for cert in certs {
-        root_store.add(cert).ok();
-    }
-    let tls_config = rustls::ClientConfig::builder()
-        .with_root_certificates(root_store)
-        .with_no_client_auth();
-
-    let connector = Connector::Rustls(std::sync::Arc::new(tls_config));
+    let connector = get_connector()?;
 
     let user_agent = ssid.user_agent();
 
@@ -166,7 +179,7 @@ pub async fn try_connect(
 
     let (ws, _) = tokio::time::timeout(
         StdDuration::from_secs(10),
-        connect_async_tls_with_config(request, None, false, Some(connector)),
+        connect_async_tls_with_config(request, None, false, Some(connector.clone())),
     )
     .await
     .map_err(|_| ConnectorError::Timeout)?

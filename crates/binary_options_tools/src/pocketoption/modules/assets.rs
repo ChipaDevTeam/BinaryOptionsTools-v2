@@ -48,13 +48,13 @@ impl LightweightModule<State> for AssetsModule {
                         // Try to parse as a 1-step Socket.IO message: 42["updateAssets", [...]]
                         let mut parsed_1step = false;
                         if let Some(start) = text.find('[') {
-                            if let Ok(value) =
+                            if let Ok(mut value) =
                                 serde_json::from_str::<serde_json::Value>(&text[start..])
                             {
-                                if let Some(arr) = value.as_array() {
+                                if let Some(arr) = value.as_array_mut() {
                                     if arr.len() >= 2 && arr[0] == "updateAssets" {
                                         if let Ok(assets) =
-                                            serde_json::from_value::<Assets>(arr[1].clone())
+                                            serde_json::from_value::<Assets>(arr[1].take())
                                         {
                                             debug!(
                                                 "Loaded assets (text 1-step): {:?}",
