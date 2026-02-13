@@ -29,8 +29,8 @@
 
 ### Pocket Option
 
-- Add support for Signals (No clue how to start)
-- Add support for pending trades (Seems easy and will add a lot new features to the api) --> Done
+- Add support for Signals (???)
+- Add support for pending trades --> Done
 
 ### Important
 

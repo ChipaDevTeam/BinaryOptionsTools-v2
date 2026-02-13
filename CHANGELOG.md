@@ -173,6 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [PyPI Package](https://pypi.org/project/binaryoptionstoolsv2/)
 - [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/)
 
+[0.2.6]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.6
 [0.2.5]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.5
 [0.2.4]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.4
 [0.2.3]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.3
