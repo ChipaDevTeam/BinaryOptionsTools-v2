@@ -453,7 +453,7 @@ class PocketOption:
             ```python
             client.disconnect()
             # Connection is closed
-            await client.connect()
+            client.connect()
             # Connection is re-established
             ```
         """
