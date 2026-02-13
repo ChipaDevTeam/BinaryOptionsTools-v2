@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - N/a
 
-## [0.2.6] - 2026-02-10
+## [0.2.6] - 2026-02-13
 
 ### Added
 
@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated asset and payout gathering (`AssetsModule`) upon connection
 - New `wait_for_assets` method to ensure library readiness before operations
 - Refactored GitHub Issue and Pull Request templates
+- Pre-registration API on `ResponseRouter` to eliminate race conditions in command responses
+
+### Changed (Breaking Logic)
+
+- **Virtual Market Profit Semantics**: `Deal.profit` now stores **net gain/loss** (e.g., -stake on loss, 0 on draw, stake*payout% on win) instead of total payout.
+- **WebSocket Event System**: Unified on `EventHandler` trait and tuple/unit variants for `WebSocketEvent`. Custom handlers must update their signatures.
+- **Enhanced Client Architecture**: Updated `EnhancedWebSocketInner` to require and store `credentials`, `handler`, and `connector`.
+- **Context Manager Lifecycle**: Exiting the `PocketOption` context manager now explicitly closes the internal event loop, preventing resource leaks but also preventing instance reuse.
 
 ### Changed
 
@@ -34,11 +42,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved WebSocket routing rules (`TwoStepRule`, `MultiPatternRule`) to be resilient against interleaved messages
 - Updated documentation deployment workflow to include `mkdocstrings` dependencies (gh pages)
 - Reorganized internal project scripts
+- Updated `BinaryOptionsToolsV2.pyi` to match the actual Rust return types (JSON strings/Lists instead of Dicts).
 
 ### Fixed
 
 - GitHub Pages 404 error by normalizing documentation filenames to lowercase (`index.md`).
 - Race conditions in history retrieval by properly pairing response messages with request indices.
+- Event loop leak in Python synchronous client by fixing `__exit__` and `close()` logic.
+- Boxing issues in `BinaryOptionsToolsError::WebsocketConnectionError` variant.
+- API mismatches in `client2.rs` preventing successful compilation.
 
 ## [0.2.5] - 2026-02-08
 

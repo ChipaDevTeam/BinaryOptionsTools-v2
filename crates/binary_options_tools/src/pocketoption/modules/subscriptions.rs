@@ -58,10 +58,15 @@ impl ResponseRouter {
     }
 
     pub async fn wait_for(&self, id: Uuid) -> PocketResult<CommandResponse> {
-        let (tx, rx) = oneshot::channel();
-        self.pending.lock().await.insert(id, tx);
+        let rx = self.register(id).await;
         rx.await
             .map_err(|_| PocketError::General("Response router channel closed".into()))
+    }
+
+    pub async fn register(&self, id: Uuid) -> oneshot::Receiver<CommandResponse> {
+        let (tx, rx) = oneshot::channel();
+        self.pending.lock().await.insert(id, tx);
+        rx
     }
 }
 
@@ -237,6 +242,7 @@ impl SubscriptionsHandle {
         sub_type: SubscriptionType,
     ) -> PocketResult<SubscriptionStream> {
         let id = Uuid::new_v4();
+        let receiver = self.router.register(id).await;
         self.sender
             .send(Command::Subscribe {
                 asset: asset.clone(),
@@ -247,7 +253,10 @@ impl SubscriptionsHandle {
             .map_err(CoreError::from)?;
         // Wait for the subscription response
 
-        match self.router.wait_for(id).await? {
+        match receiver
+            .await
+            .map_err(|_| PocketError::General("Response router channel closed".into()))?
+        {
             CommandResponse::SubscriptionSuccess {
                 command_id: _,
                 stream_receiver,
@@ -274,6 +283,7 @@ impl SubscriptionsHandle {
     /// * `PocketResult<()>` - Success or error
     pub async fn unsubscribe(&self, asset: String) -> PocketResult<()> {
         let id = Uuid::new_v4();
+        let receiver = self.router.register(id).await;
         self.sender
             .send(Command::Unsubscribe {
                 asset,
@@ -282,7 +292,10 @@ impl SubscriptionsHandle {
             .await
             .map_err(CoreError::from)?;
         // Wait for the unsubscription response
-        match self.router.wait_for(id).await? {
+        match receiver
+            .await
+            .map_err(|_| PocketError::General("Response router channel closed".into()))?
+        {
             CommandResponse::UnsubscriptionSuccess { .. } => Ok(()),
             CommandResponse::UnsubscriptionFailed { error, .. } => Err(*error),
             _ => Err(PocketError::General(
@@ -297,12 +310,16 @@ impl SubscriptionsHandle {
     /// * `PocketResult<usize>` - Number of active subscriptions
     pub async fn get_active_subscriptions_count(&self) -> PocketResult<u32> {
         let id = Uuid::new_v4();
+        let receiver = self.router.register(id).await;
         self.sender
             .send(Command::SubscriptionCount { command_id: id })
             .await
             .map_err(CoreError::from)?;
         // Wait for the subscription count response
-        match self.router.wait_for(id).await? {
+        match receiver
+            .await
+            .map_err(|_| PocketError::General("Response router channel closed".into()))?
+        {
             CommandResponse::SubscriptionCount { count, .. } => Ok(count),
             _ => Err(PocketError::General(
                 "Unexpected response to subscription count command".into(),
@@ -333,6 +350,7 @@ impl SubscriptionsHandle {
     /// * `PocketResult<Vec<Candle>>` - Vector of candles
     pub async fn history(&self, asset: String, period: u32) -> PocketResult<Vec<Candle>> {
         let id = Uuid::new_v4();
+        let receiver = self.router.register(id).await;
         self.sender
             .send(Command::History {
                 asset,
@@ -342,7 +360,10 @@ impl SubscriptionsHandle {
             .await
             .map_err(CoreError::from)?;
         // Wait for the history response
-        match self.router.wait_for(id).await? {
+        match receiver
+            .await
+            .map_err(|_| PocketError::General("Response router channel closed".into()))?
+        {
             CommandResponse::History { data, .. } => Ok(data),
             CommandResponse::HistoryFailed { error, .. } => Err(*error),
             _ => Err(PocketError::General(
@@ -726,6 +747,7 @@ impl SubscriptionStream {
     pub async fn unsubscribe(mut self) -> PocketResult<()> {
         // Send unsubscribe command through the main handle
         let command_id = Uuid::new_v4();
+        let receiver = self.router.register(command_id).await;
         if let Some(sender) = self.sender.take() {
             sender
                 .send(Command::Unsubscribe {
@@ -739,7 +761,10 @@ impl SubscriptionStream {
         }
 
         // Wait for response
-        match self.router.wait_for(command_id).await? {
+        match receiver
+            .await
+            .map_err(|_| PocketError::General("Response router channel closed".into()))?
+        {
             CommandResponse::UnsubscriptionSuccess { .. } => Ok(()),
             CommandResponse::UnsubscriptionFailed { error, .. } => Err(*error),
             _ => Err(PocketError::General(

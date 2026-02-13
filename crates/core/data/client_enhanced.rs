@@ -4,21 +4,21 @@ use std::{
     time::{Duration, Instant},
 };
 
-use async_channel::{Receiver, Sender, bounded};
+use async_channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
 use futures_util::{
-    SinkExt, StreamExt,
     future::select_all,
     stream::{SplitSink, SplitStream},
+    SinkExt, StreamExt,
 };
 use tokio::{
     net::TcpStream,
     select,
-    sync::{Mutex, RwLock, Notify},
+    sync::{Mutex, Notify, RwLock},
     task::JoinHandle,
     time::{interval, sleep, timeout},
 };
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, tungstenite::Message};
+use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, info, warn};
 use url::Url;
 
@@ -62,14 +62,22 @@ where
 {
     /// Connection manager similar to Python implementation
     connection_manager: Arc<EnhancedConnectionManager>,
+    /// Connection handler
+    connector: Connector,
     /// Event manager for handling WebSocket events
     event_manager: Arc<EventManager>,
     /// Application data handler
     data: Data<T, Transfer>,
+    /// Authentication credentials
+    credentials: Creds,
+    /// Message processor
+    handler: Handler,
     /// Message sender for outgoing messages
-    message_sender: Sender<Message>,
+    message_sender: SenderMessage,
     /// Message receiver for outgoing messages
     message_receiver: Receiver<Message>,
+    /// Message receiver priority for outgoing messages
+    message_receiver_priority: Receiver<Message>,
     /// Configuration
     config: Config<T, Transfer, U>,
     /// Reconnect notification
@@ -194,6 +202,7 @@ where
     /// Initialize the enhanced WebSocket client
     pub async fn init(
         credentials: Creds,
+        connector: Connector,
         data: Data<T, Transfer>,
         handler: Handler,
         config: Config<T, Transfer, U>,
@@ -202,6 +211,7 @@ where
     ) -> BinaryOptionsResult<Self> {
         let inner = EnhancedWebSocketInner::init(
             credentials,
+            connector,
             data,
             handler,
             config,
@@ -387,6 +397,7 @@ where
     /// Initialize the inner client
     pub async fn init(
         credentials: Creds,
+        connector: Connector,
         data: Data<T, Transfer>,
         handler: Handler,
         config: Config<T, Transfer, U>,
@@ -404,7 +415,8 @@ where
         let event_manager = Arc::new(EventManager::new(1000));
 
         // Create message channel
-        let (message_sender, message_receiver) = bounded(MAX_CHANNEL_CAPACITY);
+        let (message_sender, (message_receiver, message_receiver_priority)) =
+            SenderMessage::new(MAX_CHANNEL_CAPACITY);
 
         // Create reconnect notify
         let reconnect_notify = Arc::new(Notify::new());
@@ -423,10 +435,14 @@ where
 
         Ok(Self {
             connection_manager,
+            connector,
             event_manager,
             data,
+            credentials,
+            handler,
             message_sender,
             message_receiver,
+            message_receiver_priority,
             config,
             reconnect_notify,
             connection_state,
@@ -447,10 +463,15 @@ where
 
         // Try each URL in sequence (like Python)
         for url in &self.connection_urls {
-            match self.try_connect_single(url).await {
+            // First try authenticated connect using the connector
+            match self
+                .connector
+                .connect::<T, Transfer, U>(self.credentials.clone(), &self.config)
+                .await
+            {
                 Ok(websocket) => {
                     info!(
-                        "Connected to region: {}",
+                        "Connected and authenticated to region: {}",
                         url.host_str().unwrap_or("unknown")
                     );
 
@@ -476,15 +497,18 @@ where
                     return Ok(());
                 }
                 Err(e) => {
-                    warn!("Failed to connect to {}: {}", url, e);
+                    warn!(
+                        "Failed to connect/authenticate to {}: {}, trying next URL",
+                        url, e
+                    );
                     continue;
                 }
             }
         }
 
-        Err(BinaryOptionsToolsError::WebsocketConnectionError(
+        Err(BinaryOptionsToolsError::WebsocketConnectionError(Box::new(
             tokio_tungstenite::tungstenite::Error::ConnectionClosed,
-        ))
+        )))
     }
 
     /// Connect with persistent connection and keep-alive
@@ -561,19 +585,18 @@ where
         mut write: SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
     ) -> BinaryOptionsResult<JoinHandle<BinaryOptionsResult<()>>> {
         let message_receiver = self.message_receiver.clone();
-        let connection_state = self.connection_state.clone();
+        let message_receiver_priority = self.message_receiver_priority.clone();
         let event_manager = self.event_manager.clone();
 
         let task = tokio::spawn(async move {
-            while let Ok(message) = message_receiver.recv().await {
+            let stream1 = crate::general::stream::RecieverStream::new(message_receiver);
+            let stream2 = crate::general::stream::RecieverStream::new(message_receiver_priority);
+            let mut fused_streams =
+                futures_util::stream::select_all([stream1.to_stream(), stream2.to_stream()]);
+
+            while let Some(Ok(message)) = fused_streams.next().await {
                 match write.send(message.clone()).await {
                     Ok(_) => {
-                        // Update stats
-                        /*
-                        // Note: We already update stats in send_message, but that's when it's queued.
-                        // Maybe we want to track actual sent messages here?
-                        // For now, let's just log debug
-                        */
                         debug!("Message sent to WebSocket");
                     }
                     Err(e) => {
@@ -587,9 +610,6 @@ where
                                 }),
                             ))
                             .await?;
-                        
-                        // If we can't write, the connection is likely dead.
-                        // The receiver task should handle the close/error, but we can also break here.
                         break;
                     }
                 }
@@ -610,8 +630,11 @@ where
         let data = self.data.clone();
         let reconnect_notify = self.reconnect_notify.clone();
         let message_sender = self.message_sender.clone();
+        let handler = self.handler.clone();
 
         let task = tokio::spawn(async move {
+            let mut previous_info = None;
+
             while let Some(message_result) = read.next().await {
                 match message_result {
                     Ok(message) => {
@@ -621,39 +644,64 @@ where
                             state.messages_received += 1;
                         }
 
-                        // Process message (similar to Python's message processing)
-                        match message {
-                            Message::Text(text) => {
-                                debug!("Received text message: {}", text);
+                        // Process message using the handler pipeline
+                        match handler
+                            .process_message(&message, &previous_info, &message_sender)
+                            .await
+                        {
+                            Ok((msg_type, should_close)) => {
+                                if should_close {
+                                    info!("WebSocket close frame received via handler");
+                                    event_manager
+                                        .emit(Event::new(
+                                            EventType::Disconnected,
+                                            serde_json::json!({"reason": "close_frame_handler"}),
+                                        ))
+                                        .await?;
+                                    reconnect_notify.notify_one();
+                                    break;
+                                }
 
-                                // Emit message received event
-                                event_manager
-                                    .emit(Event::new(
-                                        EventType::MessageReceived,
-                                        serde_json::json!({"message": text}),
-                                    ))
-                                    .await?;
+                                if let Some(msg) = msg_type {
+                                    match msg {
+                                        MessageType::Info(info) => {
+                                            debug!("Received info: {}", info);
+                                            previous_info = Some(info);
+                                        }
+                                        MessageType::Transfer(transfer) => {
+                                            debug!("Received transfer: {}", transfer.info());
 
-                                // Process based on message type (like Python's _process_message)
-                                Self::process_text_message(&text, &event_manager).await?;
-                            }
-                            Message::Binary(data) => {
-                                debug!("Received binary message: {} bytes", data.len());
+                                            // Update data and handle pending requests
+                                            if let Ok(Some(senders)) =
+                                                data.update_data(transfer.clone()).await
+                                            {
+                                                for s in senders {
+                                                    let _ = s.send(transfer.clone()).await;
+                                                }
+                                            }
 
-                                // Try to parse as JSON (like Python's bytes message handling)
-                                if let Ok(text) = String::from_utf8(data) {
-                                    if let Ok(json) =
-                                        serde_json::from_str::<serde_json::Value>(&text)
-                                    {
-                                        event_manager
-                                            .emit(Event::new(
-                                                EventType::Custom("json_data".to_string()),
-                                                json,
-                                            ))
-                                            .await?;
+                                            // Emit message received event
+                                            event_manager
+                                                .emit(Event::new(
+                                                    EventType::MessageReceived,
+                                                    serde_json::json!({"type": transfer.info().to_string()}),
+                                                ))
+                                                .await?;
+                                        }
+                                        MessageType::Raw(raw) => {
+                                            debug!("Received raw message");
+                                            let _ = data.raw_send(raw).await;
+                                        }
                                     }
                                 }
                             }
+                            Err(e) => {
+                                debug!("Message processing error: {}", e);
+                            }
+                        }
+
+                        // Also handle low-level messages for events (optional, can be merged into handler)
+                        match message {
                             Message::Close(_) => {
                                 info!("WebSocket close frame received");
                                 event_manager
@@ -667,16 +715,16 @@ where
                             }
                             Message::Ping(ping_data) => {
                                 debug!("Received ping");
-                                if let Err(e) = message_sender.try_send(Message::Pong(ping_data)) {
+                                if let Err(e) =
+                                    message_sender.priority_send(Message::Pong(ping_data)).await
+                                {
                                     error!("Failed to queue pong: {}", e);
                                 }
                             }
                             Message::Pong(_) => {
                                 debug!("Received pong");
                             }
-                            Message::Frame(_) => {
-                                debug!("Received frame");
-                            }
+                            _ => {}
                         }
                     }
                     Err(e) => {

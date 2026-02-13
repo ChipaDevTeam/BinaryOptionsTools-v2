@@ -1,21 +1,25 @@
 use std::{
-    collections::HashMap, f32::consts::E, ops::Deref, sync::Arc, time::{Duration, Instant}
+    collections::HashMap,
+    f32::consts::E,
+    ops::Deref,
+    sync::Arc,
+    time::{Duration, Instant},
 };
 
-use async_channel::{Receiver, Sender, bounded};
+use async_channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
 use futures_util::{
-    SinkExt, StreamExt,
     stream::{SplitSink, SplitStream},
+    SinkExt, StreamExt,
 };
 use tokio::{
     net::TcpStream,
+    select,
     sync::{Mutex, RwLock},
     task::JoinHandle,
-    time::{sleep, interval},
-    select,
+    time::{interval, sleep},
 };
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, tungstenite::Message};
+use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, info, warn};
 use url::Url;
 
@@ -36,50 +40,35 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum WebSocketEvent<Transfer: MessageTransfer> {
     /// Connection established successfully
-    Connected { region: Option<String> },
+    Connected,
     /// Connection lost with reason
-    Disconnected { reason: String },
+    Disconnected(String),
     /// Authentication completed successfully  
-    Authenticated { data: serde_json::Value },
+    Authenticated(serde_json::Value),
     /// Balance data received
-    BalanceUpdated { balance: f64, currency: String },
+    BalanceUpdated(f64, String),
     /// Order opened successfully
-    OrderOpened { order_id: String, data: serde_json::Value },
+    OrderOpened(String, serde_json::Value),
     /// Order closed with result
-    OrderClosed { order_id: String, result: serde_json::Value },
+    OrderClosed(String, serde_json::Value),
     /// Stream update received (candles, etc.)
-    StreamUpdate { asset: String, data: serde_json::Value },
+    StreamUpdate(String, serde_json::Value),
     /// Candles data received
-    CandlesReceived { asset: String, candles: Vec<serde_json::Value> },
+    CandlesReceived(String, Vec<serde_json::Value>),
     /// Message received from WebSocket
-    MessageReceived { message: Transfer },
+    MessageReceived(Transfer),
     /// Raw message received (unparsed)
-    RawMessageReceived { data: Transfer::Raw },
+    RawMessageReceived(Transfer::Raw),
     /// Message sent to WebSocket
-    MessageSent { message: Transfer },
+    MessageSent(Transfer),
     /// Error occurred during operation
-    Error { error: String, context: Option<String> },
+    Error(String),
     /// Connection is being closed
     Closing,
     /// Keep-alive ping sent
-    PingSent { timestamp: Instant },
+    PingSent(Instant),
     /// Pong received
-    PongReceived { timestamp: Instant },
-}
-
-/// Event handler trait for processing WebSocket events
-#[async_trait]
-pub trait WebSocketEventHandler<Transfer: MessageTransfer>: Send + Sync {
-    /// Handle a WebSocket event
-    async fn handle_event(&self, event: &WebSocketEvent<Transfer>) -> BinaryOptionsResult<()>;
-
-    /// Get the handler's name for identification
-    fn name(&self) -> &'static str;
-
-    /// Whether this handler should receive specific event types
-    fn handles_event(&self, event: &WebSocketEvent<Transfer>) -> bool {
-        true // Default: handle all events
-    }
+    PongReceived(Instant),
 }
 
 /// Connection statistics and state tracking (inspired by Python implementation)
@@ -152,16 +141,22 @@ impl KeepAliveManager {
         // Start ping task similar to Python implementation
         let ping_sender = message_sender.clone();
         let ping_interval = self.ping_interval;
-        
+
         self.ping_task = Some(tokio::spawn(async move {
             let mut interval = interval(ping_interval);
-            info!("Starting ping loop with {}s interval", ping_interval.as_secs());
-            
+            info!(
+                "Starting ping loop with {}s interval",
+                ping_interval.as_secs()
+            );
+
             loop {
                 interval.tick().await;
-                
+
                 // Send ping message like Python: '42["ps"]'
-                match ping_sender.send(Message::text(r#"42["ps"]"#.to_string())).await {
+                match ping_sender
+                    .send(Message::text(r#"42["ps"]"#.to_string()))
+                    .await
+                {
                     Ok(_) => {
                         debug!("Sent keep-alive ping");
                     }
@@ -171,7 +166,7 @@ impl KeepAliveManager {
                     }
                 }
             }
-            
+
             warn!("Ping loop terminated");
         }));
 
@@ -259,7 +254,7 @@ pub struct SharedState<T: DataHandler> {
     /// Connection state and statistics
     pub connection_state: Arc<RwLock<ConnectionState>>,
     /// Event handlers registry
-    pub event_handlers: Arc<RwLock<Vec<Arc<dyn WebSocketEventHandler<T::Transfer>>>>>,
+    pub event_handlers: Arc<RwLock<Vec<Arc<dyn EventHandler<WebSocketEvent<T::Transfer>>>>>>,
     /// WebSocket client configuration
     pub config: Arc<RwLock<WebSocketClientConfig>>,
     /// Event manager for internal events
@@ -267,44 +262,11 @@ pub struct SharedState<T: DataHandler> {
 }
 
 impl<T: DataHandler> SharedState<T> {
-    /// Add an event handler to the registry
-    pub async fn add_event_handler(&self, handler: Arc<dyn WebSocketEventHandler<T::Transfer>>) {
-        let mut handlers = self.event_handlers.write().await;
-        info!("Added event handler: {}", handler.name());
-        handlers.push(handler);
-    }
-
-    /// Remove an event handler by name
-    pub async fn remove_event_handler(&self, name: &str) -> bool {
-        let mut handlers = self.event_handlers.write().await;
-        let original_len = handlers.len();
-        handlers.retain(|h| h.name() != name);
-        let removed = handlers.len() != original_len;
-        if removed {
-            info!("Removed event handler: {}", name);
-        }
-        removed
-    }
-
-    /// Get current connection state
-    pub async fn get_connection_state(&self) -> ConnectionState {
-        self.connection_state.read().await.clone()
-    }
-
-    /// Update connection state using a closure
-    pub async fn update_connection_state<F>(&self, updater: F)
-    where
-        F: FnOnce(&mut ConnectionState),
-    {
-        let mut state = self.connection_state.write().await;
-        updater(&mut *state);
-    }
-
     /// Broadcast an event to all registered handlers (like Python's _emit_event)
     pub async fn broadcast_event(&self, event: WebSocketEvent<T::Transfer>) {
         let handlers = self.event_handlers.read().await;
         let config = self.get_config().await;
-        
+
         if handlers.is_empty() {
             return;
         }
@@ -312,30 +274,29 @@ impl<T: DataHandler> SharedState<T> {
         let mut tasks = Vec::new();
 
         for handler in handlers.iter() {
-            if handler.handles_event(&event) {
-                let handler = handler.clone();
-                let event = event.clone();
-                
-                let task = tokio::spawn(async move {
-                    if let Err(e) = handler.handle_event(&event).await {
-                        error!("Event handler '{}' failed: {}", handler.name(), e);
-                    }
-                });
-                tasks.push(task);
-                
-                // Limit concurrent handlers
-                if tasks.len() >= config.max_concurrent_handlers {
-                    break;
+            // Simplified handling: we don't have handles_event in EventHandler by default
+            let handler = handler.clone();
+            let event = event.clone();
+
+            let task = tokio::spawn(async move {
+                let e = Event::new(EventType::Custom("ws_event".to_string()), event);
+                if let Err(e) = handler.handle(&e).await {
+                    error!("Event handler failed: {}", e);
                 }
+            });
+            tasks.push(task);
+
+            // Limit concurrent handlers
+            if tasks.len() >= config.max_concurrent_handlers {
+                break;
             }
         }
 
         // Wait for all handlers to complete (with timeout like Python)
         let timeout_duration = Duration::from_secs(5);
-        if let Err(_) = tokio::time::timeout(
-            timeout_duration, 
-            futures_util::future::join_all(tasks)
-        ).await {
+        if let Err(_) =
+            tokio::time::timeout(timeout_duration, futures_util::future::join_all(tasks)).await
+        {
             warn!("Some event handlers timed out after {:?}", timeout_duration);
         }
     }
@@ -385,35 +346,33 @@ impl<T: DataHandler> SharedState<T> {
             connection_state: Arc::new(RwLock::new(ConnectionState::default())),
             event_handlers: Arc::new(RwLock::new(Vec::new())),
             config: Arc::new(RwLock::new(WebSocketClientConfig::default())),
-            event_manager: Arc::new(EventManager::new(buffer_size))
+            event_manager: Arc::new(EventManager::new(buffer_size)),
         }
     }
 
     /// Add an event handler to the registry
-    pub async fn add_handler(&self, handler: Arc<dyn WebSocketEventHandler<T::Transfer>>) {
+    pub async fn add_handler(&self, handler: Arc<dyn EventHandler<WebSocketEvent<T::Transfer>>>) {
         let mut handlers = self.event_handlers.write().await;
         handlers.push(handler);
     }
 
     /// Remove an event handler by name
     pub async fn remove_handler(&self, name: &str) -> bool {
-        let mut handlers = self.event_handlers.write().await;
-        let original_len = handlers.len();
-        handlers.retain(|h| h.name() != name);
-        handlers.len() != original_len
+        // Placeholder as EventHandler doesn't have a name method by default
+        false
     }
 
     /// Get current connection statistics
-    pub async fn get_stats(&self) -> ConnectionStats {
-        self.stats.read().await.clone()
+    pub async fn get_stats(&self) -> ConnectionState {
+        self.connection_state.read().await.clone()
     }
 
     /// Update connection statistics
     pub async fn update_stats<F>(&self, updater: F)
     where
-        F: FnOnce(&mut ConnectionStats),
+        F: FnOnce(&mut ConnectionState),
     {
-        let mut stats = self.stats.write().await;
+        let mut stats = self.connection_state.write().await;
         updater(&mut *stats);
     }
 
@@ -520,7 +479,10 @@ where
     }
 
     /// Add an event handler to process WebSocket events
-    pub async fn add_event_handler(&self, handler: Arc<dyn EventHandler<Transfer>>) {
+    pub async fn add_event_handler(
+        &self,
+        handler: Arc<dyn EventHandler<WebSocketEvent<Transfer>>>,
+    ) {
         self.shared_state.add_handler(handler).await;
     }
 
@@ -530,14 +492,14 @@ where
     }
 
     /// Get current connection statistics
-    pub async fn get_connection_stats(&self) -> ConnectionStats {
+    pub async fn get_connection_stats(&self) -> ConnectionState {
         self.shared_state.get_stats().await
     }
 
     /// Update WebSocket configuration
     pub async fn update_websocket_config<F>(&self, updater: F)
     where
-        F: FnOnce(&mut WebSocketConfig),
+        F: FnOnce(&mut WebSocketClientConfig),
     {
         self.shared_state.update_config(updater).await;
     }
@@ -565,7 +527,7 @@ where
         let _test_connection = connector.connect(credentials.clone(), &config).await?;
 
         // Create shared state
-        let shared_state = SharedState::new(data);
+        let shared_state = SharedState::new(data, 1000);
 
         // Create communication channels
         let (sender, receiver) = bounded(MAX_CHANNEL_CAPACITY);
@@ -737,7 +699,6 @@ where
     ) -> BinaryOptionsResult<()> {
         // Spawn message sender task
         let sender_task = {
-            let mut write = write.clone();
             let shared_state = shared_state.clone();
             tokio::spawn(async move {
                 while let Ok(message) = message_receiver.recv().await {
@@ -783,7 +744,11 @@ where
 
                             // Process the message
                             match handler
-                                .process_message(&message, &previous_info, &shared_state.data.raw_sender())
+                                .process_message(
+                                    &message,
+                                    &previous_info,
+                                    &shared_state.data.raw_sender(),
+                                )
                                 .await
                             {
                                 Ok((processed_message, should_close)) => {
@@ -908,9 +873,9 @@ where
 pub struct LoggingEventHandler;
 
 #[async_trait]
-impl<Transfer: MessageTransfer> EventHandler<Transfer> for LoggingEventHandler {
-    async fn handle_event(&self, event: WebSocketEvent<Transfer>) -> BinaryOptionsResult<()> {
-        match event {
+impl<Transfer: MessageTransfer> EventHandler<WebSocketEvent<Transfer>> for LoggingEventHandler {
+    async fn handle(&self, event: &Event<WebSocketEvent<Transfer>>) -> BinaryOptionsResult<()> {
+        match &event.data {
             WebSocketEvent::Connected => {
                 info!("WebSocket connected");
             }
@@ -932,12 +897,9 @@ impl<Transfer: MessageTransfer> EventHandler<Transfer> for LoggingEventHandler {
             WebSocketEvent::RawMessageReceived(_) => {
                 debug!("Raw message received");
             }
+            _ => debug!("Unhandled WebSocket event: {:?}", event.data),
         }
         Ok(())
-    }
-
-    fn name(&self) -> &'static str {
-        "LoggingEventHandler"
     }
 }
 
@@ -959,11 +921,11 @@ impl StatsEventHandler {
 }
 
 #[async_trait]
-impl<Transfer: MessageTransfer> EventHandler<Transfer> for StatsEventHandler {
-    async fn handle_event(&self, event: WebSocketEvent<Transfer>) -> BinaryOptionsResult<()> {
+impl<Transfer: MessageTransfer> EventHandler<WebSocketEvent<Transfer>> for StatsEventHandler {
+    async fn handle(&self, event: &Event<WebSocketEvent<Transfer>>) -> BinaryOptionsResult<()> {
         let mut stats = self.custom_stats.lock().await;
 
-        match event {
+        match &event.data {
             WebSocketEvent::Connected => {
                 *stats.entry("connections".to_string()).or_insert(0) += 1;
             }
@@ -984,21 +946,6 @@ impl<Transfer: MessageTransfer> EventHandler<Transfer> for StatsEventHandler {
 
         Ok(())
     }
-
-    fn name(&self) -> &'static str {
-        "StatsEventHandler"
-    }
-
-    fn handles_event(&self, event: &WebSocketEvent<Transfer>) -> bool {
-        matches!(
-            event,
-            WebSocketEvent::Connected
-                | WebSocketEvent::Disconnected(_)
-                | WebSocketEvent::MessageReceived(_)
-                | WebSocketEvent::MessageSent(_)
-                | WebSocketEvent::Error(_)
-        )
-    }
 }
 
 #[cfg(test)]
@@ -1012,14 +959,13 @@ mod tests {
     }
 
     #[async_trait]
-    impl<Transfer: MessageTransfer> EventHandler<Transfer> for TestEventHandler {
-        async fn handle_event(&self, _event: WebSocketEvent<Transfer>) -> BinaryOptionsResult<()> {
+    impl<Transfer: MessageTransfer> EventHandler<WebSocketEvent<Transfer>> for TestEventHandler {
+        async fn handle(
+            &self,
+            _event: &Event<WebSocketEvent<Transfer>>,
+        ) -> BinaryOptionsResult<()> {
             self.event_count.fetch_add(1, Ordering::SeqCst);
             Ok(())
-        }
-
-        fn name(&self) -> &'static str {
-            "TestEventHandler"
         }
     }
 

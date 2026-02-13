@@ -301,21 +301,24 @@ impl Market for VirtualMarket {
                 ))
             })?;
 
-        let win = match trade.action {
-            Action::Call => close_price > trade.entry_price,
-            Action::Put => close_price < trade.entry_price,
-        };
+        let draw = close_price == trade.entry_price;
+        let win = !draw
+            && match trade.action {
+                Action::Call => close_price > trade.entry_price,
+                Action::Put => close_price < trade.entry_price,
+            };
 
         let profit = if win {
-            trade.amount * (dec!(1.0) + Decimal::from(trade.payout_percent) / dec!(100.0))
-        } else if close_price == trade.entry_price {
-            trade.amount // Draw
-        } else {
+            trade.amount * Decimal::from(trade.payout_percent) / dec!(100.0)
+        } else if draw {
             dec!(0.0)
+        } else {
+            -trade.amount
         };
 
-        if profit > dec!(0.0) {
-            *balance += profit;
+        let total_payout = trade.amount + profit;
+        if total_payout > dec!(0.0) {
+            *balance += total_payout;
         }
 
         // Trade is already removed from open_trades.

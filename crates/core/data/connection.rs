@@ -165,7 +165,7 @@ impl EnhancedConnectionManager {
         &self,
         url: &Url,
     ) -> BinaryOptionsResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
-        use crate::reimports::{Connector, connect_async_tls_with_config};
+        use crate::reimports::{connect_async_tls_with_config, Connector};
         use tokio_tungstenite::tungstenite::http::Request;
 
         let request = Request::builder()
@@ -203,7 +203,9 @@ impl EnhancedConnectionManager {
                 self.pool
                     .update_stats(url.as_str(), start.elapsed(), false)
                     .await;
-                Err(BinaryOptionsToolsError::WebsocketConnectionError(e))
+                Err(BinaryOptionsToolsError::WebsocketConnectionError(Box::new(
+                    e,
+                )))
             }
             Err(_) => {
                 self.pool
@@ -264,9 +266,9 @@ impl ConnectionManager for EnhancedConnectionManager {
             }
         }
 
-        Err(BinaryOptionsToolsError::WebsocketConnectionError(
+        Err(BinaryOptionsToolsError::WebsocketConnectionError(Box::new(
             tokio_tungstenite::tungstenite::Error::ConnectionClosed,
-        ))
+        )))
     }
 
     async fn test_connection(&self, url: &Url) -> BinaryOptionsResult<Duration> {

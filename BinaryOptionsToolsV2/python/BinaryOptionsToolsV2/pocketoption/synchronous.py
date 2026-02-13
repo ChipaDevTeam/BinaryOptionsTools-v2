@@ -225,16 +225,15 @@ class PocketOption:
         """
         Context manager exit. Shuts down the client and its runner.
         """
-        self.shutdown()
+        self.close()
 
     def close(self) -> None:
         """
         Explicitly closes the client and its event loop.
         """
         self.shutdown()
-        if self.loop.is_running():
-            self.loop.stop()
-        self.loop.close()
+        if self.loop is not None and not self.loop.is_closed():
+            self.loop.close()
 
     def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         """
