@@ -26,7 +26,7 @@ class Validator:
         assert validator.check("Hello World") == True
 
         # Combined validation
-        v1 = Validator.regex(r"[A-Z]\w+")  # Starts with capital letter
+        v1 = Validator.regex(r"[A-Z]\\w+")  # Starts with capital letter
         v2 = Validator.contains("World")    # Contains "World"
         combined = Validator.all([v1, v2])  # Must satisfy both conditions
         assert combined.check("Hello World") == True
@@ -51,7 +51,7 @@ class Validator:
         Example:
             ```python
             # Match messages starting with a number
-            validator = Validator.regex(r"^\d+")
+            validator = Validator.regex(r"^\\d+")
             assert validator.check("123 message") == True
             assert validator.check("abc") == False
             ```
