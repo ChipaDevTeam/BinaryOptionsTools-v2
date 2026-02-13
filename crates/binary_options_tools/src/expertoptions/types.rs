@@ -8,7 +8,7 @@ use serde_json::Value;
 #[derive(Deserialize)]
 pub struct Asset {
     pub id: u32,
-    pub symbol: String,
+    pub symbol: Option<String>,
     pub name: String,
     #[serde(with = "bool2int")]
     pub is_active: bool,
@@ -47,7 +47,11 @@ impl Rule for MultiRule {
 
 impl Asset {
     fn is_valid(&self) -> bool {
-        !self.symbol.is_empty() && self.id > 0 && self.id != 20000 // Id of asset nos supported by client
+        self.id > 0 && self.id != 20000 // Id of asset not supported by client
+    }
+
+    pub fn get_symbol(&self) -> String {
+        self.symbol.clone().unwrap_or_else(|| self.name.clone())
     }
 }
 
@@ -57,7 +61,7 @@ impl Assets {
             assets
                 .into_iter()
                 .filter(|asset| asset.is_valid())
-                .map(|a| (a.symbol.clone(), a)),
+                .map(|a| (a.get_symbol(), a)),
         ))
     }
 
