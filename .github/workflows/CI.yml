@@ -156,17 +156,17 @@ jobs:
         if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
         shell: bash
         run: |
-          docker run --rm -v ${{ github.workspace }}:/io -w /io/BinaryOptionsToolsV2 alpine:latest sh -c "
+          docker run --rm -v ${{ github.workspace }}:/io -w /io/BinaryOptionsToolsV2 alpine:latest sh -c '
             set -e
-            apk add py3-pip py3-virtualenv
-            python3 -m virtualenv .venv
-            source .venv/bin/activate
-            pip install BinaryOptionsToolsV2 --no-index --find-links dist --force-reinstall
+            apk add py3-pip
+            python3 -m venv .venv
+            . .venv/bin/activate
+            pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
             pip install pytest pytest-asyncio
             mkdir test_run
             cd test_run
             pytest ../../tests
-          "
+          '
       - name: pytest
         if: ${{ !startsWith(matrix.platform.target, 'x86') }}
         uses: uraimo/run-on-arch-action@v2
@@ -175,12 +175,12 @@ jobs:
           distro: alpine_latest
           githubToken: ${{ github.token }}
           install: |
-            apk add py3-virtualenv
+            apk add py3-pip
           run: |
             set -e
             cd BinaryOptionsToolsV2
-            python3 -m virtualenv .venv
-            source .venv/bin/activate
+            python3 -m venv .venv
+            . .venv/bin/activate
             pip install pytest pytest-asyncio
             pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
             mkdir test_run
