@@ -24,7 +24,7 @@
 - Make `WebSocketClient` struct more general and create some traits like:
   - `Connect` --> How to connect to websocket --> Done
   - `Processor` --> How to process every `tokio_tungstenite::tungstenite::Message` --> Done
-  - `Sender` --> Struct Or class that will work be shared between threads --> Done
+  - `Sender` --> Struct or class that will be shared between threads --> Done
   - `Data` --> All the possible data management --> Done
 
 ### Pocket Option
