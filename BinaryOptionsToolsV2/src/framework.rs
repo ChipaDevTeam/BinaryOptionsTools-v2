@@ -1,5 +1,6 @@
 use crate::error::BinaryErrorPy;
 use crate::pocketoption::RawPocketOption;
+use crate::runtime::get_runtime;
 use async_trait::async_trait;
 use binary_options_tools::framework::market::Market;
 use binary_options_tools::framework::virtual_market::VirtualMarket;
@@ -9,10 +10,19 @@ use binary_options_tools::pocketoption::error::PocketResult;
 use binary_options_tools::utils::f64_to_decimal;
 use pyo3::prelude::*;
 use rust_decimal::prelude::ToPrimitive;
+use uuid::Uuid;
 use std::sync::Arc;
 
+#[pyclass]
+#[derive(Clone)]
+pub enum Action {
+    Call,
+    Put,    
+}
+
 #[pyclass(subclass)]
-pub struct PyStrategy {}
+pub struct PyStrategy {
+}
 
 #[pymethods]
 impl PyStrategy {
@@ -27,6 +37,43 @@ impl PyStrategy {
 
     pub fn on_candle(&self, _ctx: PyContext, _asset: String, _candle_json: String) -> PyResult<()> {
         Ok(())
+    }
+    
+    /// A way to place a trade synchronously from inside a PyStrategy. The function will block until the trade is executed and return the trade ID and deal information as a JSON string.
+    /// This function should be relativelly fast and should not block the trading loop at all.
+    pub fn trade<'py>(&self, py: Python<'py>, ctx: PyContext, asset: String, amount: f64, timeframe: u32, direction: Action) -> PyResult<Vec<String>>{
+        let market = ctx.market.clone();
+        let decimal_amount = f64_to_decimal(amount)
+            .ok_or_else(|| BinaryErrorPy::NotAllowed(format!("Invalid amount: {}", amount)))?;
+        let trade_future = async move {
+            let (id, deal) = match direction {
+                Action::Call =>
+                    market.buy(&asset, decimal_amount, timeframe).await.map_err(BinaryErrorPy::from),
+                    
+                Action::Put =>
+                    market.sell(&asset, decimal_amount, timeframe).await.map_err(BinaryErrorPy::from)
+            }?;
+            let trades = Vec::from([
+                id.to_string(),
+                serde_json::to_string(&deal).map_err(BinaryErrorPy::from)?
+            ]);
+            Result::<Vec<String>, BinaryErrorPy>::Ok(trades)
+        };
+        
+        Ok(get_runtime(py)?.block_on(trade_future)?)
+    }
+    
+    /// Returns the result of a trade given its UUID. The result is serialized as a JSON string.
+    /// The function is synchronous from Python's perspective, but internally it awaits the market's result asynchronously.
+    /// So it's important to call this method when the trade was completed (as it will return the result really fast otherwhise the whole script would be blocked until the trade is completed).
+    pub fn result<'py>(&self, py: Python<'py>, ctx: PyContext, id: String) -> PyResult<String> {
+        let market = ctx.market.clone();
+        let uuid = Uuid::parse_str(&id).map_err(|e| BinaryErrorPy::NotAllowed(format!("Invalid UUID: {}", e)))?;
+        let future = async move {
+            let res = market.result(uuid).await.map_err(BinaryErrorPy::from)?;
+            serde_json::to_string(&res).map_err(BinaryErrorPy::from)
+        };
+        Ok(get_runtime(py)?.block_on(future)?)
     }
 }
 

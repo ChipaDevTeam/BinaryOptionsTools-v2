@@ -16,6 +16,8 @@ use pocketoption::{RawHandle, RawHandler, RawPocketOption, RawStreamIterator, St
 use pyo3::prelude::*;
 use validator::RawValidator;
 
+use crate::framework::Action;
+
 #[pymodule(name = "BinaryOptionsToolsV2")]
 fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyConfig>()?;
@@ -32,6 +34,7 @@ fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBot>()?;
     m.add_class::<PyStrategy>()?;
     m.add_class::<PyContext>()?;
+    m.add_class::<Action>()?;
     m.add_class::<PyVirtualMarket>()?;
 
     m.add_function(wrap_pyfunction!(start_tracing, m)?)?;
