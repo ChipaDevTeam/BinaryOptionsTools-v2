@@ -1,16 +1,21 @@
 use crate::error::BinaryErrorPy;
 use crate::pocketoption::RawPocketOption;
 use crate::runtime::get_runtime;
-use async_trait::async_trait;
+
+use binary_options_tools::utils::f64_to_decimal;
 use binary_options_tools::framework::market::Market;
 use binary_options_tools::framework::virtual_market::VirtualMarket;
 use binary_options_tools::framework::{Bot, Context, Strategy};
 use binary_options_tools::pocketoption::candle::Candle;
-use binary_options_tools::pocketoption::error::PocketResult;
-use binary_options_tools::utils::f64_to_decimal;
+use binary_options_tools::pocketoption::error::{PocketResult, PocketError};
+
 use pyo3::prelude::*;
+
+use tracing::info;
+use async_trait::async_trait;
 use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 #[pyclass]
@@ -22,13 +27,29 @@ pub enum Action {
 
 #[pyclass(subclass)]
 pub struct PyStrategy {
+    /// A list of the indicators to use
+    /// Each indicator must implement:
+    /// - A method to update its value given a new candle (e.g. `update(candle_json: str)`)
+    /// - A method to reset its state (e.g. `reset()`)
+    /// - A method to get its period (e.g. `period() -> int`)
+    /// No other methods are required as once the loading period is over e.g. the amount of candles passed is greater than 
+    /// the biggest period of the indicators then the strategy will call the on_candle method and pass the update of the 
+    /// indicators to the user.
+    indicators: HashMap<String, Py<PyAny>>,
+    // The current candle number, starting from 0. It is incremented by 1 every time a new candle is received. 
+    // Used to know when the loading period is over and the strategy can start trading. It is also useful for the user to know how many candles have passed since the strategy started.
+    #[pyo3(get)]
+    current_candle: u32
 }
 
 #[pymethods]
 impl PyStrategy {
     #[new]
     pub fn new() -> Self {
-        Self {}
+        Self {
+            indicators: HashMap::new(),
+            current_candle: 0,
+        }
     }
 
     pub fn on_start(&self, _ctx: PyContext) -> PyResult<()> {
@@ -75,6 +96,76 @@ impl PyStrategy {
         };
         Ok(get_runtime(py)?.block_on(future)?)
     }
+    
+    /// Adds an indicator to the strategy. The indicator must be a Python object that implements the required methods (update, reset, period).
+    /// All the indicators of the `chipa-ta` library are compatible with this method as they implement the required methods. 
+    /// The name parameter is just a string that will be used to identify the indicator and can be any string.
+    pub fn add(&mut self, name: String, indicator: Py<PyAny>) -> PyResult<()> {
+        self.indicators.insert(name.clone(), indicator);
+        info!(target: "PyStrategy", "Added indicator '{}' to strategy", name);
+        Ok(())
+    }
+    
+    /// Gets an indicator by its name. Returns None if the indicator is not found.
+    pub fn get(&self, name: String) -> PyResult<Option<&Py<PyAny>>> {
+        Ok(self.indicators.get(&name))
+    }
+    
+    /// Returns the list of current indicators as a tuple (name, indicator_str) where name is the name of the indicator and indicator_str is the string representation of the indicator (`__str__`).
+    pub fn list_indicators(&self) -> PyResult<Vec<(String, String)>> {
+        self.indicators.iter().map(|(name, indicator)| {
+            let indicator_str = Python::attach(|py| {
+                indicator.call_method0(py, "__str__")?.extract::<String>(py)
+                
+            })?;
+            Ok((name.clone(), indicator_str))
+        }).collect()
+        
+    }
+    
+    /// Called internally by the framework when a new candle is received. It updates all the indicators with the new candle. The candle is serialized as a JSON string.
+    /// It works untill period() is completed
+    pub fn update<'py>(&mut self, candle: String) -> PyResult<()> {
+        self.current_candle += 1;
+        for indicator in self.indicators.values() {
+            Python::attach(|py| {
+                indicator.call_method1(py, "update", (candle.clone(), )).map_err(|e| {
+                    BinaryErrorPy::NotAllowed(format!("Failed to update indicator: {}", e))
+                })
+            })?;
+        }
+        info!(target: "PyStrategy", "Updated indicators with new candle: {}", self.current_candle);
+        Ok(())
+    }
+    
+    pub fn reset(&mut self) -> PyResult<()> {
+        for indicator in self.indicators.values() {
+            Python::attach(|py| {
+                indicator.call_method0(py, "reset").map_err(|e| {
+                    BinaryErrorPy::NotAllowed(format!("Failed to reset indicator: {}", e))
+                })
+            })?;
+        }
+        self.current_candle = 0;
+        Ok(())
+    }
+    
+    pub fn period(&self) -> PyResult<u32> {
+        let mut max_period = 0;
+        for indicator in self.indicators.values() {
+            let period: u32 = Python::attach(|py| {
+                indicator.call_method0(py, "period").map_err(|e| {
+                    BinaryErrorPy::NotAllowed(format!("Failed to get period from indicator: {}", e))
+                })?.extract(py).map_err(|e| {
+                    BinaryErrorPy::NotAllowed(format!("Failed to extract period as u32: {}", e))
+                })
+            })?;
+            if period > max_period {
+                max_period = period;
+            }
+        }
+        Ok(max_period)
+    }
 }
 
 pub struct StrategyWrapper {
@@ -95,7 +186,7 @@ impl Strategy for StrategyWrapper {
                     market,
                 };
                 inner.call_method1(py, "on_start", (py_ctx,)).map_err(|e| {
-                    binary_options_tools::pocketoption::error::PocketError::General(format!(
+                    PocketError::General(format!(
                         "Python on_start error: {}",
                         e
                     ))
@@ -105,7 +196,7 @@ impl Strategy for StrategyWrapper {
         })
         .await
         .map_err(|e| {
-            binary_options_tools::pocketoption::error::PocketError::General(format!(
+            PocketError::General(format!(
                 "Spawn blocking error: {}",
                 e
             ))
@@ -115,13 +206,52 @@ impl Strategy for StrategyWrapper {
 
     async fn on_candle(&self, ctx: &Context, asset: &str, candle: &Candle) -> PocketResult<()> {
         let candle_json = serde_json::to_string(candle).map_err(|e| {
-            binary_options_tools::pocketoption::error::PocketError::General(e.to_string())
+            PocketError::General(e.to_string())
         })?;
         let asset = asset.to_string();
         let inner = Python::attach(|py| self.inner.clone_ref(py));
         let client = ctx.client.clone();
         let market = ctx.market.clone();
-
+        let period = Python::attach(|py| inner.call_method0(py, "period").map_err(|e| {
+            PocketError::General(format!(
+                "Python period error: {}",
+                e
+            ))
+        }).map(|obj| obj.extract::<u32>(py)))?
+        .map_err(|e| {
+            PocketError::General(format!(
+                "Python period extract error: {}",
+                e
+            ))
+        })?;
+        let current_candle = Python::attach(|py| inner.getattr(py, "current_candle").map_err(|e| {
+            PocketError::General(format!(
+                "Python current_candle error: {}",
+                e
+            ))
+        }).and_then(|obj| obj.extract::<u32>(py).map_err(|e| {
+            PocketError::General(format!(
+                "Python current_candle extract error: {}",
+                e
+            ))
+        })))?;
+        
+        if current_candle < period {
+            // Just update the indicators and return, the strategy is not ready to trade yet
+            
+            Python::attach(|py| {
+                inner.call_method1(py, "update", (candle_json.clone(),)).map_err(|e| {
+                    PocketError::General(format!(
+                        "Python update error: {}",
+                        e
+                    ))
+                })
+            })?;
+            // Since the method update is called current_candles is incremented by 1, so we add 1 to it to show the user the correct number of candles that have passed since the strategy started.
+            info!(target: "StrategyWrapper", "Loading period: candle {} of {}", current_candle +1, period);
+            return Ok(());
+        }
+        
         tokio::task::spawn_blocking(move || -> PocketResult<()> {
             Python::attach(|py| {
                 let py_ctx = PyContext {
@@ -146,6 +276,7 @@ impl Strategy for StrategyWrapper {
                 e
             ))
         })??;
+        
         Ok(())
     }
 }
