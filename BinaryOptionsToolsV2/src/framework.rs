@@ -11,12 +11,14 @@ use binary_options_tools::pocketoption::error::{PocketResult, PocketError};
 
 use pyo3::prelude::*;
 
+use rust_decimal::Decimal;
 use tracing::info;
 use async_trait::async_trait;
 use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[pyclass]
 #[derive(Clone)]
@@ -57,6 +59,10 @@ impl PyStrategy {
     }
 
     pub fn on_candle(&self, _ctx: PyContext, _asset: String, _candle_json: String) -> PyResult<()> {
+        Ok(())
+    }
+    
+    pub fn on_balance(&self, _ctx: PyContext, _balance: f64) -> PyResult<()> {
         Ok(())
     }
     
@@ -261,7 +267,7 @@ impl Strategy for StrategyWrapper {
                 inner
                     .call_method1(py, "on_candle", (py_ctx, asset, candle_json))
                     .map_err(|e| {
-                        binary_options_tools::pocketoption::error::PocketError::General(format!(
+                        PocketError::General(format!(
                             "Python on_candle error: {}",
                             e
                         ))
@@ -271,12 +277,45 @@ impl Strategy for StrategyWrapper {
         })
         .await
         .map_err(|e| {
-            binary_options_tools::pocketoption::error::PocketError::General(format!(
+            PocketError::General(format!(
                 "Spawn blocking error: {}",
                 e
             ))
         })??;
         
+        Ok(())
+    }
+    
+    async fn on_balance_update(&self, ctx: &Context, balance: Decimal) -> PocketResult<()> {
+        let balance = balance.to_f64().unwrap_or(-1.0); // -1 default to know there is an error converting the balance to f64, but it should never happen as the balance should be always a valid decimal that can be converted to f64 without losing too much precision (the balance is usually a small number with few decimals).
+        let inner = Python::attach(|py| self.inner.clone_ref(py));
+        let client = ctx.client.clone();
+        let market = ctx.market.clone();
+        tokio::task::spawn_blocking(move || -> PocketResult<()> {
+            Python::attach(|py| {
+                let py_ctx = PyContext {
+                    client: Some(client),
+                    market,
+                };
+                inner
+                    .call_method1(py, "on_balance", (py_ctx, balance))
+                    .map_err(|e| {
+                        PocketError::General(format!(
+                            "Python on_balance error: {}",
+                            e
+                        ))
+                    })
+            })
+            .map(|_| ())
+        })
+        .await
+        .map_err(|e| {
+            PocketError::General(format!(
+                "Spawn blocking error: {}",
+                e
+            ))
+        })??;
+
         Ok(())
     }
 }
@@ -376,6 +415,17 @@ impl PyBot {
         }
         Self { inner: Some(bot) }
     }
+    
+    pub fn with_update_interval(&mut self, millis: u64) -> PyResult<()> {
+        if let Some(bot) = &mut self.inner {
+            bot.with_update_interval(Duration::from_millis(millis));
+            Ok(())
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Bot already consumed or run() called",
+            ))
+        }
+    }
 
     pub fn add_asset(&mut self, asset: String, period: u32) -> PyResult<()> {
         if let Some(bot) = &mut self.inner {
@@ -395,7 +445,7 @@ impl PyBot {
     }
 
     pub fn run<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let bot = self.inner.take().ok_or_else(|| {
+        let mut bot = self.inner.take().ok_or_else(|| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Bot already running or consumed")
         })?;
         pyo3_async_runtimes::tokio::future_into_py(py, async move {

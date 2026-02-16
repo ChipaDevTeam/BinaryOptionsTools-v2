@@ -15,6 +15,8 @@ pub trait Market: Send + Sync {
     async fn sell(&self, asset: &str, amount: Decimal, time: u32) -> PocketResult<(Uuid, Deal)>;
 
     /// Returns the current balance.
+    /// This method should be really lightweight, the balance should be stored by the client and simply retrieved
+    /// No server call should be performed here, otherwise it will cause performance issues and may lead to rate limits.
     async fn balance(&self) -> Decimal;
 
     /// Checks the result of a trade.
