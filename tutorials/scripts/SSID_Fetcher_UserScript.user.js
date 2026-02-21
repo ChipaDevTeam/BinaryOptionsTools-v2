@@ -4,7 +4,7 @@
 // @match       *://pocketoption.com/*
 // @match       *://*.pocketoption.com/*
 // @grant       none
-// @version     1.2
+// @version     1.3
 // @author      Six
 // @description Intercepts auth SSID from PocketOption
 // ==/UserScript==
@@ -12,33 +12,54 @@
 (function() {
     'use strict';
 
-    const originalSend = WebSocket.prototype.send;
+    // Hook the WebSocket constructor
+    const OriginalWebSocket = window.WebSocket;
 
-    WebSocket.prototype.send = function(data) {
+    window.WebSocket = function(url, protocols) {
+        const socket = new OriginalWebSocket(url, protocols);
+        // Manual tag as fallback in case the native .url property is restricted
+        try {
+            socket._interceptUrl = url.toString();
+        } catch (e) {}
+        return socket;
+    };
+
+    // Maintain prototype chain
+    window.WebSocket.prototype = OriginalWebSocket.prototype;
+    window.WebSocket.prototype.constructor = window.WebSocket;
+
+    // Hook the send method
+    const originalSend = OriginalWebSocket.prototype.send;
+
+    OriginalWebSocket.prototype.send = function(data) {
+        // Get the URL from the native property or our fallback tag
+        const socketUrl = (this.url || this._interceptUrl || "").toLowerCase();
+
+        // STRICT EXCLUSION: If the URL belongs to events-po.com, bypass the logic immediately
+        if (socketUrl.includes("events-po.com")) {
+            return originalSend.apply(this, arguments);
+        }
+
+        // Intercept authentication messages (Real or Demo)
         if (typeof data === 'string' && data.startsWith('42["auth",')) {
-            try {
-                const jsonStr = data.substring(2);
-                const parsedData = JSON.parse(jsonStr);
 
-                if (parsedData[0] === 'auth' && parsedData[1] && parsedData[1].session) {
-                    const ssid = parsedData[1].session;
+            // Security Check
+            const userWantsToProceed = confirm(`Auth string intercepted from:\n${socketUrl}\n\nWould you like to show the full string and copy it to your clipboard?`);
 
-                    // Ask the user before showing sensitive info (basic security check)
-                    const userwantsToShow = confirm("SSID Intercepted. Would you like to display the Session ID (SSID)?");
-
-                    if (userwantsToShow) {
-                        alert("Your SSID is:\n\n" + ssid);
-                    } else {
-                        console.log("[SSID Fetcher] Display dismissed by user.");
-                    }
-                }
-            } catch (e) {
-                // Ignore parsing errors to prevent site disruption
+            if (userWantsToProceed) {
+                // Copy the ENTIRE string
+                navigator.clipboard.writeText(data).then(() => {
+                    alert("Auth String Copied to Clipboard:\n\n" + data);
+                }).catch(err => {
+                    console.error('Clipboard copy failed:', err);
+                    alert("Auth String Found (Auto-copy failed):\n\n" + data);
+                });
             }
         }
 
+        // Always execute original send to maintain platform functionality
         return originalSend.apply(this, arguments);
     };
 
-    console.log('[SSID Fetcher] Hooked and waiting for authentication...');
+    console.log('Hooked. ignoring auth msgs from events-po.com.');
 })();
