@@ -7,7 +7,7 @@ use binary_options_tools_core_pre::{
     traits::{ApiModule, Rule, RunnerCommand},
 };
 use rust_decimal::Decimal;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::{select, time::timeout};
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -45,17 +45,17 @@ pub enum CommandResponse {
     Error(Box<FailOpenOrder>),
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(untagged)]
-enum ServerResponse {
+pub enum ServerResponse {
     Success(Box<PendingOrder>),
     Fail(Box<FailOpenOrder>),
 }
 
 pub struct PendingTradesHandle {
-    sender: AsyncSender<Command>,
-    receiver: AsyncReceiver<CommandResponse>,
-    call_lock: Arc<tokio::sync::Mutex<()>>,
+    pub sender: AsyncSender<Command>,
+    pub receiver: AsyncReceiver<CommandResponse>,
+    pub call_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl Clone for PendingTradesHandle {
@@ -69,6 +69,15 @@ impl Clone for PendingTradesHandle {
 }
 
 impl PendingTradesHandle {
+    /// Creates a new handle with the given channels.
+    pub fn new(sender: AsyncSender<Command>, receiver: AsyncReceiver<CommandResponse>) -> Self {
+        Self {
+            sender,
+            receiver,
+            call_lock: Arc::new(tokio::sync::Mutex::new(())),
+        }
+    }
+
     /// Opens a pending order on the PocketOption platform.
     ///
     /// This method is now thread-safe and will serialize requests to prevent
@@ -196,29 +205,29 @@ impl ApiModule<State> for PendingTradesApiModule {
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
     ) -> Self::Handle {
-        PendingTradesHandle {
-            sender,
-            receiver,
-            call_lock: Arc::new(tokio::sync::Mutex::new(())),
-        }
+        PendingTradesHandle::new(sender, receiver)
     }
 
     async fn run(&mut self) -> CoreResult<()> {
+        eprintln!("[DEBUG] PendingTradesApiModule::run started");
         loop {
             select! {
                 Ok(cmd) = self.command_receiver.recv() => {
+                    eprintln!("[DEBUG] Received command: {:?}, last_req_id before: {:?}", cmd, self.last_req_id);
                     match cmd {
                         Command::OpenPendingOrder { open_type, amount, asset, open_time, open_price, timeframe, min_payout, command, req_id } => {
                             if self.last_req_id.is_some() {
                                 warn!(target: "PendingTradesApiModule", "Overwriting a pending request. Concurrent open_pending_order calls are not supported.");
                             }
                             self.last_req_id = Some(req_id);
+                            eprintln!("[DEBUG] Set last_req_id to: {:?}", req_id);
                             let order = OpenPendingOrder::new(open_type, amount, asset, open_time, open_price, timeframe, min_payout, command);
                             self.to_ws_sender.send(Message::text(order.to_string())).await?;
                         }
                     }
                 },
                 Ok(msg) = self.message_receiver.recv() => {
+                    eprintln!("[DEBUG] Received message: {:?}, last_req_id: {:?}", msg, self.last_req_id);
                     let response_result = match msg.as_ref() {
                         Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data).map_err(|e| e.to_string()),
                         Message::Text(text) => {
@@ -249,12 +258,15 @@ impl ApiModule<State> for PendingTradesApiModule {
                                 ServerResponse::Success(pending_order) => {
                                     self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
                                     info!(target: "PendingTradesApiModule", "Pending trade opened: {}", pending_order.ticket);
+                                    eprintln!("[DEBUG] Success response, last_req_id: {:?}", self.last_req_id);
                                     if let Some(req_id) = self.last_req_id.take() {
+                                        eprintln!("[DEBUG] Sending Success response with req_id: {}", req_id);
                                         self.command_responder.send(CommandResponse::Success {
                                             req_id,
                                             pending_order,
                                         }).await?;
                                     } else {
+                                        eprintln!("[DEBUG] No req_id pending, dropping response");
                                         warn!(target: "PendingTradesApiModule", "Received successopenPendingOrder but no req_id was pending. Dropping response to avoid ambiguity.");
                                     }
                                 }
@@ -273,6 +285,7 @@ impl ApiModule<State> for PendingTradesApiModule {
                     }
                 }
             }
+            eprintln!("[DEBUG] Loop iteration completed");
         }
     }
 
@@ -281,5 +294,11 @@ impl ApiModule<State> for PendingTradesApiModule {
             "successopenPendingOrder",
             "failopenPendingOrder",
         ]))
+    }
+}
+
+impl Drop for PendingTradesApiModule {
+    fn drop(&mut self) {
+        eprintln!("[DEBUG] PendingTradesApiModule dropped");
     }
 }

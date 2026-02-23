@@ -42,5 +42,6 @@ php_serde = "0.6.0"
 
 [dev-dependencies]
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+kanal = "0.1.0"
 
 [workspace]

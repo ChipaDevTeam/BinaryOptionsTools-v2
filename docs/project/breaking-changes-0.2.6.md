@@ -10,9 +10,9 @@ The `Deal.profit` field in `VirtualMarket` now stores the **net gain or loss** i
 
 ### Impact
 
-* **Win**: `profit = stake * payout_percentage` (e.g., $1.00 stake at 80% returns $0.80 profit).
-* **Loss**: `profit = -stake` (e.g., $1.00 stake returns -$1.00 profit).
-* **Draw**: `profit = 0.00`.
+- **Win**: `profit = stake * payout_percentage` (e.g., $1.00 stake at 80% returns $0.80 profit).
+- **Loss**: `profit = -stake` (e.g., $1.00 stake returns -$1.00 profit).
+- **Draw**: `profit = 0.00`.
 
 ### Why?
 
@@ -54,7 +54,7 @@ match event {
 
 ### Change
 
-The `ResponseRouter` now requires explicit registration of a request ID *before* the command is sent to the module.
+The `ResponseRouter` now requires explicit registration of a request ID _before_ the command is sent to the module.
 
 ### Impact
 

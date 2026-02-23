@@ -1,14 +1,16 @@
 import asyncio
-import os
 import json
+import os
 from datetime import datetime
-from BinaryOptionsToolsV2 import RawPocketOption, PyBot, PyStrategy
+
 from dotenv import load_dotenv
 from rich.console import Console
-from rich.table import Table
+from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
-from rich.layout import Layout
+from rich.table import Table
+
+from BinaryOptionsToolsV2 import PyBot, PyStrategy, RawPocketOption
 
 load_dotenv()
 

@@ -72,7 +72,7 @@ impl TradesHandle {
         amount: Decimal,
         time: u32,
     ) -> PocketResult<Deal> {
-        let id = Uuid::new_v4(); // Generate a unique request ID for this order
+        let id = Uuid::new_v4();
         let (tx, rx) = oneshot::channel();
 
         self.sender
@@ -87,10 +87,11 @@ impl TradesHandle {
             .await
             .map_err(CoreError::from)?;
 
-        // Wait for the specific response for this trade
         match rx.await {
             Ok(result) => result,
-            Err(_) => Err(CoreError::Other("TradesApiModule responder dropped".into()).into()),
+            Err(_) => Err(PocketError::General(
+                "TradesApiModule responder dropped".into(),
+            )),
         }
     }
 

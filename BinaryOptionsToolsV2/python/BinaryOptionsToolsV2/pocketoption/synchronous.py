@@ -1,11 +1,10 @@
 import asyncio
 import json
 from datetime import timedelta
-from typing import Optional, Union, List, Dict, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 from ..config import Config
 from ..validator import Validator
-
 from .asynchronous import PocketOptionAsync
 
 
@@ -15,6 +14,10 @@ class SyncSubscription:
 
     def __iter__(self):
         return self
+
+    def __aiter__(self):
+        """Return the async iterator for the subscription."""
+        return self.subscription
 
     def __next__(self):
         return json.loads(next(self.subscription))
@@ -147,6 +150,10 @@ class SyncRawSubscription:
     def __iter__(self):
         return self
 
+    def __aiter__(self):
+        """Return the async iterator for the raw subscription."""
+        return self.subscription
+
     def __next__(self):
         return next(self.subscription)
 
@@ -214,6 +221,16 @@ class PocketOption:
         self._client = PocketOptionAsync(ssid, url=url, config=config)
         # Wait for assets to ensure connection is ready
         self.loop.run_until_complete(self._client.wait_for_assets())
+
+    @property
+    def client(self):
+        """Returns the underlying PocketOptionAsync client."""
+        return self._client
+
+    @property
+    def config(self):
+        """Returns the configuration object."""
+        return self._client.config
 
     def __enter__(self):
         """
@@ -299,6 +316,24 @@ class PocketOption:
 
         return self.loop.run_until_complete(self._client.get_candles_advanced(asset, period, offset, time))
 
+    def candles(self, asset: str, period: int) -> List[Dict]:
+        """
+        Retrieves historical candle data for an asset.
+
+        Args:
+            asset (str): Trading asset (e.g., "EURUSD_otc")
+            period (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
+
+        Returns:
+            List[Dict]: List of candles, each containing:
+                - time: Candle timestamp
+                - open: Opening price
+                - high: Highest price
+                - low: Lowest price
+                - close: Closing price
+        """
+        return self.loop.run_until_complete(self._client.candles(asset, period))
+
     def balance(self) -> float:
         "Returns the balance of the account"
         return self.loop.run_until_complete(self._client.balance())
@@ -367,6 +402,45 @@ class PocketOption:
         "Returns a list of dictionaries containing the latest data available for the specified asset starting from 'period', the data is in the same format as the returned data of the 'get_candles' function."
         return self.loop.run_until_complete(self._client.history(asset, period))
 
+    def compile_candles(self, asset: str, custom_period: int, lookback_period: int) -> List[Dict]:
+        """Compiles custom candlesticks from raw tick history.
+
+        This method fetches raw tick data over the specified lookback period and
+        aggregates it into custom-sized candles. This enables non-standard timeframes
+        like 20 seconds, 40 seconds, 90 seconds, etc.
+
+        Args:
+            asset (str): Trading asset symbol (e.g., "EURUSD_otc")
+            custom_period (int): Desired candle duration in seconds (e.g., 20, 40, 90)
+            lookback_period (int): Number of seconds of tick history to fetch
+
+        Returns:
+            List[Dict]: A list of dictionaries, each representing a compiled candlestick:
+                - time: Candle timestamp (Unix timestamp, aligned to period boundaries)
+                - open: Opening price
+                - high: Highest price during the period
+                - low: Lowest price during the period
+                - close: Closing price
+
+        Raises:
+            ValueError: If the asset is invalid or periods are zero/negative
+            ConnectionError: If the client is not connected
+
+        Example:
+            ```python
+            client = PocketOption(ssid)
+            # Get 20-second candles from last 5 minutes
+            candles = client.compile_candles("EURUSD_otc", 20, 300)
+            for candle in candles:
+                print(f"{candle['time']}: O={candle['open']}, C={candle['close']}")
+            ```
+
+        Note:
+            - This is a compute-intensive operation.
+            - For standard timeframes, use `get_candles()` for better efficiency.
+        """
+        return self.loop.run_until_complete(self._client.compile_candles(asset, custom_period, lookback_period))
+
     def subscribe_symbol(self, asset: str) -> SyncSubscription:
         """Returns a sync iterator over the associated asset, it will return real time raw candles and will return new candles while the 'PocketOption' class is loaded if the class is droped then the iterator will fail"""
         return SyncSubscription(self.loop.run_until_complete(self._client._subscribe_symbol_inner(asset)))
@@ -426,6 +500,18 @@ class PocketOption:
             ```
         """
         return self._client.is_demo()
+
+    def wait_for_assets(self, timeout: float = 60.0) -> None:
+        """
+        Waits for the assets to be loaded from the server.
+
+        Args:
+            timeout (float): The maximum time to wait in seconds. Default is 60.0.
+
+        Raises:
+            TimeoutError: If the assets are not loaded within the timeout period.
+        """
+        self.loop.run_until_complete(self._client.wait_for_assets(timeout))
 
     def disconnect(self) -> None:
         """

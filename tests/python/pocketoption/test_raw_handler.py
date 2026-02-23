@@ -4,12 +4,10 @@ Example script demonstrating the new connection control and raw handler features
 
 import asyncio
 import os
+
 import pytest
 
-from BinaryOptionsToolsV2 import (
-    PocketOption,
-    PocketOptionAsync,
-)
+from BinaryOptionsToolsV2 import PocketOption, PocketOptionAsync
 from BinaryOptionsToolsV2.validator import Validator
 
 

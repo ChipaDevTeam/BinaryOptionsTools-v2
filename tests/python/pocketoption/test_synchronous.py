@@ -1,5 +1,7 @@
-import pytest
 import os
+
+import pytest
+
 from BinaryOptionsToolsV2.pocketoption.synchronous import PocketOption
 
 

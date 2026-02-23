@@ -51,6 +51,7 @@ Discord = "https://discord.com/invite/chipa-1261483112991555665"
 features = ["pyo3/extension-module"]
 module-name = "BinaryOptionsToolsV2"
 python-source = "python"
+include = ["**/*.pyi"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

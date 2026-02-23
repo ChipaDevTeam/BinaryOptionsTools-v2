@@ -22,8 +22,9 @@
 //!
 //! #[derive(Debug)]
 //! struct MyState;
+//! #[async_trait]
 //! impl AppState for MyState {
-//!     fn clear_temporal_data(&self) {}
+//!     async fn clear_temporal_data(&self) {}
 //! }
 //!
 //! // Example statistics middleware
@@ -185,8 +186,9 @@ pub trait WebSocketMiddleware<S: AppState>: Send + Sync + 'static {
 /// # use async_trait::async_trait;
 /// # #[derive(Debug)]
 /// # struct MyState;
+/// # #[async_trait]
 /// # impl AppState for MyState {
-/// #     fn clear_temporal_data(&self) {}
+/// #     async fn clear_temporal_data(&self) {}
 /// # }
 /// # struct LoggingMiddleware;
 /// # #[async_trait]
@@ -363,8 +365,9 @@ impl<S: AppState> Default for MiddlewareStack<S> {
 /// # use async_trait::async_trait;
 /// # #[derive(Debug)]
 /// # struct MyState;
+/// # #[async_trait]
 /// # impl AppState for MyState {
-/// #     fn clear_temporal_data(&self) {}
+/// #     async fn clear_temporal_data(&self) {}
 /// # }
 /// # struct LoggingMiddleware;
 /// # #[async_trait]

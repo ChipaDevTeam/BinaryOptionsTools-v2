@@ -3,7 +3,7 @@ import json
 import re
 import sys
 from datetime import timedelta
-from typing import Optional, Union, List, Dict, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 from ..config import Config
 from ..validator import Validator
@@ -448,7 +448,45 @@ class PocketOptionAsync:
         return await self.client.balance()
 
     async def opened_deals(self) -> List[Dict]:
-        "Returns a list of all the opened deals as dictionaries"
+        """Retrieves a list of all currently open (active) deals.
+
+        This method returns all deals that are currently active/open on the account,
+        including both pending and executed trades that have not yet closed.
+
+        Returns:
+            List[Dict]: A list of dictionaries, each representing an open deal with details such as:
+                - id: Unique deal identifier
+                - asset: Trading asset symbol
+                - amount: Trade amount
+                - direction: "buy" or "sell"
+                - entry_price: Entry price of the trade
+                - current_price: Current market price
+                - expiry: Expiration timestamp
+                - status: Current status of the deal
+                - timestamp: Deal creation time
+                - profit: Potential or realized profit (may be None for open deals)
+
+        Raises:
+            ConnectionError: If the client is not connected to the platform
+            ValueError: If the response format is invalid
+
+        Examples:
+            Basic usage:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                open_deals = await client.opened_deals()
+                for deal in open_deals:
+                    print(f"Deal {deal['id']}: {deal['asset']} {deal['direction']}")
+            ```
+
+            Filtering active deals:
+            ```python
+            async def monitor_open_deals(client):
+                deals = await client.opened_deals()
+                total_value = sum(d['amount'] for d in deals)
+                print(f"Open deals: {len(deals)}, Total exposure: {total_value}")
+            ```
+        """
         return json.loads(await self.client.opened_deals())
 
     async def get_pending_deals(self) -> List[Dict]:
@@ -493,11 +531,93 @@ class PocketOptionAsync:
         return json.loads(order)
 
     async def closed_deals(self) -> List[Dict]:
-        "Returns a list of all the closed deals as dictionaries"
+        """Retrieves a list of all closed/completed deals.
+
+        This method returns all deals that have been completed, including trades
+        that have expired and reached a final outcome (win, loss, or draw).
+
+        Returns:
+            List[Dict]: A list of dictionaries, each representing a closed deal with details such as:
+                - id: Unique deal identifier
+                - asset: Trading asset symbol
+                - amount: Trade amount
+                - direction: "buy" or "sell"
+                - entry_price: Entry price of the trade
+                - close_price: Closing/expiry price
+                - expiry: Expiration timestamp
+                - result: Final outcome ("win", "loss", or "draw")
+                - profit: Profit/loss amount (positive for win, negative for loss, 0 for draw)
+                - timestamp: Deal creation and close timestamps
+
+        Raises:
+            ConnectionError: If the client is not connected to the platform
+            ValueError: If the response format is invalid
+
+        Examples:
+            Basic usage:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                closed = await client.closed_deals()
+                for deal in closed:
+                    print(f"Deal {deal['id']}: {deal['result']} (profit: {deal['profit']})")
+            ```
+
+            Calculate total profit/loss:
+            ```python
+            async def calculate_pnl():
+                async with PocketOptionAsync(ssid) as client:
+                    closed = await client.closed_deals()
+                    total_pnl = sum(d['profit'] for d in closed)
+                    wins = sum(1 for d in closed if d['result'] == 'win')
+                    print(f"Total P/L: {total_pnl}, Win rate: {wins}/{len(closed)}")
+            ```
+        """
         return json.loads(await self.client.closed_deals())
 
     async def clear_closed_deals(self) -> None:
-        "Removes all the closed deals from memory, this function doesn't return anything"
+        """Removes all closed deals from the client's memory.
+
+        This method clears the internal cache/storage of closed deals. After calling
+        this method, subsequent calls to `closed_deals()` will only return deals
+        that have been closed after this operation. This is useful for managing
+        memory when dealing with a large number of historical trades.
+
+        Note:
+            This operation is irreversible. Once cleared, the closed deal history
+            cannot be recovered through the client. However, the data may still
+            be available on the server.
+
+        Raises:
+            ConnectionError: If the client is not connected to the platform
+            RuntimeError: If the clear operation fails on the server
+
+        Examples:
+            Clear old closed deals:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                # Check current closed deals count
+                closed = await client.closed_deals()
+                print(f"Before clear: {len(closed)} closed deals")
+
+                # Clear the cache
+                await client.clear_closed_deals()
+
+                # Verify cleared
+                closed_after = await client.closed_deals()
+                print(f"After clear: {len(closed_after)} closed deals")
+            ```
+
+            Periodic cleanup:
+            ```python
+            async def periodic_cleanup():
+                async with PocketOptionAsync(ssid) as client:
+                    # Clear closed deals every hour
+                    while True:
+                        await asyncio.sleep(3600)
+                        await client.clear_closed_deals()
+                        print("Closed deals cache cleared")
+            ```
+        """
         await self.client.clear_closed_deals()
 
     async def payout(
@@ -522,6 +642,8 @@ class PocketOptionAsync:
             return payout.get(asset)
         elif isinstance(asset, list):
             return [payout.get(ast) for ast in asset]
+        else:
+            return payout
 
     async def active_assets(self) -> List[Dict]:
         """
@@ -551,19 +673,182 @@ class PocketOptionAsync:
         return list(assets.values()) if isinstance(assets, dict) else assets
 
     async def history(self, asset: str, period: int) -> List[Dict]:
-        "Returns a list of dictionaries containing the latest data available for the specified asset starting from 'period', the data is in the same format as the returned data of the 'get_candles' function."
+        """Retrieves historical price data for an asset.
+
+        This method fetches the latest available historical data for the specified asset,
+        starting from the given period. The returned data format is identical to
+        `get_candles()`, containing OHLC (Open, High, Low, Close) candle data.
+
+        Args:
+            asset (str): Trading asset symbol (e.g., "EURUSD_otc", "BTCUSD")
+            period (int): Time period in seconds to fetch historical data from.
+                For example, period=60 fetches data from the last minute.
+
+        Returns:
+            List[Dict]: A list of dictionaries, each representing a candlestick with:
+                - time: Candle timestamp (Unix timestamp)
+                - open: Opening price
+                - high: Highest price during the period
+                - low: Lowest price during the period
+                - close: Closing price
+
+        Raises:
+            ConnectionError: If the client is not connected to the platform
+            ValueError: If the asset is invalid or the period is not supported
+            TimeoutError: If the data fetch times out
+
+        Examples:
+            Basic usage - fetch last minute of data:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                candles = await client.history("EURUSD_otc", 60)
+                for candle in candles:
+                    print(f"{candle['time']}: O={candle['open']}, C={candle['close']}")
+            ```
+
+            Calculate moving average:
+            ```python
+            async def calculate_ma(asset, period=300):
+                async with PocketOptionAsync(ssid) as client:
+                    candles = await client.history(asset, period)
+                    if candles:
+                        closes = [c['close'] for c in candles]
+                        ma = sum(closes) / len(closes)
+                        print(f"Simple Moving Average: {ma:.5f}")
+            ```
+
+        Note:
+            This method is similar to `get_candles()` but uses a different API endpoint
+            and may have different availability or latency characteristics. For advanced
+            historical data with specific time ranges, consider using `get_candles_advanced()`.
+        """
         return json.loads(await self.client.history(asset, period))
 
+    async def compile_candles(self, asset: str, custom_period: int, lookback_period: int) -> List[Dict]:
+        """Compiles custom candlesticks from raw tick history.
+
+        This method fetches raw tick data over the specified lookback period and
+        aggregates it into custom-sized candles. This enables non-standard timeframes
+        like 20 seconds, 40 seconds, 90 seconds, etc.
+
+        Args:
+            asset (str): Trading asset symbol (e.g., "EURUSD_otc")
+            custom_period (int): Desired candle duration in seconds (e.g., 20, 40, 90)
+            lookback_period (int): Number of seconds of tick history to fetch.
+                This determines the time range from which ticks are collected.
+
+        Returns:
+            List[Dict]: A list of dictionaries, each representing a compiled candlestick:
+                - time: Candle timestamp (Unix timestamp, aligned to period boundaries)
+                - open: Opening price
+                - high: Highest price during the period
+                - low: Lowest price during the period
+                - close: Closing price
+
+        Raises:
+            ConnectionError: If the client is not connected
+            ValueError: If the asset is invalid or periods are zero/negative
+            TimeoutError: If tick fetch or compilation times out
+
+        Example:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                # Get 20-second candles from last 5 minutes
+                candles = await client.compile_candles("EURUSD_otc", 20, 300)
+                for candle in candles:
+                    print(f"{candle['time']}: O={candle['open']}, C={candle['close']}")
+            ```
+
+        Note:
+            - This is a compute-intensive operation as it fetches and processes raw ticks.
+            - For standard timeframes, use `candles()` or `get_candles()` for better efficiency.
+        """
+        return json.loads(await self.client.compile_candles(asset, custom_period, lookback_period))
+
     async def _subscribe_symbol_inner(self, asset: str):
+        """Internal method to establish a real-time subscription for an asset.
+
+        This method directly calls the underlying client's subscribe_symbol method
+        and is used internally by `subscribe_symbol()`. It returns a raw subscription
+        iterator that yields JSON strings.
+
+        Args:
+            asset (str): Trading asset symbol to subscribe to (e.g., "EURUSD_otc")
+
+        Returns:
+            AsyncIterator[str]: Raw async iterator yielding JSON string messages
+
+        Note:
+            This is an internal method. Users should typically use `subscribe_symbol()`
+            which wraps this method in an `AsyncSubscription` for easier handling.
+        """
         return await self.client.subscribe_symbol(asset)
 
     async def _subscribe_symbol_chuncked_inner(self, asset: str, chunck_size: int):
+        """Internal method to establish a chunked real-time subscription for an asset.
+
+        This method creates a subscription that aggregates raw price updates into
+        candlesticks of the specified chunk size. It directly calls the underlying
+        client's subscribe_symbol_chuncked method and returns a raw subscription iterator.
+
+        Args:
+            asset (str): Trading asset symbol to subscribe to (e.g., "EURUSD_otc")
+            chunck_size (int): Number of raw ticks to aggregate into each candle.
+                For example, chunck_size=10 will create a candle from every 10 price ticks.
+
+        Returns:
+            AsyncIterator[str]: Raw async iterator yielding JSON string messages,
+                each representing a completed candlestick.
+
+        Note:
+            This is an internal method. Users should typically use `subscribe_symbol_chuncked()`
+            which wraps this method in an `AsyncSubscription` for easier handling.
+        """
         return await self.client.subscribe_symbol_chuncked(asset, chunck_size)
 
     async def _subscribe_symbol_timed_inner(self, asset: str, time: timedelta):
+        """Internal method to establish a timed real-time subscription for an asset.
+
+        This method creates a subscription that yields price updates at regular
+        time intervals. It directly calls the underlying client's subscribe_symbol_timed
+        method and returns a raw subscription iterator.
+
+        Args:
+            asset (str): Trading asset symbol to subscribe to (e.g., "EURUSD_otc")
+            time (timedelta): Time interval between updates. For example, timedelta(seconds=5)
+                will yield an update every 5 seconds.
+
+        Returns:
+            AsyncIterator[str]: Raw async iterator yielding JSON string messages
+                at the specified time intervals.
+
+        Note:
+            This is an internal method. Users should typically use `subscribe_symbol_timed()`
+            which wraps this method in an `AsyncSubscription` for easier handling.
+        """
         return await self.client.subscribe_symbol_timed(asset, time)
 
     async def _subscribe_symbol_time_aligned_inner(self, asset: str, time: timedelta):
+        """Internal method to establish a time-aligned real-time subscription.
+
+        This method creates a subscription that yields price updates aligned to
+        specific time boundaries (e.g., on the minute, on the hour). It directly
+        calls the underlying client's subscribe_symbol_time_aligned method and
+        returns a raw subscription iterator.
+
+        Args:
+            asset (str): Trading asset symbol to subscribe to (e.g., "EURUSD_otc")
+            time (timedelta): Time alignment interval. For example, timedelta(minutes=1)
+                will align updates to the start of each minute.
+
+        Returns:
+            AsyncIterator[str]: Raw async iterator yielding JSON string messages
+                aligned to the specified time boundaries.
+
+        Note:
+            This is an internal method. Users should typically use `subscribe_symbol_time_aligned()`
+            which wraps this method in an `AsyncSubscription` for easier handling.
+        """
         return await self.client.subscribe_symbol_time_aligned(asset, time)
 
     async def subscribe_symbol(self, asset: str) -> AsyncSubscription:
@@ -632,7 +917,48 @@ class PocketOptionAsync:
         return AsyncSubscription(await self._subscribe_symbol_time_aligned_inner(asset, time))
 
     async def get_server_time(self) -> int:
-        """Returns the current server time as a UNIX timestamp"""
+        """Retrieves the current server time from Pocket Option.
+
+        Returns the server's current Unix timestamp (seconds since epoch).
+        This is useful for synchronizing local operations with server time,
+        calculating time-sensitive parameters, or debugging time-related issues.
+
+        Returns:
+            int: Unix timestamp representing the current server time in seconds.
+
+        Raises:
+            ConnectionError: If the client is not connected to the platform
+            TimeoutError: If the request times out
+
+        Examples:
+            Basic usage:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                server_time = await client.get_server_time()
+                print(f"Server time: {datetime.fromtimestamp(server_time)}")
+            ```
+
+            Synchronize local time:
+            ```python
+            import time
+
+            async def check_time_sync():
+                async with PocketOptionAsync(ssid) as client:
+                    server_time = await client.get_server_time()
+                    local_time = int(time.time())
+                    offset = server_time - local_time
+                    print(f"Time offset with server: {offset} seconds")
+            ```
+
+            Calculate expiry time:
+            ```python
+            async def place_trade_with_expiry(asset: str, amount: float, duration: int):
+                async with PocketOptionAsync(ssid) as client:
+                    server_time = await client.get_server_time()
+                    expiry = server_time + duration
+                    # Use expiry for trade timing
+            ```
+        """
         return await self.client.get_server_time()
 
     async def wait_for_assets(self, timeout: float = 60.0) -> None:
@@ -774,25 +1100,292 @@ class PocketOptionAsync:
         return RawHandler(rust_handler)
 
     async def send_raw_message(self, message: str) -> None:
-        """Sends a raw message through the websocket without waiting for a response"""
+        """Sends a raw WebSocket message without waiting for a response.
+
+        This method allows sending arbitrary WebSocket messages directly to the server.
+        It is fire-and-forget - no response is expected or returned. Useful for
+        sending commands that don't require acknowledgment or for one-way communication.
+
+        Args:
+            message (str): Raw WebSocket message to send. Must be properly formatted
+                as a JSON string or Socket.IO protocol message (e.g., '42["event",{"data":...}]')
+
+        Raises:
+            ConnectionError: If the client is not connected to the platform
+            ValueError: If the message format is invalid
+
+        Examples:
+            Send a simple ping:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                await client.send_raw_message('42["ping"]')
+            ```
+
+            Send custom event:
+            ```python
+            async def send_custom_notification():
+                async with PocketOptionAsync(ssid) as client:
+                    payload = {"event": "notification", "message": "Hello"}
+                    await client.send_raw_message(f'42{json.dumps(payload)}')
+            ```
+
+            Broadcast to channel:
+            ```python
+            async def broadcast_to_channel(channel: str, data: dict):
+                async with PocketOptionAsync(ssid) as client:
+                    message = f'42["join",{{"channel":"{channel}"}}]'
+                    await client.send_raw_message(message)
+            ```
+        """
         await self.client.send_raw_message(message)
 
     async def create_raw_order(self, message: str, validator: Validator) -> str:
-        """Sends a raw message and waits for a response that matches the validator"""
+        """Sends a raw message and waits for a matching response.
+
+        This method sends a WebSocket message and blocks until a response is received
+        that matches the provided validator. It is the basic request-response pattern
+        for custom API interactions.
+
+        Args:
+            message (str): Raw WebSocket message to send, properly formatted as JSON
+                or Socket.IO protocol (e.g., '42["getBalance"]')
+            validator (Validator): Validator instance used to filter and identify
+                the expected response. The validator determines which incoming
+                messages are considered matching responses.
+
+        Returns:
+            str: The first response message that matches the validator, as a raw string.
+                Typically this is a JSON string that can be parsed with `json.loads()`.
+
+        Raises:
+            ConnectionError: If the client is not connected to the platform
+            ValueError: If the message format is invalid or validator doesn't match
+            TimeoutError: If no matching response is received within the default timeout
+
+        Examples:
+            Basic request-response:
+            ```python
+            from BinaryOptionsToolsV2.validator import Validator
+
+            async def get_balance():
+                async with PocketOptionAsync(ssid) as client:
+                    validator = Validator.starts_with('42["balance"')
+                    response = await client.create_raw_order('42["getBalance"]', validator)
+                    balance_data = json.loads(response)
+                    print(f"Balance: {balance_data}")
+            ```
+
+            Query specific trade:
+            ```python
+            async def get_trade_details(trade_id: str):
+                async with PocketOptionAsync(ssid) as client:
+                    msg = f'42["getTrade",{{"id":"{trade_id}"}}]'
+                    validator = Validator.contains('"trade"')
+                    response = await client.create_raw_order(msg, validator)
+                    return json.loads(response)
+            ```
+
+        Note:
+            The default timeout is determined by the client configuration. For more
+            control over timeout behavior, use `create_raw_order_with_timeout()`.
+        """
         return await self.client.create_raw_order(message, validator.raw_validator)
 
     async def create_raw_order_with_timeout(self, message: str, validator: Validator, timeout: timedelta) -> str:
-        """Sends a raw message and waits for a response that matches the validator with a timeout"""
+        """Sends a raw message and waits for a matching response with a custom timeout.
+
+        This method is similar to `create_raw_order()` but allows specifying a
+        custom timeout duration. It sends a WebSocket message and blocks until
+        a response matching the validator is received or the timeout expires.
+
+        Args:
+            message (str): Raw WebSocket message to send, properly formatted as JSON
+                or Socket.IO protocol (e.g., '42["getBalance"]')
+            validator (Validator): Validator instance to filter and identify the
+                expected response.
+            timeout (timedelta): Maximum time to wait for a response. For example,
+                `timedelta(seconds=30)` will wait up to 30 seconds.
+
+        Returns:
+            str: The first response message that matches the validator, as a raw string.
+
+        Raises:
+            ConnectionError: If the client is not connected to the platform
+            ValueError: If the message format is invalid or validator doesn't match
+            TimeoutError: If no matching response is received within the specified timeout
+
+        Examples:
+            Short timeout for quick operations:
+            ```python
+            from datetime import timedelta
+
+            async def quick_request():
+                async with PocketOptionAsync(ssid) as client:
+                    validator = Validator.starts_with('42["pong"')
+                    try:
+                        response = await client.create_raw_order_with_timeout(
+                            '42["ping"]', validator, timedelta(seconds=5)
+                        )
+                        print(f"Pong: {response}")
+                    except TimeoutError:
+                        print("Server did not respond in time")
+            ```
+
+            Longer timeout for complex operations:
+            ```python
+            async def fetch_historical_data(asset: str, days: int):
+                async with PocketOptionAsync(ssid) as client:
+                    msg = f'42["history",{{"asset":"{asset}","days":{days}}}]'
+                    validator = Validator.json_path("$.data")
+                    # Allow up to 60 seconds for historical data fetch
+                    response = await client.create_raw_order_with_timeout(
+                        msg, validator, timedelta(seconds=60)
+                    )
+                    return json.loads(response)
+            ```
+        """
         return await self.client.create_raw_order_with_timeout(message, validator.raw_validator, timeout)
 
     async def create_raw_order_with_timeout_and_retry(
         self, message: str, validator: Validator, timeout: timedelta
     ) -> str:
-        """Sends a raw message and waits for a response that matches the validator with a timeout and retry logic"""
+        """Sends a raw message with timeout and automatic retry logic.
+
+        This method extends `create_raw_order_with_timeout()` by adding automatic
+        retry logic. If the request fails or times out, it will automatically
+        retry the operation, providing enhanced reliability for flaky connections
+        or temporary server issues.
+
+        Args:
+            message (str): Raw WebSocket message to send, properly formatted as JSON
+                or Socket.IO protocol.
+            validator (Validator): Validator instance to filter and identify the
+                expected response.
+            timeout (timedelta): Maximum time to wait for each attempt. For example,
+                `timedelta(seconds=30)` sets a 30-second timeout per try.
+
+        Returns:
+            str: The first response message that matches the validator, as a raw string.
+
+        Raises:
+            ConnectionError: If the client is not connected to the platform
+            ValueError: If the message format is invalid or validator doesn't match
+            TimeoutError: If all retry attempts fail to receive a matching response
+
+        Examples:
+            Reliable request with retries:
+            ```python
+            from datetime import timedelta
+
+            async def reliable_fetch():
+                async with PocketOptionAsync(ssid) as client:
+                    validator = Validator.starts_with('42["data"')
+                    try:
+                        response = await client.create_raw_order_with_timeout_and_retry(
+                            '42["fetch"]', validator, timedelta(seconds=30)
+                        )
+                        return json.loads(response)
+                    except TimeoutError:
+                        print("All retry attempts exhausted")
+            ```
+
+            Critical operation with guaranteed delivery:
+            ```python
+            async def place_critical_order(asset: str, amount: float):
+                async with PocketOptionAsync(ssid) as client:
+                    msg = f'42["order",{{"asset":"{asset}","amount":{amount}}}]'
+                    validator = Validator.contains('"order_id"')
+                    # Retry with 30s timeout per attempt
+                    response = await client.create_raw_order_with_timeout_and_retry(
+                        msg, validator, timedelta(seconds=30)
+                    )
+                    return json.loads(response)
+            ```
+
+        Note:
+            The retry strategy (number of retries, backoff behavior) is determined
+            by the underlying Rust client configuration. Check the client config for
+            retry-related parameters.
+        """
         return await self.client.create_raw_order_with_timeout_and_retry(message, validator.raw_validator, timeout)
 
     async def create_raw_iterator(self, message: str, validator: Validator, timeout: Optional[timedelta] = None):
-        """Returns an async iterator that yields messages matching the validator after sending the initial message"""
+        """Creates an async iterator for streaming responses.
+
+        This method sends an initial message and returns an async iterator that yields
+        all subsequent messages matching the validator. It is useful for subscribing
+        to a stream of responses or for scenarios where multiple responses are expected
+        to a single request.
+
+        Args:
+            message (str): Initial raw WebSocket message to send, properly formatted
+                as JSON or Socket.IO protocol.
+            validator (Validator): Validator instance to filter incoming messages.
+                Only messages matching this validator will be yielded by the iterator.
+            timeout (timedelta | None, optional): Optional timeout for the entire
+                iterator session. If None, the iterator may continue indefinitely
+                until closed or the connection ends. Defaults to None.
+
+        Returns:
+            AsyncIterator[str]: Async iterator yielding matching response messages
+                as raw strings. Each item can be parsed with `json.loads()`.
+
+        Raises:
+            ConnectionError: If the client is not connected to the platform
+            ValueError: If the message format is invalid
+
+        Examples:
+            Stream multiple responses:
+            ```python
+            from BinaryOptionsToolsV2.validator import Validator
+
+            async def stream_updates():
+                async with PocketOptionAsync(ssid) as client:
+                    validator = Validator.starts_with('42["update"')
+                    iterator = await client.create_raw_iterator(
+                        '42["subscribeUpdates"]', validator, timeout=timedelta(minutes=5)
+                    )
+                    async for response in iterator:
+                        data = json.loads(response)
+                        print(f"Update: {data}")
+            ```
+
+            Collect all items into a list:
+            ```python
+            async def collect_all():
+                async with PocketOptionAsync(ssid) as client:
+                    validator = Validator.contains('"item"')
+                    iterator = await client.create_raw_iterator(
+                        '42["getAll"]', validator
+                    )
+                    items = []
+                    async for response in iterator:
+                        items.append(json.loads(response))
+                    return items
+            ```
+
+            Use with context manager:
+            ```python
+            async def bounded_stream():
+                async with PocketOptionAsync(ssid) as client:
+                    validator = Validator.regex(r'42\["signal"')
+                    async with await client.create_raw_iterator(
+                        '42["startSignals"]', validator
+                    ) as stream:
+                        async for signal in stream:
+                            process_signal(json.loads(signal))
+            ```
+
+        Note:
+            The iterator will continue yielding messages until:
+            - The connection is closed or times out
+            - The client is shut down
+            - An exception occurs
+            - The optional timeout expires (if specified)
+
+            Proper cleanup is handled automatically when using the iterator as an
+            async context manager or when it is garbage collected.
+        """
         return await self.client.create_raw_iterator(message, validator.raw_validator, timeout)
 
 

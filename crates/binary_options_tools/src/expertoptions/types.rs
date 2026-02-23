@@ -10,7 +10,7 @@ pub struct Asset {
     pub id: u32,
     pub symbol: Option<String>,
     pub name: String,
-    #[serde(with = "bool2int")]
+    #[serde(with = "bool2int", rename = "active")]
     pub is_active: bool,
     #[serde(flatten)]
     _extra: HashMap<String, Value>,

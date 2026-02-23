@@ -52,7 +52,7 @@ pub trait Strategy: Send + Sync {
     async fn on_deal_opened(&self, _ctx: &Context, _deal: &Deal) -> PocketResult<()> {
         Ok(())
     }
-    
+
     /// Called when a new deal is closed
     async fn on_deal_closed(&self, _ctx: &Context, _deal: &Deal) -> PocketResult<()> {
         Ok(())
@@ -83,7 +83,7 @@ impl Bot {
             update_time: Duration::from_secs(5), // Default to 5 seconds
         }
     }
-    
+
     pub fn with_update_interval(&mut self, duration: Duration) {
         self.update_time = duration;
     }
@@ -104,7 +104,7 @@ impl Bot {
         info!("Starting bot...");
         self.strategy.on_start(&self.ctx).await?;
         self.spawn_balance_task();
-        
+
         let mut streams = Vec::new();
 
         for (asset, sub_type) in &self.assets {
@@ -143,29 +143,32 @@ impl Bot {
 
         Ok(())
     }
-    
+
     fn spawn_balance_task(&mut self) {
-        info!("Spawning balance update task with interval of {:?}...", self.update_time);
+        info!(
+            "Spawning balance update task with interval of {:?}...",
+            self.update_time
+        );
         let ctx = self.ctx.clone();
         let strategy = self.strategy.clone();
         let time = self.update_time;
         let mut last_balance = Decimal::ZERO;
         let task = tokio::spawn(async move {
             loop {
-                let balance =  ctx.market.balance().await;
+                let balance = ctx.market.balance().await;
                 if balance != last_balance {
                     info!("Balance updated: {}", balance);
                     last_balance = balance;
-                    if let Err(e) = strategy.on_balance_update(&ctx,balance).await {
-                        warn!("Strategy on_balance_update error sharing balance {}: {:?}", balance, e);
-                    } 
+                    if let Err(e) = strategy.on_balance_update(&ctx, balance).await {
+                        warn!(
+                            "Strategy on_balance_update error sharing balance {}: {:?}",
+                            balance, e
+                        );
+                    }
                 }
                 tokio::time::sleep(time).await;
             }
-            
         });
         self.background_tasks.push(task);
     }
-    
-    
 }

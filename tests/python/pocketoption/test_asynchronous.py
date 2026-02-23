@@ -1,10 +1,11 @@
-import pytest
-import os
 import asyncio
-from BinaryOptionsToolsV2.pocketoption.asynchronous import (
-    PocketOptionAsync as PocketOption,
-)
+import os
+
+import pytest
+
 from BinaryOptionsToolsV2.config import Config
+from BinaryOptionsToolsV2.pocketoption.asynchronous import \
+    PocketOptionAsync as PocketOption
 from BinaryOptionsToolsV2.validator import Validator
 
 

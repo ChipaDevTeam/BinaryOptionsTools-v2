@@ -1,6 +1,6 @@
 import asyncio
-import os
 import logging
+import os
 import sys
 
 # Ensure we use the local version of the library

@@ -56,10 +56,11 @@ pub struct State {
     pub active_subscriptions: RwLock<
         HashMap<
             String,
-            (
+            Vec<(
                 AsyncSender<SubscriptionEvent>,
                 crate::pocketoption::candle::SubscriptionType,
-            ),
+                Uuid,
+            )>,
         >,
     >,
     /// Active history requests

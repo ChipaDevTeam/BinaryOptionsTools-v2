@@ -1,4 +1,5 @@
 import pytest
+
 from BinaryOptionsToolsV2.config import Config
 
 

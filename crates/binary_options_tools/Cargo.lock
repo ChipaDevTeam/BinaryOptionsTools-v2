@@ -137,6 +137,7 @@ dependencies = [
  "binary-options-tools-macros",
  "chrono",
  "futures-util",
+ "kanal",
  "php_serde",
  "rand 0.8.5",
  "regex",

@@ -20,9 +20,9 @@
 
 - **Format**: [Subject Line]
 
- [Body]
+[Body]
 
- [Footer/Issues]
+[Footer/Issues]
 
 - **Subject Line**:
   - Limit to 72 characters.

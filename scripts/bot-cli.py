@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
+import argparse
 import os
 import sys
-import argparse
 
 TEMPLATE = """import asyncio
 import os
