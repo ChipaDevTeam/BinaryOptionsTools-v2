@@ -582,10 +582,6 @@ async fn test_run_handles_socket_io_text_success() {
     let server_response = ServerResponse::Success(Box::new(pending_order.clone()));
     let data_json = serde_json::to_string(&server_response).unwrap();
     let socket_io_msg = format!("42[\"successopenPendingOrder\",{}]", data_json);
-    msg_tx
-        .send(Arc::new(Message::Text(socket_io_msg.into())))
-        .await
-        .unwrap();
 
     let cmd_req_id = Uuid::new_v4();
     cmd_tx
@@ -600,6 +596,14 @@ async fn test_run_handles_socket_io_text_success() {
             command: 0,
             req_id: cmd_req_id,
         })
+        .await
+        .unwrap();
+
+    // Wait for the command to be processed by the module
+    tokio::time::sleep(Duration::from_millis(10)).await;
+
+    msg_tx
+        .send(Arc::new(Message::Text(socket_io_msg.into())))
         .await
         .unwrap();
 
