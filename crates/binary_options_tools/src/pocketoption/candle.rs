@@ -1,3 +1,5 @@
+#![allow(clippy::items_after_test_module)]
+
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};

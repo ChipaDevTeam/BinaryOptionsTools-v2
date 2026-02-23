@@ -1,7 +1,6 @@
-use std::{fs::OpenOptions, io::Write, sync::Arc};
+use std::{fs::OpenOptions, io::Write, sync::Arc, time::Duration};
 
 use binary_options_tools::stream::{stream_logs_layer, Message, RecieverStream};
-use chrono::Duration;
 use futures_util::{
     stream::{BoxStream, Fuse},
     StreamExt,
@@ -159,16 +158,6 @@ impl LogBuilder {
         level: String,
         timeout: Option<Duration>,
     ) -> StreamLogsIterator {
-        let timeout = match timeout {
-            Some(timeout) => match timeout.to_std() {
-                Ok(timeout) => Some(timeout),
-                Err(e) => {
-                    warn!("Error converting duration to std, {e}");
-                    None
-                }
-            },
-            None => None,
-        };
         let (layer, inner_iter) =
             stream_logs_layer(level.parse().unwrap_or(Level::DEBUG.into()), timeout);
         let stream = RecieverStream::to_stream_static(Arc::new(inner_iter))
