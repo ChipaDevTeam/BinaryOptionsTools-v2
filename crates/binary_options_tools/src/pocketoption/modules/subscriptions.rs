@@ -479,7 +479,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             if let Err(e) = self.add_subscription(asset.clone(), sub_type.clone(), stream_sender.clone(), subscription_id).await {
                                 self.command_responder.send(CommandResponse::SubscriptionFailed {
                                     command_id,
-                                    error: Box::new(e.into()),
+                                    error: Box::new(e),
                                 }).await?;
                                 continue;
                             }
@@ -750,18 +750,6 @@ impl SubscriptionsApiModule {
         Ok(false)
     }
 
-    async fn resend_connection_messages(&self) -> CoreResult<()> {
-        // Resend connection messages to re-establish subscriptions
-        let subscriptions = self.state.active_subscriptions.read().await.clone();
-        for (symbol, vec) in subscriptions {
-            if let Some((_, sub_type, _)) = vec.first() {
-                let period = sub_type.period_secs().unwrap_or(1);
-                // Send subscription message for each active asset (once per asset)
-                self.send_subscribe_message(&symbol, period).await?;
-            }
-        }
-        Ok(())
-    }
 
     /// Send subscription message to WebSocket.
     ///
