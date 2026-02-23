@@ -187,7 +187,7 @@ async fn test_open_pending_order_failure() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async(1);
     let (resp_tx, resp_rx) = kanal::bounded_async(1);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, _) = kanal::bounded_async(1);
+    let (ws_tx, ws_rx) = kanal::bounded_async(1);
     let (runner_tx, _) = kanal::bounded_async(1);
 
     let state = create_mock_state();
@@ -211,23 +211,31 @@ async fn test_open_pending_order_failure() {
     let server_response = ServerResponse::Fail(Box::new(fail_order.clone()));
     let response_json = serde_json::to_string(&server_response).unwrap();
 
+    // Spawn the open_pending_order call to allow the module to process the command first
+    let result_handle = tokio::spawn(async move {
+        client_handle
+            .open_pending_order(
+                1,
+                Decimal::from_f64_retain(100.0).unwrap(),
+                "EURUSD_otc".to_string(),
+                60,
+                Decimal::from_f64_retain(1.1950).unwrap(),
+                60,
+                85,
+                0,
+            )
+            .await
+    });
+
+    // Wait for the command to be processed by the module
+    tokio::time::sleep(Duration::from_millis(10)).await;
+
     msg_tx
         .send(Arc::new(Message::Text(response_json.into())))
         .await
         .unwrap();
 
-    let result = client_handle
-        .open_pending_order(
-            1,
-            Decimal::from_f64_retain(100.0).unwrap(),
-            "EURUSD_otc".to_string(),
-            60,
-            Decimal::from_f64_retain(1.1950).unwrap(),
-            60,
-            85,
-            0,
-        )
-        .await;
+    let result = result_handle.await.unwrap();
 
     assert!(result.is_err());
     match result.unwrap_err() {
@@ -403,7 +411,7 @@ async fn test_open_pending_order_with_socket_io_framing() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async(1);
     let (resp_tx, resp_rx) = kanal::bounded_async(1);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, _) = kanal::bounded_async(1);
+    let (ws_tx, ws_rx) = kanal::bounded_async(1);
     let (runner_tx, _) = kanal::bounded_async(1);
 
     let state = create_mock_state();
@@ -560,7 +568,7 @@ async fn test_run_handles_socket_io_text_success() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async(1);
     let (resp_tx, resp_rx) = kanal::bounded_async(1);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, _) = kanal::bounded_async(1);
+    let (ws_tx, ws_rx) = kanal::bounded_async(1);
     let (runner_tx, _) = kanal::bounded_async(1);
 
     let state = create_mock_state();
@@ -627,7 +635,7 @@ async fn test_run_handles_failure_response() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async(1);
     let (resp_tx, resp_rx) = kanal::bounded_async(1);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, _) = kanal::bounded_async(1);
+    let (ws_tx, ws_rx) = kanal::bounded_async(1);
     let (runner_tx, _) = kanal::bounded_async(1);
 
     let state = create_mock_state();
@@ -664,6 +672,9 @@ async fn test_run_handles_failure_response() {
         })
         .await
         .unwrap();
+
+    // Wait for the command to be processed by the module
+    tokio::time::sleep(Duration::from_millis(10)).await;
 
     let socket_io_msg = format!("42[\"failopenPendingOrder\",{}]", response_json);
     msg_tx
