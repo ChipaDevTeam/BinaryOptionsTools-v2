@@ -15,45 +15,48 @@ permissions:
 
 jobs:
   linux:
-   runs-on: ${{ matrix.platform.runner }}
-   timeout-minutes: 60
-   strategy:
-     fail-fast: false
-     matrix:
-       platform:
-         - runner: ubuntu-22.04
-           target: x86_64
-         - runner: ubuntu-22.04
-           target: x86
-         - runner: ubuntu-22.04
-           target: aarch64
-         - runner: ubuntu-22.04
-           target: armv7
-         - runner: ubuntu-22.04
-           target: s390x
-         - runner: ubuntu-22.04
-           target: ppc64le
-   steps:
-     - uses: actions/checkout@v4
-     - name: Build wheels
-       uses: PyO3/maturin-action@v1
-       with:
-         target: ${{ matrix.platform.target }}
-         args: --release --out dist
-         sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-         manylinux: 2_28
-         working-directory: BinaryOptionsToolsV2
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-22.04
+            target: x86_64
+          - runner: ubuntu-22.04
+            target: x86
+          - runner: ubuntu-22.04
+            target: aarch64
+          - runner: ubuntu-22.04
+            target: armv7
+          - runner: ubuntu-22.04
+            target: s390x
+          - runner: ubuntu-22.04
+            target: ppc64le
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          manylinux: 2_28
+          working-directory: BinaryOptionsToolsV2
         env:
           CFLAGS_aarch64_unknown_linux_gnu: "-D__ARM_ARCH=8"
           CFLAGS_armv7_unknown_linux_gnueabihf: "-D__ARM_ARCH=7"
           ASFLAGS_aarch64_unknown_linux_gnu: "-D__ARM_ARCH=8"
           ASFLAGS_armv7_unknown_linux_gnueabihf: "-D__ARM_ARCH=7"
+
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-linux-${{ matrix.platform.target }}
           path: BinaryOptionsToolsV2/dist
-      - name: pytest
+
+      - name: pytest (Native x86_64)
         if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
         shell: bash
         working-directory: BinaryOptionsToolsV2
@@ -63,10 +66,11 @@ jobs:
           source .venv/bin/activate
           pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
           pip install pytest pytest-asyncio
-          mkdir test_run
+          mkdir -p test_run
           cd test_run
           pytest ../../tests
-      - name: pytest
+
+      - name: pytest (Emulated Arch)
         if: ${{ !startsWith(matrix.platform.target, 'x86') && matrix.platform.target != 'ppc64' }}
         uses: uraimo/run-on-arch-action@v2
         with:
@@ -81,46 +85,49 @@ jobs:
             set -e
             cd BinaryOptionsToolsV2
             pip3 install BinaryOptionsToolsV2 --find-links dist --force-reinstall
-            mkdir test_run
+            mkdir -p test_run
             cd test_run
             pytest ../../tests
 
   musllinux:
-   runs-on: ${{ matrix.platform.runner }}
-   timeout-minutes: 60
-   strategy:
-     fail-fast: false
-     matrix:
-       platform:
-         - runner: ubuntu-22.04
-           target: x86_64
-         - runner: ubuntu-22.04
-           target: x86
-         - runner: ubuntu-22.04
-           target: aarch64
-         - runner: ubuntu-22.04
-           target: armv7
-   steps:
-     - uses: actions/checkout@v4
-     - name: Build wheels
-       uses: PyO3/maturin-action@v1
-       with:
-         target: ${{ matrix.platform.target }}
-         args: --release --out dist
-         sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-         manylinux: musllinux_1_2
-         working-directory: BinaryOptionsToolsV2
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-22.04
+            target: x86_64
+          - runner: ubuntu-22.04
+            target: x86
+          - runner: ubuntu-22.04
+            target: aarch64
+          - runner: ubuntu-22.04
+            target: armv7
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          manylinux: musllinux_1_2
+          working-directory: BinaryOptionsToolsV2
         env:
           CFLAGS_aarch64_unknown_linux_musl: "-D__ARM_ARCH=8"
           CFLAGS_armv7_unknown_linux_musleabihf: "-D__ARM_ARCH=7"
           ASFLAGS_aarch64_unknown_linux_musl: "-D__ARM_ARCH=8"
           ASFLAGS_armv7_unknown_linux_musleabihf: "-D__ARM_ARCH=7"
+
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-musllinux-${{ matrix.platform.target }}
           path: BinaryOptionsToolsV2/dist
-      - name: pytest
+
+      - name: pytest (Native Alpine)
         if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
         shell: bash
         run: |
@@ -131,11 +138,12 @@ jobs:
             . .venv/bin/activate
             pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
             pip install pytest pytest-asyncio
-            mkdir test_run
+            mkdir -p test_run
             cd test_run
             pytest ../../tests
           '
-      - name: pytest
+
+      - name: pytest (Emulated Alpine)
         if: ${{ !startsWith(matrix.platform.target, 'x86') }}
         uses: uraimo/run-on-arch-action@v2
         with:
@@ -151,7 +159,7 @@ jobs:
             . .venv/bin/activate
             pip install pytest pytest-asyncio
             pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
-            mkdir test_run
+            mkdir -p test_run
             cd test_run
             pytest ../../tests
 
@@ -172,6 +180,7 @@ jobs:
         with:
           python-version: 3.x
           architecture: ${{ matrix.platform.target }}
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -179,10 +188,12 @@ jobs:
           args: --release --out dist
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           working-directory: BinaryOptionsToolsV2
+
       - uses: actions/setup-python@v5
         with:
           python-version: 3.13
           architecture: ${{ matrix.platform.target }}
+
       - name: Build wheels (3.13)
         uses: PyO3/maturin-action@v1
         with:
@@ -190,22 +201,23 @@ jobs:
           args: --release --out dist -i python3.13
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           working-directory: BinaryOptionsToolsV2
+
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-${{ matrix.platform.target }}
           path: BinaryOptionsToolsV2/dist
+
       - name: pytest
-        if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
         working-directory: BinaryOptionsToolsV2
         run: |
           set -e
-          python3 -m venv .venv
+          python -m venv .venv
           source .venv/Scripts/activate
           pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
           pip install pytest pytest-asyncio
-          mkdir test_run
+          mkdir -p test_run
           cd test_run
           pytest ../../tests
 
@@ -261,8 +273,6 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          # This downloads all artifacts.
-          # Each artifact is placed in a directory named after its name (e.g., wheels-linux-x86_64/)
           path: wheels
 
       - name: Display structure of downloaded files
@@ -277,27 +287,10 @@ jobs:
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         uses: softprops/action-gh-release@v2
         with:
-          # This pattern catches all wheels and the sdist from all artifact folders
           files: wheels/wheels-*/*
           generate_release_notes: true
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
           fail_on_unmatched_files: false
           body: |
             ## BinaryOptionsToolsV2 Release ${{ github.ref_name }}
-
             Pre-built wheels for Python 3.8+ on various platforms.
-
-            ### Installation
-
-            ```bash
-            # Windows
-            pip install BinaryOptionsToolsV2-${{ github.ref_name }}-cp38-abi3-win_amd64.whl
-
-            # Linux (x86_64)
-            pip install BinaryOptionsToolsV2-${{ github.ref_name }}-cp38-abi3-manylinux_2_28_x86_64.whl
-
-            # macOS (Intel)
-            pip install BinaryOptionsToolsV2-${{ github.ref_name }}-cp38-abi3-macosx_10_12_x86_64.whl
-            ```
-
-            See the README for more installation options and documentation.
