@@ -21,7 +21,7 @@ crate-type = ["cdylib"]
 pyo3 = "0.28.2"
 pyo3-async-runtimes = { version = "0.28.0", features = ["tokio-runtime"] }
 
-binary_options_tools = { path = "../crates/binary_options_tools", version = "0.2.0" }
+binary_options_tools = { path = "../../crates/binary_options_tools", version = "0.2.0" }
 
 thiserror = "2.0.17"
 serde = { version = "1.0.228", features = ["derive"] }

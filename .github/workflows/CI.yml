@@ -15,37 +15,34 @@ permissions:
 
 jobs:
   linux:
-    runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - runner: ubuntu-22.04
-            target: x86_64
-          - runner: ubuntu-22.04
-            target: x86
-          - runner: ubuntu-22.04
-            target: aarch64
-          - runner: ubuntu-22.04
-            target: armv7
-          - runner: ubuntu-22.04
-            target: s390x
-          - runner: ubuntu-22.04
-            target: ppc64le
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.x
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          manylinux: 2_28
-          working-directory: BinaryOptionsToolsV2
+   runs-on: ${{ matrix.platform.runner }}
+   timeout-minutes: 60
+   strategy:
+     fail-fast: false
+     matrix:
+       platform:
+         - runner: ubuntu-22.04
+           target: x86_64
+         - runner: ubuntu-22.04
+           target: x86
+         - runner: ubuntu-22.04
+           target: aarch64
+         - runner: ubuntu-22.04
+           target: armv7
+         - runner: ubuntu-22.04
+           target: s390x
+         - runner: ubuntu-22.04
+           target: ppc64le
+   steps:
+     - uses: actions/checkout@v4
+     - name: Build wheels
+       uses: PyO3/maturin-action@v1
+       with:
+         target: ${{ matrix.platform.target }}
+         args: --release --out dist
+         sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+         manylinux: 2_28
+         working-directory: BinaryOptionsToolsV2
         env:
           CFLAGS_aarch64_unknown_linux_gnu: "-D__ARM_ARCH=8"
           CFLAGS_armv7_unknown_linux_gnueabihf: "-D__ARM_ARCH=7"
@@ -89,33 +86,30 @@ jobs:
             pytest ../../tests
 
   musllinux:
-    runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - runner: ubuntu-22.04
-            target: x86_64
-          - runner: ubuntu-22.04
-            target: x86
-          - runner: ubuntu-22.04
-            target: aarch64
-          - runner: ubuntu-22.04
-            target: armv7
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.x
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          manylinux: musllinux_1_2
-          working-directory: BinaryOptionsToolsV2
+   runs-on: ${{ matrix.platform.runner }}
+   timeout-minutes: 60
+   strategy:
+     fail-fast: false
+     matrix:
+       platform:
+         - runner: ubuntu-22.04
+           target: x86_64
+         - runner: ubuntu-22.04
+           target: x86
+         - runner: ubuntu-22.04
+           target: aarch64
+         - runner: ubuntu-22.04
+           target: armv7
+   steps:
+     - uses: actions/checkout@v4
+     - name: Build wheels
+       uses: PyO3/maturin-action@v1
+       with:
+         target: ${{ matrix.platform.target }}
+         args: --release --out dist
+         sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+         manylinux: musllinux_1_2
+         working-directory: BinaryOptionsToolsV2
         env:
           CFLAGS_aarch64_unknown_linux_musl: "-D__ARM_ARCH=8"
           CFLAGS_armv7_unknown_linux_musleabihf: "-D__ARM_ARCH=7"
