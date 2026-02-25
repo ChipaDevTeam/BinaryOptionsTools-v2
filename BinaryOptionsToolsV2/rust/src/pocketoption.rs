@@ -66,7 +66,7 @@ async fn send_raw_message_and_wait(
     Ok(arc_message_to_string(&response))
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RawPocketOption {
     pub(crate) client: PocketOption,

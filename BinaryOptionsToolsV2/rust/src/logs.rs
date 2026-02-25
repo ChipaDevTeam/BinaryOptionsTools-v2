@@ -72,7 +72,7 @@ pub fn start_tracing(
     Ok(())
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct StreamLogsLayer {
     layer: Arc<Box<dyn Layer<Registry> + Send + Sync>>,

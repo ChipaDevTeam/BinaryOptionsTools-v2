@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub enum Action {
     Call,
@@ -320,7 +320,7 @@ impl Strategy for StrategyWrapper {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct PyContext {
     pub client: Option<Arc<binary_options_tools::pocketoption::pocket_client::PocketOption>>,

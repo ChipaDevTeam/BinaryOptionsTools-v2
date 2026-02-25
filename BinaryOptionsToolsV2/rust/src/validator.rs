@@ -14,27 +14,27 @@ use binary_options_tools::traits::ValidatorTrait;
 use binary_options_tools::validator::Validator as CrateValidator;
 use pyo3::Python;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct ArrayValidator(Vec<RawValidator>);
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct BoxedValidator(Box<RawValidator>);
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RegexValidator {
     regex: Regex,
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct PyCustom {
     custom: Arc<Py<PyAny>>,
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 /// `RawValidator` provides a flexible way to filter WebSocket messages
 /// within the Python API. It encapsulates various validation strategies,
