@@ -505,7 +505,9 @@ class PocketOption:
         Please keep in mind the iterator won't return a new candle exactly each `time` duration, there could be a small delay and imperfect timestamps
         """
         with self._lock:
-            return SyncSubscription(self.loop.run_until_complete(self._client._subscribe_symbol_timed_inner(asset, time)))
+            return SyncSubscription(
+                self.loop.run_until_complete(self._client._subscribe_symbol_timed_inner(asset, time))
+            )
 
     def subscribe_symbol_time_aligned(self, asset: str, time: timedelta) -> SyncSubscription:
         """

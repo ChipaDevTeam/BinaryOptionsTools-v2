@@ -34,8 +34,7 @@ else:
 # Debug helper to verify import source
 try:
     import BinaryOptionsToolsV2
-    from BinaryOptionsToolsV2.pocketoption.asynchronous import \
-        PocketOptionAsync
+    from BinaryOptionsToolsV2.pocketoption.asynchronous import PocketOptionAsync
     from BinaryOptionsToolsV2.pocketoption.synchronous import PocketOption
 
     print(
@@ -54,8 +53,7 @@ except ImportError:
 
     try:
         import BinaryOptionsToolsV2
-        from BinaryOptionsToolsV2.pocketoption.asynchronous import \
-            PocketOptionAsync
+        from BinaryOptionsToolsV2.pocketoption.asynchronous import PocketOptionAsync
         from BinaryOptionsToolsV2.pocketoption.synchronous import PocketOption
 
         print(

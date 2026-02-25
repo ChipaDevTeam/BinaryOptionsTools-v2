@@ -4,8 +4,7 @@ import os
 
 from dotenv import load_dotenv
 
-from BinaryOptionsToolsV2 import (PyBot, PyStrategy, RawPocketOption,
-                                  start_tracing)
+from BinaryOptionsToolsV2 import PyBot, PyStrategy, RawPocketOption, start_tracing
 
 load_dotenv()
 
