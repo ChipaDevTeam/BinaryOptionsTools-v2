@@ -1,5 +1,4 @@
 name: CI
-
 on:
   push:
     branches: [main, master]
@@ -11,27 +10,24 @@ permissions:
 jobs:
   # --- 1. LINUX BUILD ---
   linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        # We build for both standard (glibc) and alpine (musl)
         target: [x86_64, aarch64, armv7]
         libc: [manylinux_2_28, musllinux_1_1]
     steps:
       - uses: actions/checkout@v4
-      - uses: goto-bus-stop/setup-zig@v2
+      - name: Install Zig
+        uses: goto-bus-stop/setup-zig@v2
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          # --zig allows manylinux compliance without Docker containers
+          # --zig is the modern way to cross-compile for GLIBC/MUSL without Docker
           args: --release --out dist -i python3.13 --zig
-          manylinux: off 
+          manylinux: off
           working-directory: BinaryOptionsToolsV2
-        env:
-          RING_CFLAGS_aarch64_unknown_linux_gnu: "-D__ARM_ARCH=8"
-          RING_CFLAGS_armv7_unknown_linux_gnueabihf: "-D__ARM_ARCH=7"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -65,7 +61,7 @@ jobs:
 
   # --- 3. MACOS BUILD ---
   macos:
-    runs-on: macos-latest # This is Apple Silicon (M1/M2)
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -74,8 +70,9 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          # We build a 'universal2' wheel containing both Intel and Apple Silicon code
-          args: --release --out dist -i python3.13 --universal2
+          # Targets both Intel and Apple Silicon in a single wheel
+          target: universal2-apple-darwin 
+          args: --release --out dist -i python3.13
           working-directory: BinaryOptionsToolsV2
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -83,67 +80,52 @@ jobs:
           name: wheels-macos
           path: BinaryOptionsToolsV2/dist
 
-  # --- 4. SOURCE DISTRIBUTION ---
-  sdist:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build sdist
-        uses: PyO3/maturin-action@v1
-        with:
-          command: sdist
-          args: --out dist
-          working-directory: BinaryOptionsToolsV2
-      - name: Upload sdist
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-sdist
-          path: BinaryOptionsToolsV2/dist
-
-  # --- 5. AUTOMATIC RELEASE ---
+  # --- 4. AUTOMATED RELEASE & VERSION SYNC ---
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [linux, windows, macos, sdist]
+    needs: [linux, windows, macos]
     steps:
       - uses: actions/checkout@v4
-
+      
       - name: Get Version from pyproject.toml
         id: get_version
         working-directory: BinaryOptionsToolsV2
         run: |
+          # Use Python 3.11+ tomllib for reliable parsing
           VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "TAG=v$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Download all artifacts
+      - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           path: wheels
           pattern: wheels-*
           merge-multiple: true
 
-      - name: Create or Update Release
+      - name: Sync GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.get_version.outputs.TAG }}
           VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
-          # Check if the release already exists
+          # Check if tag exists
           if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "Release $TAG exists. Overwriting assets..."
-            gh release upload "$TAG" wheels/*.whl wheels/*.tar.gz --clobber
+            echo "Updating existing release $TAG..."
+            gh release upload "$TAG" wheels/*.whl --clobber
           else
             echo "Creating new release $TAG..."
-            gh release create "$TAG" wheels/*.whl wheels/*.tar.gz \
-              --title "Release $VERSION" \
+            gh release create "$TAG" wheels/*.whl \
+              --title "BinaryOptionsToolsV2 $VERSION" \
               --generate-notes \
-              --notes "Automated build for version $VERSION"
+              --notes "### Automated Release $TAG
+              Built natively for Python 3.13."
           fi
 
       - name: Summary
         run: |
-          echo "### Deployed" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Tag:** ${{ steps.get_version.outputs.TAG }}" >> $GITHUB_STEP_SUMMARY
-          echo "Uploaded $(ls wheels | wc -l) artifacts." >> $GITHUB_STEP_SUMMARY
+          echo "### blehh ill edit this if it actually works" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform:** macOS Sequoia / Ubuntu 24.04 / Windows 2025" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python:** 3.13 (Stable)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
