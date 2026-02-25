@@ -90,6 +90,6 @@ We appreciate all forms of contribution, from code to documentation to community
 
 ---
 
-**Last Updated**: January 2024
+**Last Updated**: January 2026
 
 Thank you all for making BinaryOptionsTools v2 possible! 🙏
