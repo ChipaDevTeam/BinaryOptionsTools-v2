@@ -14,24 +14,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [x86_64, aarch64, armv7]
-        libc: [manylinux_2_28, musllinux_1_1]
+        # Define specific Rust targets for Zig to handle
+        include:
+          - target: x86_64-unknown-linux-gnu
+            libc: manylinux_2_28
+          - target: x86_64-unknown-linux-musl
+            libc: musllinux_1_1
+          - target: aarch64-unknown-linux-gnu
+            libc: manylinux_2_28
+          - target: aarch64-unknown-linux-musl
+            libc: musllinux_1_1
+          - target: armv7-unknown-linux-gnueabihf
+            libc: manylinux_2_28
     steps:
       - uses: actions/checkout@v4
+      
       - name: Install Zig
         uses: mlugg/setup-zig@v1
+        with:
+          version: 0.13.0 # Explicitly use stable to avoid 404s
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          # --zig is the modern way to cross-compile for GLIBC/MUSL without Docker
+          # --zig handles the cross-compilation and linking for GLIBC/MUSL
           args: --release --out dist -i python3.13 --zig
-          manylinux: off
+          manylinux: off # Handled by --zig
           working-directory: BinaryOptionsToolsV2
+
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux-${{ matrix.target }}-${{ matrix.libc }}
+          name: wheels-linux-${{ matrix.target }}
           path: BinaryOptionsToolsV2/dist
 
   # --- 2. WINDOWS BUILD ---
@@ -70,7 +85,6 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          # Targets both Intel and Apple Silicon in a single wheel
           target: universal2-apple-darwin
           args: --release --out dist -i python3.13
           working-directory: BinaryOptionsToolsV2
@@ -80,7 +94,7 @@ jobs:
           name: wheels-macos
           path: BinaryOptionsToolsV2/dist
 
-  # --- 4. AUTOMATED RELEASE & VERSION SYNC ---
+  # --- 4. AUTOMATED RELEASE ---
   release:
     name: Release
     runs-on: ubuntu-latest
@@ -92,7 +106,7 @@ jobs:
         id: get_version
         working-directory: BinaryOptionsToolsV2
         run: |
-          # Use Python 3.11+ tomllib for reliable parsing
+          # The runner has python3 installed; tomllib is built-in since 3.11
           VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('rust/Cargo.toml', 'rb'))['package']['version'])")
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "TAG=v$VERSION" >> $GITHUB_OUTPUT
@@ -110,7 +124,6 @@ jobs:
           TAG: ${{ steps.get_version.outputs.TAG }}
           VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
-          # Check if tag exists
           if gh release view "$TAG" > /dev/null 2>&1; then
             echo "Updating existing release $TAG..."
             gh release upload "$TAG" wheels/*.whl --clobber
