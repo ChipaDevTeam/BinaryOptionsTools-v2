@@ -64,10 +64,9 @@ jobs:
           set -e
           python3 -m venv .venv
           source .venv/bin/activate
-          pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
+          pip install --find-links dist --only-binary=:all: BinaryOptionsToolsV2
           pip install pytest pytest-asyncio
-          mkdir test_run
-          cd test_run
+          mkdir -p test_run && cd test_run
           pytest ../../tests
 
       - name: pytest (cross-arch)
@@ -79,14 +78,15 @@ jobs:
           githubToken: ${{ github.token }}
           install: |
             apt-get update
-            apt-get install -y --no-install-recommends python3 python3-pip
+            apt-get install -y --no-install-recommends python3 python3-pip python3-venv
             pip3 install -U pip pytest pytest-asyncio
           run: |
             set -e
             cd BinaryOptionsToolsV2
-            pip3 install BinaryOptionsToolsV2 --find-links dist --force-reinstall
-            mkdir test_run
-            cd test_run
+            python3 -m venv .venv
+            source .venv/bin/activate
+            pip3 install --find-links dist --only-binary=:all: BinaryOptionsToolsV2
+            mkdir -p test_run && cd test_run
             pytest ../../tests
 
   musllinux:
@@ -133,13 +133,12 @@ jobs:
         run: |
           docker run --rm -v ${{ github.workspace }}:/io -w /io/BinaryOptionsToolsV2 alpine:latest sh -c '
             set -e
-            apk add py3-pip
+            apk add py3-pip python3-dev
             python3 -m venv .venv
             . .venv/bin/activate
-            pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
+            pip install --find-links dist --only-binary=:all: BinaryOptionsToolsV2
             pip install pytest pytest-asyncio
-            mkdir test_run
-            cd test_run
+            mkdir -p test_run && cd test_run
             pytest ../../tests
           '
 
@@ -151,29 +150,26 @@ jobs:
           distro: alpine_latest
           githubToken: ${{ github.token }}
           install: |
-            apk add py3-pip
+            apk add py3-pip python3-dev build-base
           run: |
             set -e
             cd BinaryOptionsToolsV2
             python3 -m venv .venv
             . .venv/bin/activate
             pip install pytest pytest-asyncio
-            pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
-            mkdir test_run
-            cd test_run
+            pip install --find-links dist --only-binary=:all: BinaryOptionsToolsV2
+            mkdir -p test_run && cd test_run
             pytest ../../tests
 
   windows:
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: windows-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         platform:
-          - runner: windows-latest
-            target: x64
-          - runner: windows-latest
-            target: x86
+          - target: x64
+          - target: x86
     steps:
       - uses: actions/checkout@v4
 
@@ -192,7 +188,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.13
+          python-version: "3.13"
           architecture: ${{ matrix.platform.target }}
 
       - name: Build wheels (3.13)
@@ -210,28 +206,20 @@ jobs:
           path: BinaryOptionsToolsV2/dist
 
       - name: pytest
-        if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
         working-directory: BinaryOptionsToolsV2
         run: |
           set -e
-          python3 -m venv .venv
+          python -m venv .venv
           source .venv/Scripts/activate
-          pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall
+          pip install --find-links dist --only-binary=:all: BinaryOptionsToolsV2
           pip install pytest pytest-asyncio
-          mkdir test_run
-          cd test_run
+          mkdir -p test_run && cd test_run
           pytest ../../tests
 
   macos:
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: macos-15-intel
     timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - runner: macos-15-intel
-            target: x86_64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -265,7 +253,6 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     needs: [linux, musllinux, windows, macos, sdist]
     permissions:
@@ -276,9 +263,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: wheels
-
-      - name: Display structure of downloaded files
-        run: ls -R wheels
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
