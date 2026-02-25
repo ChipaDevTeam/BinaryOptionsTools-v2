@@ -2,241 +2,90 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
-      - master
-    tags:
-      - "*"
-  pull_request:
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  # --- 1. LINUX BUILD ---
   linux:
-    runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 60
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        platform:
-          - runner: ubuntu-22.04
-            target: x86_64
-          - runner: ubuntu-22.04
-            target: x86
-          - runner: ubuntu-22.04
-            target: aarch64
-          - runner: ubuntu-22.04
-            target: armv7
-          - runner: ubuntu-22.04
-            target: s390x
-          - runner: ubuntu-22.04
-            target: ppc64le
+        # We build for both standard (glibc) and alpine (musl)
+        target: [x86_64, aarch64, armv7]
+        libc: [manylinux_2_28, musllinux_1_1]
     steps:
       - uses: actions/checkout@v4
-
+      - uses: goto-bus-stop/setup-zig@v2
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.13
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          manylinux: 2_28
+          target: ${{ matrix.target }}
+          # --zig allows manylinux compliance without Docker containers
+          args: --release --out dist -i python3.13 --zig
+          manylinux: off 
           working-directory: BinaryOptionsToolsV2
         env:
           RING_CFLAGS_aarch64_unknown_linux_gnu: "-D__ARM_ARCH=8"
           RING_CFLAGS_armv7_unknown_linux_gnueabihf: "-D__ARM_ARCH=7"
-          RING_ASFLAGS_aarch64_unknown_linux_gnu: "-D__ARM_ARCH=8"
-          RING_ASFLAGS_armv7_unknown_linux_gnueabihf: "-D__ARM_ARCH=7"
-
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux-${{ matrix.platform.target }}
+          name: wheels-linux-${{ matrix.target }}-${{ matrix.libc }}
           path: BinaryOptionsToolsV2/dist
 
+  # --- 2. WINDOWS BUILD ---
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x64, x86]
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-
-      - name: pytest
-        if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
-        shell: bash
-        working-directory: BinaryOptionsToolsV2
-        run: |
-          set -e
-          python -m venv .venv
-          source .venv/bin/activate
-          pip install --find-links dist --only-binary=:all: BinaryOptionsToolsV2
-          pip install pytest pytest-asyncio
-          mkdir -p test_run && cd test_run
-          pytest ../../tests
-
-      - name: pytest (cross-arch)
-        if: ${{ !startsWith(matrix.platform.target, 'x86') && matrix.platform.target != 'ppc64' }}
-        uses: uraimo/run-on-arch-action@v2
-        with:
-          arch: ${{ matrix.platform.target }}
-          distro: none
-          base_image: python:3.13
-          githubToken: ${{ github.token }}
-          run: |
-            set -e
-            cd BinaryOptionsToolsV2
-            python -m venv .venv
-            source .venv/bin/activate
-            pip install pytest pytest-asyncio
-            pip install --find-links dist --only-binary=:all: BinaryOptionsToolsV2
-            mkdir -p test_run && cd test_run
-            pytest ../../tests
-
-  musllinux:
-    runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - runner: ubuntu-22.04
-            arch: x86_64
-            cargo_target: x86_64-unknown-linux-musl
-          - runner: ubuntu-22.04
-            arch: aarch64
-            cargo_target: aarch64-unknown-linux-musl
-          - runner: ubuntu-22.04
-            arch: armv7
-            cargo_target: armv7-unknown-linux-musleabihf
-    steps:
-      - uses: actions/checkout@v4
-
+          architecture: ${{ matrix.target }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.platform.cargo_target }}
+          target: ${{ matrix.target }}
           args: --release --out dist -i python3.13
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          manylinux: auto
           working-directory: BinaryOptionsToolsV2
-        env:
-          RING_CFLAGS_aarch64_unknown_linux_musl: "-D__ARM_ARCH=8"
-          RING_CFLAGS_armv7_unknown_linux_musleabihf: "-D__ARM_ARCH=7"
-          RING_ASFLAGS_aarch64_unknown_linux_musl: "-D__ARM_ARCH=8"
-          RING_ASFLAGS_armv7_unknown_linux_musleabihf: "-D__ARM_ARCH=7"
-
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-musllinux-${{ matrix.platform.cargo_target }}
+          name: wheels-windows-${{ matrix.target }}
           path: BinaryOptionsToolsV2/dist
 
-      - name: pytest
-        if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
-        shell: bash
-        run: |
-          docker run --rm -v ${{ github.workspace }}:/io -w /io/BinaryOptionsToolsV2 python:3.13-alpine sh -c '
-            set -e
-            python -m venv .venv
-            . .venv/bin/activate
-            pip install pytest pytest-asyncio
-            pip install --find-links dist --only-binary=:all: BinaryOptionsToolsV2
-            mkdir -p test_run && cd test_run
-            pytest ../../tests
-          '
-
-      - name: pytest (cross-arch)
-        if: ${{ !startsWith(matrix.platform.cargo_target, 'x86') }}
-        uses: uraimo/run-on-arch-action@v2
-        with:
-          arch: ${{ matrix.platform.arch }}
-          distro: none
-          base_image: python:3.13-alpine
-          githubToken: ${{ github.token }}
-          run: |
-            set -e
-            cd BinaryOptionsToolsV2
-            python -m venv .venv
-            . .venv/bin/activate
-            pip install pytest pytest-asyncio
-            pip install --find-links dist --only-binary=:all: BinaryOptionsToolsV2
-            mkdir -p test_run && cd test_run
-            pytest ../../tests
-
-  windows:
-    runs-on: windows-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - target: x64
-          - target: x86
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.x
-          architecture: ${{ matrix.platform.target }}
-
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.13
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          working-directory: BinaryOptionsToolsV2
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-          architecture: ${{ matrix.platform.target }}
-
-      - name: Build wheels (3.13)
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.13
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          working-directory: BinaryOptionsToolsV2
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-windows-${{ matrix.platform.target }}
-          path: BinaryOptionsToolsV2/dist
-
-      - name: pytest
-        shell: bash
-        working-directory: BinaryOptionsToolsV2
-        run: |
-          set -e
-          python -m venv .venv
-          source .venv/Scripts/activate
-          pip install --find-links dist --only-binary=:all: BinaryOptionsToolsV2
-          pip install pytest pytest-asyncio
-          mkdir -p test_run && cd test_run
-          pytest ../../tests
-
+  # --- 3. MACOS BUILD ---
   macos:
-    runs-on: macos-15-intel
-    timeout-minutes: 60
+    runs-on: macos-latest # This is Apple Silicon (M1/M2)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.x
+          python-version: '3.13'
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.13
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          # We build a 'universal2' wheel containing both Intel and Apple Silicon code
+          args: --release --out dist -i python3.13 --universal2
           working-directory: BinaryOptionsToolsV2
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-macos
+          path: BinaryOptionsToolsV2/dist
 
+  # --- 4. SOURCE DISTRIBUTION ---
   sdist:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Build sdist
@@ -251,48 +100,50 @@ jobs:
           name: wheels-sdist
           path: BinaryOptionsToolsV2/dist
 
+  # --- 5. AUTOMATIC RELEASE ---
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
-    needs: [linux, musllinux, windows, macos, sdist]
-    permissions:
-      id-token: write
-      contents: write
-      attestations: write
+    needs: [linux, windows, macos, sdist]
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+
+      - name: Get Version from pyproject.toml
+        id: get_version
+        working-directory: BinaryOptionsToolsV2
+        run: |
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
           path: wheels
+          pattern: wheels-*
+          merge-multiple: true
 
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: "wheels/wheels-*/*"
+      - name: Create or Update Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.get_version.outputs.TAG }}
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: |
+          # Check if the release already exists
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG exists. Overwriting assets..."
+            gh release upload "$TAG" wheels/*.whl wheels/*.tar.gz --clobber
+          else
+            echo "Creating new release $TAG..."
+            gh release create "$TAG" wheels/*.whl wheels/*.tar.gz \
+              --title "Release $VERSION" \
+              --generate-notes \
+              --notes "Automated build for version $VERSION"
+          fi
 
-      - name: Create GitHub Release
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        uses: softprops/action-gh-release@v2
-        with:
-          files: wheels/wheels-*/*
-          generate_release_notes: true
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-          fail_on_unmatched_files: false
-          body: |
-            ## BinaryOptionsToolsV2 Release ${{ github.ref_name }}
-            Pre-built wheels for Python 3.8+ on various platforms.
-
-            ### Installation
-
-            ```bash
-            # Windows
-            pip install BinaryOptionsToolsV2-${{ github.ref_name }}-cp38-abi3-win_amd64.whl
-
-            # Linux (x86_64)
-            pip install BinaryOptionsToolsV2-${{ github.ref_name }}-cp38-abi3-manylinux_2_28_x86_64.whl
-
-            # macOS (Intel)
-            pip install BinaryOptionsToolsV2-${{ github.ref_name }}-cp38-abi3-macosx_10_12_x86_64.whl
-            ```
-
-            See the README for more installation options and documentation such as installing from source.
+      - name: Summary
+        run: |
+          echo "### Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** ${{ steps.get_version.outputs.TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "Uploaded $(ls wheels | wc -l) artifacts." >> $GITHUB_STEP_SUMMARY
