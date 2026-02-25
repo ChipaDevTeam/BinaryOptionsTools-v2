@@ -36,7 +36,7 @@ rust_decimal_macros = "1.35.0"
 ryu = "1.0"
 thiserror = "1.0.63"
 regex = "1.10.5"
-rustls = { version = "0.23.10", features = ["ring"] }
+rustls = { version = "0.23.10", default-features = false, features = ["ring"] }
 rustls-native-certs = "0.8.0"
 php_serde = "0.6.0"
 

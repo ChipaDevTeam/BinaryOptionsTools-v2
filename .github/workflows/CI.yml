@@ -45,10 +45,10 @@ jobs:
           manylinux: 2_28
           working-directory: BinaryOptionsToolsV2
         env:
-          CFLAGS_aarch64_unknown_linux_gnu: "-D__ARM_ARCH=8"
-          CFLAGS_armv7_unknown_linux_gnueabihf: "-D__ARM_ARCH=7"
-          ASFLAGS_aarch64_unknown_linux_gnu: "-D__ARM_ARCH=8"
-          ASFLAGS_armv7_unknown_linux_gnueabihf: "-D__ARM_ARCH=7"
+          RING_CFLAGS_aarch64_unknown_linux_gnu: "-D__ARM_ARCH=8"
+          RING_CFLAGS_armv7_unknown_linux_gnueabihf: "-D__ARM_ARCH=7"
+          RING_ASFLAGS_aarch64_unknown_linux_gnu: "-D__ARM_ARCH=8"
+          RING_ASFLAGS_armv7_unknown_linux_gnueabihf: "-D__ARM_ARCH=7"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -97,29 +97,33 @@ jobs:
       matrix:
         platform:
           - runner: ubuntu-22.04
-            target: x86_64
+            arch: x86_64
+            cargo_target: x86_64-unknown-linux-musl
           - runner: ubuntu-22.04
-            target: x86
+            arch: x86
+            cargo_target: i686-unknown-linux-musl
           - runner: ubuntu-22.04
-            target: aarch64
+            arch: aarch64
+            cargo_target: aarch64-unknown-linux-musl
           - runner: ubuntu-22.04
-            target: armv7
+            arch: armv7
+            cargo_target: armv7-unknown-linux-musleabihf
     steps:
       - uses: actions/checkout@v4
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.platform.target }}
+          target: ${{ matrix.platform.cargo_target }}
           args: --release --out dist -i python3.13
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
           working-directory: BinaryOptionsToolsV2
         env:
-          CFLAGS_aarch64_unknown_linux_musl: "-D__ARM_ARCH=8"
-          CFLAGS_armv7_unknown_linux_musleabihf: "-D__ARM_ARCH=7"
-          ASFLAGS_aarch64_unknown_linux_musl: "-D__ARM_ARCH=8"
-          ASFLAGS_armv7_unknown_linux_musleabihf: "-D__ARM_ARCH=7"
+          RING_CFLAGS_aarch64_unknown_linux_musl: "-D__ARM_ARCH=8"
+          RING_CFLAGS_armv7_unknown_linux_musleabihf: "-D__ARM_ARCH=7"
+          RING_ASFLAGS_aarch64_unknown_linux_musl: "-D__ARM_ARCH=8"
+          RING_ASFLAGS_armv7_unknown_linux_musleabihf: "-D__ARM_ARCH=7"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -143,10 +147,10 @@ jobs:
           '
 
       - name: pytest (cross-arch)
-        if: ${{ !startsWith(matrix.platform.target, 'x86') }}
+        if: ${{ !startsWith(matrix.platform.cargo_target, 'x86') }}
         uses: uraimo/run-on-arch-action@v2
         with:
-          arch: ${{ matrix.platform.target }}
+          arch: ${{ matrix.platform.arch }}
           distro: alpine_latest
           githubToken: ${{ github.token }}
           install: |
@@ -294,4 +298,4 @@ jobs:
             pip install BinaryOptionsToolsV2-${{ github.ref_name }}-cp38-abi3-macosx_10_12_x86_64.whl
             ```
 
-            See the README for more installation options and documentation.
+            See the README for more installation options and documentation such as installing from source.
