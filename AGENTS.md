@@ -27,13 +27,6 @@
 - Install from wheel: `pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall`
 - Create virtualenv: `python3 -m venv .venv`
 
-## Python Stub Generation
-
-- Enable stubgen feature: `cargo build -p BinaryOptionsToolsV2 --features stubgen`
-- Stubs auto-generated to `BinaryOptionsToolsV2/python/BinaryOptionsToolsV2/`
-- Stubs included in wheel via maturin `include` config in `pyproject.toml`
-- Manual alternative: Use `pyo3-stub-gen` CLI or custom build script
-
 ## Test Commands
 
 ### Python Tests (pytest)

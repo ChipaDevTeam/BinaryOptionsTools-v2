@@ -209,7 +209,7 @@ impl ApiModule<State> for PendingTradesApiModule {
     }
 
     async fn run(&mut self) -> CoreResult<()> {
-        eprintln!("[DEBUG] PendingTradesApiModule::run started");
+        // eprintln!("[DEBUG] PendingTradesApiModule::run started");
         loop {
             select! {
                 Ok(cmd) = self.command_receiver.recv() => {
