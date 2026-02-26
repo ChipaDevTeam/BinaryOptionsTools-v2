@@ -6,7 +6,7 @@ Prerequisites
 
 Installation steps
 1. Save the userscript file
-   - Create a new file named pocketoption-ssid-fetcher.user.js and paste the userscript contents into it.
+   - Locate the userscript at tutorials/scripts/SSID_Fetcher_UserScript.user.js or copy its contents.
 2. Install the userscript
    - Open your userscript manager dashboard in the browser.
    - Use the manager’s "Add new script" or "Import" option and paste the script, or open the saved .user.js file in the browser; the manager should prompt to install.
@@ -29,7 +29,7 @@ Security & storage best practices
 - Limit where copies of the secret exist; remove from clipboard history if your OS exposes it.
 
 Notes and cautions
-- The script deliberately ignores WebSocket URLs containing events-po.com to prevent incorrect SSID parsing.
+- The script completely bypasses all interception and send-hook logic for WebSocket URLs matching "events-po.com" for safety and correctness.
 - Use this only on accounts you own or are authorized to access.
 - Running user scripts that intercept authentication data can be risky—only run trusted code and verify the script contents before installing.
 - If unsure, prefer manual inspection via Developer Tools over installing third-party scripts.

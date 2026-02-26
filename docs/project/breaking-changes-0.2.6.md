@@ -14,6 +14,8 @@ The `Deal.profit` field in `VirtualMarket` now stores the **net gain or loss** i
 - **Loss**: `profit = -stake` (e.g., $1.00 stake returns -$1.00 profit).
 - **Draw**: `profit = 0.00`.
 
+**Note:** `payout_percentage` is represented as a decimal fraction (e.g., `0.8` for 80% payout). If you are using integer percent values (like `80`), use `profit = stake * (payout_percentage / 100)`.
+
 ### Why?
 
 This aligns with standard trading API semantics and makes it easier to calculate overall PnL (Profit and Loss) by simply summing the `profit` fields.

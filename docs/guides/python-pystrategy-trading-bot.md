@@ -596,7 +596,7 @@ class AdvancedTradingStrategy(PyStrategy):
             self.prices[asset].pop(0)
 
         # Update balance periodically
-        if not hasattr(self, "_balance_task") or self._balance_task.done():
+        if not hasattr(self, "_balance_task") or self._balance_task is None or self._balance_task.done():
             self._balance_task = asyncio.create_task(self.update_balance(ctx))
 
         # Execute trading logic

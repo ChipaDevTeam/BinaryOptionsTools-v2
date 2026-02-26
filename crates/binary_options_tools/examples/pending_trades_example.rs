@@ -103,7 +103,6 @@ fn create_socket_io_text_message(event: &str, data: &serde_json::Value) -> Strin
 /// 4. Handle the response (success or error)
 ///
 /// This example shows the simplest use case with proper error handling.
-#[tokio::main]
 async fn example_basic_pending_order() -> PocketResult<()> {
     println!("=== Example 1: Basic Pending Order Placement ===\n");
 
@@ -203,7 +202,6 @@ async fn example_basic_pending_order() -> PocketResult<()> {
 /// request at a time. Concurrent calls will work due to the lock, but they are
 /// serialized. For high-volume scenarios, consider batching or using multiple
 /// client instances.
-#[tokio::main]
 async fn example_concurrent_pending_orders() -> PocketResult<()> {
     println!("=== Example 2: Concurrent Pending Orders ===\n");
 
@@ -345,7 +343,6 @@ async fn example_concurrent_pending_orders() -> PocketResult<()> {
 ///
 /// In a real application, the `PocketClient` manages all of this internally.
 /// This example is useful for understanding the architecture.
-#[tokio::main]
 async fn example_integration_with_pocketclient() -> PocketResult<()> {
     println!("=== Example 3: Integration with PocketClient ===\n");
 
@@ -653,7 +650,6 @@ async fn scenario3_timeout() -> PocketResult<()> {
     Ok(())
 }
 
-#[tokio::main]
 async fn example_timeouts_and_retries() -> PocketResult<()> {
     println!("=== Example 4: Timeouts and Retries ===\n");
     scenario1_mismatched_responses().await?;
@@ -683,6 +679,12 @@ async fn example_timeouts_and_retries() -> PocketResult<()> {
 async fn main() {
     // Initialize logging (optional but helpful)
     let _ = tracing_subscriber::fmt::try_init();
+
+    // To run an example, uncomment one of these lines:
+    // example_basic_pending_order().await.unwrap();
+    // example_concurrent_pending_orders().await.unwrap();
+    // example_integration_with_pocketclient().await.unwrap();
+    // example_timeouts_and_retries().await.unwrap();
 
     println!("Pending Trades Examples\n");
     println!("Uncomment the example you want to run in main():\n");

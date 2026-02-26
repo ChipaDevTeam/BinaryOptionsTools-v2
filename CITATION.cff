@@ -24,7 +24,6 @@ keywords:
   - "automated trading"
   - "financial technology"
 version: "0.2.8"
-date-released: "2024-01-01"
 identifiers:
   - type: url
     value: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"

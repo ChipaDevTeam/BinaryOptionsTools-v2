@@ -34,7 +34,7 @@ Supports **Python 3.8 to 3.13**.
 
 ## Compile from source (Not recommended)
 
-- Make sure you have `rust` and `cargo` installed (Check here)
+- Make sure you have `rust` and `cargo` installed ([Check here](https://www.rust-lang.org/tools/install))
 
 - Install [`maturin`](https://www.maturin.rs/installation) in order to compile the library
 
@@ -94,6 +94,7 @@ Key Features of PocketOptionAsync
 - **Market Data**:
   - `get_candles()`: Fetches historical candle data.
   - `history()`: Retrieves recent data for a specific asset.
+  - `compile_candles()`: Compiles custom-period candlesticks from base candle data.
 - **Account Management**:
   - `balance()`: Returns the current account balance.
   - `opened_deals()`: Lists all open trades.
@@ -128,7 +129,7 @@ async def main():
     print(f"Account Balance: ${balance}")
 
     # Place a buy trade
-    trade_id, deal = await client.buy("EURUSD_otc", 60, 1.0)
+    trade_id, deal = await client.buy("EURUSD_otc", 1.0, 60)
     print(f"Trade placed: {deal}")
 
     # Check result
@@ -156,6 +157,7 @@ Key Features of PocketOption
 - **Market Data**:
   - `get_candles()`: Fetches historical candle data.
   - `history()`: Retrieves recent data for a specific asset.
+  - `compile_candles()`: Compiles custom-period candlesticks from base candle data.
 - **Account Management**:
   - `balance()`: Retrieves account balance.
   - `opened_deals()`: Lists all open trades.
@@ -189,7 +191,7 @@ balance = client.balance()
 print(f"Account Balance: ${balance}")
 
 # Place a buy trade
-trade_id, deal = client.buy("EURUSD_otc", 60, 1.0)
+trade_id, deal = client.buy("EURUSD_otc", 1.0, 60)
 print(f"Trade placed: {deal}")
 
 # Check result
@@ -252,7 +254,7 @@ def main():
     print(f"Current Balance: ${balance}")
 
     # Place a buy trade on EURUSD for 60 seconds with $1
-    trade_id, deal = client.buy(asset="EURUSD_otc", time=60, amount=1.0)
+    trade_id, deal = client.buy(asset="EURUSD_otc", amount=1.0, time=60)
     print(f"Trade ID: {trade_id}")
     print(f"Deal Data: {deal}")
 
@@ -283,7 +285,7 @@ async def main():
     print(f"Current Balance: ${balance}")
 
     # Place a buy trade on EURUSD for 60 seconds with $1
-    trade_id, deal = await client.buy(asset="EURUSD_otc", time=60, amount=1.0)
+    trade_id, deal = await client.buy(asset="EURUSD_otc", amount=1.0, time=60)
     print(f"Trade ID: {trade_id}")
     print(f"Deal Data: {deal}")
 
@@ -323,6 +325,27 @@ async def main():
         #     'low': 1.22354,
         #     'close': 1.22355
         # }
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Compiling Custom Period Candles
+
+```python
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
+
+async def main():
+    client = PocketOptionAsync(ssid="your-session-id")
+
+    # Compile 5-minute candles from 1-minute base data
+    # Parameters: symbol, source_period, target_period, lookback_period
+    candles = await client.compile_candles("EURUSD_otc", 60, 300, 100)
+
+    print(f"Compiled {len(candles)} custom candles")
+    if candles:
+        print("Latest compiled candle:", candles[-1])
 
 if __name__ == "__main__":
     asyncio.run(main())

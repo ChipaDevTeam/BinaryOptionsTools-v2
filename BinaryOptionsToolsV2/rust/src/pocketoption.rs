@@ -503,6 +503,12 @@ impl RawPocketOption {
         custom_period: u32,
         lookback_period: u32,
     ) -> PyResult<Bound<'py, PyAny>> {
+        if custom_period == 0 {
+            return Err(BinaryErrorPy::InvalidParameter("custom_period must be non-zero".to_string()).into());
+        }
+        if lookback_period == 0 {
+            return Err(BinaryErrorPy::InvalidParameter("lookback_period must be non-zero".to_string()).into());
+        }
         let client = self.client.clone();
         future_into_py(py, async move {
             let res = client

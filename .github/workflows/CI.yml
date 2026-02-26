@@ -139,6 +139,6 @@ jobs:
       - name: Summary
         run: |
           echo "### Automatic build success, more info below." >> $GITHUB_STEP_SUMMARY
-          echo "- **Platform:** macOS Sequoia / Ubuntu 24.04 / Windows 2025" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform:** macOS Sequoia / Ubuntu 24.04 / Windows Server 2022" >> $GITHUB_STEP_SUMMARY
           echo "- **Python:** 3.13 (Stable)" >> $GITHUB_STEP_SUMMARY
           echo "- **Version:** ${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY

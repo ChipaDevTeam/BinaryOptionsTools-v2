@@ -105,6 +105,7 @@ pub struct PocketOption {
     client: Client<State>,
     _runner: Arc<tokio::task::JoinHandle<()>>,
     pub config: Config,
+    pending_trades_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl PocketOption {
@@ -202,6 +203,7 @@ impl PocketOption {
             client,
             _runner: Arc::new(_runner),
             config,
+            pending_trades_lock: Arc::new(tokio::sync::Mutex::new(())),
         })
     }
 
@@ -253,6 +255,7 @@ impl PocketOption {
             client,
             _runner: Arc::new(_runner),
             config,
+            pending_trades_lock: Arc::new(tokio::sync::Mutex::new(())),
         })
     }
 
@@ -580,6 +583,7 @@ impl PocketOption {
     ) -> PocketResult<PendingOrder> {
         self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
             .await?
+            .with_lock(self.pending_trades_lock.clone())
             .open_pending_order(
                 open_type, amount, asset, open_time, open_price, timeframe, min_payout, command,
             )

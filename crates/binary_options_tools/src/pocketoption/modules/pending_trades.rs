@@ -78,6 +78,12 @@ impl PendingTradesHandle {
         }
     }
 
+    /// Sets an external lock for request serialization.
+    pub fn with_lock(mut self, lock: Arc<tokio::sync::Mutex<()>>) -> Self {
+        self.call_lock = lock;
+        self
+    }
+
     /// Opens a pending order on the PocketOption platform.
     ///
     /// This method is now thread-safe and will serialize requests to prevent
@@ -209,25 +215,24 @@ impl ApiModule<State> for PendingTradesApiModule {
     }
 
     async fn run(&mut self) -> CoreResult<()> {
-        // eprintln!("[DEBUG] PendingTradesApiModule::run started");
         loop {
             select! {
                 Ok(cmd) = self.command_receiver.recv() => {
-                    eprintln!("[DEBUG] Received command: {:?}, last_req_id before: {:?}", cmd, self.last_req_id);
+                    tracing::debug!(target: "PendingTradesApiModule", "Received command: {:?}, last_req_id before: {:?}", cmd, self.last_req_id);
                     match cmd {
                         Command::OpenPendingOrder { open_type, amount, asset, open_time, open_price, timeframe, min_payout, command, req_id } => {
                             if self.last_req_id.is_some() {
                                 warn!(target: "PendingTradesApiModule", "Overwriting a pending request. Concurrent open_pending_order calls are not supported.");
                             }
                             self.last_req_id = Some(req_id);
-                            eprintln!("[DEBUG] Set last_req_id to: {:?}", req_id);
+                            tracing::debug!(target: "PendingTradesApiModule", "Set last_req_id to: {:?}", req_id);
                             let order = OpenPendingOrder::new(open_type, amount, asset, open_time, open_price, timeframe, min_payout, command);
                             self.to_ws_sender.send(Message::text(order.to_string())).await?;
                         }
                     }
                 },
                 Ok(msg) = self.message_receiver.recv() => {
-                    eprintln!("[DEBUG] Received message: {:?}, last_req_id: {:?}", msg, self.last_req_id);
+                    tracing::debug!(target: "PendingTradesApiModule", "Received message: {:?}, last_req_id: {:?}", msg, self.last_req_id);
                     let response_result = match msg.as_ref() {
                         Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data).map_err(|e| e.to_string()),
                         Message::Text(text) => {
@@ -258,15 +263,15 @@ impl ApiModule<State> for PendingTradesApiModule {
                                 ServerResponse::Success(pending_order) => {
                                     self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
                                     info!(target: "PendingTradesApiModule", "Pending trade opened: {}", pending_order.ticket);
-                                    eprintln!("[DEBUG] Success response, last_req_id: {:?}", self.last_req_id);
+                                    tracing::debug!(target: "PendingTradesApiModule", "Success response, last_req_id: {:?}", self.last_req_id);
                                     if let Some(req_id) = self.last_req_id.take() {
-                                        eprintln!("[DEBUG] Sending Success response with req_id: {}", req_id);
+                                        tracing::debug!(target: "PendingTradesApiModule", "Sending Success response with req_id: {}", req_id);
                                         self.command_responder.send(CommandResponse::Success {
                                             req_id,
                                             pending_order,
                                         }).await?;
                                     } else {
-                                        eprintln!("[DEBUG] No req_id pending, dropping response");
+                                        tracing::debug!(target: "PendingTradesApiModule", "No req_id pending, dropping response");
                                         warn!(target: "PendingTradesApiModule", "Received successopenPendingOrder but no req_id was pending. Dropping response to avoid ambiguity.");
                                     }
                                 }
@@ -285,7 +290,7 @@ impl ApiModule<State> for PendingTradesApiModule {
                     }
                 }
             }
-            eprintln!("[DEBUG] Loop iteration completed");
+            tracing::debug!(target: "PendingTradesApiModule", "Loop iteration completed");
         }
     }
 
@@ -299,6 +304,6 @@ impl ApiModule<State> for PendingTradesApiModule {
 
 impl Drop for PendingTradesApiModule {
     fn drop(&mut self) {
-        eprintln!("[DEBUG] PendingTradesApiModule dropped");
+        tracing::debug!(target: "PendingTradesApiModule", "PendingTradesApiModule dropped");
     }
 }

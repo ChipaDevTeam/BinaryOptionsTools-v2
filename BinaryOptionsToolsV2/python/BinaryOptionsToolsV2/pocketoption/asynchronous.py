@@ -1364,16 +1364,16 @@ class PocketOptionAsync:
                     return items
             ```
 
-            Use with context manager:
+            Example:
             ```python
             async def bounded_stream():
                 async with PocketOptionAsync(ssid) as client:
                     validator = Validator.regex(r'42\["signal"')
-                    async with await client.create_raw_iterator(
+                    stream = await client.create_raw_iterator(
                         '42["startSignals"]', validator
-                    ) as stream:
-                        async for signal in stream:
-                            process_signal(json.loads(signal))
+                    )
+                    async for signal in stream:
+                        process_signal(json.loads(signal))
             ```
 
         Note:

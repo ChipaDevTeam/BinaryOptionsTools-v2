@@ -162,6 +162,7 @@ pub enum CommandResponse {
     /// Successful subscription with stream receiver
     SubscriptionSuccess {
         command_id: Uuid,
+        subscription_id: Uuid,
         stream_receiver: AsyncReceiver<SubscriptionEvent>,
     },
     /// Subscription failed
@@ -272,9 +273,9 @@ impl SubscriptionsHandle {
         {
             CommandResponse::SubscriptionSuccess {
                 command_id: _,
+                subscription_id,
                 stream_receiver,
             } => {
-                let subscription_id = Uuid::new_v4();
                 Ok(SubscriptionStream {
                     receiver: stream_receiver,
                     sender: Some(self.sender.clone()),
@@ -498,6 +499,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             // Send success response with stream receiver
                             self.command_responder.send(CommandResponse::SubscriptionSuccess {
                                 command_id,
+                                subscription_id,
                                 stream_receiver,
                             }).await?;
                         }

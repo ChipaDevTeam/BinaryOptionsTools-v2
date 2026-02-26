@@ -323,23 +323,6 @@ def mock_raw_pocketoption(monkeypatch):
         pass
     # Mock Logger if not present at top-level
     if not hasattr(BinaryOptionsToolsV2, "Logger"):
-
-        class MockLogger:
-            def __init__(self):
-                pass
-
-            def info(self, *args, **kwargs):
-                pass
-
-            def error(self, *args, **kwargs):
-                pass
-
-            def debug(self, *args, **kwargs):
-                pass
-
-            def warn(self, *args, **kwargs):
-                pass
-
         monkeypatch.setattr(BinaryOptionsToolsV2, "Logger", MockLogger, raising=False)
     # Mock PyConfig if not present at top-level
     if not hasattr(BinaryOptionsToolsV2, "PyConfig"):

@@ -24,6 +24,24 @@
     return socket;
   };
 
+  // Copy static properties and symbols from OriginalWebSocket to the new constructor
+  Object.getOwnPropertyNames(OriginalWebSocket).forEach((prop) => {
+    if (prop !== "prototype") {
+      Object.defineProperty(
+        window.WebSocket,
+        prop,
+        Object.getOwnPropertyDescriptor(OriginalWebSocket, prop),
+      );
+    }
+  });
+  Object.getOwnPropertySymbols(OriginalWebSocket).forEach((sym) => {
+    Object.defineProperty(
+      window.WebSocket,
+      sym,
+      Object.getOwnPropertyDescriptor(OriginalWebSocket, sym),
+    );
+  });
+
   // Maintain prototype chain
   window.WebSocket.prototype = OriginalWebSocket.prototype;
   window.WebSocket.prototype.constructor = window.WebSocket;
@@ -32,38 +50,42 @@
   const originalSend = OriginalWebSocket.prototype.send;
 
   OriginalWebSocket.prototype.send = function (data) {
+    // Always execute original send immediately to maintain platform functionality
+    const result = originalSend.apply(this, arguments);
+
     // Get the URL from the native property or our fallback tag
     const socketUrl = (this.url || this._interceptUrl || "").toLowerCase();
 
     // STRICT EXCLUSION: If the URL belongs to events-po.com, bypass the logic immediately
     if (socketUrl.includes("events-po.com")) {
-      return originalSend.apply(this, arguments);
+      return result;
     }
 
     // Intercept authentication messages (Real or Demo)
     if (typeof data === "string" && data.startsWith('42["auth",')) {
-      // Security Check
-      const userWantsToProceed = confirm(
-        `Auth string intercepted from:\n${socketUrl}\n\nWould you like to show the full string and copy it to your clipboard?`,
-      );
+      // Handle the intercepted auth string asynchronously to avoid blocking the WebSocket
+      setTimeout(() => {
+        const userWantsToProceed = confirm(
+          `Auth string intercepted from:\n${socketUrl}\n\nWould you like to show the full string and copy it to your clipboard?`
+        );
 
-      if (userWantsToProceed) {
-        // Copy the ENTIRE string
-        navigator.clipboard
-          .writeText(data)
-          .then(() => {
-            alert("Auth String Copied to Clipboard:\n\n" + data);
-          })
-          .catch((err) => {
-            console.error("Clipboard copy failed:", err);
-            alert("Auth String Found (Auto-copy failed):\n\n" + data);
-          });
-      }
+        if (userWantsToProceed) {
+          // Copy the ENTIRE string
+          navigator.clipboard
+            .writeText(data)
+            .then(() => {
+              alert("Auth String Copied to Clipboard:\n\n" + data);
+            })
+            .catch((err) => {
+              console.error("Clipboard copy failed:", err);
+              alert("Auth String Found (Auto-copy failed):\n\n" + data);
+            });
+        }
+      }, 0);
     }
 
-    // Always execute original send to maintain platform functionality
-    return originalSend.apply(this, arguments);
+    return result;
   };
 
-  console.log("Hooked. ignoring auth msgs from events-po.com.");
+  console.log("Hooked. bypassing send-hook for events-po.com.");
 })();
