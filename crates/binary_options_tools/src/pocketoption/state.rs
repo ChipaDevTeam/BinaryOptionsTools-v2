@@ -52,10 +52,14 @@ pub struct State {
     pub default_symbol: String,
     /// Current balance, if available.
     pub balance: RwLock<Option<Decimal>>,
+    /// Notification for when balance is updated
+    pub balance_updated: Arc<tokio::sync::Notify>,
     /// Server time synchronization state
     pub server_time: ServerTimeState,
     /// Assets information
     pub assets: RwLock<Option<Assets>>,
+    /// Notification for when assets are updated
+    pub assets_updated: Arc<tokio::sync::Notify>,
     /// Holds the state for all trading-related data.
     pub trade_state: Arc<TradeState>,
     /// Holds the current validators for the raw module keyed by ID
@@ -132,8 +136,10 @@ impl StateBuilder {
                 .default_symbol
                 .unwrap_or_else(|| "EURUSD_otc".to_string()),
             balance: RwLock::new(None),
+            balance_updated: Arc::new(tokio::sync::Notify::new()),
             server_time: ServerTimeState::default(),
             assets: RwLock::new(None),
+            assets_updated: Arc::new(tokio::sync::Notify::new()),
             trade_state: Arc::new(TradeState::default()),
             raw_validators: SyncRwLock::new(HashMap::new()),
             active_subscriptions: RwLock::new(HashMap::new()),
@@ -178,6 +184,7 @@ impl State {
     pub async fn set_balance(&self, balance: Decimal) {
         let mut state = self.balance.write().await;
         *state = Some(balance);
+        self.balance_updated.notify_waiters();
     }
 
     /// Get the current balance
@@ -264,6 +271,7 @@ impl State {
     pub async fn set_assets(&self, assets: Assets) {
         let mut state = self.assets.write().await;
         *state = Some(assets);
+        self.assets_updated.notify_waiters();
     }
 
     /// Adds or replaces a validator in the list of raw validators.
