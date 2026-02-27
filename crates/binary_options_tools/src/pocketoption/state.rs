@@ -21,8 +21,16 @@ use crate::pocketoption::types::{
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     ssid::Ssid,
+    candle::SubscriptionType,
 };
 use crate::validator::Validator;
+
+/// A subscription entry: (sender, subscription type, subscription id)
+type SubscriptionEntry = (
+    AsyncSender<SubscriptionEvent>,
+    SubscriptionType,
+    Uuid,
+);
 
 /// Application state for PocketOption client
 ///
@@ -53,15 +61,7 @@ pub struct State {
     /// Holds the current validators for the raw module keyed by ID
     pub raw_validators: SyncRwLock<HashMap<Uuid, Arc<Validator>>>,
     /// Active subscriptions mapped by subscription symbol
-    pub active_subscriptions: RwLock<
-        HashMap<
-            String,
-            (
-                AsyncSender<SubscriptionEvent>,
-                crate::pocketoption::candle::SubscriptionType,
-            ),
-        >,
-    >,
+    pub active_subscriptions: RwLock<HashMap<String, Vec<SubscriptionEntry>>>,
     /// Active history requests
     pub histories: RwLock<Vec<(String, u32, Uuid)>>,
     /// Sinks for raw module

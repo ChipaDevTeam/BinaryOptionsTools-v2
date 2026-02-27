@@ -1,6 +1,7 @@
+import time
+
 from BinaryOptionsToolsV2.pocketoption import PocketOption
 from BinaryOptionsToolsV2.tracing import start_logs
-import time
 
 
 # Main part of the code

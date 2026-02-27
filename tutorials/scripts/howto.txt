@@ -1,0 +1,35 @@
+## Improved howto.txt
+
+Prerequisites
+- Install a userscript manager (Violentmonkey, Tampermonkey, or Greasemonkey).
+  - Violentmonkey: https://github.com/violentmonkey/violentmonkey
+
+Installation steps
+1. Save the userscript file
+   - Locate the userscript at tutorials/scripts/SSID_Fetcher_UserScript.user.js or copy its contents.
+2. Install the userscript
+   - Open your userscript manager dashboard in the browser.
+   - Use the manager’s "Add new script" or "Import" option and paste the script, or open the saved .user.js file in the browser; the manager should prompt to install.
+3. Verify it’s enabled
+   - Ensure the script is active for pocketoption.com in the manager’s list.
+
+Usage
+1. Open pocketoption (https://pocketoption.com/) and log in to the account you want (real or demo).
+2. The script intercepts WebSocket outgoing messages. When it detects an authentication message (starts with 42["auth",...), it will prompt you to confirm before showing and copying the string.
+3. If you confirm, the script attempts to copy the full auth string to the clipboard and shows it in an alert. If clipboard copy fails, the auth string is still displayed so you can manually copy it.
+4. Once gathered, feel free to disable the userscript.
+
+Security & storage best practices
+- Treat the SSID/auth string as a secret. Do not share it.
+- Store it in a secure secret store (dotenv, system keychain, or a secrets manager). Example options:
+  - .env file (local development only) — never commit to version control. Ensure .env is added to .gitignore so it isn’t committed.
+  - OS keychain (macOS Keychain, Windows Credential Manager).
+  - Password manager or trusted dedicated secrets manager (1Password, Bitwarden, AWS Secrets Manager, etc).
+- Never hardcode secrets into source files or public repos.
+- Limit where copies of the secret exist; remove from clipboard history if your OS exposes it.
+
+Notes and cautions
+- The script completely bypasses all interception and send-hook logic for WebSocket URLs matching "events-po.com" for safety and correctness.
+- Use this only on accounts you own or are authorized to access.
+- Running user scripts that intercept authentication data can be risky—only run trusted code and verify the script contents before installing.
+- If unsure, prefer manual inspection via Developer Tools over installing third-party scripts.

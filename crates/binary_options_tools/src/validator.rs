@@ -132,3 +132,125 @@ impl RawValidator {
         !message.is_null()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use regex::Regex;
+    use serde_json::json;
+
+    #[test]
+    fn test_validator_none() {
+        let v = Validator::None;
+        assert!(v.call("anything"));
+    }
+
+    #[test]
+    fn test_validator_starts_with() {
+        let v = Validator::starts_with("prefix".into());
+        assert!(v.call("prefix_data"));
+        assert!(!v.call("data_prefix"));
+    }
+
+    #[test]
+    fn test_validator_ends_with() {
+        let v = Validator::ends_with("suffix".into());
+        assert!(v.call("data_suffix"));
+        assert!(!v.call("suffix_data"));
+    }
+
+    #[test]
+    fn test_validator_contains() {
+        let v = Validator::contains("middle".into());
+        assert!(v.call("some_middle_data"));
+        assert!(!v.call("other_data"));
+    }
+
+    #[test]
+    fn test_validator_regex() {
+        let re = Regex::new(r"^\d+$").unwrap();
+        let v = Validator::regex(re);
+        assert!(v.call("12345"));
+        assert!(!v.call("abc123"));
+    }
+
+    #[test]
+    fn test_validator_negate() {
+        let v = Validator::negate(Validator::starts_with("not".into()));
+        assert!(v.call("is_allowed"));
+        assert!(!v.call("not_allowed"));
+    }
+
+    #[test]
+    fn test_validator_all() {
+        let v = Validator::all(vec![
+            Validator::starts_with("a".into()),
+            Validator::ends_with("z".into()),
+        ]);
+        assert!(v.call("applez"));
+        assert!(!v.call("apple"));
+        assert!(!v.call("banana z"));
+    }
+
+    #[test]
+    fn test_validator_any() {
+        let v = Validator::any(vec![
+            Validator::starts_with("a".into()),
+            Validator::starts_with("b".into()),
+        ]);
+        assert!(v.call("apple"));
+        assert!(v.call("banana"));
+        assert!(!v.call("cherry"));
+    }
+
+    #[test]
+    fn test_validator_add() {
+        let mut v = Validator::starts_with("a".into());
+        v.add(Validator::ends_with("z".into()));
+        assert!(v.call("applez"));
+        assert!(!v.call("apple"));
+
+        let mut v_any = Validator::any(vec![Validator::starts_with("a".into())]);
+        v_any.add(Validator::starts_with("b".into()));
+        assert!(v_any.call("banana"));
+    }
+
+    #[test]
+    fn test_raw_validator() {
+        let rv = RawValidator::new();
+        assert!(rv.check(&json!({"key": "value"})));
+        assert!(!rv.check(&json!(null)));
+    }
+
+    #[test]
+    fn test_validator_debug() {
+        let v = Validator::starts_with("test".into());
+        assert!(format!("{:?}", v).contains("Validator::StartsWith(\"test\")"));
+
+        let custom = Validator::Custom(Arc::new(RawValidator::new()));
+        assert_eq!(format!("{:?}", custom), "Validator::Custom(<opaque>)");
+    }
+
+    impl ValidatorTrait for RawValidator {
+        fn call(&self, _data: &str) -> bool {
+            true
+        }
+    }
+
+    #[test]
+    fn test_validator_partial_eq() {
+        assert_eq!(Validator::None, Validator::None);
+        assert_eq!(
+            Validator::starts_with("a".into()),
+            Validator::starts_with("a".into())
+        );
+        assert_ne!(
+            Validator::starts_with("a".into()),
+            Validator::starts_with("b".into())
+        );
+
+        let re1 = Regex::new("a").unwrap();
+        let re2 = Regex::new("a").unwrap();
+        assert_eq!(Validator::regex(re1), Validator::regex(re2));
+    }
+}

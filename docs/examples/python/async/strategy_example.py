@@ -1,13 +1,10 @@
 import asyncio
-import os
 import json
-from BinaryOptionsToolsV2 import (
-    RawPocketOption,
-    PyBot,
-    PyStrategy,
-    start_tracing,
-)
+import os
+
 from dotenv import load_dotenv
+
+from BinaryOptionsToolsV2 import PyBot, PyStrategy, RawPocketOption, start_tracing
 
 load_dotenv()
 

@@ -10,7 +10,7 @@ readme = "README.md"
 description = "Low-level WebSocket client and protocol handler for binary options trading. Core foundation providing connection management, message routing, and async communication primitives."
 keywords = ["binary-options", "websocket", "trading", "async", "tokio"]
 categories = ["asynchronous", "network-programming", "api-bindings"]
-license-file = "../../LICENSE"
+license-file = "LICENSE"
 
 [dependencies]
 async-trait = "0.1.88"

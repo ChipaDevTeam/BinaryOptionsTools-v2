@@ -22,6 +22,8 @@ pub enum BinaryErrorPy {
     NotAllowed(String),
     #[error("Invalid Regex pattern, {0}")]
     InvalidRegexError(#[from] regex::Error),
+    #[error("Invalid parameter: {0}")]
+    InvalidParameter(String),
 }
 
 impl From<BinaryErrorPy> for PyErr {

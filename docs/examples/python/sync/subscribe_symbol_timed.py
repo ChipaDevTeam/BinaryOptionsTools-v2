@@ -1,5 +1,5 @@
-from datetime import timedelta
 import time
+from datetime import timedelta
 
 from BinaryOptionsToolsV2.pocketoption import PocketOption
 

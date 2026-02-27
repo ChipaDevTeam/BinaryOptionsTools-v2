@@ -19,7 +19,7 @@ use crate::pocketoption::types::Outgoing;
 use crate::{
     error::BinaryOptionsError,
     pocketoption::{
-        candle::{Candle, SubscriptionType},
+        candle::{compile_candles_from_tuples, Candle, SubscriptionType},
         connect::PocketConnect,
         error::{PocketError, PocketResult},
         modules::{
@@ -105,6 +105,7 @@ pub struct PocketOption {
     client: Client<State>,
     _runner: Arc<tokio::task::JoinHandle<()>>,
     pub config: Config,
+    pending_trades_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl PocketOption {
@@ -202,6 +203,7 @@ impl PocketOption {
             client,
             _runner: Arc::new(_runner),
             config,
+            pending_trades_lock: Arc::new(tokio::sync::Mutex::new(())),
         })
     }
 
@@ -253,6 +255,7 @@ impl PocketOption {
             client,
             _runner: Arc::new(_runner),
             config,
+            pending_trades_lock: Arc::new(tokio::sync::Mutex::new(())),
         })
     }
 
@@ -580,6 +583,7 @@ impl PocketOption {
     ) -> PocketResult<PendingOrder> {
         self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
             .await?
+            .with_lock(self.pending_trades_lock.clone())
             .open_pending_order(
                 open_type, amount, asset, open_time, open_price, timeframe, min_payout, command,
             )
@@ -762,6 +766,66 @@ impl PocketOption {
     /// Deprecated: use `candles()` instead.
     pub async fn history(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<Candle>> {
         self.candles(asset, period).await
+    }
+
+    /// Compiles custom candlesticks from raw tick history.
+    ///
+    /// This method fetches raw tick data for the asset over the specified
+    /// `lookback_period` and then aggregates those ticks into custom-sized
+    /// candlesticks of `custom_period` seconds. This allows for non-standard
+    /// timeframes like 20s, 40s, 90s, etc.
+    ///
+    /// # Arguments
+    /// * `asset` - Trading symbol (e.g., "EURUSD_otc")
+    /// * `custom_period` - Desired candle duration in seconds (e.g., 20, 40)
+    /// * `lookback_period` - How many seconds of tick history to fetch.
+    ///   This determines the maximum number of custom candles you'll receive.
+    ///
+    /// # Returns
+    /// PocketResult<Vec<Candle>> - Vector of compiled OHLC candles
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use binary_options_tools::pocketoption::PocketOption;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let api = PocketOption::new("your-ssid").await?;
+    /// // Get 20-second candles from last 5 minutes
+    /// let candles = api.compile_candles("EURUSD_otc", 20, 300).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Notes
+    /// - The `lookback_period` should be a multiple of `custom_period` for best results.
+    /// - This is a compute-intensive operation: fetches raw ticks then aggregates.
+    /// - For standard timeframes (1, 5, 15, 30, 60, 300), use `candles()` for better efficiency.
+    pub async fn compile_candles(
+        &self,
+        asset: impl ToString,
+        custom_period: u32,
+        lookback_period: u32,
+    ) -> PocketResult<Vec<Candle>> {
+        let asset_str = asset.to_string();
+
+        if custom_period == 0 {
+            return Err(PocketError::InvalidPeriod(0));
+        }
+
+        // Validate asset exists (if assets are loaded)
+        if let Some(assets) = self.assets().await {
+            if assets.get(&asset_str).is_none() {
+                return Err(PocketError::InvalidAsset(asset_str));
+            }
+        }
+
+        // Fetch raw tick data
+        let ticks = self.ticks(asset_str.clone(), lookback_period).await?;
+
+        // Compile ticks into custom-period candles
+        let candles = compile_candles_from_tuples(&ticks, custom_period, &asset_str);
+
+        Ok(candles)
     }
 
     pub async fn get_handle<M: ApiModule<State>>(&self) -> Option<M::Handle> {

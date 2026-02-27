@@ -1,7 +1,8 @@
-import pytest
+import asyncio
 import os
 import sys
-import asyncio
+
+import pytest
 
 # Get SSID from environment variable
 SSID = os.getenv("POCKET_OPTION_SSID")

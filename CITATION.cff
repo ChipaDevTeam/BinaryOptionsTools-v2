@@ -23,8 +23,7 @@ keywords:
   - "websocket"
   - "automated trading"
   - "financial technology"
-version: "0.2.5"
-date-released: "2024-01-01"
+version: "0.2.8"
 identifiers:
   - type: url
     value: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
@@ -41,5 +40,5 @@ preferred-citation:
     - family-names: "Rick"
       given-names: "Rick-29"
       alias: "Rick-29"
-  year: 2024
+  year: 2026
   url: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"

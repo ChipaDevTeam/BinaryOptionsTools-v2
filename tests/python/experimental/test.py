@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 
 # Ensure we use the local version of the library
 sys.path.insert(

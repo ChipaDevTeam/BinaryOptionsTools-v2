@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use std::time::Duration;
 use url::Url;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Default)]
 pub struct PyConfig {
     pub inner: Config,

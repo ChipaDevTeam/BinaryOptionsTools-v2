@@ -37,7 +37,7 @@ Integrated with GitHub Actions to automatically build and deploy the latest docu
 
 ### For Developers
 
-1. Read the [Introduction](index.md) and [Overview](overview.md).
+1. Read the [Introduction](INDEX.md) and [Overview](OVERVIEW.md).
 2. Explore the [API Reference](api/reference.md) for your preferred language.
 3. Check out the [Trading Guide](guides/trading.md) for implementation patterns.
 

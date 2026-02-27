@@ -66,7 +66,7 @@ async fn send_raw_message_and_wait(
     Ok(arc_message_to_string(&response))
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RawPocketOption {
     pub(crate) client: PocketOption,
@@ -473,6 +473,46 @@ impl RawPocketOption {
         future_into_py(py, async move {
             let res = client
                 .history(asset, period)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| {
+                serde_json::to_string(&res)
+                    .map_err(BinaryErrorPy::from)?
+                    .into_py_any(py)
+            })
+        })
+    }
+
+    /// Compiles custom candlesticks from raw tick history.
+    ///
+    /// This method fetches raw tick data for the asset over the specified
+    /// `lookback_period` and then aggregates those ticks into custom-sized
+    /// candlesticks of `custom_period` seconds.
+    ///
+    /// Args:
+    ///     asset (str): Trading symbol
+    ///     custom_period (int): Desired candle duration in seconds
+    ///     lookback_period (int): Number of seconds of tick history to fetch
+    ///
+    /// Returns:
+    ///     List[Dict]: List of candle dictionaries with OHLC data
+    pub fn compile_candles<'py>(
+        &self,
+        py: Python<'py>,
+        asset: String,
+        custom_period: u32,
+        lookback_period: u32,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        if custom_period == 0 {
+            return Err(BinaryErrorPy::InvalidParameter("custom_period must be non-zero".to_string()).into());
+        }
+        if lookback_period == 0 {
+            return Err(BinaryErrorPy::InvalidParameter("lookback_period must be non-zero".to_string()).into());
+        }
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let res = client
+                .compile_candles(asset, custom_period, lookback_period)
                 .await
                 .map_err(BinaryErrorPy::from)?;
             Python::attach(|py| {

@@ -53,3 +53,9 @@ pub mod trades;
 //     CandleConfig, MAX_SUBSCRIPTIONS, SubscriptionCommand, SubscriptionHandle, SubscriptionModule,
 //     SubscriptionResponse,
 // };
+
+#[cfg(test)]
+mod pending_trades_tests;
+
+#[cfg(test)]
+mod trades_tests;

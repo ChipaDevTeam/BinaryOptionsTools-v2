@@ -1,3 +1,5 @@
+#![allow(clippy::items_after_test_module)]
+
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
@@ -715,4 +717,92 @@ mod tests {
         assert_eq!(c.low.to_string(), "1.5");
         assert_eq!(c.close.to_string(), "1.5");
     }
+
+    #[test]
+    fn test_compile_candles_from_tuples_simple() {
+        let ticks = vec![
+            (1000, 1.5),
+            (1001, 1.6),
+            (1002, 1.7),
+            (1003, 1.8),
+            (1004, 1.9),
+            (1005, 2.0),
+        ];
+        let candles = compile_candles_from_tuples(&ticks, 3, "TEST");
+        // With period=3, timestamps: 1000,1001,1002 -> boundaries: 999,1002,1005
+        assert_eq!(candles.len(), 3);
+        assert_eq!(candles[0].timestamp, 999);
+        assert_eq!(candles[0].open.to_string(), "1.5");
+        assert_eq!(candles[0].high.to_string(), "1.6");
+        assert_eq!(candles[0].low.to_string(), "1.5");
+        assert_eq!(candles[0].close.to_string(), "1.6");
+        assert_eq!(candles[1].timestamp, 1002);
+        assert_eq!(candles[1].open.to_string(), "1.7");
+        assert_eq!(candles[1].high.to_string(), "1.9");
+        assert_eq!(candles[1].low.to_string(), "1.7");
+        assert_eq!(candles[1].close.to_string(), "1.9");
+        assert_eq!(candles[2].timestamp, 1005);
+        assert_eq!(candles[2].open.to_string(), "2");
+        assert_eq!(candles[2].high.to_string(), "2");
+        assert_eq!(candles[2].low.to_string(), "2");
+        assert_eq!(candles[2].close.to_string(), "2");
+    }
+
+    #[test]
+    fn test_compile_candles_from_tuples_empty() {
+        let ticks = vec![];
+        let candles = compile_candles_from_tuples(&ticks, 60, "TEST");
+        assert!(candles.is_empty());
+    }
+
+    #[test]
+    fn test_compile_candles_from_tuples_zero_period() {
+        let ticks = vec![(1000, 1.5), (1001, 1.6)];
+        let candles = compile_candles_from_tuples(&ticks, 0, "TEST");
+        assert!(candles.is_empty());
+    }
+
+    #[test]
+    fn test_compile_candles_from_tuples_unaligned() {
+        // Test with timestamps that don't align to period boundaries
+        let ticks = vec![
+            (1001, 1.5), // 1001/20 = 50, boundary = 1000
+            (1015, 1.6), // 1015/20 = 50, boundary = 1000
+            (1020, 1.7), // 1020/20 = 51, boundary = 1020
+            (1035, 1.8), // 1035/20 = 51, boundary = 1020
+            (1040, 1.9), // 1040/20 = 52, boundary = 1040
+        ];
+        let candles = compile_candles_from_tuples(&ticks, 20, "TEST");
+        assert_eq!(candles.len(), 3);
+        assert_eq!(candles[0].timestamp, 1000);
+        assert_eq!(candles[1].timestamp, 1020);
+        assert_eq!(candles[2].timestamp, 1040);
+    }
+}
+
+/// Compiles raw tick data (timestamp, price tuples) into custom-period candles.
+///
+/// This is a convenience function that works with the output of `ticks()`.
+///
+/// # Arguments
+/// * `ticks` - Slice of (timestamp, price) tuples
+/// * `period` - Time period in seconds for each candle. Must be greater than 0.
+/// * `symbol` - Trading symbol
+///
+/// # Returns
+/// Vector of compiled Candles. Returns an empty vector if:
+/// * `ticks` is empty
+/// * `period` is 0 (to avoid division by zero)
+pub fn compile_candles_from_tuples(ticks: &[(i64, f64)], period: u32, symbol: &str) -> Vec<Candle> {
+    if ticks.is_empty() || period == 0 {
+        return Vec::new();
+    }
+
+    // Convert tuples to HistoryItem::Tick format
+    let history_items: Vec<HistoryItem> = ticks
+        .iter()
+        .map(|&(timestamp, price)| HistoryItem::Tick([timestamp.into(), price.into()]))
+        .collect();
+
+    compile_candles_from_ticks(&history_items, period, symbol)
 }

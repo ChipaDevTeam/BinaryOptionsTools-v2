@@ -9,57 +9,83 @@
 // @description Intercepts auth SSID from PocketOption
 // ==/UserScript==
 
-(function() {
-    'use strict';
+(function () {
+  "use strict";
 
-    // Hook the WebSocket constructor
-    const OriginalWebSocket = window.WebSocket;
+  // Hook the WebSocket constructor
+  const OriginalWebSocket = window.WebSocket;
 
-    window.WebSocket = function(url, protocols) {
-        const socket = new OriginalWebSocket(url, protocols);
-        // Manual tag as fallback in case the native .url property is restricted
-        try {
-            socket._interceptUrl = url.toString();
-        } catch (e) {}
-        return socket;
-    };
+  window.WebSocket = function (url, protocols) {
+    const socket = new OriginalWebSocket(url, protocols);
+    // Manual tag as fallback in case the native .url property is restricted
+    try {
+      socket._interceptUrl = url.toString();
+    } catch (e) {}
+    return socket;
+  };
 
-    // Maintain prototype chain
-    window.WebSocket.prototype = OriginalWebSocket.prototype;
-    window.WebSocket.prototype.constructor = window.WebSocket;
+  // Copy static properties and symbols from OriginalWebSocket to the new constructor
+  Object.getOwnPropertyNames(OriginalWebSocket).forEach((prop) => {
+    if (prop !== "prototype") {
+      Object.defineProperty(
+        window.WebSocket,
+        prop,
+        Object.getOwnPropertyDescriptor(OriginalWebSocket, prop),
+      );
+    }
+  });
+  Object.getOwnPropertySymbols(OriginalWebSocket).forEach((sym) => {
+    Object.defineProperty(
+      window.WebSocket,
+      sym,
+      Object.getOwnPropertyDescriptor(OriginalWebSocket, sym),
+    );
+  });
 
-    // Hook the send method
-    const originalSend = OriginalWebSocket.prototype.send;
+  // Maintain prototype chain
+  window.WebSocket.prototype = OriginalWebSocket.prototype;
+  window.WebSocket.prototype.constructor = window.WebSocket;
 
-    OriginalWebSocket.prototype.send = function(data) {
-        // Get the URL from the native property or our fallback tag
-        const socketUrl = (this.url || this._interceptUrl || "").toLowerCase();
+  // Hook the send method
+  const originalSend = OriginalWebSocket.prototype.send;
 
-        // STRICT EXCLUSION: If the URL belongs to events-po.com, bypass the logic immediately
-        if (socketUrl.includes("events-po.com")) {
-            return originalSend.apply(this, arguments);
+  OriginalWebSocket.prototype.send = function (data) {
+    // Always execute original send immediately to maintain platform functionality
+    const result = originalSend.apply(this, arguments);
+
+    // Get the URL from the native property or our fallback tag
+    const socketUrl = (this.url || this._interceptUrl || "").toLowerCase();
+
+    // STRICT EXCLUSION: If the URL belongs to events-po.com, bypass the logic immediately
+    if (socketUrl.includes("events-po.com")) {
+      return result;
+    }
+
+    // Intercept authentication messages (Real or Demo)
+    if (typeof data === "string" && data.startsWith('42["auth",')) {
+      // Handle the intercepted auth string asynchronously to avoid blocking the WebSocket
+      setTimeout(() => {
+        const userWantsToProceed = confirm(
+          `Auth string intercepted from:\n${socketUrl}\n\nWould you like to show the full string and copy it to your clipboard?`
+        );
+
+        if (userWantsToProceed) {
+          // Copy the ENTIRE string
+          navigator.clipboard
+            .writeText(data)
+            .then(() => {
+              alert("Auth String Copied to Clipboard:\n\n" + data);
+            })
+            .catch((err) => {
+              console.error("Clipboard copy failed:", err);
+              alert("Auth String Found (Auto-copy failed):\n\n" + data);
+            });
         }
+      }, 0);
+    }
 
-        // Intercept authentication messages (Real or Demo)
-        if (typeof data === 'string' && data.startsWith('42["auth",')) {
+    return result;
+  };
 
-            // Security Check
-            const userWantsToProceed = confirm(`Auth string intercepted from:\n${socketUrl}\n\nWould you like to show the full string and copy it to your clipboard?`);
-
-            if (userWantsToProceed) {
-                // Copy the ENTIRE string
-                navigator.clipboard.writeText(data).then(() => {
-                    alert("Auth String Copied to Clipboard:\n\n" + data);
-                }).catch(err => {
-                    console.error('Clipboard copy failed:', err);
-                    alert("Auth String Found (Auto-copy failed):\n\n" + data);
-                });
-            }
-        }
-
-        // Always execute original send to maintain platform functionality
-        return originalSend.apply(this, arguments);
-    };
-
-    console.log('Hooked. ignoring auth msgs from events-po.com.');
+  console.log("Hooked. bypassing send-hook for events-po.com.");
 })();

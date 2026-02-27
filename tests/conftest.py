@@ -1,7 +1,8 @@
-import sys
-import os
-import pytest
 import asyncio
+import os
+import sys
+
+import pytest
 
 # Manual .env loader
 env_path = os.path.join(os.path.dirname(__file__), "../.env")

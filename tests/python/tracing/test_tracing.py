@@ -1,6 +1,8 @@
-import pytest
 import time
-from BinaryOptionsToolsV2.tracing import Logger, LogBuilder, start_logs
+
+import pytest
+
+from BinaryOptionsToolsV2.tracing import LogBuilder, Logger, start_logs
 
 
 def test_logger_basic(tmp_path):

@@ -263,7 +263,7 @@ impl Rule for TwoStepRule {
 ///   to pass through (by returning `true` from `call`). All other messages will be filtered.
 pub struct MultiPatternRule {
     valid: AtomicBool,
-    patterns: Vec<String>,
+    pub patterns: Vec<String>,
 }
 
 impl MultiPatternRule {
@@ -532,14 +532,14 @@ pub struct FailOpenOrder {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenOrder {
-    asset: String,
-    action: Action,
+    pub asset: String,
+    pub action: Action,
     #[serde(with = "rust_decimal::serde::float")]
-    amount: Decimal,
-    is_demo: u32,
-    option_type: u32,
-    request_id: Uuid,
-    time: u32,
+    pub amount: Decimal,
+    pub is_demo: u32,
+    pub option_type: u32,
+    pub request_id: Uuid,
+    pub time: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -652,14 +652,14 @@ pub struct PendingOrder {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenPendingOrder {
-    open_type: u32,
-    amount: Decimal,
-    asset: String,
-    open_time: u32,
-    open_price: Decimal,
-    timeframe: u32,
-    min_payout: u32,
-    command: u32,
+    pub open_type: u32,
+    pub amount: Decimal,
+    pub asset: String,
+    pub open_time: u32,
+    pub open_price: Decimal,
+    pub timeframe: u32,
+    pub min_payout: u32,
+    pub command: u32,
 }
 
 impl OpenPendingOrder {
