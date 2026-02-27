@@ -305,18 +305,13 @@ impl Ssid {
 }
 impl fmt::Display for Demo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if !self.raw.is_empty() {
-            write!(f, "{}", self.raw)
-        } else {
-            let ssid = serde_json::to_string(&self).map_err(|_| fmt::Error)?;
-            write!(f, r#"42["auth",{ssid}]"#)
-        }
+        write!(f, "DemoSsid(uid={}, demo=true)", self.uid)
     }
 }
 
 impl fmt::Display for Real {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.raw)
+        write!(f, "RealSsid(uid={}, demo=false)", self.uid)
     }
 }
 

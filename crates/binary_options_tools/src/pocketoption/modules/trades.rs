@@ -72,7 +72,18 @@ impl TradesHandle {
         amount: Decimal,
         time: u32,
     ) -> PocketResult<Deal> {
-        let id = Uuid::new_v4();
+        self.trade_with_id(asset, action, amount, time, Uuid::new_v4()).await
+    }
+
+    /// Places a new trade with a specific request ID.
+    pub async fn trade_with_id(
+        &self,
+        asset: String,
+        action: Action,
+        amount: Decimal,
+        time: u32,
+        req_id: Uuid,
+    ) -> PocketResult<Deal> {
         let (tx, rx) = oneshot::channel();
 
         self.sender
@@ -81,7 +92,7 @@ impl TradesHandle {
                 action,
                 amount,
                 time,
-                req_id: id,
+                req_id,
                 responder: tx,
             })
             .await
@@ -243,6 +254,9 @@ impl ApiModule<State> for TradesApiModule {
                               info!(target: "TradesApiModule", "Trade opened: {}", deal.id);
 
                               let req_id = deal.request_id.unwrap_or_default();
+                              
+                              // Clean up pending_market_orders in state
+                              self.state.trade_state.pending_market_orders.write().await.remove(&req_id);
 
                               if let Some(tracker) = self.pending_orders.remove(&req_id) {
                                   let _ = tracker.responder.send(Ok(*deal.clone()));
@@ -272,6 +286,9 @@ impl ApiModule<State> for TradesApiModule {
                               };
 
                               if let Some(req_id) = found_req_id {
+                                  // Clean up pending_market_orders in state
+                                  self.state.trade_state.pending_market_orders.write().await.remove(&req_id);
+
                                   if let Some(tracker) = self.pending_orders.remove(&req_id) {
                                       let _ = tracker.responder.send(Err(PocketError::FailOpenOrder {
                                           error: fail.error.clone(),
