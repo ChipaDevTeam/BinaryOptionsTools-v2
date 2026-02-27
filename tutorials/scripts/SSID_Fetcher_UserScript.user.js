@@ -66,7 +66,7 @@
       // Handle the intercepted auth string asynchronously to avoid blocking the WebSocket
       setTimeout(() => {
         const userWantsToProceed = confirm(
-          `Auth string intercepted from:\n${socketUrl}\n\nWould you like to show the full string and copy it to your clipboard?`
+          `Auth string intercepted from:\n${socketUrl}\n\nWould you like to show the full string and copy it to your clipboard?`,
         );
 
         if (userWantsToProceed) {

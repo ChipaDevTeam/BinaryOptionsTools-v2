@@ -1373,7 +1373,7 @@ class PocketOptionAsync:
             ```python
             async def bounded_stream():
                 async with PocketOptionAsync(ssid) as client:
-                    validator = Validator.regex(r'42\["signal"')
+                    validator = Validator.regex(r'42\\["signal"')
                     stream = await client.create_raw_iterator(
                         '42["startSignals"]', validator
                     )
