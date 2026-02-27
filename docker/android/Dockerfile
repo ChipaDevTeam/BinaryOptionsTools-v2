@@ -18,7 +18,7 @@ RUN pip install --upgrade pip && pip install maturin
 ENV ANDROID_NDK_VERSION=r26d
 ENV ANDROID_SDK_ROOT=/opt/android-sdk
 ENV ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION
-ENV PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
+ENV PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86/bin:$PATH"
 
 RUN mkdir -p $ANDROID_SDK_ROOT/ndk && \
     curl -L https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip -o ndk.zip && \

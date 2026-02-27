@@ -16,9 +16,9 @@ jobs:
       matrix:
         # Define specific Rust targets for Zig to handle
         include:
-          - target: x86_64-unknown-linux-gnu
+          - target: x86-unknown-linux-gnu
             libc: manylinux_2_28
-          - target: x86_64-unknown-linux-musl
+          - target: x86-unknown-linux-musl
             libc: musllinux_1_1
           - target: aarch64-unknown-linux-gnu
             libc: manylinux_2_28
@@ -55,12 +55,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [x86_64, x86]
+        target: [x86, x86]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.13.12"
           architecture: ${{ matrix.target }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -81,7 +81,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.13.12"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -135,12 +135,12 @@ jobs:
               --title "BinaryOptionsToolsV2 $VERSION" \
               --generate-notes \
               --notes "### Automated Release $TAG
-              Built natively for Python 3.13."
+              Built natively for Python 3.13.12."
           fi
 
       - name: Summary
         run: |
           echo "### Automatic build success, more info below." >> $GITHUB_STEP_SUMMARY
           echo "- **Platform:** macOS Sequoia / Ubuntu 24.04 / Windows Server 2022" >> $GITHUB_STEP_SUMMARY
-          echo "- **Python:** 3.13 (Stable)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python:** 3.13.12 (Stable)" >> $GITHUB_STEP_SUMMARY
           echo "- **Version:** ${{ steps.get_version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
