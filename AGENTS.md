@@ -126,7 +126,7 @@ Python tests rely on `POCKET_OPTION_SSID` environment variable (optional). Tests
 
 ## Conventions Observed
 
-- Rust macros in `crates/macros` with ` darling` for attribute parsing
+- Rust macros in `crates/macros` with `darling` for attribute parsing
 - Timeout handling via `#[timeout(secs)]` macro
 - Config structs derive `Config` macro for validation
 - Regions/actions use derive macros `RegionImpl`, `ActionImpl`
