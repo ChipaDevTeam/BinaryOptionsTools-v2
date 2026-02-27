@@ -133,7 +133,7 @@ Python tests rely on `POCKET_OPTION_SSID` environment variable (optional). Tests
 - WebSocket client uses tokio-tungstenite with rustls
 - Tests often skip without live credentials; use mocking where possible
 - Python tests use fixtures from `conftest.py`; module-scoped fixtures for connection reuse
-- CI builds wheels for Linux (manylinux, musllinux), Windows, macOS; runs pytest on x86_64
+- CI builds wheels for Linux (manylinux, musllinux), Windows, macOS; runs pytest on x86
 
 ## Running a Single Test
 

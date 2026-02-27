@@ -118,7 +118,7 @@ pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/down
 **Linux**
 
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.8/BinaryOptionsToolsV2-0.2.8-cp38-abi3-manylinux_2_34_x86_64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/BinaryOptionsToolsV2-0.2.8/BinaryOptionsToolsV2-0.2.8-cp38-abi3-manylinux_2_34_x86.whl"
 ```
 
 **macOS (Apple Silicon)**
