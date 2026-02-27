@@ -257,7 +257,7 @@ class PocketOptionAsync:
             asset (str): Trading asset (e.g., "EURUSD_otc", "EURUSD")
             amount (float): Trade amount in account currency
             time (int): Expiry time in seconds (e.g., 60 for 1 minute)
-            check_win (bool): If True, waits for trade result. Defaults to True.
+            check_win (bool): If True, waits for trade result. Defaults to False.
 
         Returns:
             Tuple[str, Dict]: Tuple containing (trade_id, trade_details)
@@ -289,7 +289,7 @@ class PocketOptionAsync:
             asset (str): Trading asset (e.g., "EURUSD_otc", "EURUSD")
             amount (float): Trade amount in account currency
             time (int): Expiry time in seconds (e.g., 60 for 1 minute)
-            check_win (bool): If True, waits for trade result. Defaults to True.
+            check_win (bool): If True, waits for trade result. Defaults to False.
 
         Returns:
             Tuple[str, Dict]: Tuple containing (trade_id, trade_details)
