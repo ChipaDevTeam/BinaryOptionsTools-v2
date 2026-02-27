@@ -39,6 +39,12 @@ pub enum PocketError {
     #[error("Invalid period: {0}")]
     InvalidPeriod(u32),
 
+    #[error("Module not found: {0}")]
+    ModuleNotFound(String),
+
+    #[error("Configuration error: {0}")]
+    Configuration(String),
+
     #[error("General error: {0}")]
     General(String),
 

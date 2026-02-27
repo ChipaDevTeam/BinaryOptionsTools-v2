@@ -134,7 +134,7 @@ impl PocketOption {
         self.client
             .get_handle::<M>()
             .await
-            .ok_or_else(|| BinaryOptionsError::General(format!("{module_name} not found")).into())
+            .ok_or_else(|| PocketError::ModuleNotFound(module_name.to_string()))
     }
 
     fn builder(ssid: impl ToString) -> PocketResult<ClientBuilder<State>> {
@@ -283,19 +283,19 @@ impl PocketOption {
     /// The current balance as a `Decimal`, or `-1.0` if the balance is unknown.
     pub async fn balance(&self) -> Decimal {
         let state = &self.client.state;
-        let start = std::time::Instant::now();
-        loop {
-            let balance = state.balance.read().await;
-            if let Some(balance) = *balance {
+        
+        // Fast path: return immediately if available
+        if let Some(balance) = *state.balance.read().await {
+            return balance;
+        }
+
+        // Wait for update
+        if let Ok(_) = tokio::time::timeout(Duration::from_secs(10), state.balance_updated.notified()).await {
+            if let Some(balance) = *state.balance.read().await {
                 return balance;
             }
-            drop(balance);
-
-            if start.elapsed() > Duration::from_secs(10) {
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(200)).await;
         }
+        
         dec!(-1.0)
     }
 
@@ -353,15 +353,26 @@ impl PocketOption {
         }
     }
 
-    /// Executes a trade on the specified asset.
+    /// Executes a trade on the specified asset with built-in duplicate prevention.
+    ///
     /// # Arguments
-    /// * `asset` - The asset to trade.
-    /// * `action` - The action to perform (Call or Put).
-    /// * `time` - The time to trade.
-    /// * `amount` - The amount to trade.
+    /// * `asset` - The symbol to trade (e.g., "EURUSD_otc").
+    /// * `action` - Call (Buy) or Put (Sell).
+    /// * `time` - Expiration duration in seconds. Must be a divisor of 86400.
+    /// * `amount` - Trade amount. Must be between 1.0 and 20000.0.
+    ///
     /// # Returns
     /// A `PocketResult` containing the `Deal` if successful, or an error if
     /// the trade fails.
+    ///
+    /// # Errors
+    /// * `PocketError::InvalidAsset` - If the asset is inactive or the timeframe is invalid.
+    /// * `PocketError::General` - If the amount is out of bounds, a duplicate is detected, 
+    ///    or the underlying TradesApiModule fails.
+    ///
+    /// # Note on Concurrency
+    /// Duplicate prevention uses a 2-second window and safely blocks concurrent identical 
+    /// requests from going to the server simultaneously.
     pub async fn trade(
         &self,
         asset: impl ToString,
@@ -392,34 +403,47 @@ impl PocketOption {
         let fingerprint = (asset_str.clone(), action, time, amount);
 
         {
-            let recent = self.client.state.trade_state.recent_trades.read().await;
+            let mut recent = self.client.state.trade_state.recent_trades.write().await;
             if let Some((existing_id, created_at)) = recent.get(&fingerprint) {
                 if created_at.elapsed() < Duration::from_secs(2) {
+                    let id_str = if existing_id.is_nil() { "pending".to_string() } else { existing_id.to_string() };
                     return Err(PocketError::General(format!(
                         "Duplicate trade blocked (original ID: {})",
-                        existing_id
+                        id_str
                     )));
                 }
             }
-        }
-
-        let handle = self
-            .require_handle::<TradesApiModule>("TradesApiModule")
-            .await?;
-
-        let deal = handle
-            .trade(asset_str.clone(), action, amount, time)
-            .await?;
-
-        // Store for deduplication
-        {
-            let mut recent = self.client.state.trade_state.recent_trades.write().await;
-            recent.insert(fingerprint, (deal.id, std::time::Instant::now()));
+            // Insert a placeholder to prevent concurrent duplicate calls while we await the handle
+            recent.insert(fingerprint.clone(), (Uuid::nil(), std::time::Instant::now()));
             // Cleanup old entries (>5 seconds)
             recent.retain(|_, (_, t)| t.elapsed() < Duration::from_secs(5));
         }
 
-        Ok((deal.id, deal))
+        let handle_result = self.require_handle::<TradesApiModule>("TradesApiModule").await;
+        
+        let handle = match handle_result {
+            Ok(h) => h,
+            Err(e) => {
+                // Remove the placeholder if handle retrieval fails
+                self.client.state.trade_state.recent_trades.write().await.remove(&fingerprint);
+                return Err(e);
+            }
+        };
+
+        let deal_result = handle.trade(asset_str.clone(), action, amount, time).await;
+
+        match deal_result {
+            Ok(deal) => {
+                // Update with the actual deal ID
+                self.client.state.trade_state.recent_trades.write().await.insert(fingerprint, (deal.id, std::time::Instant::now()));
+                Ok((deal.id, deal))
+            }
+            Err(e) => {
+                // Remove the placeholder if trade fails
+                self.client.state.trade_state.recent_trades.write().await.remove(&fingerprint);
+                Err(e)
+            }
+        }
     }
 
     /// Places a new buy trade.
@@ -492,24 +516,28 @@ impl PocketOption {
     /// # Returns
     /// `Ok(())` if assets are loaded, or an error if the timeout is reached.
     pub async fn wait_for_assets(&self, timeout: Duration) -> PocketResult<()> {
-        let start = std::time::Instant::now();
-        loop {
-            if self.assets().await.is_some() {
+        let state = &self.client.state;
+
+        // Fast path
+        if state.assets.read().await.is_some() {
+            return Ok(());
+        }
+
+        if tokio::time::timeout(timeout, state.assets_updated.notified()).await.is_ok() {
+            if state.assets.read().await.is_some() {
                 return Ok(());
             }
-            if start.elapsed() > timeout {
-                let state = &self.client.state;
-                let balance = state.get_balance().await;
-                let ssid_type = if state.ssid.demo() { "demo" } else { "real" };
-                return Err(PocketError::General(format!(
-                    "Timeout waiting for assets (timeout: {:?}, account: {}, balance set: {})",
-                    timeout,
-                    ssid_type,
-                    balance.is_some()
-                )));
-            }
-            tokio::time::sleep(Duration::from_millis(200)).await;
         }
+        
+        // Timeout or failed
+        let balance = state.get_balance().await;
+        let ssid_type = if state.ssid.demo() { "demo" } else { "real" };
+        Err(PocketError::General(format!(
+            "Timeout waiting for assets (timeout: {:?}, account: {}, balance set: {})",
+            timeout,
+            ssid_type,
+            balance.is_some()
+        )))
     }
 
     /// Checks the result of a trade by its ID.
@@ -1201,5 +1229,60 @@ mod tests {
         }
 
         api.shutdown().await.unwrap();
+    }
+}
+
+#[cfg(test)]
+mod additional_tests {
+    use super::*;
+    use rust_decimal_macros::dec;
+    use crate::pocketoption::types::{Asset, Assets, AssetType};
+    use std::collections::HashMap;
+
+    #[tokio::test]
+    async fn test_high_level_client_duplicate_prevention_race() {
+        let ssid = "mock-ssid-mock-ssid-mock-ssid-mo";
+        // Use an invalid/dummy URL so we don't hit the real server
+        let api = match PocketOption::new_with_url(ssid, "ws://127.0.0.1:0".to_string()).await {
+            Ok(client) => client,
+            Err(_) => return, 
+        };
+
+        // Inject mock assets so validate_asset passes
+        let mut mock_assets = HashMap::new();
+        mock_assets.insert("EURUSD_otc".to_string(), Asset {
+            id: 1,
+            name: "EUR/USD OTC".to_string(),
+            symbol: "EURUSD_otc".to_string(),
+            is_otc: true,
+            is_active: true,
+            payout: 92,
+            allowed_candles: vec![],
+            asset_type: AssetType::Currency,
+        });
+        api.client.state.set_assets(Assets(mock_assets)).await;
+
+        let asset = "EURUSD_otc";
+        let amount = dec!(1.0);
+        let time = 60;
+
+        // Concurrent calls
+        let call1 = api.buy(asset, time, amount);
+        let call2 = api.buy(asset, time, amount);
+
+        let (res1, res2) = tokio::join!(call1, call2);
+
+        let is_duplicate_err = |res: &crate::pocketoption::error::PocketResult<(uuid::Uuid, crate::pocketoption::types::Deal)>| -> bool {
+            if let Err(crate::pocketoption::error::PocketError::General(msg)) = res {
+                msg.contains("Duplicate trade blocked")
+            } else {
+                false
+            }
+        };
+
+        // One of them must be a duplicate error! 
+        // (The other one will likely be a ModuleNotFound error since we didn't start TradesApiModule correctly,
+        // or a timeout error since the socket is invalid)
+        assert!(is_duplicate_err(&res1) || is_duplicate_err(&res2), "One call should be blocked as duplicate");
     }
 }

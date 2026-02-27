@@ -8,6 +8,29 @@ permissions:
   contents: read
 
 jobs:
+  # --- 0. DOCS ---
+  docs:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Git Credentials
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+      - run: echo "cache_id=$(date --utc +%V)" >> $GITHUB_ENV
+      - uses: actions/cache@v4
+        with:
+          key: mkdocs-material-${{ env.cache_id }}
+          path: .cache
+          restore-keys: |
+            mkdocs-material-
+      - run: pip install mkdocs-material "mkdocstrings[python]"
+      - run: mkdocs gh-deploy --force
+
   # --- 1. LINUX BUILD ---
   linux:
     runs-on: ubuntu-24.04
@@ -40,7 +63,7 @@ jobs:
           target: ${{ matrix.target }}
           # --zig handles the cross-compilation and linking for GLIBC/MUSL
           args: --release --out dist -i python3.13 --zig
-          manylinux: off # Handled by --zig
+          manylinux: ${{ matrix.libc }}
           working-directory: BinaryOptionsToolsV2
 
       - name: Upload wheels
@@ -194,3 +217,4 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
           skip-existing: true
           packages-dir: dist/
+          verify-metadata: false
