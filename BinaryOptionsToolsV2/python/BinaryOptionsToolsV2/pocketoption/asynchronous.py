@@ -763,6 +763,11 @@ class PocketOptionAsync:
             - This is a compute-intensive operation as it fetches and processes raw ticks.
             - For standard timeframes, use `candles()` or `get_candles()` for better efficiency.
         """
+        if not isinstance(custom_period, int) or custom_period <= 0:
+            raise ValueError("custom_period must be a positive integer")
+        if not isinstance(lookback_period, int) or lookback_period <= 0:
+            raise ValueError("lookback_period must be a positive integer")
+
         return json.loads(await self.client.compile_candles(asset, custom_period, lookback_period))
 
     async def _subscribe_symbol_inner(self, asset: str):

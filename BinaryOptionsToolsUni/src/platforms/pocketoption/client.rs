@@ -436,10 +436,8 @@ impl PocketOption {
     /// This method should be called when you are finished with the client
     /// to ensure a graceful shutdown.
     #[uniffi::method]
-    pub async fn shutdown(self: Arc<Self>) -> Result<(), UniError> {
-        // Call shutdown on a clone of the inner client to consume it
+    pub async fn shutdown(&self) -> Result<(), UniError> {
         self.inner
-            .clone()
             .shutdown()
             .await
             .map_err(|e| UniError::from(BinaryOptionsError::from(e)))

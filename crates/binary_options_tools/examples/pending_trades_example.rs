@@ -136,17 +136,23 @@ async fn example_basic_pending_order() -> PocketResult<()> {
         }
     });
 
-    // 6. Simulate a successful server response (in real usage, this comes from WebSocket)
-    let req_id = Uuid::new_v4();
-    let pending_order = create_test_pending_order(req_id);
-    let server_response = ServerResponse::Success(Box::new(pending_order.clone()));
-    let response_json = serde_json::to_string(&server_response).unwrap();
-    msg_tx
-        .send(Arc::new(Message::Text(response_json.into())))
-        .await
-        .unwrap();
+    // 6. Call open_pending_order with realistic parameters
+    let client_handle_clone = client_handle.clone();
+    let msg_tx_clone = msg_tx.clone();
 
-    // 7. Call open_pending_order with realistic parameters
+    // Start a task to simulate the server response AFTER a short delay to ensure open_pending_order is called
+    let response_sim_task = tokio::spawn(async move {
+        sleep(Duration::from_millis(50)).await;
+        let req_id = Uuid::new_v4();
+        let pending_order = create_test_pending_order(req_id);
+        let server_response = ServerResponse::Success(Box::new(pending_order.clone()));
+        let response_json = serde_json::to_string(&server_response).unwrap();
+        msg_tx_clone
+            .send(Arc::new(Message::Text(response_json.into())))
+            .await
+            .unwrap();
+    });
+
     let result = client_handle
         .open_pending_order(
             1,                                         // open_type: 1 = typical for binary options
@@ -160,7 +166,7 @@ async fn example_basic_pending_order() -> PocketResult<()> {
         )
         .await;
 
-    // 8. Handle the result
+    // 7. Handle the result
     match result {
         Ok(order) => {
             println!("✓ Pending order opened successfully!");
@@ -180,7 +186,8 @@ async fn example_basic_pending_order() -> PocketResult<()> {
         }
     }
 
-    // 9. Clean shutdown
+    // 8. Clean shutdown
+    response_sim_task.abort();
     module_task.abort();
     println!("\nExample 1 complete.\n");
     Ok(())
@@ -263,6 +270,45 @@ async fn example_concurrent_pending_orders() -> PocketResult<()> {
                 id: (1000 + i) as u64,
             };
 
+            // Call open_pending_order in a separate task so we can simulate response concurrently
+            let handle_clone2 = handle_clone.clone();
+            let amount2 = amount;
+            let asset2 = asset.clone();
+
+            let order_fut = tokio::spawn(async move {
+                handle_clone2
+                    .open_pending_order(
+                        1,
+                        amount2,
+                        asset2,
+                        60,
+                        Decimal::from_f64_retain(1.0).unwrap(),
+                        60,
+                        85,
+                        0,
+                    )
+                    .await
+            });
+
+            // Short delay to ensure open_pending_order is called
+            sleep(Duration::from_millis(50)).await;
+
+            // Create a pending order response for this request
+            let req_id = Uuid::new_v4();
+            let pending_order = PendingOrder {
+                ticket: req_id,
+                open_type: 1,
+                amount,
+                symbol: asset.clone(),
+                open_time: "2024-01-01 10:00:00".to_string(),
+                open_price: Decimal::from_f64_retain(1.0 + (i as f64 * 0.01)).unwrap(),
+                timeframe: 60,
+                min_payout: 85,
+                command: 0,
+                date_created: "2024-01-01 10:00:00".to_string(),
+                id: (1000 + i) as u64,
+            };
+
             let server_response = ServerResponse::Success(Box::new(pending_order.clone()));
             let response_json = serde_json::to_string(&server_response).unwrap();
             msg_tx_clone
@@ -270,20 +316,7 @@ async fn example_concurrent_pending_orders() -> PocketResult<()> {
                 .await
                 .unwrap();
 
-            // Call open_pending_order
-            let result = handle_clone
-                .open_pending_order(
-                    1,
-                    amount,
-                    asset,
-                    60,
-                    Decimal::from_f64_retain(1.0).unwrap(),
-                    60,
-                    85,
-                    0,
-                )
-                .await;
-
+            let result = order_fut.await.unwrap();
             result
         });
 
@@ -422,6 +455,19 @@ async fn example_integration_with_pocketclient() -> PocketResult<()> {
 
     // 7. Open a pending order through the handle
     println!("\nOpening pending order...");
+    let msg_tx_clone = msg_tx.clone();
+    let response_task = tokio::spawn(async move {
+        sleep(Duration::from_millis(100)).await;
+        let req_id = Uuid::new_v4();
+        let pending_order = create_test_pending_order(req_id);
+        let server_response = ServerResponse::Success(Box::new(pending_order.clone()));
+        let response_json = serde_json::to_string(&server_response).unwrap();
+        msg_tx_clone
+            .send(Arc::new(Message::Text(response_json.into())))
+            .await
+            .unwrap();
+    });
+
     let order_result = timeout(
         Duration::from_secs(30),
         pending_trades_handle.open_pending_order(
@@ -436,6 +482,8 @@ async fn example_integration_with_pocketclient() -> PocketResult<()> {
         ),
     )
     .await;
+
+    response_task.abort();
 
     match order_result {
         Ok(Ok(order)) => {
@@ -501,22 +549,15 @@ async fn scenario1_mismatched_responses() -> PocketResult<()> {
         call_lock: call_lock.clone(),
     };
 
-    let correct_id = Uuid::new_v4();
     let wrong_id1 = Uuid::new_v4();
     let wrong_id2 = Uuid::new_v4();
-    let pending_order = create_test_pending_order(correct_id);
+    let pending_order_template = create_test_pending_order(Uuid::new_v4());
 
-    let resp1 = CommandResponse::Success {
-        req_id: wrong_id1,
-        pending_order: Box::new(pending_order.clone()),
-    };
-    let resp2 = CommandResponse::Success {
-        req_id: wrong_id2,
-        pending_order: Box::new(pending_order.clone()),
-    };
-    let resp3 = CommandResponse::Success {
-        req_id: correct_id,
-        pending_order: Box::new(pending_order.clone()),
+    let (cmd_tx, cmd_rx) = kanal::bounded_async::<Command>(1);
+    let handle = PendingTradesHandle {
+        sender: cmd_tx,
+        receiver: resp_rx.clone(),
+        call_lock: call_lock.clone(),
     };
 
     let result_handle = tokio::spawn(async move {
@@ -533,6 +574,29 @@ async fn scenario1_mismatched_responses() -> PocketResult<()> {
             )
             .await
     });
+
+    // Capture the actual req_id from the command sent to cmd_rx
+    let cmd = cmd_rx.recv().await.unwrap();
+    let correct_id = match cmd {
+        Command::OpenPendingOrder { req_id, .. } => req_id,
+        _ => panic!("Expected OpenPendingOrder command"),
+    };
+
+    let mut pending_order = pending_order_template.clone();
+    pending_order.ticket = correct_id;
+
+    let resp1 = CommandResponse::Success {
+        req_id: wrong_id1,
+        pending_order: Box::new(pending_order_template.clone()),
+    };
+    let resp2 = CommandResponse::Success {
+        req_id: wrong_id2,
+        pending_order: Box::new(pending_order_template.clone()),
+    };
+    let resp3 = CommandResponse::Success {
+        req_id: correct_id,
+        pending_order: Box::new(pending_order.clone()),
+    };
 
     // Send mismatched responses first
     resp_tx.send(resp1).await.unwrap();

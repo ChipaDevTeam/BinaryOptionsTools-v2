@@ -22,7 +22,7 @@ Usage
 Security & storage best practices
 - Treat the SSID/auth string as a secret. Do not share it.
 - Store it in a secure secret store (dotenv, system keychain, or a secrets manager). Example options:
-  - .env file (local development only) — never commit to version control.
+  - .env file (local development only) — never commit to version control. Ensure .env is added to .gitignore so it isn’t committed.
   - OS keychain (macOS Keychain, Windows Credential Manager).
   - Password manager or trusted dedicated secrets manager (1Password, Bitwarden, AWS Secrets Manager, etc).
 - Never hardcode secrets into source files or public repos.

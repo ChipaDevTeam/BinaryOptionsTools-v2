@@ -138,4 +138,14 @@ mod tests {
         assert_eq!(f64_to_decimal(f64::INFINITY), None);
         assert_eq!(f64_to_decimal(f64::NEG_INFINITY), None);
     }
+
+    #[test]
+    fn test_f64_to_decimal_extreme_precision() {
+        // Test a value that exceeds Decimal's 28-digit precision
+        let extreme_small = 1e-31f64;
+        let result = f64_to_decimal(extreme_small);
+        // Decimal should return None or a rounded value depending on implementation,
+        // but it must not crash.
+        assert!(result.is_none() || result.unwrap().is_zero());
+    }
 }

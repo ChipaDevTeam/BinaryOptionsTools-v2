@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # --- 1. LINUX BUILD ---
@@ -55,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [x64, x86]
+        target: [x86_64, x86]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -99,6 +99,8 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     needs: [linux, windows, macos]
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 

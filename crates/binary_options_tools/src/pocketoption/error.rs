@@ -36,6 +36,9 @@ pub enum PocketError {
         duration: Duration,
     },
 
+    #[error("Invalid period: {0}")]
+    InvalidPeriod(u32),
+
     #[error("General error: {0}")]
     General(String),
 

@@ -533,7 +533,8 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             }
                         },
                         Command::SubscriptionCount { command_id } => {
-                            let count = self.state.active_subscriptions.read().await.len() as u32;
+                            let subscriptions = self.state.active_subscriptions.read().await;
+                            let count = subscriptions.values().map(|v| v.len()).sum::<usize>() as u32;
                             self.command_responder.send(CommandResponse::SubscriptionCount { command_id, count }).await?;
                         },
                         Command::History { asset, period, command_id } => {
@@ -661,7 +662,9 @@ impl SubscriptionsApiModule {
     /// # Returns
     /// * `bool` - True if limit reached
     async fn is_max_subscriptions_reached(&self) -> bool {
-        self.state.active_subscriptions.read().await.len() >= MAX_SUBSCRIPTIONS
+        let subscriptions = self.state.active_subscriptions.read().await;
+        let total_count: usize = subscriptions.values().map(|v| v.len()).sum();
+        total_count >= MAX_SUBSCRIPTIONS
     }
 
     /// Add a new subscription.
@@ -705,51 +708,48 @@ impl SubscriptionsApiModule {
         asset: &str,
         subscription_id: Option<Uuid>,
     ) -> CoreResult<bool> {
-        let mut subscriptions = self.state.active_subscriptions.write().await;
-        if let Some(vec) = subscriptions.get_mut(asset) {
-            if let Some(sub_id) = subscription_id {
-                // Remove specific subscription by ID
-                let index = vec.iter().position(|(_, _, id)| *id == sub_id);
-                if let Some(idx) = index {
-                    let (stream_sender, _, _) = vec.remove(idx);
-                    // Send termination signal
-                    stream_sender
-                        .send(SubscriptionEvent::Terminated { reason: "Unsubscribed from main module".to_string() })
-                        .await
-                        .inspect_err(|e| warn!(target: "SubscriptionsApiModule", "Failed to send termination signal: {}", e))?;
-                    // If vec is empty, remove the asset entry
-                    if vec.is_empty() {
-                        subscriptions.remove(asset);
+        let (removed_senders, removed_at_least_one) = {
+            let mut subscriptions = self.state.active_subscriptions.write().await;
+            let mut removed_senders = Vec::new();
+            let mut removed_at_least_one = false;
+
+            if let Some(vec) = subscriptions.get_mut(asset) {
+                if let Some(sub_id) = subscription_id {
+                    // Remove specific subscription by ID
+                    if let Some(idx) = vec.iter().position(|(_, _, id)| *id == sub_id) {
+                        let (stream_sender, _, _) = vec.remove(idx);
+                        removed_senders.push(stream_sender);
+                        removed_at_least_one = true;
+                        if vec.is_empty() {
+                            subscriptions.remove(asset);
+                        }
                     }
-                    return Ok(true);
                 } else {
-                    // Subscription ID not found
-                    return Ok(false);
-                }
-            } else {
-                // Remove all subscriptions for this asset
-                let senders: Vec<_> = vec
-                    .drain(..)
-                    .map(|(stream_sender, _, _)| stream_sender)
-                    .collect();
-                if !senders.is_empty() {
-                    // Send termination to all
-                    for stream_sender in senders {
-                        stream_sender
-                            .send(SubscriptionEvent::Terminated { reason: "Unsubscribed from main module".to_string() })
-                            .await
-                            .inspect_err(|e| warn!(target: "SubscriptionsApiModule", "Failed to send termination signal: {}", e))?;
-                    }
-                    // Remove the asset entry
+                    // Remove all subscriptions for this asset
+                    removed_senders = vec
+                        .drain(..)
+                        .map(|(stream_sender, _, _)| stream_sender)
+                        .collect();
+                    removed_at_least_one = !removed_senders.is_empty();
                     subscriptions.remove(asset);
-                    return Ok(true);
-                } else {
-                    return Ok(false);
                 }
             }
+            (removed_senders, removed_at_least_one)
+        };
+
+        // Send termination signals outside the lock
+        for stream_sender in removed_senders {
+            let _ = stream_sender
+                .send(SubscriptionEvent::Terminated {
+                    reason: "Unsubscribed from main module".to_string(),
+                })
+                .await
+                .inspect_err(|e| {
+                    warn!(target: "SubscriptionsApiModule", "Failed to send termination signal: {}", e)
+                });
         }
-        // No subscriptions for this asset
-        Ok(false)
+
+        Ok(removed_at_least_one)
     }
 
 
@@ -774,20 +774,24 @@ impl SubscriptionsApiModule {
         timestamp: i64,
     ) -> CoreResult<()> {
         // Forward data to all subscribers for this asset
-        let subscriptions = self.state.active_subscriptions.read().await;
-        if let Some(vec) = subscriptions.get(asset) {
-            // Iterate over all senders and send data
-            for (stream_sender, _, _) in vec {
-                // Best effort: send to each subscriber, don't fail if one fails
-                let update = SubscriptionEvent::Update {
-                    asset: asset.to_string(),
-                    price,
-                    timestamp,
-                };
-                if let Err(e) = stream_sender.send(update).await {
-                    // Log but continue to other subscribers
-                    warn!(target: "SubscriptionsApiModule", "Failed to forward data to subscriber: {}", e);
-                }
+        let senders: Vec<AsyncSender<SubscriptionEvent>> = {
+            let subscriptions = self.state.active_subscriptions.read().await;
+            subscriptions
+                .get(asset)
+                .map(|vec| vec.iter().map(|(sender, _, _)| sender.clone()).collect())
+                .unwrap_or_default()
+        };
+
+        for stream_sender in senders {
+            // Best effort: send to each subscriber, don't fail if one fails
+            let update = SubscriptionEvent::Update {
+                asset: asset.to_string(),
+                price,
+                timestamp,
+            };
+            if let Err(e) = stream_sender.send(update).await {
+                // Log but continue to other subscribers
+                warn!(target: "SubscriptionsApiModule", "Failed to forward data to subscriber: {}", e);
             }
         }
         Ok(())

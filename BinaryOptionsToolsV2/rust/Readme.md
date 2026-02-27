@@ -42,23 +42,23 @@ Supports **Python 3.8 to 3.13**.
   To create the `.whl` file
 
 ```bash
-// Inside the root folder
+# Inside the root folder
 cd BinaryOptionsToolsV2
 maturin build -r
 
-// Once the command is executed it should print a path to a .whl file, copy it and then run
+# Once the command is executed it should print a path to a .whl file, copy it and then run
 pip install path/to/file.whl
 ```
 
 To install the library in a local virtual environment
 
 ```bash
-// Inside the root folder
+# Inside the root folder
 cd BinaryOptionsToolsV2
 
-// Activate the virtual environment if not done already
+# Activate the virtual environment if not done already
 
-// Execute the following command and it should automatically install the library in the VM
+# Execute the following command and it should automatically install the library in the VM
 maturin develop
 ```
 
@@ -339,9 +339,9 @@ import asyncio
 async def main():
     client = PocketOptionAsync(ssid="your-session-id")
 
-    # Compile 5-minute candles from 1-minute base data
-    # Parameters: symbol, source_period, target_period, lookback_period
-    candles = await client.compile_candles("EURUSD_otc", 60, 300, 100)
+    # Compile custom candles from raw tick data
+    # Parameters: asset, custom_period, lookback_period
+    candles = await client.compile_candles("EURUSD_otc", 60, 300)
 
     print(f"Compiled {len(candles)} custom candles")
     if candles:

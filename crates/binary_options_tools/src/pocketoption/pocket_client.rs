@@ -808,6 +808,10 @@ impl PocketOption {
     ) -> PocketResult<Vec<Candle>> {
         let asset_str = asset.to_string();
 
+        if custom_period == 0 {
+            return Err(PocketError::InvalidPeriod(0));
+        }
+
         // Validate asset exists (if assets are loaded)
         if let Some(assets) = self.assets().await {
             if assets.get(&asset_str).is_none() {

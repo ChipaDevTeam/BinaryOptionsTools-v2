@@ -123,25 +123,25 @@ class MockRawClient:
 
     async def subscribe_symbol(self, asset):
         async def subscription():
-            yield {"symbol": asset, "price": 1.11}
+            yield json.dumps({"symbol": asset, "price": 1.11})
 
         return subscription()
 
     async def subscribe_symbol_chuncked(self, asset, chunk_size):
         async def subscription():
-            yield {"chunk": 1, "open": 1.1, "close": 1.2}
+            yield json.dumps({"chunk": 1, "open": 1.1, "close": 1.2})
 
         return subscription()
 
     async def subscribe_symbol_timed(self, asset, time):
         async def subscription():
-            yield {"time": 1000, "price": 1.11}
+            yield json.dumps({"time": 1000, "price": 1.11})
 
         return subscription()
 
     async def subscribe_symbol_time_aligned(self, asset, time):
         async def subscription():
-            yield {"aligned_time": 1000, "price": 1.11}
+            yield json.dumps({"aligned_time": 1000, "price": 1.11})
 
         return subscription()
 
@@ -176,7 +176,11 @@ class MockRawClient:
         mock_handler.send_binary = AsyncMock()
         mock_handler.send_and_wait = AsyncMock(return_value='42["response"]')
         mock_handler.wait_next = AsyncMock(return_value='42["message"]')
-        mock_handler.subscribe = AsyncMock(return_value=AsyncMock())
+
+        async def mock_subscribe():
+            yield '42["stream_data"]'
+
+        mock_handler.subscribe = MagicMock(return_value=mock_subscribe())
         mock_handler.close = AsyncMock()
         return mock_handler
 
@@ -360,10 +364,7 @@ async def async_client(mock_raw_pocketoption):
     """Fixture that creates a PocketOptionAsync client with mocked backend."""
     client = PocketOptionAsync("test_ssid", config={"terminal_logging": False})
     yield client
-    try:
-        await client.shutdown()
-    except Exception:
-        pass
+    await client.shutdown()
 
 
 class TestPocketOptionAsyncInit:
@@ -518,6 +519,32 @@ class TestCandles:
         )
         assert isinstance(candles, list)
         assert len(candles) > 0
+
+    @pytest.mark.asyncio
+    async def test_compile_candles_success(self, async_client, mock_raw_pocketoption):
+        """Test compile_candles with custom periods."""
+        # Setup mock to return expected compiled candles shape
+        mock_raw_pocketoption.compile_candles = AsyncMock(
+            return_value=json.dumps(
+                [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
+            )
+        )
+        candles = await async_client.compile_candles("EURUSD_otc", 20, 300)
+        assert isinstance(candles, list)
+        assert len(candles) == 1
+        assert "open" in candles[0]
+        assert "time" in candles[0]
+        mock_raw_pocketoption.compile_candles.assert_called_with(
+            "EURUSD_otc", 20, 300
+        )
+
+    @pytest.mark.asyncio
+    async def test_compile_candles_validation_error(self, async_client):
+        """Test compile_candles validation for non-positive periods."""
+        with pytest.raises(ValueError, match="custom_period must be a positive integer"):
+            await async_client.compile_candles("EURUSD_otc", 0, 300)
+        with pytest.raises(ValueError, match="lookback_period must be a positive integer"):
+            await async_client.compile_candles("EURUSD_otc", 20, -1)
 
 
 class TestBalance:
