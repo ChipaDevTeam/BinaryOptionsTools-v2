@@ -123,6 +123,14 @@ pub struct TradesApiModule {
     pending_orders: HashMap<Uuid, PendingOrderTracker>,
     // Secondary index for matching failures (which lack UUID)
     // Map of (Asset, Amount) -> Queue of UUIDs (FIFO)
+    /// A heuristic-based mapping for correlating server-side failures to client requests.
+    ///
+    /// Since the PocketOption protocol does not return a `request_id` for `failopenOrder`
+    /// messages, we maintain a FIFO queue of pending requests per (Asset, Amount).
+    ///
+    /// # Warning
+    /// This is susceptible to race conditions if multiple identical trades are
+    /// executed simultaneously and the server responds out-of-order.
     failure_matching: HashMap<(String, Decimal), VecDeque<Uuid>>,
 }
 
