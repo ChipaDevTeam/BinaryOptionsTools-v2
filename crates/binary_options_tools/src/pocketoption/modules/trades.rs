@@ -123,6 +123,14 @@ pub struct TradesApiModule {
     pending_orders: HashMap<Uuid, PendingOrderTracker>,
     // Secondary index for matching failures (which lack UUID)
     // Map of (Asset, Amount) -> Queue of UUIDs (FIFO)
+    /// A heuristic-based mapping for correlating server-side failures to client requests.
+    ///
+    /// Since the PocketOption protocol does not return a `request_id` for `failopenOrder`
+    /// messages, we maintain a FIFO queue of pending requests per (Asset, Amount).
+    ///
+    /// # Warning
+    /// This is susceptible to race conditions if multiple identical trades are
+    /// executed simultaneously and the server responds out-of-order.
     failure_matching: HashMap<(String, Decimal), VecDeque<Uuid>>,
 }
 
@@ -206,7 +214,8 @@ impl ApiModule<State> for TradesApiModule {
                           if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
                               Ok(res)
                           } else if let Some(start) = text.find('[') {
-                              // Try parsing as a 1-step Socket.IO message: 42["successopenOrder", {...}]
+                              // Resilient Socket.IO parsing: extract the JSON array content
+                              // Handles prefixes like "42", "451-", etc.
                               match serde_json::from_str::<serde_json::Value>(&text[start..]) {
                                   Ok(serde_json::Value::Array(arr)) => {
                                       if arr.len() >= 2 && (arr[0] == "successopenOrder" || arr[0] == "failopenOrder") {
@@ -241,6 +250,9 @@ impl ApiModule<State> for TradesApiModule {
                                   let key = (tracker.asset, tracker.amount);
                                   if let Some(queue) = self.failure_matching.get_mut(&key) {
                                       queue.retain(|&id| id != req_id);
+                                      if queue.is_empty() {
+                                          self.failure_matching.remove(&key);
+                                      }
                                   }
                               } else {
                                   warn!(target: "TradesApiModule", "Received success for unknown request ID: {}", req_id);
@@ -250,7 +262,11 @@ impl ApiModule<State> for TradesApiModule {
                               let key = (fail.asset.clone(), fail.amount);
 
                               let found_req_id = if let Some(queue) = self.failure_matching.get_mut(&key) {
-                                  queue.pop_front()
+                                  let id = queue.pop_front();
+                                  if queue.is_empty() {
+                                      self.failure_matching.remove(&key);
+                                  }
+                                  id
                               } else {
                                   None
                               };
