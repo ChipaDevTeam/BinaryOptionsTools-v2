@@ -16,9 +16,9 @@ jobs:
       matrix:
         # Define specific Rust targets for Zig to handle
         include:
-          - target: x86-unknown-linux-gnu
+          - target: x86_64-unknown-linux-gnu
             libc: manylinux_2_28
-          - target: x86-unknown-linux-musl
+          - target: x86_64-unknown-linux-musl
             libc: musllinux_1_1
           - target: aarch64-unknown-linux-gnu
             libc: manylinux_2_28
