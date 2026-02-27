@@ -217,6 +217,12 @@ impl Rule for TwoStepRule {
         match msg {
             Message::Text(text) => {
                 if text.starts_with(&self.pattern) {
+                    // Check if it's a 1-step message (ends with ']') or contains JSON data '{'
+                    if text.ends_with(']') || text.contains('{') {
+                        tracing::debug!(target: "TwoStepRule", "1-step message matched pattern! Allowing through.");
+                        self.valid.store(false, Ordering::SeqCst);
+                        return true;
+                    }
                     tracing::debug!(target: "TwoStepRule", "Pattern matched! Next message will be accepted.");
                     self.valid.store(true, Ordering::SeqCst);
                     return false;
@@ -730,6 +736,36 @@ mod tests {
         assert_eq!(data_float.symbol, "EURUSD_otc");
         assert_eq!(data_float.timestamp, 1770856131);
         assert_eq!(data_float.price, Decimal::from_f64_retain(1.19537).unwrap());
+    }
+
+    #[test]
+    fn test_two_step_rule_one_step_message() {
+        let pattern = r#"451-["successupdateBalance","#;
+        let rule = TwoStepRule::new(pattern);
+        
+        // A 1-step message containing the data
+        let msg = Message::Text(format!("{}{{\"balance\":100.0}}]", pattern).into());
+        
+        // Should return true because it contains '{' and ends with ']'
+        assert!(rule.call(&msg), "Rule should accept 1-step messages containing data");
+        // State should remain invalid (ready for another 1-step or start of 2-step)
+        assert!(!rule.valid.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn test_two_step_rule_two_step_sequence() {
+        let pattern = r#"451-["successupdateBalance","#;
+        let rule = TwoStepRule::new(pattern);
+        
+        // Step 1: The header message
+        let msg1 = Message::Text(pattern.to_string().into());
+        assert!(!rule.call(&msg1), "Step 1 should return false and set valid flag");
+        assert!(rule.valid.load(Ordering::SeqCst));
+        
+        // Step 2: The binary data message
+        let msg2 = Message::Binary(vec![1, 2, 3].into());
+        assert!(rule.call(&msg2), "Step 2 should return true and clear valid flag");
+        assert!(!rule.valid.load(Ordering::SeqCst));
     }
 
     #[test]

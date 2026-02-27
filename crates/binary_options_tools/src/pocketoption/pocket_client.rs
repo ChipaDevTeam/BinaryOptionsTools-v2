@@ -274,9 +274,13 @@ impl PocketOption {
         handle.create(validator, keep_alive).await
     }
 
-    /// Gets the current balance of the user.
-    /// If the balance is not set, it returns -1.
+    /// Gets the current account balance.
     ///
+    /// This method waits up to 10 seconds for the balance to be populated from the server.
+    /// If the balance cannot be retrieved within the timeout, it returns -1.0.
+    ///
+    /// # Returns
+    /// The current balance as a `Decimal`, or `-1.0` if the balance is unknown.
     pub async fn balance(&self) -> Decimal {
         let state = &self.client.state;
         let start = std::time::Instant::now();

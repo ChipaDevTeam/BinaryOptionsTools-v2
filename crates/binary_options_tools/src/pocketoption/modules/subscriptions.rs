@@ -208,18 +208,23 @@ impl ReconnectCallback<State> for SubscriptionCallback {
         // Resubscribe to all active subscriptions
         let subscriptions = state.active_subscriptions.read().await.clone();
 
-        // Send subscription messages concurrently (one per asset)
-        let futures = subscriptions.into_iter().map(|(symbol, vec)| {
-            let ws_sender = ws_sender.clone();
-            async move {
-                if let Some((_, sub_type, _)) = vec.first() {
-                    let period = sub_type.period_secs().unwrap_or(1);
-                    send_subscribe_message(&ws_sender, &symbol, period).await
-                } else {
-                    Ok(())
+        // Send subscription messages concurrently (all unique types per asset)
+        let mut futures = Vec::new();
+        for (symbol, vec) in subscriptions {
+            // Keep track of unique periods to avoid redundant subfor messages
+            let mut seen_periods = Vec::new();
+            for (_, sub_type, _) in vec {
+                let period = sub_type.period_secs().unwrap_or(1);
+                if !seen_periods.contains(&period) {
+                    seen_periods.push(period);
+                    let ws_sender = ws_sender.clone();
+                    let symbol_clone = symbol.clone();
+                    futures.push(async move {
+                        send_subscribe_message(&ws_sender, &symbol_clone, period).await
+                    });
                 }
             }
-        });
+        }
 
         let results = join_all(futures).await;
 
@@ -962,18 +967,17 @@ impl Drop for SubscriptionStream {
         debug!(target: "SubscriptionStream", "Dropping subscription stream for asset: {}", self.asset);
         // Send Unsubscribe signal to the main handle
         // This will notify the main module to remove this subscription
-        // We don't need to wait for response since we're consuming self
-        // and it will be dropped anyway
+        // We use try_send here to avoid blocking during drop if the channel is full.
         if let Some(sender) = &self.sender {
             let _ = sender
                 .as_sync()
-                .send(Command::Unsubscribe {
+                .try_send(Command::Unsubscribe {
                     asset: self.asset.clone(),
                     subscription_id: Some(self.subscription_id),
                     command_id: Uuid::new_v4(),
                 })
                 .inspect_err(|e| {
-                    warn!(target: "SubscriptionStream", "Failed to send unsubscribe command: {}", e);
+                    warn!(target: "SubscriptionStream", "Failed to send unsubscribe command during drop: {}", e);
                 });
         }
     }
