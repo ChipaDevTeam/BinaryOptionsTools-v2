@@ -353,7 +353,13 @@ impl PocketOption {
         }
     }
 
-    /// Executes a trade on the specified asset with built-in duplicate prevention.
+    /// Executes a trade on the specified asset with built-in duplicate prevention and validation.
+    ///
+    /// This method performs the following steps:
+    /// 1. Validates the trade amount and asset availability.
+    /// 2. Employs a 2-second debounce window using trade fingerprints to prevent accidental double-trades.
+    /// 3. Registers the trade in `pending_market_orders` to allow for reconciliation if the connection drops.
+    /// 4. Dispatches the trade request to the `TradesApiModule`.
     ///
     /// # Arguments
     /// * `asset` - The symbol to trade (e.g., "EURUSD_otc").
@@ -362,17 +368,11 @@ impl PocketOption {
     /// * `amount` - Trade amount. Must be between 1.0 and 20000.0.
     ///
     /// # Returns
-    /// A `PocketResult` containing the `Deal` if successful, or an error if
-    /// the trade fails.
+    /// A `PocketResult` containing the trade UUID and the resulting `Deal`.
     ///
     /// # Errors
     /// * `PocketError::InvalidAsset` - If the asset is inactive or the timeframe is invalid.
-    /// * `PocketError::General` - If the amount is out of bounds, a duplicate is detected, 
-    ///    or the underlying TradesApiModule fails.
-    ///
-    /// # Note on Concurrency
-    /// Duplicate prevention uses a 2-second window and safely blocks concurrent identical 
-    /// requests from going to the server simultaneously.
+    /// * `PocketError::General` - If the amount is out of bounds or a duplicate is detected.
     pub async fn trade(
         &self,
         asset: impl ToString,
@@ -401,6 +401,7 @@ impl PocketOption {
 
         // Fix #4: Duplicate Trade Prevention
         let fingerprint = (asset_str.clone(), action, time, amount);
+        let request_id = Uuid::new_v4();
 
         {
             let mut recent = self.client.state.trade_state.recent_trades.write().await;
@@ -419,6 +420,26 @@ impl PocketOption {
             recent.retain(|_, (_, t)| t.elapsed() < Duration::from_secs(5));
         }
 
+        // Populate pending_market_orders for reconciliation
+        {
+            use crate::pocketoption::types::OpenOrder;
+            let order = OpenOrder::new(
+                amount,
+                asset_str.clone(),
+                action,
+                time,
+                self.is_demo() as u32,
+                request_id,
+            );
+            self.client
+                .state
+                .trade_state
+                .pending_market_orders
+                .write()
+                .await
+                .insert(request_id, (order, std::time::Instant::now()));
+        }
+
         let handle_result = self.require_handle::<TradesApiModule>("TradesApiModule").await;
         
         let handle = match handle_result {
@@ -426,21 +447,24 @@ impl PocketOption {
             Err(e) => {
                 // Remove the placeholder if handle retrieval fails
                 self.client.state.trade_state.recent_trades.write().await.remove(&fingerprint);
+                self.client.state.trade_state.pending_market_orders.write().await.remove(&request_id);
                 return Err(e);
             }
         };
 
-        let deal_result = handle.trade(asset_str.clone(), action, amount, time).await;
+        let deal_result = handle.trade_with_id(asset_str.clone(), action, amount, time, request_id).await;
 
         match deal_result {
             Ok(deal) => {
                 // Update with the actual deal ID
                 self.client.state.trade_state.recent_trades.write().await.insert(fingerprint, (deal.id, std::time::Instant::now()));
+                // Note: We keep it in pending_market_orders until it's confirmed by the DealsApiModule or TradesApiModule
                 Ok((deal.id, deal))
             }
             Err(e) => {
                 // Remove the placeholder if trade fails
                 self.client.state.trade_state.recent_trades.write().await.remove(&fingerprint);
+                self.client.state.trade_state.pending_market_orders.write().await.remove(&request_id);
                 Err(e)
             }
         }
