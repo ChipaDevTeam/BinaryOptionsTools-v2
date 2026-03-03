@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- N/a
+- Fixed auth failure with valid SSID: `Ssid::Display` now returns the raw auth message (`42["auth",{...}]`) instead of a human-readable label, so the correct credential string is sent to the server during WebSocket handshake.
 
 ## [0.2.8] - 2026-02-22
 

@@ -305,13 +305,13 @@ impl Ssid {
 }
 impl fmt::Display for Demo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "DemoSsid(uid={}, demo=true)", self.uid)
+        write!(f, "{}", self.raw)
     }
 }
 
 impl fmt::Display for Real {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "RealSsid(uid={}, demo=false)", self.uid)
+        write!(f, "{}", self.raw)
     }
 }
 
