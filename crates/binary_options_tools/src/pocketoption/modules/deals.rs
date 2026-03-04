@@ -1,9 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::Arc,
     time::Duration,
 };
 
@@ -22,12 +19,12 @@ use uuid::Uuid;
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
-    types::Deal,
+    types::{Deal, MultiPatternRule},
 };
 
-const UPDATE_OPENED_DEALS: &str = r#"451-["updateOpenedDeals","#;
-const UPDATE_CLOSED_DEALS: &str = r#"451-["updateClosedDeals","#;
-const SUCCESS_CLOSE_ORDER: &str = r#"451-["successcloseOrder","#;
+const EV_UPDATE_OPENED_DEALS: &str = "updateOpenedDeals";
+const EV_UPDATE_CLOSED_DEALS: &str = "updateClosedDeals";
+const EV_SUCCESS_CLOSE_ORDER: &str = "successcloseOrder";
 
 #[derive(Debug)]
 pub enum Command {
@@ -223,39 +220,45 @@ impl ApiModule<State> for DealsApiModule {
                             tracing::debug!("Received message: {:?}", msg);
                             match msg.as_ref() {
                                 Message::Text(text) => {
-                                    let mut data_text = None;
                                     let mut current_expected = ExpectedMessage::None;
-                                    if text.starts_with(UPDATE_OPENED_DEALS) {
-                                        current_expected = ExpectedMessage::UpdateOpenedDeals;
-                                        data_text = text.strip_prefix(UPDATE_OPENED_DEALS);
-                                    } else if text.starts_with(UPDATE_CLOSED_DEALS) {
-                                        current_expected = ExpectedMessage::UpdateClosedDeals;
-                                        data_text = text.strip_prefix(UPDATE_CLOSED_DEALS);
-                                    } else if text.starts_with(SUCCESS_CLOSE_ORDER) {
-                                        current_expected = ExpectedMessage::SuccessCloseOrder;
-                                        data_text = text.strip_prefix(SUCCESS_CLOSE_ORDER);
-                                    }
 
-                                    if let Some(data) = data_text {
-                                        let trimmed = data.trim();
+                                    if let Some(start) = text.find('[') {
+                                        if let Ok(serde_json::Value::Array(arr)) =
+                                            serde_json::from_str::<serde_json::Value>(&text[start..])
+                                        {
+                                            if arr.len() >= 1 {
+                                                if let Some(event_name) = arr[0].as_str() {
+                                                    if event_name == EV_UPDATE_OPENED_DEALS {
+                                                        current_expected = ExpectedMessage::UpdateOpenedDeals;
+                                                    } else if event_name == EV_UPDATE_CLOSED_DEALS {
+                                                        current_expected = ExpectedMessage::UpdateClosedDeals;
+                                                    } else if event_name == EV_SUCCESS_CLOSE_ORDER {
+                                                        current_expected = ExpectedMessage::SuccessCloseOrder;
+                                                    }
 
-                                        // Socket.IO 4.x binary placeholder check
-                                        if trimmed.contains(r#""_placeholder":true"#) {
-                                            tracing::debug!(target: "DealsApiModule", "Detected binary placeholder, waiting for binary payload for {:?}", current_expected);
-                                            expected = current_expected;
-                                            continue;
-                                        }
-
-                                        if !trimmed.is_empty() && trimmed != "]" && trimmed != ",]" {
-                                            // It's a 1-step message, process the data now
-                                            let json_data = trimmed.strip_suffix(']').unwrap_or(trimmed);
-                                            self.process_text_data(json_data, current_expected).await;
-                                            expected = ExpectedMessage::None;
-                                            continue;
-                                        } else {
-                                            // Header-only, wait for data
-                                            expected = current_expected;
-                                            continue;
+                                                    if current_expected != ExpectedMessage::None {
+                                                        if arr.len() >= 2 {
+                                                            // 1-step message
+                                                            if let Ok(data) = serde_json::to_string(&arr[1]) {
+                                                                self.process_text_data(&data, current_expected).await;
+                                                                expected = ExpectedMessage::None;
+                                                                continue;
+                                                            }
+                                                        } else {
+                                                            // Check for binary placeholder in the whole array if it's not 1-step
+                                                            let has_placeholder = arr.iter().skip(1).any(|v| {
+                                                                v.as_object().is_some_and(|obj| obj.contains_key("_placeholder"))
+                                                            });
+                                                            
+                                                            if has_placeholder || arr.len() == 1 {
+                                                                tracing::debug!(target: "DealsApiModule", "Detected binary placeholder, waiting for binary payload for {:?}", current_expected);
+                                                                expected = current_expected;
+                                                                continue;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
 
@@ -373,89 +376,10 @@ impl ApiModule<State> for DealsApiModule {
         // 451-["updateClosedDeals",...]
         // 451-["successcloseOrder",...]
 
-        Box::new(DealsUpdateRule::new(vec![
-            UPDATE_CLOSED_DEALS,
-            UPDATE_OPENED_DEALS,
-            SUCCESS_CLOSE_ORDER,
+        Box::new(MultiPatternRule::new(vec![
+            EV_UPDATE_CLOSED_DEALS,
+            EV_UPDATE_OPENED_DEALS,
+            EV_SUCCESS_CLOSE_ORDER,
         ]))
-    }
-}
-
-/// Create a new custom rule that matches the specific patterns and also returns true for strings
-/// that starts with any of the patterns
-struct DealsUpdateRule {
-    valid: AtomicBool,
-    patterns: Vec<String>,
-}
-
-impl DealsUpdateRule {
-    /// Create a new MultiPatternRule with the specified patterns
-    ///
-    /// # Arguments
-    /// * `patterns` - The string patterns to match against incoming messages
-    pub fn new(patterns: Vec<impl ToString>) -> Self {
-        Self {
-            valid: AtomicBool::new(false),
-            patterns: patterns.into_iter().map(|p| p.to_string()).collect(),
-        }
-    }
-}
-
-impl Rule for DealsUpdateRule {
-    fn call(&self, msg: &Message) -> bool {
-        match msg {
-            Message::Text(text) => {
-                for pattern in &self.patterns {
-                    if text.starts_with(pattern) {
-                        let remaining = &text[pattern.len()..];
-                        let trimmed_rem = remaining.trim();
-                        let has_placeholder = trimmed_rem.contains(r#""_placeholder":true"#);
-                        let is_header_only = trimmed_rem.is_empty()
-                            || trimmed_rem == "]"
-                            || trimmed_rem == ",]"
-                            || has_placeholder;
-
-                        if is_header_only {
-                            self.valid.store(true, Ordering::SeqCst);
-                            return true;
-                        } else {
-                            self.valid.store(false, Ordering::SeqCst);
-                            return true;
-                        }
-                    }
-                }
-
-                if let Some(start) = text.find('[') {
-                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text[start..]) {
-                        if let Some(arr) = value.as_array() {
-                            if arr.first().and_then(|v| v.as_str()).is_some() {
-                                // It's an event, but doesn't match our pattern.
-                                // Ignore it and don't consume 'valid'.
-                                return false;
-                            }
-                        }
-                    }
-                }
-
-                if self.valid.load(Ordering::SeqCst) {
-                    self.valid.store(false, Ordering::SeqCst);
-                    return true;
-                }
-                false
-            }
-            Message::Binary(_) => {
-                if self.valid.load(Ordering::SeqCst) {
-                    self.valid.store(false, Ordering::SeqCst);
-                    true
-                } else {
-                    false
-                }
-            }
-            _ => false,
-        }
-    }
-
-    fn reset(&self) {
-        self.valid.store(false, Ordering::SeqCst)
     }
 }

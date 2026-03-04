@@ -105,9 +105,17 @@ graph TD
 
 ### Python
 
-#### Option A: Prebuilt Wheels (Recommended)
+#### Option A: PyPI (Recommended)
 
-Install directly from our GitHub releases. Supports **Python 3.8 - 3.13**.
+The easiest way to install the library is via PyPI:
+
+```bash
+pip install binaryoptionstoolsv2
+```
+
+#### Option B: Prebuilt Wheels
+
+You can also install directly from our GitHub releases. Supports **Python 3.8 - 3.15**.
 
 **Windows**
 
@@ -127,7 +135,7 @@ pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/down
 pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.8/binaryoptionstoolsv2-0.2.8-cp39-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
 ```
 
-#### Option B: Build from Source
+#### Option C: Build from Source
 
 Requires `rustc`, `cargo`, and `maturin`.
 
@@ -136,12 +144,8 @@ git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git
 cd BinaryOptionsTools-v2/BinaryOptionsToolsV2
 pip install maturin
 maturin develop --release
-```
-
-#### Option C: Build from Source Automatically
-
-```bash
-pip install git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git#subdirectory=BinaryOptionsToolsV2
+# bleeding edge release(s)
+# pip install git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git#subdirectory=BinaryOptionsToolsV2
 ```
 
 ### Rust
@@ -164,7 +168,7 @@ Best for building trading bots that need to handle streams and trades simultaneo
 ```python
 import asyncio
 import os
-from BinaryOptionsToolsV2 import PocketOptionAsync
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
 async def main():
     # 1. Get SSID (Session ID)
@@ -176,13 +180,13 @@ async def main():
         balance = await client.balance()
         print(f"Current Balance: ${balance}")
 
-        # Place Trade: Asset, Amount, Duration
+        # Place Trade: Asset, Amount, Duration (seconds)
         trade_id, deal = await client.buy("EURUSD_otc", 1.0, 60)
         print(f"Trade Placed: {deal}")
 
-        # Wait for Result
+        # Wait for Result (blocks until trade is closed)
         result = await client.check_win(trade_id)
-        print(f"Outcome: {result['result']}")
+        print(f"Outcome: {result['result']} | Profit: {result['profit']}")
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -193,34 +197,75 @@ if __name__ == "__main__":
 Best for simple scripts or data fetching.
 
 ```python
-from BinaryOptionsToolsV2 import PocketOption
+from BinaryOptionsToolsV2.pocketoption import PocketOption
 import os
 
+# Initialize with Context Manager
 with PocketOption(ssid=os.getenv("POCKET_OPTION_SSID")) as client:
     print(f"Balance: ${client.balance()}")
+    
+    # Place Trade
     trade_id, _ = client.buy("EURUSD_otc", 1.0, 60)
+    
+    # Check Result
     print(f"Result: {client.check_win(trade_id)['result']}")
 ```
 
 ### Real-time Data Streaming
 
 ```python
-async with PocketOptionAsync(ssid="...") as client:
-    # Subscribe to 1-minute candles
-    subscription = await client.subscribe_symbol("EURUSD_otc", 60)
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
 
-    print("Streaming data...")
-    async for candle in subscription:
-        print(f"Timestamp: {candle['time']} | Close: {candle['close']}")
+async def main():
+    async with PocketOptionAsync(ssid="...") as client:
+        # Subscribe to real-time price updates
+        subscription = await client.subscribe_symbol("EURUSD_otc")
+
+        print("Streaming data...")
+        async for candle in subscription:
+            print(f"Time: {candle['time']} | Close: {candle['close']}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
+
+---
+
+## Examples & Tutorials
+
+For more detailed usage and advanced patterns, explore our examples:
+
+- **Python Examples**:
+  - [Asynchronous Examples](docs/examples/python/async/) - Advanced bots, chunked subscriptions, and more.
+  - [Synchronous Examples](docs/examples/python/sync/) - Simple scripts and data gathering.
+- **Rust Examples**:
+  - [Core Library Examples](docs/examples/rust/) - High-performance implementations.
+  - [Advanced Module Usage](crates/binary_options_tools/examples/) - Pending orders and complex logic.
+- **SSID Tutorial**: See the [Tutorials Directory](tutorials/) for instructions on how to extract your session ID (SSID) from the browser.
 
 ---
 
 ## Advanced Usage
 
+### Logging and Tracing
+
+Enable detailed logging for debugging:
+
+```python
+from BinaryOptionsToolsV2.tracing import start_logs
+
+# Start logging to terminal and file
+start_logs(path="logs/", level="INFO", terminal=True)
+```
+
+### Raw Handler API
+
 For complex implementations, you can access the **Raw Handler API**. This allows you to construct custom WebSocket messages and filter responses.
 
 ```python
+from BinaryOptionsToolsV2.validator import Validator
+
 # Create a validator to filter messages containing "balance"
 validator = Validator.contains("balance")
 handler = await client.create_raw_handler(validator)
