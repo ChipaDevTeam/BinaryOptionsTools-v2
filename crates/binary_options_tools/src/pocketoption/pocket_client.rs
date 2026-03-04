@@ -165,6 +165,13 @@ impl PocketOption {
     ///     Ok(())
     /// }
     /// ```
+    /// Creates a new PocketOption client with the provided session ID.
+    ///
+    /// # Arguments
+    /// * `ssid` - A valid PocketOption session ID (SSID)
+    ///
+    /// # Returns
+    /// A `PocketResult` containing the initialized client if successful
     pub async fn new(ssid: impl ToString) -> PocketResult<Self> {
         Self::new_with_config(ssid, Config::default()).await
     }
@@ -290,7 +297,7 @@ impl PocketOption {
         }
 
         // Wait for update
-        if let Ok(_) = tokio::time::timeout(Duration::from_secs(10), state.balance_updated.notified()).await {
+        if tokio::time::timeout(Duration::from_secs(10), state.balance_updated.notified()).await.is_ok() {
             if let Some(balance) = *state.balance.read().await {
                 return balance;
             }
@@ -547,10 +554,10 @@ impl PocketOption {
             return Ok(());
         }
 
-        if tokio::time::timeout(timeout, state.assets_updated.notified()).await.is_ok() {
-            if state.assets.read().await.is_some() {
-                return Ok(());
-            }
+        if tokio::time::timeout(timeout, state.assets_updated.notified()).await.is_ok()
+            && state.assets.read().await.is_some()
+        {
+            return Ok(());
         }
         
         // Timeout or failed

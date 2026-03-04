@@ -226,7 +226,7 @@ impl ApiModule<State> for DealsApiModule {
                                         if let Ok(serde_json::Value::Array(arr)) =
                                             serde_json::from_str::<serde_json::Value>(&text[start..])
                                         {
-                                            if arr.len() >= 1 {
+                                            if !arr.is_empty() {
                                                 if let Some(event_name) = arr[0].as_str() {
                                                     if event_name == EV_UPDATE_OPENED_DEALS {
                                                         current_expected = ExpectedMessage::UpdateOpenedDeals;

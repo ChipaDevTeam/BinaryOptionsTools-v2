@@ -277,19 +277,18 @@ impl State {
     /// Adds or replaces a validator in the list of raw validators.
     pub fn add_raw_validator(&self, id: Uuid, validator: Validator) {
         self.raw_validators
-            .write()
-            .unwrap()
+            .write().expect("Raw validators lock poisoned")
             .insert(id, Arc::new(validator));
     }
 
     /// Removes a validator by ID. Returns whether it existed.
     pub fn remove_raw_validator(&self, id: &Uuid) -> bool {
-        self.raw_validators.write().unwrap().remove(id).is_some()
+        self.raw_validators.write().expect("Raw validators lock poisoned").remove(id).is_some()
     }
 
     /// Removes all the validators
     pub fn clear_raw_validators(&self) {
-        self.raw_validators.write().unwrap().clear();
+        self.raw_validators.write().expect("Raw validators lock poisoned").clear();
     }
 }
 

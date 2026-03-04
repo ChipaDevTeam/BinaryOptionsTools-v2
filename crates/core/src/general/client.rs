@@ -86,6 +86,15 @@ where
     T: DataHandler<Transfer = Transfer> + 'static,
     U: InnerConfig + 'static,
 {
+    /// Initializes a new WebSocket client with the provided credentials and configuration.
+    ///
+    /// # Generic Parameters
+    /// * `Transfer` - The message transfer type
+    /// * `Handler` - The message handler type
+    /// * `Connector` - The connection manager type
+    /// * `Creds` - The credentials type
+    /// * `T` - The data handler type
+    /// * `U` - The configuration type
     pub async fn init(
         credentials: Creds,
         connector: Connector,
@@ -119,6 +128,15 @@ where
     T: DataHandler<Transfer = Transfer> + 'static,
     U: InnerConfig + 'static,
 {
+    /// Initializes a new WebSocket client with the provided credentials and configuration.
+    ///
+    /// # Generic Parameters
+    /// * `Transfer` - The message transfer type
+    /// * `Handler` - The message handler type
+    /// * `Connector` - The connection manager type
+    /// * `Creds` - The credentials type
+    /// * `T` - The data handler type
+    /// * `U` - The configuration type
     pub async fn init(
         credentials: Creds,
         connector: Connector,
@@ -250,42 +268,11 @@ where
 
         match try_join3(listener_future, sender_future, callback).await {
             Ok(_) => {
-                if let Ok(websocket) = connector.connect(credentials.clone(), config).await {
-                    return Ok(websocket);
-                } else {
-                    *loops += 1;
-                    let sleep_interval = config.get_sleep_interval()?;
-                    let max_loops = config.get_max_allowed_loops()?;
-                    warn!(
-                        "Error reconnecting... trying again in {sleep_interval} seconds (try {loops} of {max_loops})"
-                    );
-                    sleep(Duration::from_secs(config.get_sleep_interval()?)).await;
-                    if *loops >= max_loops {
-                        return Err(BinaryOptionsToolsError::MaxReconnectAttemptsReached(
-                            max_loops,
-                        ));
-                    }
-                }
+                Self::handle_reconnection_failure(connector, credentials, config, loops).await
             }
             Err(e) => {
                 warn!("Error in event loop, {e}, reconnecting...");
-                // println!("Reconnecting...");
-                if let Ok(websocket) = connector.connect(credentials.clone(), config).await {
-                    return Ok(websocket);
-                } else {
-                    *loops += 1;
-                    let sleep_interval = config.get_sleep_interval()?;
-                    let max_loops = config.get_max_allowed_loops()?;
-                    warn!(
-                        "Error reconnecting... trying again in {sleep_interval} seconds (try {loops} of {max_loops})"
-                    );
-                    sleep(Duration::from_secs(config.get_sleep_interval()?)).await;
-                    if *loops >= max_loops {
-                        return Err(BinaryOptionsToolsError::MaxReconnectAttemptsReached(
-                            max_loops,
-                        ));
-                    }
-                }
+                Self::handle_reconnection_failure(connector, credentials, config, loops).await
             }
         }
         Err(BinaryOptionsToolsError::ReconnectionAttemptFailure {
@@ -293,6 +280,34 @@ where
             max: config.get_max_allowed_loops()?,
         })
         // unreachable!("Please contact @Rick-29 on github.com this error is completely unexpected and should not happen.")
+    }
+
+    async fn handle_reconnection_failure(
+        connector: &Connector,
+        credentials: &Creds,
+        config: &Config<T, Transfer, U>,
+        loops: &mut u32,
+    ) -> BinaryOptionsResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
+        if let Ok(websocket) = connector.connect(credentials.clone(), config).await {
+            return Ok(websocket);
+        } else {
+            *loops += 1;
+            let sleep_interval = config.get_sleep_interval()?;
+            let max_loops = config.get_max_allowed_loops()?;
+            warn!(
+                "Error reconnecting... trying again in {sleep_interval} seconds (try {loops} of {max_loops})"
+            );
+            sleep(Duration::from_secs(config.get_sleep_interval()?)).await;
+            if *loops >= max_loops {
+                return Err(BinaryOptionsToolsError::MaxReconnectAttemptsReached(
+                    max_loops,
+                ));
+            }
+        }
+        Err(BinaryOptionsToolsError::ReconnectionAttemptFailure {
+            number: *loops,
+            max: config.get_max_allowed_loops()?,
+        })
     }
 
     /// Recieves all the messages from the websocket connection and handles it
