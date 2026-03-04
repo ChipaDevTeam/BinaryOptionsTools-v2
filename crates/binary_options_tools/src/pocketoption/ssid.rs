@@ -164,7 +164,12 @@ impl Ssid {
         let mut ssid: Demo = serde_json::from_str(parsed)
             .map_err(|e| CoreError::SsidParsing(format!("JSON parsing error: {e}")))?;
 
-        ssid.raw = trimmed.to_string();
+        // Ensure raw is always in the full 42["auth",...] format for sending over WS
+        ssid.raw = if trimmed.starts_with("42[\"auth\",") {
+            trimmed.to_string()
+        } else {
+            format!("42[\"auth\",{}]", trimmed)
+        };
         ssid.json_raw = parsed.to_string();
 
         let is_demo_url = ssid
@@ -360,7 +365,16 @@ mod tests {
             let reconstructed = parsed.to_string();
             let re_parsed = Ssid::parse(&reconstructed)?;
             assert_eq!(format!("{:?}", parsed), format!("{:?}", re_parsed));
+            assert!(reconstructed.starts_with("42[\"auth\","));
         }
+
+        // Test parsing ONLY JSON part
+        let json_only = r#"{"session":"dummy_session_id","isDemo":1,"uid":87654321,"platform":2}"#;
+        let parsed = Ssid::parse(json_only)?;
+        let reconstructed = parsed.to_string();
+        assert!(reconstructed.starts_with("42[\"auth\","));
+        assert!(reconstructed.contains(json_only));
+
         Ok(())
     }
 }
