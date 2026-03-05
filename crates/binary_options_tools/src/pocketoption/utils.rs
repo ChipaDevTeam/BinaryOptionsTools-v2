@@ -1,4 +1,5 @@
 use binary_options_tools_core_pre::connector::{ConnectorError, ConnectorResult};
+use binary_options_tools_core_pre::error::{CoreError, CoreResult};
 use binary_options_tools_core_pre::reimports::{
     connect_async_tls_with_config, generate_key, Connector, MaybeTlsStream, Request,
     WebSocketStream,
@@ -20,7 +21,7 @@ use url::Url;
 
 static CONNECTOR: OnceLock<Connector> = OnceLock::new();
 
-fn get_connector() -> ConnectorResult<&'static Connector> {
+fn get_connector() -> CoreResult<&'static Connector> {
     if let Some(connector) = CONNECTOR.get() {
         return Ok(connector);
     }
@@ -28,9 +29,9 @@ fn get_connector() -> ConnectorResult<&'static Connector> {
     let mut root_store = rustls::RootCertStore::empty();
     let certs = rustls_native_certs::load_native_certs().certs;
     if certs.is_empty() {
-        return Err(ConnectorError::Custom(
+        return Err(CoreError::Connection(ConnectorError::Custom(
             "Could not load any native certificates".to_string(),
-        ));
+        )));
     }
     for cert in certs {
         root_store.add(cert).ok();
@@ -41,7 +42,7 @@ fn get_connector() -> ConnectorResult<&'static Connector> {
 
     let connector = Connector::Rustls(std::sync::Arc::new(tls_config));
     let _ = CONNECTOR.set(connector);
-    Ok(CONNECTOR.get().unwrap())
+    CONNECTOR.get().ok_or_else(|| CoreError::Other("Connector not initialized".into()))
 }
 
 const IP_PROVIDERS: &[&str] = &[
@@ -154,7 +155,7 @@ pub async fn try_connect(
     url: String,
 ) -> ConnectorResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
     init_crypto_provider();
-    let connector = get_connector()?;
+    let connector = get_connector().map_err(|e| ConnectorError::Core(e.to_string()))?;
 
     let user_agent = ssid.user_agent();
 

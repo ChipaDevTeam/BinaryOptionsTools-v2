@@ -26,6 +26,7 @@ project_name: "BinaryOptionsTools-v2"
 # Note that when using the JetBrains backend, language servers are not used and this list is correspondingly ignored.
 languages:
   - rust
+  - python
 
 # the encoding used by text files in the project
 # For a list of possible encodings, see https://docs.python.org/3.11/library/codecs.html#standard-encodings

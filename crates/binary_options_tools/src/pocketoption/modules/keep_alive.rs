@@ -88,7 +88,14 @@ impl LightweightModule<State> for InitModule {
 
                         // Socket.IO 4.x established connection SID message: 40{"sid":"..."}
                         if text.starts_with("40") {
-                            let ssid_str = self.state.ssid.to_string();
+                            let mut ssid_str = self.state.ssid.to_string();
+                            
+                            // Ensure SSID is correctly formatted for Socket.IO (starts with a packet type, usually 42)
+                            if !ssid_str.starts_with('4') {
+                                debug!(target: "InitModule", "SSID does not start with Socket.IO packet type; wrapping in 42[\"auth\",...]");
+                                ssid_str = format!(r#"42["auth",{}]"#, ssid_str);
+                            }
+
                             let redacted_ssid = if ssid_str.len() > 20 {
                                 format!("{}...", &ssid_str[..20])
                             } else {
@@ -260,6 +267,7 @@ impl Rule for InitRule {
                     false
                 }
             }
+            Message::Close(_) => true,
             _ => false,
         }
     }

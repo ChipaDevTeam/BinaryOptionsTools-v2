@@ -140,6 +140,8 @@ maturin develop --release
 
 #### Option C: Build from Source Automatically
 
+Requires `rustc`, `cargo`, and `maturin`.
+
 ```bash
 pip install git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git#subdirectory=BinaryOptionsToolsV2
 ```

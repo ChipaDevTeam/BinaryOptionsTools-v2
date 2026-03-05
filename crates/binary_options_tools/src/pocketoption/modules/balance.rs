@@ -11,7 +11,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use tracing::{debug, warn};
 
-use crate::pocketoption::{state::State, types::TwoStepRule};
+use crate::pocketoption::{state::State, types::MultiPatternRule};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -79,6 +79,6 @@ impl LightweightModule<State> for BalanceModule {
     }
 
     fn rule() -> Box<dyn Rule + Send + Sync> {
-        Box::new(TwoStepRule::new(r#"451-["successupdateBalance","#))
+        Box::new(MultiPatternRule::new(vec!["successupdateBalance"]))
     }
 }

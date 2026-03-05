@@ -58,4 +58,7 @@ pub mod trades;
 mod pending_trades_tests;
 
 #[cfg(test)]
+mod resilient_parsing_tests;
+
+#[cfg(test)]
 mod trades_tests;

@@ -534,16 +534,18 @@ class TestCandles:
         assert len(candles) == 1
         assert "open" in candles[0]
         assert "time" in candles[0]
-        mock_raw_pocketoption.compile_candles.assert_called_with(
-            "EURUSD_otc", 20, 300
-        )
+        mock_raw_pocketoption.compile_candles.assert_called_with("EURUSD_otc", 20, 300)
 
     @pytest.mark.asyncio
     async def test_compile_candles_validation_error(self, async_client):
         """Test compile_candles validation for non-positive periods."""
-        with pytest.raises(ValueError, match="custom_period must be a positive integer"):
+        with pytest.raises(
+            ValueError, match="custom_period must be a positive integer"
+        ):
             await async_client.compile_candles("EURUSD_otc", 0, 300)
-        with pytest.raises(ValueError, match="lookback_period must be a positive integer"):
+        with pytest.raises(
+            ValueError, match="lookback_period must be a positive integer"
+        ):
             await async_client.compile_candles("EURUSD_otc", 20, -1)
 
 
