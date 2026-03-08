@@ -7,12 +7,22 @@
 - Build all crates: `cargo build`
 - Build release: `cargo build --release`
 - Build specific crate: `cargo build -p binary_options_tools`
+- Build UniFFI bindings: `cargo build -p binary_options_tools_uni`
 - Build Python extension (from BinaryOptionsToolsV2): `maturin build --release`
 - Build free-threaded Python: `maturin build --release -i python3.13t`
 - Build sdist: `maturin sdist`
 - Build with stub generation: `cargo build -p BinaryOptionsToolsV2 --features stubgen`
 - Generate stubs only: `cargo build -p BinaryOptionsToolsV2 --features stubgen --target-dir target/stubgen`
 - Clean build artifacts: `cargo clean`
+
+### UniFFI Bindings (Multi-language)
+
+- Generate bindings (from BinaryOptionsToolsUni):
+  - Kotlin: `cargo run -p uniffi-bindgen generate src/binary_options_tools_uni.udl --language kotlin --out-dir out/kotlin`
+  - Swift: `cargo run -p uniffi-bindgen generate src/binary_options_tools_uni.udl --language swift --out-dir out/swift`
+  - C#: `cargo run -p uniffi-bindgen generate src/binary_options_tools_uni.udl --language cs --out-dir out/cs`
+  - Go: `cargo run -p uniffi-bindgen generate src/binary_options_tools_uni.udl --language go --out-dir out/go`
+- Note: Requires the `.udl` or `uniffi::setup_scaffolding!` macros to be correctly configured in `src/lib.rs`.
 
 ### Python Stub Generation
 
@@ -118,11 +128,25 @@ Python tests rely on `POCKET_OPTION_SSID` environment variable (optional). Tests
 ## Project Structure
 
 - `crates/`: Rust crates (core, macros, binary_options_tools)
-- `BinaryOptionsToolsV2/`: Python package with maturin build
-- `BinaryOptionsToolsUni/`: UniFFI bindings for multi-language support
-- `tests/`: Python tests (mirrors package structure)
-- `data/`: Test fixtures and JSON data
-- `docs/`: MkDocs documentation
+  - `core/`: Low-level utilities, configuration, and WebSocket base.
+  - `binary_options_tools/`: High-level platform implementations (PocketOption, ExpertOption) and Framework.
+- `BinaryOptionsToolsV2/`: Python package with maturin build (PyO3).
+- `BinaryOptionsToolsUni/`: UniFFI bindings for multi-language support (Kotlin, Swift, Go, C#, Ruby, etc.).
+- `tests/`: Python and Rust tests (mirrors package structure).
+- `data/`: Test fixtures and JSON data.
+- `docs/`: MkDocs documentation.
+
+## Framework & High-Level API
+
+The `framework` module in `binary_options_tools` provides an event-driven system for building trading bots.
+
+- **Bot**: Manages the event loop and strategy execution.
+- **Strategy**: Trait for implementing custom trading logic (on_candle, on_tick, etc.).
+- **Context**: Provides a unified API to interact with any market (Real or Virtual).
+- **VirtualMarket**: A simulated market for backtesting without live connections or SSIDs.
+
+### Running Framework Tests
+- Rust: `cargo test --package binary_options_tools --lib framework::tests`
 
 ## Conventions Observed
 
@@ -147,7 +171,7 @@ husky + lint-staged configured to run:
 - Python: `ruff check --fix` then `ruff format`
 - Rust: `rustfmt`
 
-Install with `pnpm install` (package.json present for tooling).
+Install with `bun install` (package.json present for tooling).
 
 ## Notes
 

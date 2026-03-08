@@ -4,7 +4,7 @@ use async_channel::{Receiver, RecvError};
 use futures_util::{stream::unfold, Stream};
 
 use crate::{
-    error::{BinaryOptionsResult, BinaryOptionsToolsError},
+    error::{Result, Error},
     utils::time::timeout,
 };
 
@@ -33,21 +33,21 @@ impl<T> RecieverStream<T> {
         Self { inner, timeout }
     }
 
-    async fn receive(&self) -> BinaryOptionsResult<T> {
+    async fn receive(&self) -> Result<T> {
         match self.timeout {
             Some(time) => timeout(time, self.inner.recv(), "RecieverStream".to_string()).await,
             None => Ok(self.inner.recv().await?),
         }
     }
 
-    pub fn to_stream(&self) -> impl Stream<Item = BinaryOptionsResult<T>> + '_ {
+    pub fn to_stream(&self) -> impl Stream<Item = Result<T>> + '_ {
         Box::pin(unfold(self, move |state| async move {
             let item = state.receive().await;
             Some((item, state))
         }))
     }
 
-    pub fn to_stream_static(self: Arc<Self>) -> impl Stream<Item = BinaryOptionsResult<T>> + 'static
+    pub fn to_stream_static(self: Arc<Self>) -> impl Stream<Item = Result<T>> + 'static
     where
         T: 'static,
     {
@@ -82,32 +82,32 @@ impl<T> FilteredRecieverStream<T> {
         Self::new(inner, None, filter)
     }
 
-    async fn recv(&self) -> BinaryOptionsResult<T> {
+    async fn recv(&self) -> Result<T> {
         while let Ok(msg) = self.inner.recv().await {
             if self.filter.validate(&msg) {
                 return Ok(msg);
             }
         }
-        Err(BinaryOptionsToolsError::ChannelRequestRecievingError(
+        Err(Error::ChannelRequestRecievingError(
             RecvError,
         ))
     }
 
-    async fn receive(&self) -> BinaryOptionsResult<T> {
+    async fn receive(&self) -> Result<T> {
         match self.timeout {
             Some(time) => timeout(time, self.recv(), "RecieverStream".to_string()).await,
             None => Ok(self.inner.recv().await?),
         }
     }
 
-    pub fn to_stream(&self) -> impl Stream<Item = BinaryOptionsResult<T>> + '_ {
+    pub fn to_stream(&self) -> impl Stream<Item = Result<T>> + '_ {
         Box::pin(unfold(self, move |state| async move {
             let item = state.receive().await;
             Some((item, state))
         }))
     }
 
-    pub fn to_stream_static(self: Arc<Self>) -> impl Stream<Item = BinaryOptionsResult<T>> + 'static
+    pub fn to_stream_static(self: Arc<Self>) -> impl Stream<Item = Result<T>> + 'static
     where
         T: 'static,
     {

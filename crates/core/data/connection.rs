@@ -9,7 +9,7 @@ use tokio::{net::TcpStream, sync::Mutex, time::timeout};
 use url::Url;
 
 use crate::{
-    error::{BinaryOptionsResult, BinaryOptionsToolsError},
+    error::{Result, Error},
     reimports::{MaybeTlsStream, WebSocketStream},
 };
 
@@ -114,7 +114,7 @@ impl ConnectionPool {
         &self,
         url: String,
         info: ConnectionInfo,
-    ) -> BinaryOptionsResult<()> {
+    ) -> Result<()> {
         let mut connections = self.connections.lock().await;
 
         if connections.len() >= self.max_connections {
@@ -142,8 +142,8 @@ pub trait ConnectionManager: Send + Sync {
     async fn connect(
         &self,
         urls: &[Url],
-    ) -> BinaryOptionsResult<(WebSocketStream<MaybeTlsStream<TcpStream>>, String)>;
-    async fn test_connection(&self, url: &Url) -> BinaryOptionsResult<Duration>;
+    ) -> Result<(WebSocketStream<MaybeTlsStream<TcpStream>>, String)>;
+    async fn test_connection(&self, url: &Url) -> Result<Duration>;
 }
 
 pub struct EnhancedConnectionManager {
@@ -164,7 +164,7 @@ impl EnhancedConnectionManager {
     async fn try_connect_single(
         &self,
         url: &Url,
-    ) -> BinaryOptionsResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
+    ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {
         use crate::reimports::{connect_async_tls_with_config, Connector};
         use tokio_tungstenite::tungstenite::http::Request;
 
@@ -203,7 +203,7 @@ impl EnhancedConnectionManager {
                 self.pool
                     .update_stats(url.as_str(), start.elapsed(), false)
                     .await;
-                Err(BinaryOptionsToolsError::WebsocketConnectionError(Box::new(
+                Err(Error::WebsocketConnectionError(Box::new(
                     e,
                 )))
             }
@@ -211,7 +211,7 @@ impl EnhancedConnectionManager {
                 self.pool
                     .update_stats(url.as_str(), self.connect_timeout, false)
                     .await;
-                Err(BinaryOptionsToolsError::TimeoutError {
+                Err(Error::TimeoutError {
                     task: "Connection".to_string(),
                     duration: self.connect_timeout,
                 })
@@ -225,7 +225,7 @@ impl ConnectionManager for EnhancedConnectionManager {
     async fn connect(
         &self,
         urls: &[Url],
-    ) -> BinaryOptionsResult<(WebSocketStream<MaybeTlsStream<TcpStream>>, String)> {
+    ) -> Result<(WebSocketStream<MaybeTlsStream<TcpStream>>, String)> {
         // Try best URL first if available
         if let Some(best_url) = self.pool.get_best_url().await {
             if let Ok(url) = Url::parse(&best_url) {
@@ -271,12 +271,12 @@ impl ConnectionManager for EnhancedConnectionManager {
             }
         }
 
-        Err(BinaryOptionsToolsError::WebsocketConnectionError(Box::new(
+        Err(Error::WebsocketConnectionError(Box::new(
             last_error.unwrap_or(tokio_tungstenite::tungstenite::Error::ConnectionClosed),
         )))
     }
 
-    async fn test_connection(&self, url: &Url) -> BinaryOptionsResult<Duration> {
+    async fn test_connection(&self, url: &Url) -> Result<Duration> {
         let start = Instant::now();
         self.try_connect_single(url).await?;
         Ok(start.elapsed())

@@ -4,7 +4,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use tokio::net::TcpStream;
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
-use crate::error::BinaryOptionsResult;
+use crate::error::Result;
 
 use super::{
     config::Config,
@@ -23,7 +23,7 @@ pub trait InnerConfig: DeserializeOwned + Clone + Send {}
 pub trait DataHandler: Clone + Send + Sync {
     type Transfer: MessageTransfer;
 
-    async fn update(&self, message: &Self::Transfer) -> BinaryOptionsResult<()>;
+    async fn update(&self, message: &Self::Transfer) -> Result<()>;
 }
 
 /// Allows users to add a callback that will be called when the websocket connection is established after being disconnected, you will have access to the `Data` struct providing access to any required information stored during execution
@@ -38,7 +38,7 @@ pub trait WCallback: Send + Sync {
         data: Data<Self::T, Self::Transfer>,
         sender: &SenderMessage,
         config: &Config<Self::T, Self::Transfer, Self::U>,
-    ) -> BinaryOptionsResult<()>;
+    ) -> Result<()>;
 }
 
 /// Main entry point for the `WebsocketClient` struct, this trait is used by the client to handle incoming messages, return data to user and a lot more things
@@ -82,7 +82,7 @@ pub trait MessageHandler: Clone + Send + Sync {
         message: &Message,
         previous: &Option<<<Self as MessageHandler>::Transfer as MessageTransfer>::Info>,
         sender: &SenderMessage,
-    ) -> BinaryOptionsResult<(Option<MessageType<Self::Transfer>>, bool)>;
+    ) -> Result<(Option<MessageType<Self::Transfer>>, bool)>;
 }
 
 #[async_trait]
@@ -94,7 +94,7 @@ pub trait Connect: Clone + Send + Sync {
         &self,
         creds: Self::Creds,
         config: &Config<T, Transfer, U>,
-    ) -> BinaryOptionsResult<WebSocketStream<MaybeTlsStream<TcpStream>>>;
+    ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 }
 
 pub trait ValidatorTrait<T> {

@@ -35,5 +35,5 @@
 - **Dependency Management**:
   - Rust: `cargo`
   - Python: `pip`, `uv.lock`
-  - JS: `pnpm`
+  - JS: `bun`
 - **Quality Control**: `husky`, `lint-staged`, `rustfmt`, `prettier`, `markdownlint`

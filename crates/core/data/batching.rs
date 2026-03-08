@@ -11,7 +11,7 @@ use tokio::{
 };
 use tokio_tungstenite::tungstenite::Message;
 
-use crate::error::{BinaryOptionsResult, BinaryOptionsToolsError};
+use crate::error::{Result, Error};
 
 #[derive(Debug, Clone)]
 pub struct BatchingConfig {
@@ -53,11 +53,11 @@ impl MessageBatcher {
         }
     }
 
-    pub async fn add_message(&self, message: Message) -> BinaryOptionsResult<()> {
+    pub async fn add_message(&self, message: Message) -> Result<()> {
         let mut pending = self.pending_messages.lock().await;
 
         if pending.len() >= self.config.max_pending {
-            return Err(BinaryOptionsToolsError::GeneralMessageSendingError(
+            return Err(Error::GeneralMessageSendingError(
                 "Message queue is full".to_string(),
             ));
         }
@@ -81,7 +81,7 @@ impl MessageBatcher {
     async fn flush_batch_internal(
         &self,
         pending: &mut VecDeque<Message>,
-    ) -> BinaryOptionsResult<()> {
+    ) -> Result<()> {
         if pending.is_empty() {
             return Ok(());
         }
@@ -92,12 +92,12 @@ impl MessageBatcher {
         self.batch_sender
             .send(batch)
             .await
-            .map_err(|e| BinaryOptionsToolsError::GeneralMessageSendingError(e.to_string()))?;
+            .map_err(|e| Error::GeneralMessageSendingError(e.to_string()))?;
 
         Ok(())
     }
 
-    pub async fn flush_batch(&self) -> BinaryOptionsResult<()> {
+    pub async fn flush_batch(&self) -> Result<()> {
         let mut pending = self.pending_messages.lock().await;
         self.flush_batch_internal(&mut pending).await
     }
@@ -150,7 +150,7 @@ impl RateLimiter {
         }
     }
 
-    pub async fn acquire(&self) -> BinaryOptionsResult<()> {
+    pub async fn acquire(&self) -> Result<()> {
         loop {
             {
                 let mut tokens = self.tokens.lock().await;

@@ -17,7 +17,7 @@ include = ["src/**/*", "data/**/*", "Cargo.toml", "Readme.md", "LICENSE"]
 anyhow = "1.0.98"
 async-trait = "0.1.89"
 chrono = { version = "0.4.35", features = ["serde"] }
-# trading-core = { path = "../core" }
+binary-options-tools-core = { path = "../core", version = "0.2.0" }
 # trading-macros = { path = "../macros" }
 futures-util = "0.3.30"
 reqwest = { version = "0.12.1", default-features = false, features = ["rustls-tls", "json"] }
@@ -44,4 +44,3 @@ php_serde = "0.6.0"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 kanal = "0.1.0"
 
-[workspace]

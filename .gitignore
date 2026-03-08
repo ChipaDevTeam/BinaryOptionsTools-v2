@@ -37,6 +37,9 @@ pytest_cache/
 
 # ---- Node (if used) ----
 node_modules/
+bun-debug.log*
+bun-error.log*
+# npm/yarn legacy
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

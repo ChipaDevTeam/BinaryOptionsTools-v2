@@ -25,7 +25,7 @@ use url::Url;
 
 use crate::{
     constants::MAX_CHANNEL_CAPACITY,
-    error::{BinaryOptionsResult, BinaryOptionsToolsError},
+    error::{Result, Error},
     general::{
         batching::{BatchingConfig, MessageBatcher, RateLimiter},
         config::Config,
@@ -158,7 +158,7 @@ impl KeepAliveManager {
     }
 
     /// Start keep-alive with ping loop (like Python's _ping_loop)
-    pub async fn start(&mut self, message_sender: Sender<Message>) -> BinaryOptionsResult<()> {
+    pub async fn start(&mut self, message_sender: Sender<Message>) -> Result<()> {
         if self.is_running {
             return Ok(());
         }
@@ -456,7 +456,7 @@ where
     /// Configuration from the original system
     pub config: Config<T, Transfer, U>,
     /// Event loop handle
-    _event_loop: JoinHandle<BinaryOptionsResult<()>>,
+    _event_loop: JoinHandle<Result<()>>,
     /// Optional message batcher for performance
     batcher: Option<MessageBatcher>,
     /// Optional rate limiter
@@ -497,7 +497,7 @@ where
         data: Data<T, Transfer>,
         handler: Handler,
         config: Config<T, Transfer, U>,
-    ) -> BinaryOptionsResult<Self> {
+    ) -> Result<Self> {
         let inner =
             WebSocketInnerClient2::init(credentials, connector, data, handler, config).await?;
 
@@ -550,7 +550,7 @@ where
         data: Data<T, Transfer>,
         handler: Handler,
         config: Config<T, Transfer, U>,
-    ) -> BinaryOptionsResult<Self> {
+    ) -> Result<Self> {
         // Test connection first
         let _test_connection = connector.connect(credentials.clone(), &config).await?;
 
@@ -609,7 +609,7 @@ where
         connector: Connector,
         config: Config<T, Transfer, U>,
         message_receiver: Receiver<Message>,
-    ) -> BinaryOptionsResult<JoinHandle<BinaryOptionsResult<()>>> {
+    ) -> Result<JoinHandle<Result<()>>> {
         let task = tokio::spawn(async move {
             let mut reconnect_attempts = 0;
             let max_reconnects = config.get_max_allowed_loops()?;
@@ -697,7 +697,7 @@ where
                 reconnect_attempts += 1;
                 if reconnect_attempts >= max_reconnects {
                     error!("Max reconnection attempts reached");
-                    return Err(BinaryOptionsToolsError::MaxReconnectAttemptsReached(
+                    return Err(Error::MaxReconnectAttemptsReached(
                         max_reconnects,
                     ));
                 }
@@ -724,7 +724,7 @@ where
         message_receiver: Receiver<Message>,
         mut write: SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
         mut read: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
-    ) -> BinaryOptionsResult<()> {
+    ) -> Result<()> {
         // Spawn message sender task
         let sender_task = {
             let shared_state = shared_state.clone();
@@ -735,7 +735,7 @@ where
 
                     if let Err(e) = write.send(message.clone()).await {
                         error!("Failed to send message: {}", e);
-                        return Err(BinaryOptionsToolsError::WebSocketMessageError(
+                        return Err(Error::WebSocketMessageError(
                             e.to_string(),
                         ));
                     }
@@ -843,14 +843,14 @@ where
                         }
                         Err(e) => {
                             error!("WebSocket message error: {}", e);
-                            return Err(BinaryOptionsToolsError::WebSocketMessageError(
+                            return Err(Error::WebSocketMessageError(
                                 e.to_string(),
                             ));
                         }
                     }
                 }
 
-                Err(BinaryOptionsToolsError::WebSocketMessageError(
+                Err(Error::WebSocketMessageError(
                     "Message stream ended unexpectedly".to_string(),
                 ))
             })
@@ -870,7 +870,7 @@ where
     }
 
     /// Send a message through the WebSocket connection
-    pub async fn send_message(&self, message: Message) -> BinaryOptionsResult<()> {
+    pub async fn send_message(&self, message: Message) -> Result<()> {
         // Apply rate limiting if enabled
         if let Some(rate_limiter) = &self.rate_limiter {
             rate_limiter.acquire().await?;
@@ -883,7 +883,7 @@ where
             self.sender
                 .send(message)
                 .await
-                .map_err(|e| BinaryOptionsToolsError::ChannelRequestSendingError(e.to_string()))?;
+                .map_err(|e| Error::ChannelRequestSendingError(e.to_string()))?;
         }
 
         Ok(())
@@ -902,7 +902,7 @@ pub struct LoggingEventHandler;
 
 #[async_trait]
 impl<Transfer: MessageTransfer> EventHandler<WebSocketEvent<Transfer>> for LoggingEventHandler {
-    async fn handle(&self, event: &Event<WebSocketEvent<Transfer>>) -> BinaryOptionsResult<()> {
+    async fn handle(&self, event: &Event<WebSocketEvent<Transfer>>) -> Result<()> {
         match &event.data {
             WebSocketEvent::Connected => {
                 info!("WebSocket connected");
@@ -950,7 +950,7 @@ impl StatsEventHandler {
 
 #[async_trait]
 impl<Transfer: MessageTransfer> EventHandler<WebSocketEvent<Transfer>> for StatsEventHandler {
-    async fn handle(&self, event: &Event<WebSocketEvent<Transfer>>) -> BinaryOptionsResult<()> {
+    async fn handle(&self, event: &Event<WebSocketEvent<Transfer>>) -> Result<()> {
         let mut stats = self.custom_stats.lock().await;
 
         match &event.data {
@@ -991,7 +991,7 @@ mod tests {
         async fn handle(
             &self,
             _event: &Event<WebSocketEvent<Transfer>>,
-        ) -> BinaryOptionsResult<()> {
+        ) -> Result<()> {
             self.event_count.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
