@@ -267,11 +267,13 @@ where
 
         match try_join3(listener_future, sender_future, callback).await {
             Ok(_) => {
-                return Self::handle_reconnection_failure(connector, credentials, config, loops).await;
+                return Self::handle_reconnection_failure(connector, credentials, config, loops)
+                    .await;
             }
             Err(e) => {
                 warn!("Error in event loop, {e}, reconnecting...");
-                return Self::handle_reconnection_failure(connector, credentials, config, loops).await;
+                return Self::handle_reconnection_failure(connector, credentials, config, loops)
+                    .await;
             }
         }
         // unreachable!("Please contact @Rick-29 on github.com this error is completely unexpected and should not happen.")
@@ -294,9 +296,7 @@ where
             );
             sleep(Duration::from_secs(config.get_sleep_interval()?)).await;
             if *loops >= max_loops {
-                return Err(crate::error::Error::MaxReconnectAttemptsReached(
-                    max_loops,
-                ));
+                return Err(crate::error::Error::MaxReconnectAttemptsReached(max_loops));
             }
         }
         Err(crate::error::Error::ReconnectionAttemptFailure {
@@ -379,9 +379,7 @@ where
                 ws.flush().await?;
                 debug!("Sent message to websocket!");
             }
-            Err(crate::error::Error::ChannelRequestRecievingError(
-                RecvError,
-            ))
+            Err(crate::error::Error::ChannelRequestRecievingError(RecvError))
         }
 
         tokio::select! {
@@ -399,9 +397,7 @@ where
             ws.flush().await?;
             debug!("Sent message to websocket!");
         }
-        Err(crate::error::Error::ChannelRequestRecievingError(
-            RecvError,
-        ))
+        Err(crate::error::Error::ChannelRequestRecievingError(RecvError))
     }
 
     // async fn api_loop(

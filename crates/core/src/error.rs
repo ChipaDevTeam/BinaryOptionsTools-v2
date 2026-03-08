@@ -1,7 +1,7 @@
 use std::time::Duration;
 use thiserror::Error;
-use tokio_tungstenite::tungstenite::Error as TungsteniteError;
 use tokio_tungstenite::tungstenite::http;
+use tokio_tungstenite::tungstenite::Error as TungsteniteError;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -49,7 +49,7 @@ pub enum Error {
     TimeoutError { task: String, duration: Duration },
     #[error("Failed to parse duration, error {0}")]
     ChronoDurationParsingError(#[from] chrono::OutOfRangeError),
-    
+
     // New variants for unification
     #[error("Operation timeout: {0}")]
     Timeout(String),

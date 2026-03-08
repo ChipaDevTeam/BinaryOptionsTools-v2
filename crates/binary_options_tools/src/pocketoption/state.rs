@@ -19,18 +19,14 @@ use crate::pocketoption::types::{
     Action, Assets, Deal, OpenOrder, Outgoing, PendingOrder, SubscriptionEvent,
 };
 use crate::pocketoption::{
+    candle::SubscriptionType,
     error::{PocketError, PocketResult},
     ssid::Ssid,
-    candle::SubscriptionType,
 };
 use crate::validator::Validator;
 
 /// A subscription entry: (sender, subscription type, subscription id)
-type SubscriptionEntry = (
-    AsyncSender<SubscriptionEvent>,
-    SubscriptionType,
-    Uuid,
-);
+type SubscriptionEntry = (AsyncSender<SubscriptionEvent>, SubscriptionType, Uuid);
 
 /// Application state for PocketOption client
 ///
@@ -277,18 +273,26 @@ impl State {
     /// Adds or replaces a validator in the list of raw validators.
     pub fn add_raw_validator(&self, id: Uuid, validator: Validator) {
         self.raw_validators
-            .write().expect("Raw validators lock poisoned")
+            .write()
+            .expect("Raw validators lock poisoned")
             .insert(id, Arc::new(validator));
     }
 
     /// Removes a validator by ID. Returns whether it existed.
     pub fn remove_raw_validator(&self, id: &Uuid) -> bool {
-        self.raw_validators.write().expect("Raw validators lock poisoned").remove(id).is_some()
+        self.raw_validators
+            .write()
+            .expect("Raw validators lock poisoned")
+            .remove(id)
+            .is_some()
     }
 
     /// Removes all the validators
     pub fn clear_raw_validators(&self) {
-        self.raw_validators.write().expect("Raw validators lock poisoned").clear();
+        self.raw_validators
+            .write()
+            .expect("Raw validators lock poisoned")
+            .clear();
     }
 }
 

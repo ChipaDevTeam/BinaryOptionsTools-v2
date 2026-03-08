@@ -42,7 +42,9 @@ fn get_connector() -> CoreResult<&'static Connector> {
 
     let connector = Connector::Rustls(std::sync::Arc::new(tls_config));
     let _ = CONNECTOR.set(connector);
-    CONNECTOR.get().ok_or_else(|| CoreError::Other("Connector not initialized".into()))
+    CONNECTOR
+        .get()
+        .ok_or_else(|| CoreError::Other("Connector not initialized".into()))
 }
 
 const IP_PROVIDERS: &[&str] = &[

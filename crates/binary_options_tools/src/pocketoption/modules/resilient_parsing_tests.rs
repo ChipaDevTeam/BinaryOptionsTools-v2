@@ -2,12 +2,12 @@
 mod tests {
     use crate::pocketoption::modules::balance::BalanceModule;
     use crate::pocketoption::modules::deals::DealsApiModule;
-    use crate::pocketoption::state::StateBuilder;
     use crate::pocketoption::ssid::Ssid;
+    use crate::pocketoption::state::StateBuilder;
     use binary_options_tools_core_pre::reimports::{bounded_async, Message};
-    use binary_options_tools_core_pre::traits::{LightweightModule, ApiModule};
-    use std::sync::Arc;
+    use binary_options_tools_core_pre::traits::{ApiModule, LightweightModule};
     use rust_decimal_macros::dec;
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn test_balance_module_resilient_parsing() {
@@ -25,7 +25,7 @@ mod tests {
         // 1. Test 451- prefix (legacy/binary)
         let msg_451 = Message::text(r#"451-["successupdateBalance",{"balance":123.45}]"#);
         assert!(rule.call(&msg_451), "Rule should match 451- prefix");
-        
+
         // 2. Test 42 prefix (standard)
         let msg_42 = Message::text(r#"42["successupdateBalance",{"balance":678.90}]"#);
         assert!(rule.call(&msg_42), "Rule should match 42 prefix");
@@ -58,12 +58,16 @@ mod tests {
         let (ws_tx, _ws_rx) = bounded_async(10);
         let (runner_tx, _runner_rx) = bounded_async(1);
 
-        let mut module = DealsApiModule::new(state.clone(), _cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
+        let mut module =
+            DealsApiModule::new(state.clone(), _cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
         let rule = DealsApiModule::rule(state.clone());
 
         // Test patterns
         let msg_451 = Message::text(r#"451-["updateOpenedDeals",[]]"#);
-        assert!(rule.call(&msg_451), "Rule should match 451- prefix for deals");
+        assert!(
+            rule.call(&msg_451),
+            "Rule should match 451- prefix for deals"
+        );
 
         let msg_42 = Message::text(r#"42["updateOpenedDeals",[]]"#);
         assert!(rule.call(&msg_42), "Rule should match 42 prefix for deals");
@@ -100,12 +104,15 @@ mod tests {
             "amountUSD": 1
         }"#;
         let msg_deal_42 = Message::text(format!(r#"42["updateOpenedDeals",[{}]]"#, deal_json));
-        
+
         msg_tx.send(Arc::new(msg_deal_42)).await.unwrap();
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        
+
         let opened = state.trade_state.opened_deals.read().await;
         let deal_id = uuid::Uuid::parse_str("2f561661-334c-4de3-920f-f095c7b1193f").unwrap();
-        assert!(opened.contains_key(&deal_id), "Deal should be correctly parsed and added to state");
+        assert!(
+            opened.contains_key(&deal_id),
+            "Deal should be correctly parsed and added to state"
+        );
     }
 }

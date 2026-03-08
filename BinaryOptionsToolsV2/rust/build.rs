@@ -7,12 +7,15 @@ use std::path::PathBuf;
 fn main() {
     #[cfg(feature = "stubgen")]
     {
-
         // Define stub info gatherer function
         define_stub_info_gatherer!(stub_info);
 
         let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let python_package_path = crate_root.parent().unwrap().join("python").join("BinaryOptionsToolsV2");
+        let python_package_path = crate_root
+            .parent()
+            .unwrap()
+            .join("python")
+            .join("BinaryOptionsToolsV2");
 
         // Ensure the target directory exists
         std::fs::create_dir_all(&python_package_path)

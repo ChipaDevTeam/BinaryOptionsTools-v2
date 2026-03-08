@@ -1,4 +1,4 @@
-use crate::error::{Result, Error};
+use crate::error::{Error, Result};
 
 use super::traits::{MessageTransfer, ValidatorTrait};
 
@@ -10,9 +10,7 @@ where
     Transfer: MessageTransfer,
 {
     if let Some(e) = message.error() {
-        Err(Error::WebSocketMessageError(
-            e.to_string(),
-        ))
+        Err(Error::WebSocketMessageError(e.to_string()))
     } else if validator.validate(&message) {
         Ok(Some(message))
     } else {

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::error::{Result, Error};
+use crate::error::{Error, Result};
 use core::future::Future;
 
 pub async fn timeout<F, T, E>(duration: Duration, future: F, task: String) -> Result<T>

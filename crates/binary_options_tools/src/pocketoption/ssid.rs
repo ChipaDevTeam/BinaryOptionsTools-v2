@@ -148,7 +148,9 @@ impl Ssid {
 
         // Security: Direct validation to prevent double-JSON injection
         if (trimmed.starts_with('"') && trimmed.ends_with('"')) || trimmed.starts_with("'") {
-            return Err(CoreError::SsidParsing("Invalid SSID format: double-encoding detected".into()));
+            return Err(CoreError::SsidParsing(
+                "Invalid SSID format: double-encoding detected".into(),
+            ));
         }
         let prefix = "42[\"auth\",";
 
@@ -379,10 +381,13 @@ mod tests {
 
     #[test]
     fn test_ssid_rejects_double_encoded_json() {
-        let malicious = r#"42["auth","{\"session\":\"dummy\",\"isDemo\":1,\"uid\":123,\"platform\":2}"]"#;
+        let malicious =
+            r#"42["auth","{\"session\":\"dummy\",\"isDemo\":1,\"uid\":123,\"platform\":2}"]"#;
         let result = Ssid::parse(malicious);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.to_string().contains("Invalid SSID format: double-encoding detected"));
+        assert!(err
+            .to_string()
+            .contains("Invalid SSID format: double-encoding detected"));
     }
 }

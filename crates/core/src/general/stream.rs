@@ -4,7 +4,7 @@ use async_channel::{Receiver, RecvError};
 use futures_util::{stream::unfold, Stream};
 
 use crate::{
-    error::{Result, Error},
+    error::{Error, Result},
     utils::time::timeout,
 };
 
@@ -88,9 +88,7 @@ impl<T> FilteredRecieverStream<T> {
                 return Ok(msg);
             }
         }
-        Err(Error::ChannelRequestRecievingError(
-            RecvError,
-        ))
+        Err(Error::ChannelRequestRecievingError(RecvError))
     }
 
     async fn receive(&self) -> Result<T> {

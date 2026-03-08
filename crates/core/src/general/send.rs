@@ -5,7 +5,7 @@ use tokio_tungstenite::tungstenite::Message;
 use tracing::{info, warn};
 
 use crate::{
-    error::{Result, Error},
+    error::{Error, Result},
     general::validate::validate,
     utils::time::timeout,
 };
@@ -66,10 +66,7 @@ impl SenderMessage {
         Ok(reciever)
     }
 
-    pub async fn raw_send<Transfer: MessageTransfer>(
-        &self,
-        msg: Transfer::Raw,
-    ) -> Result<()> {
+    pub async fn raw_send<Transfer: MessageTransfer>(&self, msg: Transfer::Raw) -> Result<()> {
         self.sender
             .send(msg.message())
             .await
@@ -107,9 +104,7 @@ impl SenderMessage {
                 return Ok(msg);
             }
         }
-        Err(Error::ChannelRequestRecievingError(
-            RecvError,
-        ))
+        Err(Error::ChannelRequestRecievingError(RecvError))
     }
 
     pub async fn send_raw_message<
@@ -128,9 +123,7 @@ impl SenderMessage {
                 return Ok(msg);
             }
         }
-        Err(Error::ChannelRequestRecievingError(
-            RecvError,
-        ))
+        Err(Error::ChannelRequestRecievingError(RecvError))
     }
 
     pub async fn send_message_with_timeout<
@@ -157,9 +150,7 @@ impl SenderMessage {
                         return Ok(msg);
                     }
                 }
-                Err(Error::ChannelRequestRecievingError(
-                    RecvError,
-                ))
+                Err(Error::ChannelRequestRecievingError(RecvError))
             },
             task.to_string(),
         )
@@ -186,9 +177,7 @@ impl SenderMessage {
                         return Ok(msg);
                     }
                 }
-                Err(Error::ChannelRequestRecievingError(
-                    RecvError,
-                ))
+                Err(Error::ChannelRequestRecievingError(RecvError))
             },
             task.to_string(),
         )
@@ -221,9 +210,7 @@ impl SenderMessage {
                         return Ok(msg);
                     }
                 }
-                Err(Error::ChannelRequestRecievingError(
-                    RecvError,
-                ))
+                Err(Error::ChannelRequestRecievingError(RecvError))
             },
             task.to_string(),
         )
@@ -243,9 +230,7 @@ impl SenderMessage {
                                 return Ok(msg);
                             }
                         }
-                        Err(Error::ChannelRequestRecievingError(
-                            RecvError,
-                        ))
+                        Err(Error::ChannelRequestRecievingError(RecvError))
                     },
                     task.to_string(),
                 )
@@ -275,9 +260,7 @@ impl SenderMessage {
                         return Ok(msg);
                     }
                 }
-                Err(Error::ChannelRequestRecievingError(
-                    RecvError,
-                ))
+                Err(Error::ChannelRequestRecievingError(RecvError))
             },
             task.to_string(),
         )
@@ -295,9 +278,7 @@ impl SenderMessage {
                                 return Ok(msg);
                             }
                         }
-                        Err(Error::ChannelRequestRecievingError(
-                            RecvError,
-                        ))
+                        Err(Error::ChannelRequestRecievingError(RecvError))
                     },
                     task.to_string(),
                 )

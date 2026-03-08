@@ -1,9 +1,9 @@
 use super::common::*;
 use crate::pocketoption::types::Action;
+use binary_options_tools_core_pre::reimports::Message;
 use rust_decimal_macros::dec;
 use std::sync::Arc;
 use tokio::time::{timeout, Duration};
-use binary_options_tools_core_pre::reimports::Message;
 use uuid::Uuid;
 
 #[tokio::test]
@@ -26,14 +26,17 @@ async fn test_concurrent_identical_trades_hammer() {
     // Wait for all 5 to be sent to WS
     let mut req_ids = Vec::new();
     for _ in 0..5 {
-        if let Ok(Message::Text(text)) = timeout(Duration::from_secs(1), setup.ws_rx.recv()).await.unwrap() {
-             // 42["openOrder",{"amount":"10.0","asset":"EURUSD_otc","action":"call","isDemo":0,"requestId":"...","optionType":100,"time":60}]
-             let start = text.find('{').unwrap();
-             let end = text.rfind('}').unwrap();
-             let json_str = &text[start..end+1];
-             let v: serde_json::Value = serde_json::from_str(json_str).unwrap();
-             let req_id = Uuid::parse_str(v["requestId"].as_str().unwrap()).unwrap();
-             req_ids.push(req_id);
+        if let Ok(Message::Text(text)) = timeout(Duration::from_secs(1), setup.ws_rx.recv())
+            .await
+            .unwrap()
+        {
+            // 42["openOrder",{"amount":"10.0","asset":"EURUSD_otc","action":"call","isDemo":0,"requestId":"...","optionType":100,"time":60}]
+            let start = text.find('{').unwrap();
+            let end = text.rfind('}').unwrap();
+            let json_str = &text[start..end + 1];
+            let v: serde_json::Value = serde_json::from_str(json_str).unwrap();
+            let req_id = Uuid::parse_str(v["requestId"].as_str().unwrap()).unwrap();
+            req_ids.push(req_id);
         }
     }
 
@@ -42,21 +45,42 @@ async fn test_concurrent_identical_trades_hammer() {
     // Now simulate responses from server.
     // Server doesn't send requestId for failures, it uses asset/amount matching.
     // For successes, it DOES send requestId.
-    
+
     // 1. Success for 2nd request
     let deal2 = create_test_deal(req_ids[1], &asset);
-    let resp2 = format!(r#"42["successopenOrder",{}]"#, serde_json::to_string(&deal2).unwrap());
-    setup.msg_tx.send(Arc::new(Message::Text(resp2.into()))).await.unwrap();
+    let resp2 = format!(
+        r#"42["successopenOrder",{}]"#,
+        serde_json::to_string(&deal2).unwrap()
+    );
+    setup
+        .msg_tx
+        .send(Arc::new(Message::Text(resp2.into())))
+        .await
+        .unwrap();
 
     // 2. Failure (will be matched to 1st request because it's the oldest in failure_matching queue)
     let fail_data = create_test_fail(&asset, amount);
-    let resp_fail = format!(r#"42["failopenOrder",{}]"#, serde_json::to_string(&fail_data).unwrap());
-    setup.msg_tx.send(Arc::new(Message::Text(resp_fail.into()))).await.unwrap();
+    let resp_fail = format!(
+        r#"42["failopenOrder",{}]"#,
+        serde_json::to_string(&fail_data).unwrap()
+    );
+    setup
+        .msg_tx
+        .send(Arc::new(Message::Text(resp_fail.into())))
+        .await
+        .unwrap();
 
     // 3. Success for 4th request
     let deal4 = create_test_deal(req_ids[3], &asset);
-    let resp4 = format!(r#"42["successopenOrder",{}]"#, serde_json::to_string(&deal4).unwrap());
-    setup.msg_tx.send(Arc::new(Message::Text(resp4.into()))).await.unwrap();
+    let resp4 = format!(
+        r#"42["successopenOrder",{}]"#,
+        serde_json::to_string(&deal4).unwrap()
+    );
+    setup
+        .msg_tx
+        .send(Arc::new(Message::Text(resp4.into())))
+        .await
+        .unwrap();
 
     // Now collect results from handles
     // handle 2 (req_ids[1]) should be Success

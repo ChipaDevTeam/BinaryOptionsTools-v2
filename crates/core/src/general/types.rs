@@ -145,10 +145,7 @@ where
         Ok(())
     }
 
-    pub async fn update_data(
-        &self,
-        message: Transfer,
-    ) -> Result<Option<Vec<Sender<Transfer>>>> {
+    pub async fn update_data(&self, message: Transfer) -> Result<Option<Vec<Sender<Transfer>>>> {
         self.inner.update(&message).await?;
         Ok(self.get_sender(&message).await)
     }
