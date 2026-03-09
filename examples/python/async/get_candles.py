@@ -1,6 +1,7 @@
 import asyncio
 
-import pandas as pd
+# import pandas as pd
+
 
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
@@ -17,10 +18,9 @@ async def main(ssid: str):
     for time in times:
         for frame in time_frames:
             candles = await api.get_candles("EURUSD_otc", 60, time)
-            # print(f"Raw Candles: {candles}")
-            candles_pd = pd.DataFrame.from_dict(candles)
-            print(f"Candles: {candles_pd}")
-
+            print(f"Raw Candles: {candles}")
+            # candles_pd = pd.DataFrame.from_dict(candles)
+            # print(f"Candles: {candles_pd}")
 
 if __name__ == "__main__":
     ssid = input("Please enter your ssid: ")
