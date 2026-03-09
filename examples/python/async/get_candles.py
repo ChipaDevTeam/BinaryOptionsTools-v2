@@ -22,6 +22,7 @@ async def main(ssid: str):
             # candles_pd = pd.DataFrame.from_dict(candles)
             # print(f"Candles: {candles_pd}")
 
+
 if __name__ == "__main__":
     ssid = input("Please enter your ssid: ")
     asyncio.run(main(ssid))
