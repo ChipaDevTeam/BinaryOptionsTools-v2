@@ -4,14 +4,22 @@ from typing import Any, Dict, List
 
 
 def _get_pyconfig():
+    """Helper to get the PyConfig class from the compiled Rust module."""
     try:
-        from .BinaryOptionsToolsV2 import PyConfig
+        # First try to import from the package
+        from . import PyConfig
 
         return PyConfig
-    except ImportError:
-        import BinaryOptionsToolsV2
+    except (ImportError, AttributeError):
+        # Fallback to direct import
+        try:
+            from ..BinaryOptionsToolsV2 import PyConfig
 
-        return getattr(BinaryOptionsToolsV2, "PyConfig")
+            return PyConfig
+        except ImportError:
+            import BinaryOptionsToolsV2
+
+            return getattr(BinaryOptionsToolsV2, "PyConfig")
 
 
 @dataclass

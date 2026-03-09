@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+env:
+  RUSTC_WRAPPER: sccache
+  SCCACHE_GHA_ENABLED: "true"
+
 jobs:
   # --- 0. DOCS ---
   docs:
@@ -23,14 +27,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
-      - run: echo "cache_id=$(date --utc +%V)" >> $GITHUB_ENV
-      - uses: actions/cache@v4
-        with:
-          key: mkdocs-material-${{ env.cache_id }}
-          path: .cache
-          restore-keys: |
-            mkdocs-material-
-      - run: pip install mkdocs-material "mkdocstrings[python]"
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install dependencies with uv
+        run: uv pip install --system mkdocs-material "mkdocstrings[python]"
       - run: mkdocs gh-deploy --force
 
   # --- 1. LINUX BUILD ---
@@ -54,6 +54,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Run sccache-cache
+        uses: mozilla/sccache-action@v0.0.6
+
       - name: Install Zig
         uses: mlugg/setup-zig@v1
         with:
@@ -64,7 +67,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           # --zig handles the cross-compilation and linking for GLIBC/MUSL
-          args: --release --out dist -i python3.13 --zig
+          args: --release --strip --out dist -i python3.13 --zig
           manylinux: ${{ matrix.libc }}
           working-directory: BinaryOptionsToolsV2
 
@@ -83,6 +86,8 @@ jobs:
         target: [x64, x86]
     steps:
       - uses: actions/checkout@v4
+      - name: Run sccache-cache
+        uses: mozilla/sccache-action@v0.0.6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13.12"
@@ -91,7 +96,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist -i python3.13
+          args: --release --strip --out dist -i python3.13
           working-directory: BinaryOptionsToolsV2
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -104,6 +109,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Run sccache-cache
+        uses: mozilla/sccache-action@v0.0.6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13.12"
@@ -111,7 +118,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: universal2-apple-darwin
-          args: --release --out dist -i python3.13
+          args: --release --strip --out dist -i python3.13
           working-directory: BinaryOptionsToolsV2
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -124,11 +131,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Run sccache-cache
+        uses: mozilla/sccache-action@v0.0.6
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --out dist
+          args: --out dist -m rust/Cargo.toml
           working-directory: BinaryOptionsToolsV2
       - name: Upload sdist
         uses: actions/upload-artifact@v4

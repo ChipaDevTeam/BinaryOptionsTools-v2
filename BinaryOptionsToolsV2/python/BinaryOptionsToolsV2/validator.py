@@ -1,15 +1,23 @@
-from typing import List
+from typing import Callable, List
 
 
 def _get_raw_validator():
+    """Helper to get the RawValidator class from the compiled Rust module."""
     try:
-        from .BinaryOptionsToolsV2 import RawValidator
+        # First try to import from the package (which should have re-exported it in __init__.py)
+        from . import RawValidator
 
         return RawValidator
-    except ImportError:
-        import BinaryOptionsToolsV2
+    except (ImportError, AttributeError):
+        # Fallback to direct import if package initialization is incomplete
+        try:
+            from ..BinaryOptionsToolsV2 import RawValidator
 
-        return getattr(BinaryOptionsToolsV2, "RawValidator")
+            return RawValidator
+        except ImportError:
+            import BinaryOptionsToolsV2
+
+            return getattr(BinaryOptionsToolsV2, "RawValidator")
 
 
 class Validator:
@@ -47,14 +55,6 @@ class Validator:
 
         Returns:
             Validator that matches messages against the pattern
-
-        Example:
-            ```python
-            # Match messages starting with a number
-            validator = Validator.regex(r"^\\d+")
-            assert validator.check("123 message") == True
-            assert validator.check("abc") == False
-            ```
         """
         v = Validator()
         v._validator = _get_raw_validator().regex(pattern)
@@ -115,14 +115,6 @@ class Validator:
 
         Returns:
             Validator that returns True when input validator returns False
-
-        Example:
-            ```python
-            # Match messages that don't contain "error"
-            v = Validator.ne(Validator.contains("error"))
-            assert v.check("success message") == True
-            assert v.check("error occurred") == False
-            ```
         """
         v = Validator()
         v._validator = _get_raw_validator().ne(validator._validator)
@@ -138,17 +130,6 @@ class Validator:
 
         Returns:
             Validator that returns True only if all input validators return True
-
-        Example:
-            ```python
-            # Match messages that start with "Hello" and end with "World"
-            v = Validator.all([
-                Validator.starts_with("Hello"),
-                Validator.ends_with("World")
-            ])
-            assert v.check("Hello Beautiful World") == True
-            assert v.check("Hello Beautiful") == False
-            ```
         """
         v = Validator()
         v._validator = _get_raw_validator().all([item._validator for item in validators])
@@ -164,85 +145,31 @@ class Validator:
 
         Returns:
             Validator that returns True if any input validator returns True
-
-        Example:
-            ```python
-            # Match messages containing either "success" or "completed"
-            v = Validator.any([
-                Validator.contains("success"),
-                Validator.contains("completed")
-            ])
-            assert v.check("operation successful") == True
-            assert v.check("task completed") == True
-            assert v.check("in progress") == False
-            ```
         """
         v = Validator()
         v._validator = _get_raw_validator().any([item._validator for item in validators])
         return v
 
     @staticmethod
-    def custom(func: callable) -> "Validator":
+    def custom(func: Callable[[str], bool]) -> "Validator":
         """
-        Creates a validator that uses a custom function for validation.
+        Creates a validator that uses a custom Python function for validation.
 
-        IMPORTANT SAFETY AND USAGE NOTES:
+        IMPORTANT USAGE NOTES:
         1. The provided function MUST:
-            - Take exactly one string parameter
-            - Return a boolean value
-            - Be synchronous (not async)
-        2. If these requirements are not met, the program will crash with a Rust panic
-        that CANNOT be caught with try/except
-        3. The function will be called from Rust, so Python exception handling won't work
-        4. Custom validators CANNOT be used in async/threaded contexts due to JavaScript
-        engine limitations
+            - Take exactly one string parameter (the WebSocket message).
+            - Return a boolean value.
+            - Be synchronous (not async).
+        2. If the function raises an exception, the validator will silently return False.
+        3. Custom validators should be used carefully in multi-threaded contexts due to
+           Python Global Interpreter Lock (GIL) constraints.
 
         Args:
             func: A callable that takes a string message and returns a boolean.
-                The function MUST follow the requirements listed above.
                 Returns True if the message is valid, False otherwise.
 
         Returns:
-            Validator that uses the custom function for validation
-
-        Raises:
-            Rust panic: If the function doesn't meet the requirements or fails during execution.
-            This cannot be caught with Python exception handling.
-
-        Example:
-            ```python
-            # Safe usage - function takes string, returns bool
-            def json_checker(msg: str) -> bool:
-                try:
-                    data = json.loads(msg)
-                    return "status" in data and "timestamp" in data
-                except:
-                    return False
-
-            validator = Validator.custom(json_checker)
-            assert validator.check('{"status": "ok", "timestamp": 123}') == True
-            assert validator.check('{"error": "failed"}') == False
-
-            # Using lambda (must still take string, return bool)
-            contains_both = Validator.custom(
-                lambda msg: "success" in msg and "completed" in msg
-            )
-            assert contains_both.check("operation success - completed") == True
-
-            # UNSAFE - Will crash the program:
-            # Wrong return type
-            bad_validator1 = Validator.custom(lambda x: "hello")  # Returns str instead of bool
-
-            # No exception handling possible
-            def will_crash(msg: str) -> bool:
-                raise ValueError("This will crash the program")
-
-            bad_validator2 = Validator.custom(will_crash)
-            try:
-                bad_validator2.check("any message")  # Will crash despite try/except
-            except Exception:
-                print("This will never be reached")
-            ```
+            Validator: A new validator instance using the provided callback.
         """
         v = Validator()
         v._validator = _get_raw_validator().custom(func)

@@ -71,3 +71,14 @@ def test_validator_complex_combination():
     assert v_complex.check('[{"id": 1}]') is True
     assert v_complex.check('{"name": "test"}') is False
     assert v_complex.check("id is 1") is False
+
+
+def test_validator_custom_exception_safety():
+    """Verify that a custom validator handles Python exceptions gracefully (returns False, no crash)."""
+
+    def crashing_func(msg: str) -> bool:
+        raise ValueError("Simulated crash")
+
+    v = Validator.custom(crashing_func)
+    # This should return False instead of crashing the process
+    assert v.check("any message") == False

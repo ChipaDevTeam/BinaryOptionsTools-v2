@@ -23,7 +23,7 @@ keywords:
   - "websocket"
   - "automated trading"
   - "financial technology"
-version: "0.2.8"
+version: "0.2.9"
 identifiers:
   - type: url
     value: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"

@@ -75,3 +75,6 @@ pyvenv.cfg
 
 # debug (i have my websocket history in here and don't want to accidentally commit it if i forget to rm it)
 debug/
+
+# serena
+.serena/

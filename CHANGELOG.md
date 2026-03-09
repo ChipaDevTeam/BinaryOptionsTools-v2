@@ -5,7 +5,7 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Bleeding Edge / Unreleased]
+## [0.2.9] - 2026-03-09
 
 ### Added
 
@@ -13,11 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- N/a
+- Updated python support
+- Improved SSID parsing to prevent double encoded JSON msgs
+- Minor docs updates
 
 ### Fixed
 
 - Fixed auth failure with valid SSID: `Ssid::Display` now returns the raw auth message (`42["auth",{...}]`) instead of a human-readable label, so the correct credential string is sent to the server during WebSocket handshake.
+- Balance returning -1 (possibly)
+- Unsafe unwraps
 
 ## [0.2.8] - 2026-02-22
 
