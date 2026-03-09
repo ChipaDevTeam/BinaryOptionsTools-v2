@@ -131,11 +131,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Run sccache-cache
+        uses: mozilla/sccache-action@v0.0.6
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --out dist
+          args: --out dist -m rust/Cargo.toml
           working-directory: BinaryOptionsToolsV2
       - name: Upload sdist
         uses: actions/upload-artifact@v4
