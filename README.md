@@ -115,24 +115,24 @@ graph TD
 
 #### Option A: Prebuilt Wheels (Recommended)
 
-Install directly from our GitHub releases. Supports **Python 3.8 - 3.13**.
+Install directly from our GitHub releases. Supports **Python 3.8 - 3.15**.
 
 **Windows**
 
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.8/binaryoptionstoolsv2-0.2.8-cp39-abi3-win_amd64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.9/binaryoptionstoolsv2-0.2.9-cp39-abi3-win_amd64.whl"
 ```
 
 **Linux**
 
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.8/binaryoptionstoolsv2-0.2.8-cp39-abi3-manylinux_2_28_x86_64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.9/binaryoptionstoolsv2-0.2.9-cp39-abi3-manylinux_2_28_x86_64.whl"
 ```
 
 **macOS (Apple Silicon)**
 
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.8/binaryoptionstoolsv2-0.2.8-cp39-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.9/binaryoptionstoolsv2-0.2.9-cp39-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
 ```
 
 #### Option B: Build from Source
