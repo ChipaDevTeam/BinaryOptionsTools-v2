@@ -1,0 +1,42 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B45FF;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#6237B3;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4C1D95;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="24" cy="24" r="22" fill="url(#logoGradient)" filter="url(#glow)"/>
+  
+  <!-- Chart lines representing binary options -->
+  <g stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Ascending line (CALL) -->
+    <path d="M12 32 L20 20 L28 24 L36 12" opacity="0.9"/>
+    
+    <!-- Data points -->
+    <circle cx="12" cy="32" r="2" fill="white"/>
+    <circle cx="20" cy="20" r="2" fill="white"/>
+    <circle cx="28" cy="24" r="2" fill="white"/>
+    <circle cx="36" cy="12" r="2" fill="white"/>
+    
+    <!-- Binary indicators -->
+    <circle cx="16" cy="26" r="1.5" fill="#00D4AA"/>
+    <circle cx="24" cy="22" r="1.5" fill="#FF6B6B"/>
+    <circle cx="32" cy="18" r="1.5" fill="#00D4AA"/>
+  </g>
+  
+  <!-- Center icon representing tools/API -->
+  <g transform="translate(24, 24)">
+    <circle cx="0" cy="0" r="3" fill="white" opacity="0.9"/>
+    <path d="M-1.5 -1.5 L1.5 1.5 M1.5 -1.5 L-1.5 1.5" stroke="url(#logoGradient)" stroke-width="1.5"/>
+  </g>
+</svg>

@@ -1,0 +1,10 @@
+1.	Login to pocket options on your browser
+2.	Navigate to Demo or Real account which ever you’d like to use it on
+3.	Press CTRL + SHIFT + I on your keyboard to bring up the inspection tab
+4.	Click on Network in the console tab [1]
+5.	Then Click on the “WS” box in the network tab [2]
+6.	Once you have clicked the WS box refresh your page
+7.	You will see a bunch of lines populate
+8.	Search for the Socket connection that has and “AUTH” line. Note it should say “session” not “sessionToken” 
+9.	Right click the AUTH message and click copy message [4]
+10.	You have now successfully retrieved your SSID to paste into the bot
