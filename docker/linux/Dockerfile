@@ -1,4 +1,13 @@
-FROM rust:1.76-slim
+# Stage 1: Planner
+FROM lukemathwalker/cargo-chef:latest-rust-1.76-slim AS planner
+WORKDIR /app
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+# Stage 2: Builder
+FROM lukemathwalker/cargo-chef:latest-rust-1.76-slim AS builder
+WORKDIR /app
+COPY --from=planner /app/recipe.json recipe.json
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -14,7 +23,19 @@ ENV PATH="$VENV_PATH/bin:$PATH"
 
 RUN pip install --upgrade pip && pip install maturin
 
-COPY ../../BinaryOptionsToolsV2 .
+# Build dependencies
+RUN cargo chef cook --release --recipe-path recipe.json
 
-# Build .whl using maturin
-CMD ["maturin", "build", "--release", "--target", "aarch64-linux-android", "--interpreter", "python3"]
+# Build the application
+COPY . .
+# We use maturin to build the Python package
+# Using --strip to reduce binary size
+RUN maturin build --release --strip --interpreter python3
+
+# Stage 3: Runner (Minimal image)
+FROM debian:bookworm-slim AS runner
+WORKDIR /app
+COPY --from=builder /app/target/wheels/*.whl /app/
+# The runner stage just holds the artifacts in this case as it's a build container.
+# If it were an app, we would install the wheel here.
+CMD ["ls", "-l", "/app"]
