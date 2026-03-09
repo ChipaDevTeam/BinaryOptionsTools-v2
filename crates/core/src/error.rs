@@ -1,13 +1,10 @@
 use std::time::Duration;
-
 use thiserror::Error;
-
-use tokio_tungstenite::tungstenite::{http, Error as TungsteniteError, Message};
-
-use crate::general::traits::MessageTransfer;
+use tokio_tungstenite::tungstenite::http;
+use tokio_tungstenite::tungstenite::Error as TungsteniteError;
 
 #[derive(Error, Debug)]
-pub enum BinaryOptionsToolsError {
+pub enum Error {
     #[error("Failed to parse recieved data: {0}")]
     SerdeGeneralParsingError(#[from] serde_json::Error),
     #[error("Url parsing failed: {0}")]
@@ -22,8 +19,6 @@ pub enum BinaryOptionsToolsError {
     WebsocketConnectionClosed(String),
     #[error("Failed to connect to websocket server: {0}")]
     WebsocketConnectionError(Box<TungsteniteError>),
-    #[error("Failed to send message to websocket sender, {0}")]
-    MessageSendingError(#[from] async_channel::SendError<Message>),
     #[error("Failed to send message using asynchronous channel, {0}")]
     GeneralMessageSendingError(String),
     #[error(
@@ -54,24 +49,34 @@ pub enum BinaryOptionsToolsError {
     TimeoutError { task: String, duration: Duration },
     #[error("Failed to parse duration, error {0}")]
     ChronoDurationParsingError(#[from] chrono::OutOfRangeError),
-    #[error("Unknown error during execution, error {0}")]
-    UnknownError(#[from] anyhow::Error),
+
+    // New variants for unification
+    #[error("Operation timeout: {0}")]
+    Timeout(String),
+    #[error("Configuration error: {0}")]
+    Configuration(String),
+    #[error("Invalid asset: {0}")]
+    InvalidAsset(String),
+    #[error("Platform internal error: {0}")]
+    Platform(String),
+
+    #[error(transparent)]
+    Context(#[from] anyhow::Error),
+
+    #[error("Other error: {0}")]
+    Other(String),
 }
 
-pub type BinaryOptionsResult<T> = Result<T, BinaryOptionsToolsError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
-impl From<TungsteniteError> for BinaryOptionsToolsError {
+impl From<TungsteniteError> for Error {
     fn from(e: TungsteniteError) -> Self {
         Self::WebsocketConnectionError(Box::new(e))
     }
 }
 
-impl<Transfer> From<Transfer> for BinaryOptionsToolsError
-where
-    Transfer: MessageTransfer,
-{
-    fn from(value: Transfer) -> Self {
-        let error = value.to_error();
-        Self::WebsocketMessageSendingError(error.to_string())
+impl<T> From<async_channel::SendError<T>> for Error {
+    fn from(e: async_channel::SendError<T>) -> Self {
+        Self::GeneralMessageSendingError(e.to_string())
     }
 }

@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::RwLock;
 
-use crate::error::BinaryOptionsResult;
+use crate::error::Result;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub enum EventType {
@@ -72,7 +72,7 @@ pub trait EventHandler<T>: Send + Sync
 where
     T: Clone + Send + Sync,
 {
-    async fn handle(&self, event: &Event<T>) -> BinaryOptionsResult<()>;
+    async fn handle(&self, event: &Event<T>) -> Result<()>;
 
     /// Returns the name of the handler for identification
     fn name(&self) -> &str {
@@ -86,9 +86,9 @@ impl<T, F, Fut> EventHandler<T> for F
 where
     T: Clone + Send + Sync + 'static,
     F: Fn(&Event<T>) -> Fut + Send + Sync,
-    Fut: std::future::Future<Output = BinaryOptionsResult<()>> + Send,
+    Fut: std::future::Future<Output = Result<()>> + Send,
 {
-    async fn handle(&self, event: &Event<T>) -> BinaryOptionsResult<()> {
+    async fn handle(&self, event: &Event<T>) -> Result<()> {
         self(event).await
     }
 }
@@ -134,9 +134,9 @@ where
         false
     }
 
-    pub async fn emit(&self, event: Event<T>) -> BinaryOptionsResult<()> {
+    pub async fn emit(&self, event: Event<T>) -> Result<()> {
         self.event_sender.send(event).await.map_err(|e| {
-            crate::error::BinaryOptionsToolsError::GeneralMessageSendingError(e.to_string())
+            crate::error::Error::GeneralMessageSendingError(e.to_string())
         })
     }
 

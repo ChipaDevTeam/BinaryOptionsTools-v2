@@ -5,7 +5,7 @@ use tokio_tungstenite::tungstenite::Message;
 use tracing::{info, warn};
 
 use crate::{
-    error::{BinaryOptionsResult, BinaryOptionsToolsError},
+    error::{Error, Result},
     general::validate::validate,
     utils::time::timeout,
 };
@@ -43,12 +43,12 @@ impl SenderMessage {
         data: &Data<T, Transfer>,
         msg: Transfer,
         response_type: Transfer::Info,
-    ) -> BinaryOptionsResult<Receiver<Transfer>> {
+    ) -> Result<Receiver<Transfer>> {
         let reciever = data.add_request(response_type).await;
 
         self.send(msg)
             .await
-            .map_err(|e| BinaryOptionsToolsError::GeneralMessageSendingError(e.to_string()))?;
+            .map_err(|e| Error::GeneralMessageSendingError(e.to_string()))?;
         Ok(reciever)
     }
 
@@ -56,38 +56,35 @@ impl SenderMessage {
         &self,
         data: &Data<T, Transfer>,
         msg: Transfer::Raw,
-    ) -> BinaryOptionsResult<Receiver<Transfer::Raw>> {
+    ) -> Result<Receiver<Transfer::Raw>> {
         let reciever = data.raw_reciever();
 
         self.raw_send::<Transfer>(msg)
             .await
-            .map_err(|e| BinaryOptionsToolsError::GeneralMessageSendingError(e.to_string()))?;
+            .map_err(|e| Error::GeneralMessageSendingError(e.to_string()))?;
 
         Ok(reciever)
     }
 
-    pub async fn raw_send<Transfer: MessageTransfer>(
-        &self,
-        msg: Transfer::Raw,
-    ) -> BinaryOptionsResult<()> {
+    pub async fn raw_send<Transfer: MessageTransfer>(&self, msg: Transfer::Raw) -> Result<()> {
         self.sender
             .send(msg.message())
             .await
-            .map_err(|e| BinaryOptionsToolsError::ChannelRequestSendingError(e.to_string()))
+            .map_err(|e| Error::ChannelRequestSendingError(e.to_string()))
     }
 
-    pub async fn send<Transfer: MessageTransfer>(&self, msg: Transfer) -> BinaryOptionsResult<()> {
+    pub async fn send<Transfer: MessageTransfer>(&self, msg: Transfer) -> Result<()> {
         self.sender
             .send(msg.into())
             .await
-            .map_err(|e| BinaryOptionsToolsError::ChannelRequestSendingError(e.to_string()))
+            .map_err(|e| Error::ChannelRequestSendingError(e.to_string()))
     }
 
-    pub async fn priority_send(&self, msg: Message) -> BinaryOptionsResult<()> {
+    pub async fn priority_send(&self, msg: Message) -> Result<()> {
         self.sender_priority
             .send(msg)
             .await
-            .map_err(|e| BinaryOptionsToolsError::ChannelRequestSendingError(e.to_string()))?;
+            .map_err(|e| Error::ChannelRequestSendingError(e.to_string()))?;
         Ok(())
     }
 
@@ -97,7 +94,7 @@ impl SenderMessage {
         msg: Transfer,
         response_type: Transfer::Info,
         validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
-    ) -> BinaryOptionsResult<Transfer> {
+    ) -> Result<Transfer> {
         let reciever = self.reciever(data, msg, response_type).await?;
 
         while let Ok(msg) = reciever.recv().await {
@@ -107,9 +104,7 @@ impl SenderMessage {
                 return Ok(msg);
             }
         }
-        Err(BinaryOptionsToolsError::ChannelRequestRecievingError(
-            RecvError,
-        ))
+        Err(Error::ChannelRequestRecievingError(RecvError))
     }
 
     pub async fn send_raw_message<
@@ -120,7 +115,7 @@ impl SenderMessage {
         data: &Data<T, Transfer>,
         msg: Transfer::Raw,
         validator: Box<dyn ValidatorTrait<Transfer::Raw> + Send + Sync>,
-    ) -> BinaryOptionsResult<Transfer::Raw> {
+    ) -> Result<Transfer::Raw> {
         let reciever = self.raw_reciever(data, msg).await?;
 
         while let Ok(msg) = reciever.recv().await {
@@ -128,9 +123,7 @@ impl SenderMessage {
                 return Ok(msg);
             }
         }
-        Err(BinaryOptionsToolsError::ChannelRequestRecievingError(
-            RecvError,
-        ))
+        Err(Error::ChannelRequestRecievingError(RecvError))
     }
 
     pub async fn send_message_with_timeout<
@@ -144,7 +137,7 @@ impl SenderMessage {
         msg: Transfer,
         response_type: Transfer::Info,
         validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
-    ) -> BinaryOptionsResult<Transfer> {
+    ) -> Result<Transfer> {
         let reciever = self.reciever(data, msg, response_type).await?;
 
         timeout(
@@ -157,9 +150,7 @@ impl SenderMessage {
                         return Ok(msg);
                     }
                 }
-                Err(BinaryOptionsToolsError::ChannelRequestRecievingError(
-                    RecvError,
-                ))
+                Err(Error::ChannelRequestRecievingError(RecvError))
             },
             task.to_string(),
         )
@@ -175,7 +166,7 @@ impl SenderMessage {
         data: &Data<T, Transfer>,
         msg: Transfer::Raw,
         validator: Box<dyn ValidatorTrait<Transfer::Raw> + Send + Sync>,
-    ) -> BinaryOptionsResult<Transfer::Raw> {
+    ) -> Result<Transfer::Raw> {
         let reciever = self.raw_reciever(data, msg).await?;
 
         timeout(
@@ -186,9 +177,7 @@ impl SenderMessage {
                         return Ok(msg);
                     }
                 }
-                Err(BinaryOptionsToolsError::ChannelRequestRecievingError(
-                    RecvError,
-                ))
+                Err(Error::ChannelRequestRecievingError(RecvError))
             },
             task.to_string(),
         )
@@ -206,7 +195,7 @@ impl SenderMessage {
         msg: Transfer,
         response_type: Transfer::Info,
         validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
-    ) -> BinaryOptionsResult<Transfer> {
+    ) -> Result<Transfer> {
         let reciever = self
             .reciever(data, msg.clone(), response_type.clone())
             .await?;
@@ -221,9 +210,7 @@ impl SenderMessage {
                         return Ok(msg);
                     }
                 }
-                Err(BinaryOptionsToolsError::ChannelRequestRecievingError(
-                    RecvError,
-                ))
+                Err(Error::ChannelRequestRecievingError(RecvError))
             },
             task.to_string(),
         )
@@ -243,9 +230,7 @@ impl SenderMessage {
                                 return Ok(msg);
                             }
                         }
-                        Err(BinaryOptionsToolsError::ChannelRequestRecievingError(
-                            RecvError,
-                        ))
+                        Err(Error::ChannelRequestRecievingError(RecvError))
                     },
                     task.to_string(),
                 )
@@ -264,7 +249,7 @@ impl SenderMessage {
         data: &Data<T, Transfer>,
         msg: Transfer::Raw,
         validator: Box<dyn ValidatorTrait<Transfer::Raw> + Send + Sync>,
-    ) -> BinaryOptionsResult<Transfer::Raw> {
+    ) -> Result<Transfer::Raw> {
         let reciever = self.raw_reciever(data, msg.clone()).await?;
 
         let call1 = timeout(
@@ -275,9 +260,7 @@ impl SenderMessage {
                         return Ok(msg);
                     }
                 }
-                Err(BinaryOptionsToolsError::ChannelRequestRecievingError(
-                    RecvError,
-                ))
+                Err(Error::ChannelRequestRecievingError(RecvError))
             },
             task.to_string(),
         )
@@ -295,9 +278,7 @@ impl SenderMessage {
                                 return Ok(msg);
                             }
                         }
-                        Err(BinaryOptionsToolsError::ChannelRequestRecievingError(
-                            RecvError,
-                        ))
+                        Err(Error::ChannelRequestRecievingError(RecvError))
                     },
                     task.to_string(),
                 )
@@ -315,7 +296,7 @@ impl SenderMessage {
         data: &Data<T, Transfer>,
         msg: Transfer::Raw,
         validator: Box<dyn ValidatorTrait<Transfer::Raw> + Send + Sync>,
-    ) -> BinaryOptionsResult<FilteredRecieverStream<Transfer::Raw>> {
+    ) -> Result<FilteredRecieverStream<Transfer::Raw>> {
         let reciever = self.raw_reciever(data, msg).await?;
         info!("Created new RawStreamIterator");
         Ok(FilteredRecieverStream::new(reciever, timeout, validator))

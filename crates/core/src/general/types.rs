@@ -7,8 +7,7 @@ use async_trait::async_trait;
 use tokio::sync::Mutex;
 
 use crate::constants::MAX_CHANNEL_CAPACITY;
-use crate::error::BinaryOptionsResult;
-use crate::error::BinaryOptionsToolsError;
+use crate::error::Result;
 
 use super::config;
 use super::send::SenderMessage;
@@ -80,7 +79,7 @@ impl<T: DataHandler, Transfer: MessageTransfer, U: InnerConfig> WCallback
         data: Data<Self::T, Self::Transfer>,
         sender: &SenderMessage,
         config: &config::Config<Self::T, Self::Transfer, Self::U>,
-    ) -> BinaryOptionsResult<()> {
+    ) -> Result<()> {
         self.inner.call(data, sender, config).await
     }
 }
@@ -135,21 +134,18 @@ where
             .map(|(s, _)| vec![s.to_owned()])
     }
 
-    pub async fn raw_send(&self, msg: Transfer::Raw) -> BinaryOptionsResult<()> {
+    pub async fn raw_send(&self, msg: Transfer::Raw) -> Result<()> {
         let sender = &self.raw_requests.0;
         if sender.receiver_count() > 1 {
             sender
                 .send(msg)
                 .await
-                .map_err(|e| BinaryOptionsToolsError::ChannelRequestSendingError(e.to_string()))?;
+                .map_err(|e| crate::error::Error::ChannelRequestSendingError(e.to_string()))?;
         }
         Ok(())
     }
 
-    pub async fn update_data(
-        &self,
-        message: Transfer,
-    ) -> BinaryOptionsResult<Option<Vec<Sender<Transfer>>>> {
+    pub async fn update_data(&self, message: Transfer) -> Result<Option<Vec<Sender<Transfer>>>> {
         self.inner.update(&message).await?;
         Ok(self.get_sender(&message).await)
     }

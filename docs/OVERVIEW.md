@@ -45,7 +45,7 @@ Integrated with GitHub Actions to automatically build and deploy the latest docu
 
 1. Documentation source is located in the `docs/` directory.
 2. Configuration is handled via `mkdocs.yml` in the root.
-3. Preview changes locally using `npm run docs:serve`.
+3. Preview changes locally using `bun run docs:serve`.
 
 ## Quality and Coverage
 

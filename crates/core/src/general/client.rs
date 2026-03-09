@@ -14,7 +14,6 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, info, warn};
 
 use crate::constants::MAX_CHANNEL_CAPACITY;
-use crate::error::{BinaryOptionsResult, BinaryOptionsToolsError};
 use crate::general::stream::RecieverStream;
 use crate::general::types::MessageType;
 
@@ -56,7 +55,7 @@ where
     pub sender: SenderMessage,
     pub reconnect_callback: Option<Callback<T, Transfer, U>>,
     pub config: Config<T, Transfer, U>,
-    _event_loop: JoinHandle<BinaryOptionsResult<()>>,
+    _event_loop: JoinHandle<crate::error::Result<()>>,
 }
 
 impl<Transfer, Handler, Connector, Creds, T, U> Deref
@@ -102,7 +101,7 @@ where
         handler: Handler,
         reconnect_callback: Option<Callback<T, Transfer, U>>,
         config: Config<T, Transfer, U>,
-    ) -> BinaryOptionsResult<Self> {
+    ) -> crate::error::Result<Self> {
         let inner = WebSocketInnerClient::init(
             credentials,
             connector,
@@ -144,7 +143,7 @@ where
         handler: Handler,
         reconnect_callback: Option<Callback<T, Transfer, U>>,
         config: Config<T, Transfer, U>,
-    ) -> BinaryOptionsResult<Self> {
+    ) -> crate::error::Result<Self> {
         let _connection = connector.connect(credentials.clone(), &config).await?; // Check if it's possible to connect before building the struct
         let (_event_loop, sender) = Self::start_loops(
             handler.clone(),
@@ -176,7 +175,7 @@ where
         connector: Connector,
         reconnect_callback: Option<Callback<T, Transfer, U>>,
         config: Config<T, Transfer, U>,
-    ) -> BinaryOptionsResult<(JoinHandle<BinaryOptionsResult<()>>, SenderMessage)> {
+    ) -> crate::error::Result<(JoinHandle<crate::error::Result<()>>, SenderMessage)> {
         let (mut write, mut read) = connector
             .connect(credentials.clone(), &config)
             .await?
@@ -213,7 +212,7 @@ where
                         loops = 0;
                     }
                     Err(e) => {
-                        if let BinaryOptionsToolsError::MaxReconnectAttemptsReached(_) = e {
+                        if let crate::error::Error::MaxReconnectAttemptsReached(_) = e {
                             return Err(e);
                         }
                     }
@@ -239,7 +238,7 @@ where
         connector: &Connector,
         credentials: &Creds,
         loops: &mut u32,
-    ) -> BinaryOptionsResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
+    ) -> crate::error::Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {
         let listener_future =
             WebSocketInnerClient::<Transfer, Handler, Connector, Creds, T, U>::listener_loop(
                 previous.clone(),
@@ -268,17 +267,15 @@ where
 
         match try_join3(listener_future, sender_future, callback).await {
             Ok(_) => {
-                Self::handle_reconnection_failure(connector, credentials, config, loops).await
+                return Self::handle_reconnection_failure(connector, credentials, config, loops)
+                    .await;
             }
             Err(e) => {
                 warn!("Error in event loop, {e}, reconnecting...");
-                Self::handle_reconnection_failure(connector, credentials, config, loops).await
+                return Self::handle_reconnection_failure(connector, credentials, config, loops)
+                    .await;
             }
         }
-        Err(BinaryOptionsToolsError::ReconnectionAttemptFailure {
-            number: *loops,
-            max: config.get_max_allowed_loops()?,
-        })
         // unreachable!("Please contact @Rick-29 on github.com this error is completely unexpected and should not happen.")
     }
 
@@ -287,7 +284,7 @@ where
         credentials: &Creds,
         config: &Config<T, Transfer, U>,
         loops: &mut u32,
-    ) -> BinaryOptionsResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
+    ) -> crate::error::Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {
         if let Ok(websocket) = connector.connect(credentials.clone(), config).await {
             return Ok(websocket);
         } else {
@@ -299,12 +296,10 @@ where
             );
             sleep(Duration::from_secs(config.get_sleep_interval()?)).await;
             if *loops >= max_loops {
-                return Err(BinaryOptionsToolsError::MaxReconnectAttemptsReached(
-                    max_loops,
-                ));
+                return Err(crate::error::Error::MaxReconnectAttemptsReached(max_loops));
             }
         }
-        Err(BinaryOptionsToolsError::ReconnectionAttemptFailure {
+        Err(crate::error::Error::ReconnectionAttemptFailure {
             number: *loops,
             max: config.get_max_allowed_loops()?,
         })
@@ -317,19 +312,19 @@ where
         handler: Handler,
         sender: &SenderMessage,
         ws: &mut SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
-    ) -> BinaryOptionsResult<()> {
+    ) -> crate::error::Result<()> {
         while let Some(msg) = &ws.next().await {
             let msg = msg
                 .as_ref()
                 .inspect_err(|e| warn!("Error recieving websocket message, {e}"))
                 .map_err(|e| {
-                    BinaryOptionsToolsError::WebsocketRecievingConnectionError(e.to_string())
+                    crate::error::Error::WebsocketRecievingConnectionError(e.to_string())
                 })?;
             match handler.process_message(msg, &previous, sender).await {
                 Ok((msg, close)) => {
                     if close {
                         info!("Recieved closing frame");
-                        return Err(BinaryOptionsToolsError::WebsocketConnectionClosed(
+                        return Err(crate::error::Error::WebsocketConnectionClosed(
                             "Recieved closing frame".into(),
                         ));
                     }
@@ -344,7 +339,7 @@ where
                                 if let Some(senders) = data.update_data(transfer.clone()).await? {
                                     for sender in senders {
                                         sender.send(transfer.clone()).await.map_err(|e| {
-                                            BinaryOptionsToolsError::ChannelRequestSendingError(
+                                            crate::error::Error::ChannelRequestSendingError(
                                                 e.to_string(),
                                             )
                                         })?;
@@ -363,7 +358,7 @@ where
                 }
             }
         }
-        Err(BinaryOptionsToolsError::WebSocketMessageError("Unexpected error encountered while recieving data from websocket connection. Loop terminated unexpectedly".to_string()))
+        Err(crate::error::Error::WebSocketMessageError("Unexpected error encountered while recieving data from websocket connection. Loop terminated unexpectedly".to_string()))
     }
 
     /// Recieves all the messages and sends them to the websocket
@@ -372,11 +367,11 @@ where
         reciever: &Receiver<Message>,
         reciever_priority: &Receiver<Message>,
         time: u64,
-    ) -> BinaryOptionsResult<()> {
+    ) -> crate::error::Result<()> {
         async fn priority_mesages(
             ws: &mut SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
             reciever_priority: &Receiver<Message>,
-        ) -> BinaryOptionsResult<()> {
+        ) -> crate::error::Result<()> {
             while let Ok(msg) = reciever_priority.recv().await {
                 ws.send(msg)
                     .await
@@ -384,9 +379,7 @@ where
                 ws.flush().await?;
                 debug!("Sent message to websocket!");
             }
-            Err(BinaryOptionsToolsError::ChannelRequestRecievingError(
-                RecvError,
-            ))
+            Err(crate::error::Error::ChannelRequestRecievingError(RecvError))
         }
 
         tokio::select! {
@@ -404,15 +397,13 @@ where
             ws.flush().await?;
             debug!("Sent message to websocket!");
         }
-        Err(BinaryOptionsToolsError::ChannelRequestRecievingError(
-            RecvError,
-        ))
+        Err(crate::error::Error::ChannelRequestRecievingError(RecvError))
     }
 
     // async fn api_loop(
     //     reciever: &mut Receiver<Transfer>,
     //     sender: &Sender<Message>,
-    // ) -> BinaryOptionsResult<()> {
+    // ) -> crate::error::Result<()> {
     //     while let Ok(msg) = reciever.recv().await {
     //         sender.send(msg.into()).await?;
     //     }
@@ -426,7 +417,7 @@ where
         reconnect: bool,
         reconnect_time: u64,
         config: Config<T, Transfer, U>,
-    ) -> BinaryOptionsResult<BinaryOptionsResult<()>> {
+    ) -> crate::error::Result<crate::error::Result<()>> {
         Ok(tokio::spawn(async move {
             sleep(Duration::from_secs(reconnect_time)).await;
             if reconnect {
@@ -444,11 +435,11 @@ where
         .await?)
     }
 
-    pub async fn send(&self, msg: Transfer) -> BinaryOptionsResult<()> {
+    pub async fn send(&self, msg: Transfer) -> crate::error::Result<()> {
         self.sender.send::<Transfer>(msg).await
     }
 
-    pub async fn raw_send(&self, msg: Transfer::Raw) -> BinaryOptionsResult<()> {
+    pub async fn raw_send(&self, msg: Transfer::Raw) -> crate::error::Result<()> {
         self.sender.raw_send::<Transfer>(msg).await
     }
 
@@ -457,7 +448,7 @@ where
         msg: Transfer,
         response_type: Transfer::Info,
         validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
-    ) -> BinaryOptionsResult<Transfer> {
+    ) -> crate::error::Result<Transfer> {
         self.sender
             .send_message(&self.data, msg, response_type, validator)
             .await
@@ -467,7 +458,7 @@ where
         &self,
         msg: Transfer::Raw,
         validator: Box<dyn ValidatorTrait<Transfer::Raw> + Send + Sync>,
-    ) -> BinaryOptionsResult<Transfer::Raw> {
+    ) -> crate::error::Result<Transfer::Raw> {
         self.sender
             .send_raw_message(&self.data, msg, validator)
             .await
@@ -480,7 +471,7 @@ where
         msg: Transfer,
         response_type: Transfer::Info,
         validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
-    ) -> BinaryOptionsResult<Transfer> {
+    ) -> crate::error::Result<Transfer> {
         self.sender
             .send_message_with_timeout(timeout, task, &self.data, msg, response_type, validator)
             .await
@@ -492,7 +483,7 @@ where
         task: impl ToString,
         msg: Transfer::Raw,
         validator: Box<dyn ValidatorTrait<Transfer::Raw> + Send + Sync>,
-    ) -> BinaryOptionsResult<Transfer::Raw> {
+    ) -> crate::error::Result<Transfer::Raw> {
         self.sender
             .send_raw_message_with_timeout(timeout, task, &self.data, msg, validator)
             .await
@@ -505,7 +496,7 @@ where
         msg: Transfer,
         response_type: Transfer::Info,
         validator: &(dyn ValidatorTrait<Transfer> + Send + Sync),
-    ) -> BinaryOptionsResult<Transfer> {
+    ) -> crate::error::Result<Transfer> {
         self.sender
             .send_message_with_timeout_and_retry(
                 timeout,
@@ -524,7 +515,7 @@ where
         task: impl ToString,
         msg: Transfer::Raw,
         validator: Box<dyn ValidatorTrait<Transfer::Raw> + Send + Sync>,
-    ) -> BinaryOptionsResult<Transfer::Raw> {
+    ) -> crate::error::Result<Transfer::Raw> {
         self.sender
             .send_raw_message_with_timeout_and_retry(timeout, task, &self.data, msg, validator)
             .await
@@ -535,7 +526,7 @@ where
         msg: Transfer::Raw,
         validator: Box<dyn ValidatorTrait<Transfer::Raw> + Send + Sync>,
         timeout: Option<Duration>,
-    ) -> BinaryOptionsResult<FilteredRecieverStream<Transfer::Raw>> {
+    ) -> crate::error::Result<FilteredRecieverStream<Transfer::Raw>> {
         self.sender
             .send_raw_message_iterator(timeout, &self.data, msg, validator)
             .await
@@ -680,7 +671,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_reconnection_limit_reached_error() {
-        use crate::error::BinaryOptionsToolsError;
+        use crate::error::Error;
 
         let max_loops = 3;
         let mut loops = 0;
@@ -689,8 +680,8 @@ mod tests {
         for _ in 0..max_loops {
             loops += 1;
             if loops >= max_loops {
-                let err = BinaryOptionsToolsError::MaxReconnectAttemptsReached(max_loops);
-                if let BinaryOptionsToolsError::MaxReconnectAttemptsReached(m) = err {
+                let err = crate::error::Error::MaxReconnectAttemptsReached(max_loops);
+                if let crate::error::Error::MaxReconnectAttemptsReached(m) = err {
                     assert_eq!(m, max_loops);
                     return;
                 }

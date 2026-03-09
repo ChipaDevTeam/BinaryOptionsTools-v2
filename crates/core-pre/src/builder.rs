@@ -275,11 +275,11 @@ impl<S: AppState> ClientBuilder<S> {
     /// # use async_trait::async_trait;
     /// # use std::sync::Arc;
     /// # #[derive(Debug)]
-/// # struct MyState;
-/// # #[async_trait]
-/// # impl AppState for MyState {
-/// #     async fn clear_temporal_data(&self) {}
-/// # }
+    /// # struct MyState;
+    /// # #[async_trait]
+    /// # impl AppState for MyState {
+    /// #     async fn clear_temporal_data(&self) {}
+    /// # }
     /// # struct MyConnector;
     /// # #[async_trait]
     /// # impl Connector<MyState> for MyConnector {
@@ -314,11 +314,11 @@ impl<S: AppState> ClientBuilder<S> {
     /// # use async_trait::async_trait;
     /// # use std::sync::Arc;
     /// # #[derive(Debug)]
-/// # struct MyState;
-/// # #[async_trait]
-/// # impl AppState for MyState {
-/// #     async fn clear_temporal_data(&self) {}
-/// # }
+    /// # struct MyState;
+    /// # #[async_trait]
+    /// # impl AppState for MyState {
+    /// #     async fn clear_temporal_data(&self) {}
+    /// # }
     /// # struct MyConnector;
     /// # #[async_trait]
     /// # impl Connector<MyState> for MyConnector {
@@ -361,11 +361,11 @@ impl<S: AppState> ClientBuilder<S> {
     /// # use async_trait::async_trait;
     /// # use std::sync::Arc;
     /// # #[derive(Debug)]
-/// # struct MyState;
-/// # #[async_trait]
-/// # impl AppState for MyState {
-/// #     async fn clear_temporal_data(&self) {}
-/// # }
+    /// # struct MyState;
+    /// # #[async_trait]
+    /// # impl AppState for MyState {
+    /// #     async fn clear_temporal_data(&self) {}
+    /// # }
     /// # struct MyConnector;
     /// # #[async_trait]
     /// # impl Connector<MyState> for MyConnector {

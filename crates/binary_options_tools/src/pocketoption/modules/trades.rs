@@ -72,7 +72,8 @@ impl TradesHandle {
         amount: Decimal,
         time: u32,
     ) -> PocketResult<Deal> {
-        self.trade_with_id(asset, action, amount, time, Uuid::new_v4()).await
+        self.trade_with_id(asset, action, amount, time, Uuid::new_v4())
+            .await
     }
 
     /// Places a new trade with a specific request ID.
@@ -254,7 +255,7 @@ impl ApiModule<State> for TradesApiModule {
                               info!(target: "TradesApiModule", "Trade opened: {}", deal.id);
 
                               let req_id = deal.request_id.unwrap_or_default();
-                              
+
                               // Clean up pending_market_orders in state
                               self.state.trade_state.pending_market_orders.write().await.remove(&req_id);
 

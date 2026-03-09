@@ -53,13 +53,13 @@ pub enum ServerResponse {
 }
 
 pub struct PendingTradesHandle {
-    sender: AsyncSender<Command>,
-    receiver: AsyncReceiver<CommandResponse>,
-        /// Single-threaded bottleneck for pending trade calls.
+    pub sender: AsyncSender<Command>,
+    pub receiver: AsyncReceiver<CommandResponse>,
+    /// Single-threaded bottleneck for pending trade calls.
     /// This intentional design prevents head-of-line blocking issues and ensures
     /// that concurrent requests do not interfere with the platform session state.
     /// If concurrency is required in the future, consider a semaphore instead.
-    call_lock: Arc<tokio::sync::Mutex<()>>,
+    pub call_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl Clone for PendingTradesHandle {

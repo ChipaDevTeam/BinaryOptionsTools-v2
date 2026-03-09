@@ -290,19 +290,22 @@ impl PocketOption {
     /// The current balance as a `Decimal`, or `-1.0` if the balance is unknown.
     pub async fn balance(&self) -> Decimal {
         let state = &self.client.state;
-        
+
         // Fast path: return immediately if available
         if let Some(balance) = *state.balance.read().await {
             return balance;
         }
 
         // Wait for update
-        if tokio::time::timeout(Duration::from_secs(10), state.balance_updated.notified()).await.is_ok() {
+        if tokio::time::timeout(Duration::from_secs(10), state.balance_updated.notified())
+            .await
+            .is_ok()
+        {
             if let Some(balance) = *state.balance.read().await {
                 return balance;
             }
         }
-        
+
         dec!(-1.0)
     }
 
@@ -414,7 +417,11 @@ impl PocketOption {
             let mut recent = self.client.state.trade_state.recent_trades.write().await;
             if let Some((existing_id, created_at)) = recent.get(&fingerprint) {
                 if created_at.elapsed() < Duration::from_secs(2) {
-                    let id_str = if existing_id.is_nil() { "pending".to_string() } else { existing_id.to_string() };
+                    let id_str = if existing_id.is_nil() {
+                        "pending".to_string()
+                    } else {
+                        existing_id.to_string()
+                    };
                     return Err(PocketError::General(format!(
                         "Duplicate trade blocked (original ID: {})",
                         id_str
@@ -422,7 +429,10 @@ impl PocketOption {
                 }
             }
             // Insert a placeholder to prevent concurrent duplicate calls while we await the handle
-            recent.insert(fingerprint.clone(), (Uuid::nil(), std::time::Instant::now()));
+            recent.insert(
+                fingerprint.clone(),
+                (Uuid::nil(), std::time::Instant::now()),
+            );
             // Cleanup old entries (>5 seconds)
             recent.retain(|_, (_, t)| t.elapsed() < Duration::from_secs(5));
         }
@@ -447,31 +457,65 @@ impl PocketOption {
                 .insert(request_id, (order, std::time::Instant::now()));
         }
 
-        let handle_result = self.require_handle::<TradesApiModule>("TradesApiModule").await;
-        
+        let handle_result = self
+            .require_handle::<TradesApiModule>("TradesApiModule")
+            .await;
+
         let handle = match handle_result {
             Ok(h) => h,
             Err(e) => {
                 // Remove the placeholder if handle retrieval fails
-                self.client.state.trade_state.recent_trades.write().await.remove(&fingerprint);
-                self.client.state.trade_state.pending_market_orders.write().await.remove(&request_id);
+                self.client
+                    .state
+                    .trade_state
+                    .recent_trades
+                    .write()
+                    .await
+                    .remove(&fingerprint);
+                self.client
+                    .state
+                    .trade_state
+                    .pending_market_orders
+                    .write()
+                    .await
+                    .remove(&request_id);
                 return Err(e);
             }
         };
 
-        let deal_result = handle.trade_with_id(asset_str.clone(), action, amount, time, request_id).await;
+        let deal_result = handle
+            .trade_with_id(asset_str.clone(), action, amount, time, request_id)
+            .await;
 
         match deal_result {
             Ok(deal) => {
                 // Update with the actual deal ID
-                self.client.state.trade_state.recent_trades.write().await.insert(fingerprint, (deal.id, std::time::Instant::now()));
+                self.client
+                    .state
+                    .trade_state
+                    .recent_trades
+                    .write()
+                    .await
+                    .insert(fingerprint, (deal.id, std::time::Instant::now()));
                 // Note: We keep it in pending_market_orders until it's confirmed by the DealsApiModule or TradesApiModule
                 Ok((deal.id, deal))
             }
             Err(e) => {
                 // Remove the placeholder if trade fails
-                self.client.state.trade_state.recent_trades.write().await.remove(&fingerprint);
-                self.client.state.trade_state.pending_market_orders.write().await.remove(&request_id);
+                self.client
+                    .state
+                    .trade_state
+                    .recent_trades
+                    .write()
+                    .await
+                    .remove(&fingerprint);
+                self.client
+                    .state
+                    .trade_state
+                    .pending_market_orders
+                    .write()
+                    .await
+                    .remove(&request_id);
                 Err(e)
             }
         }
@@ -554,12 +598,14 @@ impl PocketOption {
             return Ok(());
         }
 
-        if tokio::time::timeout(timeout, state.assets_updated.notified()).await.is_ok()
+        if tokio::time::timeout(timeout, state.assets_updated.notified())
+            .await
+            .is_ok()
             && state.assets.read().await.is_some()
         {
             return Ok(());
         }
-        
+
         // Timeout or failed
         let balance = state.get_balance().await;
         let ssid_type = if state.ssid.demo() { "demo" } else { "real" };
@@ -1266,8 +1312,8 @@ mod tests {
 #[cfg(test)]
 mod additional_tests {
     use super::*;
+    use crate::pocketoption::types::{Asset, AssetType, Assets};
     use rust_decimal_macros::dec;
-    use crate::pocketoption::types::{Asset, Assets, AssetType};
     use std::collections::HashMap;
 
     #[tokio::test]
@@ -1276,21 +1322,24 @@ mod additional_tests {
         // Use an invalid/dummy URL so we don't hit the real server
         let api = match PocketOption::new_with_url(ssid, "ws://127.0.0.1:0".to_string()).await {
             Ok(client) => client,
-            Err(_) => return, 
+            Err(_) => return,
         };
 
         // Inject mock assets so validate_asset passes
         let mut mock_assets = HashMap::new();
-        mock_assets.insert("EURUSD_otc".to_string(), Asset {
-            id: 1,
-            name: "EUR/USD OTC".to_string(),
-            symbol: "EURUSD_otc".to_string(),
-            is_otc: true,
-            is_active: true,
-            payout: 92,
-            allowed_candles: vec![],
-            asset_type: AssetType::Currency,
-        });
+        mock_assets.insert(
+            "EURUSD_otc".to_string(),
+            Asset {
+                id: 1,
+                name: "EUR/USD OTC".to_string(),
+                symbol: "EURUSD_otc".to_string(),
+                is_otc: true,
+                is_active: true,
+                payout: 92,
+                allowed_candles: vec![],
+                asset_type: AssetType::Currency,
+            },
+        );
         api.client.state.set_assets(Assets(mock_assets)).await;
 
         let asset = "EURUSD_otc";
@@ -1303,7 +1352,11 @@ mod additional_tests {
 
         let (res1, res2) = tokio::join!(call1, call2);
 
-        let is_duplicate_err = |res: &crate::pocketoption::error::PocketResult<(uuid::Uuid, crate::pocketoption::types::Deal)>| -> bool {
+        let is_duplicate_err = |res: &crate::pocketoption::error::PocketResult<(
+            uuid::Uuid,
+            crate::pocketoption::types::Deal,
+        )>|
+         -> bool {
             if let Err(crate::pocketoption::error::PocketError::General(msg)) = res {
                 msg.contains("Duplicate trade blocked")
             } else {
@@ -1311,9 +1364,12 @@ mod additional_tests {
             }
         };
 
-        // One of them must be a duplicate error! 
+        // One of them must be a duplicate error!
         // (The other one will likely be a ModuleNotFound error since we didn't start TradesApiModule correctly,
         // or a timeout error since the socket is invalid)
-        assert!(is_duplicate_err(&res1) || is_duplicate_err(&res2), "One call should be blocked as duplicate");
+        assert!(
+            is_duplicate_err(&res1) || is_duplicate_err(&res2),
+            "One call should be blocked as duplicate"
+        );
     }
 }

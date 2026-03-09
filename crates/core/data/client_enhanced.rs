@@ -24,7 +24,7 @@ use url::Url;
 
 use crate::{
     constants::MAX_CHANNEL_CAPACITY,
-    error::{BinaryOptionsResult, BinaryOptionsToolsError},
+    error::{Result, Error},
     general::{
         batching::{BatchingConfig, MessageBatcher, RateLimiter},
         config::Config,
@@ -85,7 +85,7 @@ where
     /// Connection state and statistics
     connection_state: Arc<RwLock<ConnectionState>>,
     /// Background tasks
-    background_tasks: Arc<Mutex<Vec<JoinHandle<BinaryOptionsResult<()>>>>>,
+    background_tasks: Arc<Mutex<Vec<JoinHandle<Result<()>>>>>,
     /// Keep-alive manager
     keep_alive: Arc<Mutex<Option<KeepAliveManager>>>,
     /// Message batcher for performance optimization
@@ -208,7 +208,7 @@ where
         config: Config<T, Transfer, U>,
         connection_urls: Vec<Url>,
         auto_reconnect: bool,
-    ) -> BinaryOptionsResult<Self> {
+    ) -> Result<Self> {
         let inner = EnhancedWebSocketInner::init(
             credentials,
             connector,
@@ -226,12 +226,12 @@ where
     }
 
     /// Connect to WebSocket with automatic region fallback (like Python)
-    pub async fn connect(&self) -> BinaryOptionsResult<()> {
+    pub async fn connect(&self) -> Result<()> {
         self.inner.connect().await
     }
 
     /// Connect with persistent connection and keep-alive (like Python)
-    pub async fn connect_persistent(&self) -> BinaryOptionsResult<()> {
+    pub async fn connect_persistent(&self) -> Result<()> {
         self.inner.connect_persistent().await?;
 
         // Start reconnection supervisor
@@ -330,17 +330,17 @@ where
     }
 
     /// Disconnect gracefully
-    pub async fn disconnect(&self) -> BinaryOptionsResult<()> {
+    pub async fn disconnect(&self) -> Result<()> {
         self.inner.disconnect().await
     }
 
     /// Send a message (with automatic retry logic like Python)
-    pub async fn send_message(&self, message: Message) -> BinaryOptionsResult<()> {
+    pub async fn send_message(&self, message: Message) -> Result<()> {
         self.inner.send_message(message).await
     }
 
     /// Send a raw message string (like Python's send_message)
-    pub async fn send_raw_message(&self, message: &str) -> BinaryOptionsResult<()> {
+    pub async fn send_raw_message(&self, message: &str) -> Result<()> {
         self.inner
             .send_message(Message::Text(message.to_string()))
             .await
@@ -361,9 +361,9 @@ where
         &self,
         event_type: EventType,
         handler: F,
-    ) -> BinaryOptionsResult<()>
+    ) -> Result<()>
     where
-        F: Fn(&serde_json::Value) -> BinaryOptionsResult<()> + Send + Sync + 'static,
+        F: Fn(&serde_json::Value) -> Result<()> + Send + Sync + 'static,
     {
         let handler = Arc::new(handler);
         self.inner
@@ -403,7 +403,7 @@ where
         config: Config<T, Transfer, U>,
         connection_urls: Vec<Url>,
         auto_reconnect: bool,
-    ) -> BinaryOptionsResult<Self> {
+    ) -> Result<Self> {
         // Create connection manager
         let connection_manager = Arc::new(EnhancedConnectionManager::new(
             10,                      // max_connections
@@ -456,7 +456,7 @@ where
     }
 
     /// Connect with automatic region fallback (following Python patterns)
-    pub async fn connect(&self) -> BinaryOptionsResult<()> {
+    pub async fn connect(&self) -> Result<()> {
         let mut state = self.connection_state.write().await;
         state.connection_attempts += 1;
         drop(state);
@@ -506,13 +506,13 @@ where
             }
         }
 
-        Err(BinaryOptionsToolsError::WebsocketConnectionError(Box::new(
+        Err(Error::WebsocketConnectionError(Box::new(
             tokio_tungstenite::tungstenite::Error::ConnectionClosed,
         )))
     }
 
     /// Connect with persistent connection and keep-alive
-    pub async fn connect_persistent(&self) -> BinaryOptionsResult<()> {
+    pub async fn connect_persistent(&self) -> Result<()> {
         self.connect().await?;
 
         // Start keep-alive manager
@@ -527,7 +527,7 @@ where
     async fn try_connect_single(
         &self,
         url: &Url,
-    ) -> BinaryOptionsResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
+    ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {
         let start_time = Instant::now();
 
         match timeout(
@@ -542,7 +542,7 @@ where
                 Ok(websocket)
             }
             Ok(Err(e)) => Err(e),
-            Err(_) => Err(BinaryOptionsToolsError::TimeoutError {
+            Err(_) => Err(Error::TimeoutError {
                 task: "Connection".to_string(),
                 duration: Duration::from_secs(10),
             }),
@@ -553,7 +553,7 @@ where
     async fn start_connection_handler(
         &self,
         websocket: WebSocketStream<MaybeTlsStream<TcpStream>>,
-    ) -> BinaryOptionsResult<()> {
+    ) -> Result<()> {
         // Explicitly abort any existing background tasks before spawning new handlers
         // This ensures a clean state and prevents message "stealing" by old tasks
         {
@@ -583,7 +583,7 @@ where
     async fn start_sender_task(
         &self,
         mut write: SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
-    ) -> BinaryOptionsResult<JoinHandle<BinaryOptionsResult<()>>> {
+    ) -> Result<JoinHandle<Result<()>>> {
         let message_receiver = self.message_receiver.clone();
         let message_receiver_priority = self.message_receiver_priority.clone();
         let event_manager = self.event_manager.clone();
@@ -636,7 +636,7 @@ where
     async fn start_receiver_task(
         &self,
         mut read: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
-    ) -> BinaryOptionsResult<JoinHandle<BinaryOptionsResult<()>>> {
+    ) -> Result<JoinHandle<Result<()>>> {
         let connection_state = self.connection_state.clone();
         let event_manager = self.event_manager.clone();
         let data = self.data.clone();
@@ -770,7 +770,7 @@ where
     async fn process_text_message(
         text: &str,
         event_manager: &EventManager,
-    ) -> BinaryOptionsResult<()> {
+    ) -> Result<()> {
         // Handle different message types like Python implementation
         if text.starts_with("0") && text.contains("sid") {
             // Initial connection message
@@ -805,7 +805,7 @@ where
     async fn process_socket_io_message(
         text: &str,
         event_manager: &EventManager,
-    ) -> BinaryOptionsResult<()> {
+    ) -> Result<()> {
         if text.contains("NotAuthorized") {
             event_manager
                 .emit(Event::new(
@@ -826,7 +826,7 @@ where
     async fn handle_json_message(
         data: &serde_json::Value,
         event_manager: &EventManager,
-    ) -> BinaryOptionsResult<()> {
+    ) -> Result<()> {
         if let Some(array) = data.as_array() {
             if let Some(event_type) = array.get(0).and_then(|v| v.as_str()) {
                 let event_data = array.get(1).unwrap_or(&serde_json::Value::Null);
@@ -896,7 +896,7 @@ where
     }
 
     /// Send a message through the WebSocket
-    pub async fn send_message(&self, message: Message) -> BinaryOptionsResult<()> {
+    pub async fn send_message(&self, message: Message) -> Result<()> {
         // Update stats
         {
             let mut state = self.connection_state.write().await;
@@ -907,13 +907,13 @@ where
         self.message_sender
             .send(message)
             .await
-            .map_err(|e| BinaryOptionsToolsError::ChannelRequestSendingError(e.to_string()))?;
+            .map_err(|e| Error::ChannelRequestSendingError(e.to_string()))?;
 
         Ok(())
     }
 
     /// Disconnect gracefully (like Python's disconnect method)
-    pub async fn disconnect(&self) -> BinaryOptionsResult<()> {
+    pub async fn disconnect(&self) -> Result<()> {
         info!("Disconnecting WebSocket client...");
 
         // Stop keep-alive manager
@@ -962,7 +962,7 @@ impl LoggingEventHandler {
 
 #[async_trait]
 impl crate::general::events::EventHandler<serde_json::Value> for LoggingEventHandler {
-    async fn handle(&self, event: &Event<serde_json::Value>) -> BinaryOptionsResult<()> {
+    async fn handle(&self, event: &Event<serde_json::Value>) -> Result<()> {
         match event.event_type {
             EventType::Connected => info!("🔗 WebSocket connected"),
             EventType::Disconnected => warn!("❌ WebSocket disconnected"),

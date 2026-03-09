@@ -52,8 +52,9 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 
 ### Supported Platforms
 
-- **PocketOption** (Quick Trading Mode & Pending Orders BETA)
-  - _Real & Demo Accounts Supported_
+- **PocketOption** (Full Support: Quick Trading, Pending Orders, Assets, History)
+- **ExpertOption** (Alpha/Beta: Account Info, Keep-Alive, WebSocket Core)
+- **IQ Option** (On Roadmap)
 
 ---
 
@@ -66,12 +67,19 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 - **Balances**: Real-time account balance retrieval.
 - **Portfolio**: Access active positions and closed deal history.
 
-### Market Data
+### Market Data & Backtesting
 
-- **Live Stream**: Subscribe to real-time candles (tick, 5s, 15s, 30s, 60s, 300s).
-- **Historical**: Fetch OHLC data (`get_candles`) for backtesting.
-- **Payouts**: Retrieve current payout percentages for assets.
-- **Sync**: Server time synchronization for precision timing.
+- **Live Stream**: Subscribe to real-time candles and price ticks.
+- **Historical**: Fetch OHLC data for analysis.
+- **Virtual Market**: Built-in simulator for backtesting strategies without financial risk.
+- **Server Sync**: Precision timing via NTP-like synchronization.
+
+### Bot Framework (New)
+
+- **Event-Driven**: Hooks for `on_candle`, `on_tick`, `on_deal_closed`, etc.
+- **Contextual API**: Write once, run on any platform (PocketOption, ExpertOption, or Virtual).
+- **Strategy Trait**: Easily implement and swap trading algorithms.
+- **Virtual Market**: Built-in simulator for backtesting strategies without financial risk.
 
 ### Framework Utilities
 
@@ -161,59 +169,48 @@ binary_options_tools = { path = "crates/binary_options_tools" }
 
 ### Async API (Recommended)
 
-Best for building trading bots that need to handle streams and trades simultaneously.
-
 ```python
 import asyncio
 import os
 from BinaryOptionsToolsV2 import PocketOptionAsync
 
 async def main():
-    # 1. Get SSID (Session ID)
     ssid = os.getenv("POCKET_OPTION_SSID")
-
-    # 2. Initialize with Context Manager
     async with PocketOptionAsync(ssid=ssid) as client:
-        # Get Balance
         balance = await client.balance()
-        print(f"Current Balance: ${balance}")
-
-        # Place Trade: Asset, Amount, Duration
+        print(f"Balance: ${balance}")
+        
         trade_id, deal = await client.buy("EURUSD_otc", 1.0, 60)
-        print(f"Trade Placed: {deal}")
-
-        # Wait for Result
-        result = await client.check_win(trade_id)
-        print(f"Outcome: {result['result']}")
+        print(f"Outcome: {await client.check_win(trade_id)}")
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### Sync API
+### Bot Framework & Strategy (High-Level)
 
-Best for simple scripts or data fetching.
+Implement the `Strategy` trait (Rust) or inherit from `PyStrategy` (Python) for structured bot development.
 
 ```python
-from BinaryOptionsToolsV2 import PocketOption
-import os
+from BinaryOptionsToolsV2 import PyBot, PyStrategy, PyContext, PyVirtualMarket
 
-with PocketOption(ssid=os.getenv("POCKET_OPTION_SSID")) as client:
-    print(f"Balance: ${client.balance()}")
-    trade_id, _ = client.buy("EURUSD_otc", 1.0, 60)
-    print(f"Result: {client.check_win(trade_id)['result']}")
+class MyStrategy(PyStrategy):
+    async def on_candle(self, ctx: PyContext, asset: str, candle):
+        if candle['close'] > candle['open']:
+            await ctx.buy(asset, 1.0, 60)
+
+# Run on Virtual Market (Backtesting)
+market = PyVirtualMarket()
+bot = PyBot(PyContext(market), MyStrategy())
+# bot.run() ...
 ```
 
 ### Real-time Data Streaming
 
 ```python
 async with PocketOptionAsync(ssid="...") as client:
-    # Subscribe to 1-minute candles
-    subscription = await client.subscribe_symbol("EURUSD_otc", 60)
-
-    print("Streaming data...")
-    async for candle in subscription:
-        print(f"Timestamp: {candle['time']} | Close: {candle['close']}")
+    async for candle in await client.subscribe_symbol("EURUSD_otc"):
+        print(f"Price: {candle['close']}")
 ```
 
 ---
@@ -241,13 +238,15 @@ async for message in await handler.subscribe():
 
 ## Roadmap
 
-- [x] **PocketOption**: Quick Trading
-- [x] **PocketOption**: Pending Orders (BETA)
-- [ ] **Platform**: Expert Options Integration
+- [x] **PocketOption**: Quick Trading & Pending Orders
+- [x] **ExpertOption**: Core Implementation (Alpha/Beta)
+- [x] **Framework**: Bot & Strategy System
+- [x] **Backtesting**: Virtual Market Simulator
 - [ ] **Platform**: IQ Option Integration
+- [x] **Core**: Multi-language support via UniFFI (Kotlin, Swift, Go, C#)
 - [ ] **Core**: JavaScript/TypeScript Bindings
 - [ ] **Core**: WebAssembly (WASM) Support
-- [ ] **Tools**: Historical Data Export & Backtesting Framework
+- [ ] **Tools**: Advanced Strategy Optimizer
 
 ---
 
@@ -279,4 +278,4 @@ We welcome contributions!
 
 ---
 
-[Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/) | [API Reference](https://chipadevteam.github.io/BinaryOptionsTools-v2/api/reference.md) | [Discord Community](https://discord.com/invite/p7YyFqSmAz)
+[Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/) | [API Reference](https://chipadevteam.github.io/BinaryOptionsTools-v2/api/reference.md) | [Discord Community](https://discord.com/invite/p7YyFqSmAz) | [Agents & AI](agents/AGENTS.md)

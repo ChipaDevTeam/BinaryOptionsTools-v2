@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use binary_options_tools_core_pre::{
@@ -249,7 +245,7 @@ impl ApiModule<State> for DealsApiModule {
                                                             let has_placeholder = arr.iter().skip(1).any(|v| {
                                                                 v.as_object().is_some_and(|obj| obj.contains_key("_placeholder"))
                                                             });
-                                                            
+
                                                             if has_placeholder || arr.len() == 1 {
                                                                 tracing::debug!(target: "DealsApiModule", "Detected binary placeholder, waiting for binary payload for {:?}", current_expected);
                                                                 expected = current_expected;

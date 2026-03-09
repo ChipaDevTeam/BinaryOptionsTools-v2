@@ -82,10 +82,20 @@ nav:
       - System Structure: architecture/structure.md
       - Data Flow: architecture/dataflow.md
       - Raw Module: architecture/raw-module.md
+  - Tutorials:
+      - Overview: tutorials/How to get PocketOption SSID.txt
+      - Scripts: tutorials/scripts/
   - Project Info:
+      - Contributing: ../CONTRIBUTING.md
+      - Code of Conduct: ../CODE_OF_CONDUCT.md
+      - Security: ../SECURITY.md
+      - License: ../LICENSE
+      - Acknowledgments: ../ACKNOWLEDGMENTS.md
       - Deployment: project/deployment.md
       - Next Steps: project/next-steps.md
       - Breaking Changes: project/breaking-changes-0.2.6.md
       - Documentation Summary: project/docs-summary.md
       - Enhancement Summary: project/enhancement-summary.md
       - Raw Handler Summary: project/raw-handler-summary.md
+
+

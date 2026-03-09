@@ -280,16 +280,14 @@ impl SubscriptionsHandle {
                 command_id: _,
                 subscription_id,
                 stream_receiver,
-            } => {
-                Ok(SubscriptionStream {
-                    receiver: stream_receiver,
-                    sender: Some(self.sender.clone()),
-                    router: self.router.clone(),
-                    asset,
-                    sub_type,
-                    subscription_id,
-                })
-            }
+            } => Ok(SubscriptionStream {
+                receiver: stream_receiver,
+                sender: Some(self.sender.clone()),
+                router: self.router.clone(),
+                asset,
+                sub_type,
+                subscription_id,
+            }),
             CommandResponse::SubscriptionFailed { error, .. } => Err(*error),
             _ => Err(PocketError::General(
                 "Unexpected response to subscribe command".into(),
@@ -756,7 +754,6 @@ impl SubscriptionsApiModule {
 
         Ok(removed_at_least_one)
     }
-
 
     /// Send subscription message to WebSocket.
     ///
