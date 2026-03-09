@@ -32,7 +32,6 @@ use binary_options_tools::pocketoption::{
 };
 use binary_options_tools_core_pre::reimports::Message;
 use binary_options_tools_core_pre::traits::{ApiModule, RunnerCommand};
-use kanal::bounded_async;
 use rust_decimal::Decimal;
 use tokio::{
     sync::Mutex,

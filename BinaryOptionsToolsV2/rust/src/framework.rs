@@ -257,7 +257,7 @@ impl Strategy for StrategyWrapper {
     }
 
     async fn on_balance_update(&self, ctx: &Context, balance: Decimal) -> PocketResult<()> {
-        let balance = balance.to_f64().unwrap_or(-1.0);
+        let balance = balance.to_f64().unwrap_or(-1.0); // -1.0 indicates a conversion error, though it shouldnt happen often- awaiting this should be fine and if anything u can just asyncio wait like 5 seconds
         let inner = Python::attach(|py| self.inner.clone_ref(py));
         let client = ctx.client.clone();
         let market = ctx.market.clone();
