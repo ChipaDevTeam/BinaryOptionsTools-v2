@@ -119,10 +119,12 @@ impl StateBuilder {
     }
 
     /// Build the final State instance
-    ///
-    /// # Returns
-    /// Result containing the State or an error if required fields are missing
     pub fn build(self) -> PocketResult<State> {
+        self.build_with_trade_state(Arc::new(TradeState::default()))
+    }
+
+    /// Build the final State instance with a custom TradeState
+    pub fn build_with_trade_state(self, trade_state: Arc<TradeState>) -> PocketResult<State> {
         Ok(State {
             ssid: self
                 .ssid
@@ -136,7 +138,7 @@ impl StateBuilder {
             server_time: ServerTimeState::default(),
             assets: RwLock::new(None),
             assets_updated: Arc::new(tokio::sync::Notify::new()),
-            trade_state: Arc::new(TradeState::default()),
+            trade_state,
             raw_validators: SyncRwLock::new(HashMap::new()),
             active_subscriptions: RwLock::new(HashMap::new()),
             histories: RwLock::new(Vec::new()),
@@ -336,24 +338,32 @@ impl TradeState {
 
     /// Moves deals from opened to closed and adds new closed deals.
     pub async fn update_closed_deals(&self, deals: Vec<Deal>) {
-        let ids: Vec<_> = deals.iter().map(|deal| deal.id).collect();
+        let mut opened = self.opened_deals.write().await;
+        let mut closed = self.closed_deals.write().await;
 
-        // Remove these deals from opened_deals
-        self.opened_deals
-            .write()
-            .await
-            .retain(|id, _| !ids.contains(id));
-
-        // Add them to closed_deals
-        self.closed_deals
-            .write()
-            .await
-            .extend(deals.into_iter().map(|deal| (deal.id, deal)));
+        for deal in deals {
+            opened.remove(&deal.id);
+            closed.insert(deal.id, deal);
+        }
     }
 
     /// Removes all deals from the closed_deals map.
     pub async fn clear_closed_deals(&self) {
         self.closed_deals.write().await.clear();
+    }
+
+    /// Prunes the closed_deals map to keep only the most recent N deals.
+    pub async fn prune_closed_deals(&self, max_deals: usize) {
+        let mut closed = self.closed_deals.write().await;
+        if closed.len() > max_deals {
+            let mut deals: Vec<_> = closed.values().collect();
+            // Sort by close timestamp (descending)
+            deals.sort_by(|a, b| b.close_timestamp.cmp(&a.close_timestamp));
+
+            let to_keep: std::collections::HashSet<_> =
+                deals.iter().take(max_deals).map(|d| d.id).collect();
+            closed.retain(|id, _| to_keep.contains(id));
+        }
     }
 
     /// Clears all opened deals.

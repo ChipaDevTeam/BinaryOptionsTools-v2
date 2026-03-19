@@ -134,6 +134,42 @@ impl fmt::Debug for Ssid {
     }
 }
 
+use regex::Regex;
+use std::sync::OnceLock;
+
+static KEY_REGEX: OnceLock<Regex> = OnceLock::new();
+static VAL_REGEX: OnceLock<Regex> = OnceLock::new();
+
+fn recover_json(input: &str) -> String {
+    let key_re =
+        KEY_REGEX.get_or_init(|| Regex::new(r"([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:").unwrap());
+    let val_re = VAL_REGEX.get_or_init(|| Regex::new(r"(:)\s*([a-zA-Z0-9._-]+)(\s*[,}])").unwrap());
+
+    // 1. Quote unquoted keys
+    let intermediate = key_re.replace_all(input, "$1\"$2\":");
+
+    // 2. Quote unquoted alphanumeric values (excluding true/false/null/numbers)
+    val_re
+        .replace_all(&intermediate, |caps: &regex::Captures| {
+            let prefix = &caps[1];
+            let val = &caps[2];
+            let suffix = &caps[3];
+
+            let val_lower = val.to_lowercase();
+            if val_lower == "true"
+                || val_lower == "false"
+                || val_lower == "null"
+                || (val.contains('.') && val.parse::<f64>().is_ok())
+                || val.parse::<i64>().is_ok()
+            {
+                format!("{}{}{}", prefix, val, suffix)
+            } else {
+                format!("{}\"{}\"{}", prefix, val, suffix)
+            }
+        })
+        .to_string()
+}
+
 impl Ssid {
     /// Parses a raw SSID string from PocketOption
     ///
@@ -162,8 +198,17 @@ impl Ssid {
             trimmed
         };
 
-        let mut ssid: Demo = serde_json::from_str(parsed)
-            .map_err(|e| CoreError::SsidParsing(format!("JSON parsing error: {e}")))?;
+        let mut ssid: Demo = match serde_json::from_str(parsed) {
+            Ok(s) => s,
+            Err(e) => {
+                // Try recovery: quote unquoted keys and alphanumeric values
+                let recovered = recover_json(parsed);
+                serde_json::from_str(&recovered).map_err(|re| {
+                    tracing::debug!(target: "Ssid", "Recovery failed. Original error: {:?}, Recovery error: {:?}", e, re);
+                    CoreError::SsidParsing(format!("JSON parsing error: {e} (Recovery also failed: {re})"))
+                })?
+            }
+        };
 
         // Ensure raw is always in the full 42["auth",...] format for sending over WS
         ssid.raw = if trimmed.starts_with("42[\"auth\",") {
@@ -389,5 +434,17 @@ mod tests {
         assert!(err
             .to_string()
             .contains("Invalid SSID format: double-encoding detected"));
+    }
+
+    #[test]
+    fn test_parse_ssid_recovery() -> Result<(), Box<dyn Error>> {
+        // SSID with unquoted keys and unquoted alphanumeric values (simulating shell stripping)
+        let stripped_ssid = r#"42["auth", {session: 1v072jiqj90u7sf82u22a1odns, isDemo: 1, uid: 69982301, platform: 2, isFastHistory: true, isOptimized: true}]"#;
+
+        let parsed = Ssid::parse(stripped_ssid)?;
+        assert_eq!(parsed.session_id(), "1v072jiqj90u7sf82u22a1odns");
+        assert_eq!(parsed.demo(), true);
+
+        Ok(())
     }
 }

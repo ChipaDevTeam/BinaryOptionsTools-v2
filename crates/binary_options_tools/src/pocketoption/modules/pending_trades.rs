@@ -16,6 +16,7 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
     types::{FailOpenOrder, MultiPatternRule, OpenPendingOrder, PendingOrder},
+    utils::SocketIoFrame,
 };
 
 const PENDING_ORDER_TIMEOUT: Duration = Duration::from_secs(30);
@@ -105,6 +106,12 @@ impl PendingTradesHandle {
         command: u32,
     ) -> PocketResult<PendingOrder> {
         let _lock = self.call_lock.lock().await;
+
+        // Drain the receiver of any stale responses from previous timed-out requests
+        while let Ok(msg) = self.receiver.try_recv() {
+            warn!("Drained stale response from PendingTradesHandle: {:?}", msg);
+        }
+
         let id = Uuid::new_v4();
         self.sender
             .send(Command::OpenPendingOrder {
@@ -184,7 +191,7 @@ pub struct PendingTradesApiModule {
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
-    last_req_id: Option<Uuid>,
+    pending_requests: std::collections::VecDeque<Uuid>,
 }
 
 #[async_trait]
@@ -207,7 +214,7 @@ impl ApiModule<State> for PendingTradesApiModule {
             command_responder,
             message_receiver,
             to_ws_sender,
-            last_req_id: None,
+            pending_requests: std::collections::VecDeque::new(),
         }
     }
 
@@ -217,51 +224,36 @@ impl ApiModule<State> for PendingTradesApiModule {
     ) -> Self::Handle {
         PendingTradesHandle::new(sender, receiver)
     }
-
     async fn run(&mut self) -> CoreResult<()> {
         loop {
             select! {
                 Ok(cmd) = self.command_receiver.recv() => {
-                    tracing::debug!(target: "PendingTradesApiModule", "Received command: {:?}, last_req_id before: {:?}", cmd, self.last_req_id);
+                    tracing::debug!(target: "PendingTradesApiModule", "Received command: {:?}, pending_requests before: {:?}", cmd, self.pending_requests);
                     match cmd {
                         Command::OpenPendingOrder { open_type, amount, asset, open_time, open_price, timeframe, min_payout, command, req_id } => {
-                            if self.last_req_id.is_some() {
-                                warn!(target: "PendingTradesApiModule", "Rejecting new request. Concurrent open_pending_order calls are not supported and a request is already in-flight.");
-                                // Send a failure response for this specific request
-                                if let Err(e) = self.command_responder.send(CommandResponse::Error(Box::new(FailOpenOrder {
-                                    error: "concurrent_request_not_supported".to_string(),
-                                    amount,
-                                    asset,
-                                }))).await {
-                                    warn!(target: "PendingTradesApiModule", "Failed to send rejection response: {}", e);
-                                }
-                                continue;
-                            }
-                            self.last_req_id = Some(req_id);
-                            tracing::debug!(target: "PendingTradesApiModule", "Set last_req_id to: {:?}", req_id);
+                            self.pending_requests.push_back(req_id);
+                            tracing::debug!(target: "PendingTradesApiModule", "Added req_id to queue: {:?}. Queue size: {}", req_id, self.pending_requests.len());
                             let order = OpenPendingOrder::new(open_type, amount, asset, open_time, open_price, timeframe, min_payout, command);
                             self.to_ws_sender.send(Message::text(order.to_string())).await?;
                         }
                     }
                 },
                 Ok(msg) = self.message_receiver.recv() => {
-                    tracing::debug!(target: "PendingTradesApiModule", "Received message: {:?}, last_req_id: {:?}", msg, self.last_req_id);
+                    tracing::debug!(target: "PendingTradesApiModule", "Received message: {:?}, pending_requests: {:?}", msg, self.pending_requests);
                     let response_result = match msg.as_ref() {
                         Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data).map_err(|e| e.to_string()),
                         Message::Text(text) => {
                             if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
                                 Ok(res)
-                            } else if let Some(start) = text.find('[') {
-                                // Try parsing as a 1-step Socket.IO message: 42["successopenPendingOrder", {...}]
-                                match serde_json::from_str::<serde_json::Value>(&text[start..]) {
-                                    Ok(serde_json::Value::Array(arr)) => {
-                                        if arr.len() >= 2 && (arr[0] == "successopenPendingOrder" || arr[0] == "failopenPendingOrder") {
-                                            serde_json::from_value::<ServerResponse>(arr[1].clone()).map_err(|e| e.to_string())
-                                        } else {
-                                            serde_json::from_str::<ServerResponse>(text).map_err(|e| e.to_string())
-                                        }
+                            } else if let Some(frame) = SocketIoFrame::parse(text) {
+                                if let Some((event, payload)) = frame.extract_event() {
+                                    if event == "successopenPendingOrder" || event == "failopenPendingOrder" {
+                                        serde_json::from_value::<ServerResponse>(payload).map_err(|e| e.to_string())
+                                    } else {
+                                        serde_json::from_str::<ServerResponse>(text).map_err(|e| e.to_string())
                                     }
-                                    _ => serde_json::from_str::<ServerResponse>(text).map_err(|e| e.to_string()),
+                                } else {
+                                    serde_json::from_str::<ServerResponse>(text).map_err(|e| e.to_string())
                                 }
                             } else {
                                 serde_json::from_str::<ServerResponse>(text).map_err(|e| e.to_string())
@@ -276,22 +268,26 @@ impl ApiModule<State> for PendingTradesApiModule {
                                 ServerResponse::Success(pending_order) => {
                                     self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
                                     info!(target: "PendingTradesApiModule", "Pending trade opened: {}", pending_order.ticket);
-                                    tracing::debug!(target: "PendingTradesApiModule", "Success response, last_req_id: {:?}", self.last_req_id);
-                                    if let Some(req_id) = self.last_req_id.take() {
+                                    tracing::debug!(target: "PendingTradesApiModule", "Success response, pending_requests: {:?}", self.pending_requests);
+                                    if let Some(req_id) = self.pending_requests.pop_front() {
                                         tracing::debug!(target: "PendingTradesApiModule", "Sending Success response with req_id: {}", req_id);
-                                        self.command_responder.send(CommandResponse::Success {
+                                        if let Err(e) = self.command_responder.send(CommandResponse::Success {
                                             req_id,
                                             pending_order,
-                                        }).await?;
+                                        }).await {
+                                            warn!(target: "PendingTradesApiModule", "Failed to send Success response: {}", e);
+                                        }
                                     } else {
                                         tracing::debug!(target: "PendingTradesApiModule", "No req_id pending, dropping response");
                                         warn!(target: "PendingTradesApiModule", "Received successopenPendingOrder but no req_id was pending. Dropping response to avoid ambiguity.");
                                     }
                                 }
                                 ServerResponse::Fail(fail) => {
-                                    if let Some(req_id) = self.last_req_id.take() {
+                                    if let Some(req_id) = self.pending_requests.pop_front() {
                                         tracing::debug!(target: "PendingTradesApiModule", "Forwarding failure for req_id: {}", req_id);
-                                        self.command_responder.send(CommandResponse::Error(fail)).await?;
+                                        if let Err(e) = self.command_responder.send(CommandResponse::Error(fail)).await {
+                                            warn!(target: "PendingTradesApiModule", "Failed to send Error response: {}", e);
+                                        }
                                     } else {
                                         tracing::debug!(target: "PendingTradesApiModule", "No req_id pending, dropping failure response");
                                         warn!(target: "PendingTradesApiModule", "Received failopenPendingOrder but no req_id was pending. Dropping response.");

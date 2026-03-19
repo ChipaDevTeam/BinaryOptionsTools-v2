@@ -20,6 +20,7 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
     types::{Action, Deal, FailOpenOrder, MultiPatternRule, OpenOrder},
+    utils::SocketIoFrame,
 };
 
 /// Command enum for the `TradesApiModule`.
@@ -225,18 +226,15 @@ impl ApiModule<State> for TradesApiModule {
                       Message::Text(text) => {
                           if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
                               Ok(res)
-                          } else if let Some(start) = text.find('[') {
-                              // Resilient Socket.IO parsing: extract the JSON array content
-                              // Handles prefixes like "42", "451-", etc.
-                              match serde_json::from_str::<serde_json::Value>(&text[start..]) {
-                                  Ok(serde_json::Value::Array(arr)) => {
-                                      if arr.len() >= 2 && (arr[0] == "successopenOrder" || arr[0] == "failopenOrder") {
-                                          serde_json::from_value::<ServerResponse>(arr[1].clone())
-                                      } else {
-                                          serde_json::from_str::<ServerResponse>(text)
-                                      }
+                          } else if let Some(frame) = SocketIoFrame::parse(text) {
+                              if let Some((event, payload)) = frame.extract_event() {
+                                  if event == "successopenOrder" || event == "failopenOrder" {
+                                      serde_json::from_value::<ServerResponse>(payload)
+                                  } else {
+                                      serde_json::from_str::<ServerResponse>(text)
                                   }
-                                  _ => serde_json::from_str::<ServerResponse>(text),
+                              } else {
+                                  serde_json::from_str::<ServerResponse>(text)
                               }
                           } else {
                               serde_json::from_str::<ServerResponse>(text)

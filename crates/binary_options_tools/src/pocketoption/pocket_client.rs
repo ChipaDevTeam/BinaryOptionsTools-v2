@@ -408,34 +408,8 @@ impl PocketOption {
                 "Amount must be at most {MAXIMUM_TRADE_AMOUNT}"
             )));
         }
-
-        // Fix #4: Duplicate Trade Prevention
         let fingerprint = (asset_str.clone(), action, time, amount);
         let request_id = Uuid::new_v4();
-
-        {
-            let mut recent = self.client.state.trade_state.recent_trades.write().await;
-            if let Some((existing_id, created_at)) = recent.get(&fingerprint) {
-                if created_at.elapsed() < Duration::from_secs(2) {
-                    let id_str = if existing_id.is_nil() {
-                        "pending".to_string()
-                    } else {
-                        existing_id.to_string()
-                    };
-                    return Err(PocketError::General(format!(
-                        "Duplicate trade blocked (original ID: {})",
-                        id_str
-                    )));
-                }
-            }
-            // Insert a placeholder to prevent concurrent duplicate calls while we await the handle
-            recent.insert(
-                fingerprint.clone(),
-                (Uuid::nil(), std::time::Instant::now()),
-            );
-            // Cleanup old entries (>5 seconds)
-            recent.retain(|_, (_, t)| t.elapsed() < Duration::from_secs(5));
-        }
 
         // Populate pending_market_orders for reconciliation
         {
