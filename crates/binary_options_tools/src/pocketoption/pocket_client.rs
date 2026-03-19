@@ -363,7 +363,7 @@ impl PocketOption {
         }
     }
 
-    /// Executes a trade on the specified asset with built-in duplicate prevention and validation.
+    /// Executes a trade on the specified asset
     ///
     /// This method performs the following steps:
     /// 1. Validates the trade amount and asset availability.

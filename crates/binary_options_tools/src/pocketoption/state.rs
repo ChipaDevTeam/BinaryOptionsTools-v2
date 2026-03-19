@@ -312,7 +312,7 @@ pub struct TradeState {
     /// A map of market orders sent but not yet confirmed by the server.
     /// Key: Request UUID. Value: (OpenOrder, Timestamp sent)
     pub pending_market_orders: RwLock<HashMap<Uuid, (OpenOrder, Instant)>>,
-    /// Cache of recent trades to prevent duplicates.
+    /// Cache of recent trades 
     /// Key: (Asset, Action, Time, Amount). Value: (Trade ID, Timestamp)
     pub recent_trades: RwLock<HashMap<RecentTradeKey, (Uuid, Instant)>>,
 }
