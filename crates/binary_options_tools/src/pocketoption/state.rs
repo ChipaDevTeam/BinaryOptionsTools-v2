@@ -9,7 +9,7 @@ use std::{
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use binary_options_tools_core_pre::{
+use binary_options_tools_core::{
     reimports::{AsyncSender, Message},
     traits::AppState,
 };

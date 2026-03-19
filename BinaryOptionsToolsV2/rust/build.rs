@@ -1,8 +1,9 @@
 #[cfg(feature = "stubgen")]
 use pyo3_stub_gen::define_stub_info_gatherer;
-use std::env;
 #[cfg(feature = "stubgen")]
 use std::path::PathBuf;
+#[cfg(feature = "stubgen")]
+use std::env;
 
 fn main() {
     #[cfg(feature = "stubgen")]

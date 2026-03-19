@@ -1,6 +1,6 @@
-use binary_options_tools_core_pre::connector::{ConnectorError, ConnectorResult};
-use binary_options_tools_core_pre::error::{CoreError, CoreResult};
-use binary_options_tools_core_pre::reimports::{
+use binary_options_tools_core::connector::{ConnectorError, ConnectorResult};
+use binary_options_tools_core::error::{CoreError, CoreResult};
+use binary_options_tools_core::reimports::{
     connect_async_tls_with_config, generate_key, Connector, MaybeTlsStream, Request,
     WebSocketStream,
 };
@@ -60,9 +60,9 @@ const IP_PROVIDERS: &[&str] = &[
 const EARTH_RADIUS_KM: f64 = 6371.0;
 
 pub fn get_index() -> PocketResult<u64> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
-    let rand = rng.gen_range(10..99);
+    let rand = rng.random_range(10..99);
     let time = Utc::now().timestamp();
     format!("{time}{rand}")
         .parse::<u64>()

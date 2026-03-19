@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use binary_options_tools_core_pre::{
+use binary_options_tools_core::{
     builder::ClientBuilder,
     client::Client,
     error::CoreResult,
@@ -53,7 +53,7 @@ impl ReconnectCallback<State> for TradeReconciliationCallback {
     async fn call(
         &self,
         state: Arc<State>,
-        _ws_sender: &AsyncSender<binary_options_tools_core_pre::reimports::Message>,
+        _ws_sender: &AsyncSender<binary_options_tools_core::reimports::Message>,
     ) -> CoreResult<()> {
         let pending = state.trade_state.pending_market_orders.read().await;
 
@@ -239,7 +239,7 @@ impl PocketOption {
 
         let (client, mut runner): (
             Client<State>,
-            binary_options_tools_core_pre::client::ClientRunner<State>,
+            binary_options_tools_core::client::ClientRunner<State>,
         ) = client_builder.build().await?;
 
         let _runner = tokio::spawn(async move { runner.run().await });

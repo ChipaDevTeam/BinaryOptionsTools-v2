@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use binary_options_tools_core_pre::{
+use binary_options_tools_core::{
     builder::ClientBuilder,
     client::Client,
     error::CoreError,

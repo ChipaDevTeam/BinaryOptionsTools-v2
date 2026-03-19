@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::utils::serialize::bool2int;
-use binary_options_tools_core_pre::traits::Rule;
+use binary_options_tools_core::traits::Rule;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -29,7 +29,7 @@ impl MultiRule {
 }
 
 impl Rule for MultiRule {
-    fn call(&self, msg: &binary_options_tools_core_pre::reimports::Message) -> bool {
+    fn call(&self, msg: &binary_options_tools_core::reimports::Message) -> bool {
         for rule in &self.rules {
             if rule.call(msg) {
                 return true;

@@ -2,11 +2,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use binary_options_tools_core_pre::error::CoreError;
-use binary_options_tools_core_pre::reimports::{
+use binary_options_tools_core::error::CoreError;
+use binary_options_tools_core::reimports::{
     bounded_async, AsyncReceiver, AsyncSender, Message,
 };
-use binary_options_tools_core_pre::traits::{ApiModule, Rule, RunnerCommand};
+use binary_options_tools_core::traits::{ApiModule, Rule, RunnerCommand};
 use tokio::select;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -253,7 +253,7 @@ impl ApiModule<State> for RawApiModule {
         RawHandle { sender, receiver }
     }
 
-    async fn run(&mut self) -> binary_options_tools_core_pre::error::CoreResult<()> {
+    async fn run(&mut self) -> binary_options_tools_core::error::CoreResult<()> {
         loop {
             select! {
                 Ok(cmd) = self.command_receiver.recv() => {
@@ -324,20 +324,20 @@ impl ApiModule<State> for RawApiModule {
         _command_responder: AsyncSender<Self::CommandResponse>,
         _message_receiver: AsyncReceiver<Arc<Message>>,
         _to_ws_sender: AsyncSender<Message>,
-    ) -> binary_options_tools_core_pre::error::CoreResult<
-        Option<Box<dyn binary_options_tools_core_pre::traits::ReconnectCallback<State>>>,
+    ) -> binary_options_tools_core::error::CoreResult<
+        Option<Box<dyn binary_options_tools_core::traits::ReconnectCallback<State>>>,
     > {
         // On reconnect, re-send any keep-alive messages configured per handler
         struct CB {
             msgs: Arc<RwLock<HashMap<Uuid, Outgoing>>>,
         }
         #[async_trait]
-        impl binary_options_tools_core_pre::traits::ReconnectCallback<State> for CB {
+        impl binary_options_tools_core::traits::ReconnectCallback<State> for CB {
             async fn call(
                 &self,
                 _state: Arc<State>,
                 ws_sender: &AsyncSender<Message>,
-            ) -> binary_options_tools_core_pre::error::CoreResult<()> {
+            ) -> binary_options_tools_core::error::CoreResult<()> {
                 let msgs = self.msgs.read().await.clone();
                 for (_id, msg) in msgs.into_iter() {
                     match msg {

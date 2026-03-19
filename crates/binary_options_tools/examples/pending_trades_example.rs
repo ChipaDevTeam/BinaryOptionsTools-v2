@@ -30,8 +30,8 @@ use binary_options_tools::pocketoption::{
     state::{State, StateBuilder},
     types::PendingOrder,
 };
-use binary_options_tools_core_pre::reimports::Message;
-use binary_options_tools_core_pre::traits::{ApiModule, RunnerCommand};
+use binary_options_tools_core::reimports::Message;
+use binary_options_tools_core::traits::{ApiModule, RunnerCommand};
 use rust_decimal::Decimal;
 use tokio::{
     sync::Mutex,

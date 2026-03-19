@@ -6,54 +6,10 @@ use binary_options_tools::pocketoption::{
         PendingOrder as OriginalPendingOrder,
     },
 };
+use bo2_macros::uniffi_doc;
 use rust_decimal::prelude::ToPrimitive;
 
-/// Represents the action to take in a trade.
-///
-/// This enum is used to specify whether a trade is a "Call" (buy) or a "Put" (sell).
-/// It's a fundamental concept in binary options trading.
-///
-/// # Examples
-///
-/// ## Python
-/// ```python
-/// from binaryoptionstoolsuni import Action
-///
-/// buy_action = Action.CALL
-/// sell_action = Action.PUT
-/// ```
-///
-/// ## Swift
-/// ```swift
-/// import binaryoptionstoolsuni
-///
-/// let buyAction = Action.call
-/// let sellAction = Action.put
-/// ```
-///
-/// ## Kotlin
-/// ```kotlin
-/// import uniffi.binaryoptionstoolsuni.Action
-///
-/// val buyAction = Action.CALL
-/// val sellAction = Action.PUT
-/// ```
-///
-/// ## C#
-/// ```csharp
-/// using UniFFI.BinaryOptionsToolsUni;
-///
-/// var buyAction = Action.Call;
-/// var sellAction = Action.Put;
-/// ```
-///
-/// ## Go
-/// ```go
-/// import "github.com/your-repo/binaryoptionstoolsuni"
-///
-/// var buyAction = binaryoptionstoolsuni.ActionCall
-/// var sellAction = binaryoptionstoolsuni.ActionPut
-/// ```
+#[uniffi_doc(name = "Action", path = "BinaryOptionsToolsUni/docs_json/types.json")]
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum Action {
     Call,
@@ -69,19 +25,10 @@ impl From<OriginalAction> for Action {
     }
 }
 
-/// Represents the type of an asset.
-///
-/// This enum is used to categorize assets into different types, such as stocks, currencies, etc.
-/// This information can be useful for filtering and organizing assets.
-///
-/// # Examples
-///
-/// ## Python
-/// ```python
-/// from binaryoptionstoolsuni import AssetType
-///
-/// asset_type = AssetType.CURRENCY
-/// ```
+#[uniffi_doc(
+    name = "AssetType",
+    path = "BinaryOptionsToolsUni/docs_json/types.json"
+)]
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum AssetType {
     Stock,
@@ -103,19 +50,10 @@ impl From<OriginalAssetType> for AssetType {
     }
 }
 
-/// Represents the duration of a candle.
-///
-/// This struct is a simple wrapper around a `u32` that represents the candle duration in seconds.
-/// It is used in the `Asset` struct to specify the allowed candle lengths for an asset.
-///
-/// # Examples
-///
-/// ## Python
-/// ```python
-/// from binaryoptionstoolsuni import CandleLength
-///
-/// five_second_candle = CandleLength(time=5)
-/// ```
+#[uniffi_doc(
+    name = "CandleLength",
+    path = "BinaryOptionsToolsUni/docs_json/types.json"
+)]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct CandleLength {
     pub time: u32,
@@ -129,22 +67,7 @@ impl From<OriginalCandleLength> for CandleLength {
     }
 }
 
-/// Represents a financial asset that can be traded.
-///
-/// This struct contains all the information about a specific asset, such as its name, symbol,
-/// payout, and whether it's currently active.
-///
-/// # Examples
-///
-/// ## Python
-/// ```python
-/// from binaryoptionstoolsuni import Asset
-///
-/// # This is an example of how you might receive an Asset object
-/// # from the API. You would not typically construct this yourself.
-/// eurusd = Asset(id=1, name="EUR/USD", symbol="EURUSD_otc", is_otc=True, is_active=True, payout=85, allowed_candles=[], asset_type=AssetType.CURRENCY)
-/// print(eurusd.name)
-/// ```
+#[uniffi_doc(name = "Asset", path = "BinaryOptionsToolsUni/docs_json/types.json")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct Asset {
     pub id: i32,
@@ -176,23 +99,7 @@ impl From<OriginalAsset> for Asset {
     }
 }
 
-/// Represents a completed trade.
-///
-/// This struct contains all the information about a trade that has been opened and subsequently closed.
-/// It includes details such as the open and close prices, profit, and timestamps.
-///
-/// # Examples
-///
-/// ## Python
-/// ```python
-/// from binaryoptionstoolsuni import Deal
-///
-/// # This is an example of how you might receive a Deal object
-/// # from the API after a trade is completed.
-/// # You would not typically construct this yourself.
-/// deal = ... # receive from api.result()
-/// print(f"Trade {deal.id} on {deal.asset} resulted in a profit of {deal.profit}")
-/// ```
+#[uniffi_doc(name = "Deal", path = "BinaryOptionsToolsUni/docs_json/types.json")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct Deal {
     pub id: String,
@@ -256,7 +163,10 @@ impl From<OriginalDeal> for Deal {
     }
 }
 
-/// Represents a pending trade order.
+#[uniffi_doc(
+    name = "PendingOrder",
+    path = "BinaryOptionsToolsUni/docs_json/types.json"
+)]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct PendingOrder {
     pub ticket: String,
@@ -290,22 +200,7 @@ impl From<OriginalPendingOrder> for PendingOrder {
     }
 }
 
-/// Represents a single candle in a price chart.
-///
-/// A candle represents the price movement of an asset over a specific time period.
-/// It contains the open, high, low, and close (OHLC) prices for that period.
-///
-/// # Examples
-///
-/// ## Python
-/// ```python
-/// from binaryoptionstoolsuni import Candle
-///
-/// # This is an example of how you might receive a Candle object
-/// # from the API.
-/// candle = ... # receive from api.get_candles() or stream.next()
-/// print(f"Candle for {candle.symbol} at {candle.timestamp}: O={candle.open}, H={candle.high}, L={candle.low}, C={candle.close}")
-/// ```
+#[uniffi_doc(name = "Candle", path = "BinaryOptionsToolsUni/docs_json/types.json")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct Candle {
     pub symbol: String,

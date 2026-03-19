@@ -1,7 +1,7 @@
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use binary_options_tools_core_pre::{
+use binary_options_tools_core::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, Rule, RunnerCommand},

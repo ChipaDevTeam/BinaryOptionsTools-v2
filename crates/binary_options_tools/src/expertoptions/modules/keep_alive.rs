@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use binary_options_tools_core_pre::{
+use binary_options_tools_core::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{LightweightModule, Rule, RunnerCommand},
 };
+use binary_options_tools_core::Rule;
 use serde_json::Value;
 use tracing::warn;
 
@@ -56,22 +57,10 @@ impl LightweightModule<State> for PongModule {
     }
 
     fn rule() -> Box<dyn Rule + Send + Sync> {
-        Box::new(PongRule)
+        Box::new(PongRule::new())
     }
 }
 
+#[Rule]
+#[rule({ binary_starts_with(b"{{\"action\":\"ping\"") })]
 struct PongRule;
-
-impl Rule for PongRule {
-    fn call(&self, msg: &Message) -> bool {
-        if let Message::Binary(text) = msg {
-            text.starts_with(b"{{\"action\":\"ping\"")
-        } else {
-            false
-        }
-    }
-
-    fn reset(&self) {
-        // No state to reset
-    }
-}

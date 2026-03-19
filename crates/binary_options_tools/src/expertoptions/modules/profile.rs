@@ -5,9 +5,9 @@ use crate::utils::serialize::bool2int;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use binary_options_tools_core_pre::error::{CoreError, CoreResult};
-use binary_options_tools_core_pre::reimports::{AsyncReceiver, AsyncSender, Message};
-use binary_options_tools_core_pre::traits::{ApiModule, ReconnectCallback, Rule, RunnerCommand};
+use binary_options_tools_core::error::{CoreError, CoreResult};
+use binary_options_tools_core::reimports::{AsyncReceiver, AsyncSender, Message};
+use binary_options_tools_core::traits::{ApiModule, ReconnectCallback, Rule, RunnerCommand};
 use binary_options_tools_macros::ActionImpl;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -292,7 +292,7 @@ impl ApiModule<State> for ProfileModule {
         _command_responder: AsyncSender<Self::CommandResponse>,
         _message_receiver: AsyncReceiver<Arc<Message>>,
         _to_ws_sender: AsyncSender<Message>,
-    ) -> binary_options_tools_core_pre::error::CoreResult<Option<Box<dyn ReconnectCallback<State>>>>
+    ) -> binary_options_tools_core::error::CoreResult<Option<Box<dyn ReconnectCallback<State>>>>
     {
         struct CB;
         #[async_trait::async_trait]
@@ -347,7 +347,7 @@ impl ProfileModule {
 pub fn multiple_action_action(
     token: String,
     timezone: i32,
-) -> binary_options_tools_core_pre::error::CoreResult<Action> {
+) -> binary_options_tools_core::error::CoreResult<Action> {
     // Placeholder minimal structure; extend actions list as needed
     let payload = json!({"actions":[
         {"action":"userGroup","ns":1,"token":token},

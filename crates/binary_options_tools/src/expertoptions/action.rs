@@ -1,4 +1,4 @@
-use binary_options_tools_core_pre::{error::CoreResult, reimports::Message};
+use binary_options_tools_core::{error::CoreResult, reimports::Message};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

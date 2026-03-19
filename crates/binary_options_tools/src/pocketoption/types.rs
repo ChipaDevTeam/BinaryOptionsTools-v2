@@ -5,7 +5,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use binary_options_tools_core_pre::{reimports::Message, traits::Rule};
+use binary_options_tools_core::{reimports::Message, traits::Rule};
 use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

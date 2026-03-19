@@ -5,7 +5,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use binary_options_tools_core_pre::{
+use binary_options_tools_core::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, Rule, RunnerCommand},
@@ -313,6 +313,7 @@ impl ApiModule<State> for TradesApiModule {
         // This rule will match messages like:
         // 451-["successopenOrder",...]
         // 451-["failopenOrder",...]
+        
         Box::new(MultiPatternRule::new(vec![
             "successopenOrder",
             "failopenOrder",

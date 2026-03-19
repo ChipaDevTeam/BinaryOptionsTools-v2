@@ -11,6 +11,16 @@ keywords = ["binary-options", "uniffi", "cross-platform", "trading"]
 categories = ["api-bindings"]
 license-file = "../LICENSE"
 
+[features]
+default = ["python", "swift", "go"]
+kotlin = []
+swift = []
+csharp = []
+go = []
+ruby = []
+python = []
+javascript = []
+
 [[bin]]
 # This can be whatever name makes sense for your project, but the rest of this tutorial assumes uniffi-bindgen.
 name = "uniffi-bindgen"
@@ -30,6 +40,7 @@ rust_decimal = "1.37.2"
 futures-util = "0.3.31"
 uuid = { version = "1.10.0", features = ["v4", "serde", "fast-rng"] }
 regex = "1.12.2"
+bo2_macros = { version = "0.1.0", path = "bo2_macros" }
 
 [build-dependencies]
 uniffi = { version = "0.31.0", features = ["build"] }

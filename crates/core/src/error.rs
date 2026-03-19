@@ -1,82 +1,49 @@
 use std::time::Duration;
-use thiserror::Error;
-use tokio_tungstenite::tungstenite::http;
-use tokio_tungstenite::tungstenite::Error as TungsteniteError;
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("Failed to parse recieved data: {0}")]
-    SerdeGeneralParsingError(#[from] serde_json::Error),
-    #[error("Url parsing failed: {0}")]
-    UrlParsingError(#[from] url::ParseError),
-    #[error("{platform} Error, {error}")]
-    BinaryOptionsTradingError { platform: String, error: String },
-    #[error("Error sending request, {0}")]
-    WebsocketMessageSendingError(String),
-    #[error("Failed to recieve data from websocket server: {0}")]
-    WebsocketRecievingConnectionError(String),
-    #[error("Websocket connection was closed by the server, {0}")]
-    WebsocketConnectionClosed(String),
-    #[error("Failed to connect to websocket server: {0}")]
-    WebsocketConnectionError(Box<TungsteniteError>),
-    #[error("Failed to send message using asynchronous channel, {0}")]
-    GeneralMessageSendingError(String),
-    #[error(
-        "Failed to reconnect '{0}' times, maximum allowed number of reconnections was reached, breaking"
-    )]
-    MaxReconnectAttemptsReached(u32),
-    #[error(
-        "Failed to reconnect '{number}' times, maximum allowed number of reconnections is `{max}`"
-    )]
-    ReconnectionAttemptFailure { number: u32, max: u32 },
-    #[error("Failed to recieve message from separate thread, {0}")]
-    OneShotRecieverError(#[from] tokio::sync::oneshot::error::RecvError),
-    #[error("Failed to recieve message from request channel, {0}")]
-    ChannelRequestRecievingError(#[from] async_channel::RecvError),
-    #[error("Failed to send message to request channel, {0}")]
-    ChannelRequestSendingError(String),
-    #[error("Error recieving response from server, {0}")]
-    WebSocketMessageError(String),
-    #[error("Failed to parse data: {0}")]
-    GeneralParsingError(String),
-    #[error("Error making http request: {0}")]
-    HTTPError(#[from] http::Error),
-    #[error("Unallowed operation, {0}")]
-    Unallowed(String),
-    #[error("Failed to join thread, {0}")]
-    TaskJoinError(#[from] tokio::task::JoinError),
-    #[error("Failed to execute '{task}' task before the maximum allowed time of '{duration:?}'")]
-    TimeoutError { task: String, duration: Duration },
-    #[error("Failed to parse duration, error {0}")]
-    ChronoDurationParsingError(#[from] chrono::OutOfRangeError),
+#[derive(thiserror::Error, Debug)]
+pub enum CoreError {
+    #[error("WebSocket error: {0}")]
+    WebSocket(Box<tokio_tungstenite::tungstenite::Error>),
+    #[error("Channel receiver error: {0}")]
+    ChannelReceiver(#[from] kanal::ReceiveError),
+    #[error("Channel sender error: {0}")]
+    ChannelSender(#[from] kanal::SendError),
+    #[error("Connection error: {0}")]
+    Connection(#[from] super::connector::ConnectorError),
+    #[error("Failed to join task: {0}")]
+    JoinTask(#[from] tokio::task::JoinError),
+    /// Error for when a module is not found.
+    #[error("Module '{0}' not found.")]
+    ModuleNotFound(String),
 
-    // New variants for unification
-    #[error("Operation timeout: {0}")]
-    Timeout(String),
-    #[error("Configuration error: {0}")]
-    Configuration(String),
-    #[error("Invalid asset: {0}")]
-    InvalidAsset(String),
-    #[error("Platform internal error: {0}")]
-    Platform(String),
+    #[error("Failed to parse ssid: {0}")]
+    SsidParsing(String),
+    #[error("HTTP request error: {0}")]
+    HttpRequest(String),
 
-    #[error(transparent)]
-    Context(#[from] anyhow::Error),
+    #[error("Lightweight [{0} Module] loop exited unexpectedly.")]
+    LightweightModuleLoop(String),
+
+    #[error("Api [{0} Module] loop exited unexpectedly.")]
+    ApiModuleLoop(String),
 
     #[error("Other error: {0}")]
     Other(String),
+
+    #[error("Poison error: {0}")]
+    Poison(String),
+
+    #[error("Serialization error: {0}")]
+    Serde(#[from] serde_json::Error),
+
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Tracing error: {0}")]
+    Tracing(String),
+
+    #[error("Failed to execute '{task}' task before the maximum allowed time of '{duration:?}'")]
+    TimeoutError { task: String, duration: Duration },
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
-
-impl From<TungsteniteError> for Error {
-    fn from(e: TungsteniteError) -> Self {
-        Self::WebsocketConnectionError(Box::new(e))
-    }
-}
-
-impl<T> From<async_channel::SendError<T>> for Error {
-    fn from(e: async_channel::SendError<T>) -> Self {
-        Self::GeneralMessageSendingError(e.to_string())
-    }
-}
+pub type CoreResult<T> = std::result::Result<T, CoreError>;

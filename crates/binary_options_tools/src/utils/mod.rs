@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::Once;
 
-use binary_options_tools_core_pre::{
+use binary_options_tools_core::{
     error::CoreResult,
     middleware::{MiddlewareContext, WebSocketMiddleware},
     reimports::Message,

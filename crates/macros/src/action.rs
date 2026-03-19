@@ -19,9 +19,9 @@ impl ActionImpl {
         quote! {
             pub struct #rule_ident;
 
-            impl ::binary_options_tools_core_pre::traits::Rule for #rule_ident {
-                fn call(&self, msg: &::binary_options_tools_core_pre::reimports::Message) -> bool {
-                    if let ::binary_options_tools_core_pre::reimports::Message::Binary(text) = msg {
+            impl ::binary_options_tools_core::traits::Rule for #rule_ident {
+                fn call(&self, msg: &::binary_options_tools_core::reimports::Message) -> bool {
+                    if let ::binary_options_tools_core::reimports::Message::Binary(text) = msg {
                         text.starts_with(#pattern.as_bytes())
                     } else {
                         false

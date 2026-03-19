@@ -2,12 +2,12 @@
 resolver = "2"
 
 members = [
-    "crates/core",
-    "crates/core-pre",
+    "crates/core", "crates/core/macros/",
     "crates/macros",
     "crates/binary_options_tools",
     "BinaryOptionsToolsV2/rust",
     "BinaryOptionsToolsUni",
+    "BinaryOptionsToolsUni/bo2_macros"
 ]
 
 [profile.release]

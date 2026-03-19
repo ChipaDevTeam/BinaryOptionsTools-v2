@@ -1,8 +1,8 @@
 use async_trait::async_trait;
-use binary_options_tools_core_pre::error::CoreError;
-use binary_options_tools_core_pre::reimports::bounded_async;
-use binary_options_tools_core_pre::traits::ReconnectCallback;
-use binary_options_tools_core_pre::{
+use binary_options_tools_core::error::CoreError;
+use binary_options_tools_core::reimports::bounded_async;
+use binary_options_tools_core::traits::ReconnectCallback;
+use binary_options_tools_core::{
     error::CoreResult,
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, Rule, RunnerCommand},

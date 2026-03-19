@@ -3,6 +3,9 @@ pub mod platforms;
 pub mod tracing;
 pub mod utils;
 
+#[cfg(test)]
+mod test;
+
 // Re-export main types for easier access
 pub use platforms::pocketoption::{
     client::PocketOption,

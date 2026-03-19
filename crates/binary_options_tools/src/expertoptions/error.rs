@@ -1,4 +1,4 @@
-use binary_options_tools_core_pre::error::CoreError;
+use binary_options_tools_core::error::CoreError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum ExpertOptionsError {

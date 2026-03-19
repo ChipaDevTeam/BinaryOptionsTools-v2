@@ -4,8 +4,8 @@ mod tests {
     use crate::pocketoption::modules::deals::DealsApiModule;
     use crate::pocketoption::ssid::Ssid;
     use crate::pocketoption::state::StateBuilder;
-    use binary_options_tools_core_pre::reimports::{bounded_async, Message};
-    use binary_options_tools_core_pre::traits::{ApiModule, LightweightModule};
+    use binary_options_tools_core::reimports::{bounded_async, Message};
+    use binary_options_tools_core::traits::{ApiModule, LightweightModule};
     use rust_decimal_macros::dec;
     use std::sync::Arc;
 

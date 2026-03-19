@@ -1,7 +1,14 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use async_trait::async_trait;
-use binary_options_tools_core_pre::{
+use binary_options_tools_core::{
     error::CoreError,
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, Rule, RunnerCommand},
@@ -19,9 +26,9 @@ use crate::pocketoption::{
     utils::SocketIoFrame,
 };
 
-const EV_UPDATE_OPENED_DEALS: &str = "updateOpenedDeals";
-const EV_UPDATE_CLOSED_DEALS: &str = "updateClosedDeals";
-const EV_SUCCESS_CLOSE_ORDER: &str = "successcloseOrder";
+const UPDATE_OPENED_DEALS: &str = r#"451-["updateOpenedDeals","#;
+const UPDATE_CLOSED_DEALS: &str = r#"451-["updateClosedDeals","#;
+const SUCCESS_CLOSE_ORDER: &str = r#"451-["successcloseOrder","#;
 
 #[derive(Debug)]
 pub enum Command {
@@ -213,7 +220,7 @@ impl ApiModule<State> for DealsApiModule {
         }
     }
 
-    async fn run(&mut self) -> binary_options_tools_core_pre::error::CoreResult<()> {
+    async fn run(&mut self) -> binary_options_tools_core::error::CoreResult<()> {
         let mut expected = ExpectedMessage::None;
         loop {
             tokio::select! {
@@ -224,6 +231,7 @@ impl ApiModule<State> for DealsApiModule {
                             tracing::debug!("Received message: {:?}", msg);
                             match msg.as_ref() {
                                 Message::Text(text) => {
+<<<<<<< HEAD
                                     if let Some(frame) = SocketIoFrame::parse(text) {
                                         if let Some((event, payload)) = frame.extract_event() {
                                             let current_expected = if event == EV_UPDATE_OPENED_DEALS {
@@ -253,6 +261,41 @@ impl ApiModule<State> for DealsApiModule {
                                                     }
                                                 }
                                             }
+=======
+                                    let mut data_text = None;
+                                    let mut current_expected = ExpectedMessage::None;
+                                    if text.starts_with(UPDATE_OPENED_DEALS) {
+                                        current_expected = ExpectedMessage::UpdateOpenedDeals;
+                                        data_text = text.strip_prefix(UPDATE_OPENED_DEALS);
+                                    } else if text.starts_with(UPDATE_CLOSED_DEALS) {
+                                        current_expected = ExpectedMessage::UpdateClosedDeals;
+                                        data_text = text.strip_prefix(UPDATE_CLOSED_DEALS);
+                                    } else if text.starts_with(SUCCESS_CLOSE_ORDER) {
+                                        current_expected = ExpectedMessage::SuccessCloseOrder;
+                                        data_text = text.strip_prefix(SUCCESS_CLOSE_ORDER);
+                                    }
+
+                                    if let Some(data) = data_text {
+                                        let trimmed = data.trim();
+
+                                        // Socket.IO 4.x binary placeholder check
+                                        if trimmed.contains(r#""_placeholder":true"#) {
+                                            tracing::debug!(target: "DealsApiModule", "Detected binary placeholder, waiting for binary payload for {:?}", current_expected);
+                                            expected = current_expected;
+                                            continue;
+                                        }
+
+                                        if !trimmed.is_empty() && trimmed != "]" && trimmed != ",]" {
+                                            // It's a 1-step message, process the data now
+                                            let json_data = trimmed.strip_suffix(']').unwrap_or(trimmed);
+                                            self.process_text_data(json_data, current_expected).await;
+                                            expected = ExpectedMessage::None;
+                                            continue;
+                                        } else {
+                                            // Header-only, wait for data
+                                            expected = current_expected;
+                                            continue;
+>>>>>>> 69046758c55ad74f97c50c5c06fd0506712bc0fa
                                         }
                                     }
 
@@ -377,10 +420,89 @@ impl ApiModule<State> for DealsApiModule {
         // 451-["updateClosedDeals",...]
         // 451-["successcloseOrder",...]
 
-        Box::new(MultiPatternRule::new(vec![
-            EV_UPDATE_CLOSED_DEALS,
-            EV_UPDATE_OPENED_DEALS,
-            EV_SUCCESS_CLOSE_ORDER,
+        Box::new(DealsUpdateRule::new(vec![
+            UPDATE_CLOSED_DEALS,
+            UPDATE_OPENED_DEALS,
+            SUCCESS_CLOSE_ORDER,
         ]))
+    }
+}
+
+/// Create a new custom rule that matches the specific patterns and also returns true for strings
+/// that starts with any of the patterns
+struct DealsUpdateRule {
+    valid: AtomicBool,
+    patterns: Vec<String>,
+}
+
+impl DealsUpdateRule {
+    /// Create a new MultiPatternRule with the specified patterns
+    ///
+    /// # Arguments
+    /// * `patterns` - The string patterns to match against incoming messages
+    pub fn new(patterns: Vec<impl ToString>) -> Self {
+        Self {
+            valid: AtomicBool::new(false),
+            patterns: patterns.into_iter().map(|p| p.to_string()).collect(),
+        }
+    }
+}
+
+impl Rule for DealsUpdateRule {
+    fn call(&self, msg: &Message) -> bool {
+        match msg {
+            Message::Text(text) => {
+                for pattern in &self.patterns {
+                    if text.starts_with(pattern) {
+                        let remaining = &text[pattern.len()..];
+                        let trimmed_rem = remaining.trim();
+                        let has_placeholder = trimmed_rem.contains(r#""_placeholder":true"#);
+                        let is_header_only = trimmed_rem.is_empty()
+                            || trimmed_rem == "]"
+                            || trimmed_rem == ",]"
+                            || has_placeholder;
+
+                        if is_header_only {
+                            self.valid.store(true, Ordering::SeqCst);
+                            return true;
+                        } else {
+                            self.valid.store(false, Ordering::SeqCst);
+                            return true;
+                        }
+                    }
+                }
+
+                if let Some(start) = text.find('[') {
+                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text[start..]) {
+                        if let Some(arr) = value.as_array() {
+                            if arr.first().and_then(|v| v.as_str()).is_some() {
+                                // It's an event, but doesn't match our pattern.
+                                // Ignore it and don't consume 'valid'.
+                                return false;
+                            }
+                        }
+                    }
+                }
+
+                if self.valid.load(Ordering::SeqCst) {
+                    self.valid.store(false, Ordering::SeqCst);
+                    return true;
+                }
+                false
+            }
+            Message::Binary(_) => {
+                if self.valid.load(Ordering::SeqCst) {
+                    self.valid.store(false, Ordering::SeqCst);
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    fn reset(&self) {
+        self.valid.store(false, Ordering::SeqCst)
     }
 }

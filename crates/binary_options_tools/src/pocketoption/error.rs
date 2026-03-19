@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use binary_options_tools_core_pre::error::CoreError;
+use binary_options_tools_core::error::CoreError;
 use rust_decimal::Decimal;
 use uuid::Uuid;
 

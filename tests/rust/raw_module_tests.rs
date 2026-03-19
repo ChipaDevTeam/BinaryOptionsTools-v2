@@ -10,8 +10,8 @@
 // mod tests {
 //     use super::*;
 //     use binary_options_tools::pocketoption::modules::raw::{RawApiModule, RawHandle, RawHandler};
-//     use binary_options_tools_core_pre::reimports::{AsyncReceiver, AsyncSender, bounded_async};
-//     use binary_options_tools_core_pre::traits::{ApiModule, Rule};
+//     use binary_options_tools_core::reimports::{AsyncReceiver, AsyncSender, bounded_async};
+//     use binary_options_tools_core::traits::{ApiModule, Rule};
 //     use std::collections::HashMap;
 //     use tokio::sync::RwLock;
 

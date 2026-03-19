@@ -2,6 +2,7 @@ mod action;
 mod config;
 mod deserialize;
 mod impls;
+// mod lightweight_module;
 mod region;
 mod serialize;
 mod timeout;
@@ -60,6 +61,21 @@ pub fn region(input: TokenStream) -> TokenStream {
     let region = RegionImpl::from_derive_input(&parsed).unwrap();
     quote! { #region }.into()
 }
+
+// #[proc_macro_attribute]
+// pub fn lightweight_module(attr: TokenStream, item: TokenStream) -> TokenStream {
+//     let attr_args = match darling::ast::NestedMeta::parse_meta_list(attr.into()) {
+//         Ok(v) => v,
+//         Err(e) => return TokenStream::from(darling::Error::from(e).write_errors()),
+//     };
+//     let args = match darling::FromMeta::from_list(&attr_args) {
+//         Ok(v) => v,
+//         Err(e) => return TokenStream::from(e.write_errors()),
+//     };
+
+//     let func = parse_macro_input!(item as syn::ItemFn);
+//     lightweight_module::expand(args, func).into()
+// }
 
 #[proc_macro_derive(ActionImpl, attributes(action))]
 pub fn action_impl(input: TokenStream) -> TokenStream {

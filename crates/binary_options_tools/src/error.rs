@@ -1,5 +1,5 @@
 use crate::pocketoption::error::PocketError;
-use binary_options_tools_core::error::Error as CoreError;
+use binary_options_tools_core::error::CoreError;
 use rust_decimal::Decimal;
 use std::num::ParseFloatError;
 

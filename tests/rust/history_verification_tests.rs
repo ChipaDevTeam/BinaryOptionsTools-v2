@@ -3,8 +3,8 @@ use binary_options_tools::pocketoption::modules::historical_data::{
 };
 use binary_options_tools::pocketoption::ssid::Ssid;
 use binary_options_tools::pocketoption::state::StateBuilder;
-use binary_options_tools_core_pre::reimports::{bounded_async, Message};
-use binary_options_tools_core_pre::traits::ApiModule;
+use binary_options_tools_core::reimports::{bounded_async, Message};
+use binary_options_tools_core::traits::ApiModule;
 use std::sync::Arc;
 use uuid::Uuid;
 

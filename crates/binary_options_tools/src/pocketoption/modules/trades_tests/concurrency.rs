@@ -1,6 +1,6 @@
 use super::common::*;
 use crate::pocketoption::types::Action;
-use binary_options_tools_core_pre::reimports::Message;
+use binary_options_tools_core::reimports::Message;
 use rust_decimal_macros::dec;
 use std::sync::Arc;
 use tokio::time::{timeout, Duration};

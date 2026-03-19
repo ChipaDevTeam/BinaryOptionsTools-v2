@@ -1,0 +1,9 @@
+[package]
+name = "binary-options-tools-core-macros"
+version = "0.1.0"
+edition = "2024"
+[lib]
+proc-macro = true
+
+[dependencies]
+zyn = { version = "0.5.3", features = ["diagnostics", "ext"] }

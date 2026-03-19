@@ -1,0 +1,7 @@
+{
+  "test": {
+  "default": "Example of a JSON file for testing purposes.",
+  "python": "This file can be used to test JSON parsing in Python.",
+  "javascript": "It can also be used to test JSON parsing in JavaScript."
+}
+}

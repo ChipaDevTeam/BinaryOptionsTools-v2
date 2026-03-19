@@ -2,7 +2,7 @@ use crate::{
     pocketoption::utils::try_connect,
     pocketoption::{ssid::Ssid, state::State},
 };
-use binary_options_tools_core_pre::{
+use binary_options_tools_core::{
     connector::{Connector, ConnectorError, ConnectorResult},
     reimports::{MaybeTlsStream, WebSocketStream},
 };
@@ -37,7 +37,7 @@ impl PocketConnect {
                 Err(e) => {
                     warn!(target: "PocketConnect", "Failed to connect to {}: {}", u, e);
                     // Add a jittered delay before trying the next URL
-                    let jitter = rand::thread_rng().gen_range(200..500);
+                    let jitter = rand::rng().random_range(200..500);
                     tokio::time::sleep(Duration::from_millis(jitter)).await;
                 }
             }

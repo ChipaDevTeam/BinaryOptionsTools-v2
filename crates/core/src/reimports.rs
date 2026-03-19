@@ -3,3 +3,5 @@ pub use tokio_tungstenite::{
     tungstenite::{handshake::client::generate_key, http::Request, Bytes, Message},
     Connector, MaybeTlsStream, WebSocketStream,
 };
+
+pub use kanal::{bounded_async, AsyncReceiver, AsyncSender};

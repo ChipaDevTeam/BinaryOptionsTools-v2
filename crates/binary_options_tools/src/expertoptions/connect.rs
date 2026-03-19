@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use binary_options_tools_core_pre::{
+use binary_options_tools_core::{
     connector::{Connector as ConnectorTrait, ConnectorError, ConnectorResult},
     reimports::{
         connect_async_tls_with_config, generate_key, Connector, MaybeTlsStream, Request,

@@ -36,9 +36,9 @@ pub mod traits;
 pub mod utils;
 pub mod validator;
 pub mod stream {
-    pub use binary_options_tools_core_pre::reimports::*;
-    pub use binary_options_tools_core_pre::utils::stream::RecieverStream;
-    pub use binary_options_tools_core_pre::utils::tracing::stream_logs_layer;
+    pub use binary_options_tools_core::reimports::*;
+    pub use binary_options_tools_core::utils::stream::RecieverStream;
+    pub use binary_options_tools_core::utils::tracing::stream_logs_layer;
 }
 
 #[cfg(test)]

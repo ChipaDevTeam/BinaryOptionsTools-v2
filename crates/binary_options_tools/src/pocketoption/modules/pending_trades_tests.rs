@@ -4,7 +4,7 @@ use std::any::Any;
 use std::sync::Arc;
 use std::time::Duration;
 
-use binary_options_tools_core_pre::{
+use binary_options_tools_core::{
     error::CoreError,
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, Rule, RunnerCommand},

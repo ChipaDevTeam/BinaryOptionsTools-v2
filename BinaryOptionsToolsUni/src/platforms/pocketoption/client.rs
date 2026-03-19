@@ -1,3 +1,4 @@
+use bo2_macros::uniffi_doc;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
 
@@ -18,18 +19,10 @@ use super::{
     validator::Validator,
 };
 
-/// The main client for interacting with the PocketOption platform.
-///
-/// This object provides all the functionality needed to connect to PocketOption,
-/// place trades, get account information, and subscribe to market data.
-///
-/// It is the primary entry point for using this library.
-///
-/// # Rationale
-///
-/// This struct wraps the underlying `binary_options_tools::pocketoption::PocketOption` client,
-/// exposing its functionality in a way that is compatible with UniFFI for creating
-/// multi-language bindings.
+#[uniffi_doc(
+    name = "PocketOption",
+    path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+)]
 #[derive(uniffi::Object)]
 pub struct PocketOption {
     inner: OriginalPocketOption,
@@ -37,30 +30,9 @@ pub struct PocketOption {
 
 #[uniffi::export]
 impl PocketOption {
-    /// Creates a new instance of the PocketOption client.
+    /// Creates a new `PocketOption` client, authenticating with the given session ID.
     ///
-    /// This is the primary constructor for the client. It requires a session ID (ssid)
-    /// to authenticate with the PocketOption servers.
-    ///
-    /// # Arguments
-    ///
-    /// * `ssid` - The session ID for your PocketOption account.
-    ///
-    /// # Examples
-    ///
-    /// ## Python
-    /// ```python
-    /// import asyncio
-    /// from binaryoptionstoolsuni import PocketOption
-    ///
-    /// async def main():
-    ///     ssid = "YOUR_SESSION_ID"
-    ///     api = await PocketOption.init(ssid)
-    ///     balance = await api.balance()
-    ///     print(f"Balance: {balance}")
-    ///
-    /// asyncio.run(main())
-    /// ```
+    /// This is the primary constructor. Alias: `new`.
     #[uniffi::constructor]
     pub async fn init(ssid: String) -> Result<Arc<Self>, UniError> {
         let inner = OriginalPocketOption::new(ssid)
@@ -69,30 +41,9 @@ impl PocketOption {
         Ok(Arc::new(Self { inner }))
     }
 
-    /// Creates a new instance of the PocketOption client.
+    /// Creates a new `PocketOption` client, authenticating with the given session ID.
     ///
-    /// This is the primary constructor for the client. It requires a session ID (ssid)
-    /// to authenticate with the PocketOption servers.
-    ///
-    /// # Arguments
-    ///
-    /// * `ssid` - The session ID for your PocketOption account.
-    ///
-    /// # Examples
-    ///
-    /// ## Python
-    /// ```python
-    /// import asyncio
-    /// from binaryoptionstoolsuni import PocketOption
-    ///
-    /// async def main():
-    ///     ssid = "YOUR_SESSION_ID"
-    ///     api = await PocketOption.new(ssid)
-    ///     balance = await api.balance()
-    ///     print(f"Balance: {balance}")
-    ///
-    /// asyncio.run(main())
-    /// ```
+    /// Alias for `init`.
     #[uniffi::constructor]
     pub async fn new(ssid: String) -> Result<Arc<Self>, UniError> {
         let inner = OriginalPocketOption::new(ssid)
@@ -101,15 +52,10 @@ impl PocketOption {
         Ok(Arc::new(Self { inner }))
     }
 
-    /// Creates a new instance of the PocketOption client with a custom WebSocket URL.
-    ///
-    /// This constructor is useful for connecting to different PocketOption servers,
-    /// for example, in different regions.
-    ///
-    /// # Arguments
-    ///
-    /// * `ssid` - The session ID for your PocketOption account.
-    /// * `url` - The custom WebSocket URL to connect to.
+    #[uniffi_doc(
+        name = "new_with_url",
+        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+    )]
     #[uniffi::constructor]
     pub async fn new_with_url(ssid: String, url: String) -> Result<Arc<Self>, UniError> {
         let inner = OriginalPocketOption::new_with_url(ssid, url)
@@ -118,44 +64,23 @@ impl PocketOption {
         Ok(Arc::new(Self { inner }))
     }
 
-    /// Gets the current balance of the account.
-    ///
-    /// This method retrieves the current trading balance from the client's state.
-    ///
-    /// # Returns
-    ///
-    /// The current balance as a floating-point number.
+    /// Gets the current account balance.
     #[uniffi::method]
     pub async fn balance(&self) -> f64 {
         self.inner.balance().await.to_f64().unwrap_or_default()
     }
 
-    /// Checks if the current session is a demo account.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the account is a demo account, `false` otherwise.
+    /// Returns `true` if the current session is a demo account.
     #[uniffi::method]
     pub fn is_demo(&self) -> bool {
         self.inner.is_demo()
     }
 
-    /// Places a trade.
-    ///
-    /// This is the core method for executing trades.
-    ///
-    /// # Arguments
-    ///
-    /// * `asset` - The symbol of the asset to trade (e.g., "EURUSD_otc").
-    /// * `action` - The direction of the trade (`Action.Call` or `Action.Put`).
-    /// * `time` - The duration of the trade in seconds.
-    /// * `amount` - The amount to trade.
-    ///
-    /// # Returns
-    ///
-    /// A `Deal` object representing the completed trade.
+    #[uniffi_doc(
+        name = "trade",
+        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+    )]
     #[uniffi::method]
-
     pub async fn trade(
         &self,
         asset: String,
@@ -177,33 +102,25 @@ impl PocketOption {
         Ok(Deal::from(deal))
     }
 
-    /// Places a "Call" (buy) trade.
-    ///
-    /// This is a convenience method that calls `trade` with `Action.Call`.
+    /// Places a Call (buy) trade. Shorthand for `trade(asset, Action::Call, time, amount)`.
     #[uniffi::method]
     pub async fn buy(&self, asset: String, time: u32, amount: f64) -> Result<Deal, UniError> {
         self.trade(asset, Action::Call, time, amount).await
     }
 
-    /// Places a "Put" (sell) trade.
-    ///
-    /// This is a convenience method that calls `trade` with `Action.Put`.
+    /// Places a Put (sell) trade. Shorthand for `trade(asset, Action::Put, time, amount)`.
     #[uniffi::method]
     pub async fn sell(&self, asset: String, time: u32, amount: f64) -> Result<Deal, UniError> {
         self.trade(asset, Action::Put, time, amount).await
     }
 
-    /// Gets the current server time as a Unix timestamp.
+    /// Returns the current server time as a Unix timestamp.
     #[uniffi::method]
     pub async fn server_time(&self) -> i64 {
         self.inner.server_time().await.timestamp()
     }
 
-    /// Gets the list of available assets for trading.
-    ///
-    /// # Returns
-    ///
-    /// A list of `Asset` objects, or `None` if the assets have not been loaded yet.
+    /// Returns all available trading assets, or `None` if the asset list has not yet loaded.
     #[uniffi::method]
     pub async fn assets(&self) -> Option<Vec<Asset>> {
         self.inner
@@ -212,15 +129,10 @@ impl PocketOption {
             .map(|assets_map| assets_map.0.values().cloned().map(Asset::from).collect())
     }
 
-    /// Checks the result of a trade by its ID.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - The ID of the trade to check (as a string).
-    ///
-    /// # Returns
-    ///
-    /// A `Deal` object representing the completed trade.
+    #[uniffi_doc(
+        name = "result",
+        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+    )]
     #[uniffi::method]
     pub async fn result(&self, id: String) -> Result<Deal, UniError> {
         let uuid =
@@ -233,16 +145,10 @@ impl PocketOption {
         Ok(Deal::from(deal))
     }
 
-    /// Checks the result of a trade by its ID with a timeout.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - The ID of the trade to check (as a string).
-    /// * `timeout_secs` - The maximum time to wait for the result in seconds.
-    ///
-    /// # Returns
-    ///
-    /// A `Deal` object representing the completed trade.
+    #[uniffi_doc(
+        name = "result",
+        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+    )]
     #[uniffi::method]
     pub async fn result_with_timeout(
         &self,
@@ -259,7 +165,7 @@ impl PocketOption {
         Ok(Deal::from(deal))
     }
 
-    /// Gets the list of currently opened deals.
+    /// Returns all currently open deals.
     #[uniffi::method]
     pub async fn get_opened_deals(&self) -> Vec<Deal> {
         self.inner
@@ -270,7 +176,7 @@ impl PocketOption {
             .collect()
     }
 
-    /// Gets the list of currently closed deals.
+    /// Returns all closed deals stored in the client's state.
     #[uniffi::method]
     pub async fn get_closed_deals(&self) -> Vec<Deal> {
         self.inner
@@ -281,7 +187,10 @@ impl PocketOption {
             .collect()
     }
 
-    /// Opens a pending order.
+    #[uniffi_doc(
+        name = "open_pending_order",
+        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+    )]
     #[allow(clippy::too_many_arguments)]
     #[uniffi::method]
     pub async fn open_pending_order(
@@ -317,7 +226,7 @@ impl PocketOption {
         Ok(PendingOrder::from(order))
     }
 
-    /// Gets the list of currently pending deals.
+    /// Returns all currently pending orders.
     #[uniffi::method]
     pub async fn get_pending_deals(&self) -> Vec<PendingOrder> {
         self.inner
@@ -328,22 +237,16 @@ impl PocketOption {
             .collect()
     }
 
-    /// Clears the list of closed deals from the client's state.
+    /// Clears the closed-deals list from the client's in-memory state.
     #[uniffi::method]
     pub async fn clear_closed_deals(&self) {
         self.inner.clear_closed_deals().await
     }
 
-    /// Subscribes to real-time candle data for a specific asset.
-    ///
-    /// # Arguments
-    ///
-    /// * `asset` - The symbol of the asset to subscribe to.
-    /// * `duration_secs` - The duration of each candle in seconds.
-    ///
-    /// # Returns
-    ///
-    /// A `SubscriptionStream` object that can be used to receive candle data.
+    #[uniffi_doc(
+        name = "subscribe",
+        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+    )]
     #[uniffi::method]
     pub async fn subscribe(
         &self,
@@ -360,7 +263,7 @@ impl PocketOption {
         Ok(SubscriptionStream::from_original(original_stream))
     }
 
-    /// Unsubscribes from real-time candle data for a specific asset.
+    /// Stops the real-time candle subscription for the given asset.
     #[uniffi::method]
     pub async fn unsubscribe(&self, asset: String) -> Result<(), UniError> {
         self.inner
@@ -369,7 +272,10 @@ impl PocketOption {
             .map_err(|e| UniError::from(BinaryOptionsError::from(e)))
     }
 
-    /// Gets historical candle data for a specific asset with advanced parameters.
+    #[uniffi_doc(
+        name = "candles",
+        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+    )]
     #[uniffi::method]
     pub async fn get_candles_advanced(
         &self,
@@ -389,7 +295,10 @@ impl PocketOption {
         Ok(candles)
     }
 
-    /// Gets historical candle data for a specific asset.
+    #[uniffi_doc(
+        name = "candles",
+        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+    )]
     #[uniffi::method]
     pub async fn get_candles(
         &self,
@@ -408,7 +317,10 @@ impl PocketOption {
         Ok(candles)
     }
 
-    /// Gets historical candle data for a specific asset and period.
+    #[uniffi_doc(
+        name = "candles",
+        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+    )]
     #[uniffi::method]
     pub async fn history(&self, asset: String, period: u32) -> Result<Vec<Candle>, UniError> {
         let candles = self
@@ -422,7 +334,7 @@ impl PocketOption {
         Ok(candles)
     }
 
-    /// Disconnects and reconnects the client.
+    /// Disconnects and reconnects the WebSocket client.
     #[uniffi::method]
     pub async fn reconnect(&self) -> Result<(), UniError> {
         self.inner
@@ -433,8 +345,7 @@ impl PocketOption {
 
     /// Shuts down the client and stops all background tasks.
     ///
-    /// This method should be called when you are finished with the client
-    /// to ensure a graceful shutdown.
+    /// Call this when you are done with the client to ensure a clean exit.
     #[uniffi::method]
     pub async fn shutdown(&self) -> Result<(), UniError> {
         self.inner
@@ -443,36 +354,10 @@ impl PocketOption {
             .map_err(|e| UniError::from(BinaryOptionsError::from(e)))
     }
 
-    /// Creates a raw handler for advanced WebSocket message operations.
-    ///
-    /// This allows you to send custom messages and receive filtered responses
-    /// based on a validator. Useful for implementing custom protocols or
-    /// accessing features not directly exposed by the API.
-    ///
-    /// # Arguments
-    ///
-    /// * `validator` - Validator to filter incoming messages
-    /// * `keep_alive` - Optional message to send on reconnect (e.g., for re-subscribing)
-    ///
-    /// # Returns
-    ///
-    /// A `RawHandler` object for sending and receiving messages
-    ///
-    /// # Examples
-    ///
-    /// ## Python
-    /// ```python
-    /// # Create a validator for balance updates
-    /// validator = Validator.contains('"balance"')
-    /// handler = await client.create_raw_handler(validator, None)
-    ///
-    /// # Send a custom message
-    /// await handler.send_text('42["getBalance"]')
-    ///
-    /// # Wait for response
-    /// response = await handler.wait_next()
-    /// print(f"Received: {response}")
-    /// ```
+    #[uniffi_doc(
+        name = "create_raw_handler",
+        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+    )]
     #[uniffi::method]
     pub async fn create_raw_handler(
         &self,
@@ -491,30 +376,9 @@ impl PocketOption {
         Ok(RawHandler::from_inner(inner_handler))
     }
 
-    /// Gets the payout percentage for a specific asset.
+    /// Returns the payout percentage for the given asset symbol, or `None` if unavailable.
     ///
-    /// Returns the profit percentage you'll receive if a trade on this asset wins.
-    /// For example, 0.8 means 80% profit (if you bet $1, you get $1.80 back).
-    ///
-    /// # Arguments
-    ///
-    /// * `asset` - The symbol of the asset (e.g., "EURUSD_otc")
-    ///
-    /// # Returns
-    ///
-    /// The payout percentage as a float, or None if the asset is not available
-    ///
-    /// # Examples
-    ///
-    /// ## Python
-    /// ```python
-    /// payout = await client.payout("EURUSD_otc")
-    /// if payout:
-    ///     print(f"Payout: {payout * 100}%")
-    ///     # Example output: "Payout: 80.0%"
-    /// else:
-    ///     print("Asset not available")
-    /// ```
+    /// A value of `0.8` means 80% profit on a winning trade.
     #[uniffi::method]
     pub async fn payout(&self, asset: String) -> Option<f64> {
         let assets = self.inner.assets().await?;
@@ -522,23 +386,13 @@ impl PocketOption {
         Some(asset_info.payout as f64 / 100.0)
     }
 
-    /// Gets the trade history.
-    ///
-    /// This is an alias for `get_closed_deals`.
+    /// Returns all closed deals. Alias for `get_closed_deals`.
     #[uniffi::method]
     pub async fn get_trade_history(&self) -> Vec<Deal> {
         self.get_closed_deals().await
     }
 
-    /// Gets the end time of a deal by its ID.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - The ID of the deal to check.
-    ///
-    /// # Returns
-    ///
-    /// The close timestamp as a Unix timestamp, or `None` if the deal is not found.
+    /// Returns the close timestamp (Unix) of a deal by its UUID string, or `None` if not found.
     #[uniffi::method]
     pub async fn get_deal_end_time(&self, id: String) -> Option<i64> {
         let deal_id = Uuid::parse_str(&id).ok()?;

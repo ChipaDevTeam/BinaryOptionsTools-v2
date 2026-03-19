@@ -1,7 +1,7 @@
 use core::fmt;
 use std::collections::HashMap;
 
-use binary_options_tools_core_pre::error::{CoreError, CoreResult};
+use binary_options_tools_core::error::{CoreError, CoreResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

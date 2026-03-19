@@ -1,7 +1,7 @@
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use binary_options_tools_core_pre::{
+use binary_options_tools_core::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, Rule, RunnerCommand},
@@ -17,7 +17,6 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
     types::MultiPatternRule,
-    utils::SocketIoFrame,
 };
 
 const HISTORICAL_DATA_TIMEOUT: Duration = Duration::from_secs(30);
@@ -104,14 +103,6 @@ impl HistoricalDataHandle {
     pub async fn ticks(&self, asset: String, period: u32) -> PocketResult<Vec<(i64, f64)>> {
         let _guard = self.call_lock.lock().await;
 
-        // Drain stale responses
-        while let Ok(msg) = self.receiver.try_recv() {
-            warn!(
-                "Drained stale response from HistoricalDataHandle: {:?}",
-                msg
-            );
-        }
-
         let id = Uuid::new_v4();
         self.sender
             .send(Command::GetTicks {
@@ -176,14 +167,6 @@ impl HistoricalDataHandle {
     /// ```
     pub async fn candles(&self, asset: String, period: u32) -> PocketResult<Vec<Candle>> {
         let _guard = self.call_lock.lock().await;
-
-        // Drain stale responses
-        while let Ok(msg) = self.receiver.try_recv() {
-            warn!(
-                "Drained stale response from HistoricalDataHandle: {:?}",
-                msg
-            );
-        }
 
         let id = Uuid::new_v4();
         self.sender
@@ -344,15 +327,16 @@ impl ApiModule<State> for HistoricalDataApiModule {
                         Message::Text(text) => {
                             if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
                                 Some(res)
-                            } else if let Some(frame) = SocketIoFrame::parse(text) {
-                                if let Some((event, payload)) = frame.extract_event() {
-                                    if event.starts_with("updateHistory") {
+                            } else if let Some(start) = text.find('[') {
+                                // Try parsing as a 1-step Socket.IO message: 42["updateHistory", {...}]
+                                if let Ok(serde_json::Value::Array(arr)) = serde_json::from_str::<serde_json::Value>(&text[start..]) {
+                                    if arr.len() >= 2 && arr[0].as_str().map(|s| s.starts_with("updateHistory")).unwrap_or(false) {
                                         // Check for binary placeholder
-                                        if payload.as_object().is_some_and(|obj| obj.contains_key("_placeholder")) {
+                                        if arr[1].as_object().is_some_and(|obj| obj.contains_key("_placeholder")) {
                                             is_binary_placeholder = true;
                                             None
                                         } else {
-                                            serde_json::from_value::<ServerResponse>(payload).ok()
+                                            serde_json::from_value::<ServerResponse>(arr[1].clone()).ok()
                                         }
                                     } else {
                                         None
@@ -378,22 +362,18 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                 if let Some((req_id, _, _, req_type)) = self.pending_request.take() {
                                     match req_type {
                                         RequestType::Candles => {
-                                            if let Err(e) = self.command_responder.send(CommandResponse::Candles {
+                                            self.command_responder.send(CommandResponse::Candles {
                                                 req_id,
                                                 candles,
-                                            }).await {
-                                                warn!(target: "HistoricalDataApiModule", "Failed to send Candles response: {:?}", e);
-                                            }
+                                            }).await?;
                                         }
                                         RequestType::Ticks => {
                                             // Convert candles back to ticks (not ideal but better than nothing)
                                             let ticks = candles.iter().map(|c| (c.timestamp, c.close.to_f64().unwrap_or_default())).collect();
-                                            if let Err(e) = self.command_responder.send(CommandResponse::Ticks {
+                                            self.command_responder.send(CommandResponse::Ticks {
                                                 req_id,
                                                 ticks,
-                                            }).await {
-                                                warn!(target: "HistoricalDataApiModule", "Failed to send Ticks response: {:?}", e);
-                                            }
+                                            }).await?;
                                         }
                                     }
                                 } else {
@@ -439,12 +419,10 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                              }
                                         }
 
-                                        if let Err(e) = self.command_responder.send(CommandResponse::Ticks {
+                                        self.command_responder.send(CommandResponse::Ticks {
                                             req_id,
                                             ticks,
-                                        }).await {
-                                            warn!(target: "HistoricalDataApiModule", "Failed to send Ticks response: {:?}", e);
-                                        }
+                                        }).await?;
                                     } else {
                                         // RequestType::Candles
                                         let mut candles = Vec::new();
@@ -501,12 +479,10 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                             }
                                         }
 
-                                        if let Err(e) = self.command_responder.send(CommandResponse::Candles {
+                                        self.command_responder.send(CommandResponse::Candles {
                                             req_id,
                                             candles,
-                                        }).await {
-                                            warn!(target: "HistoricalDataApiModule", "Failed to send Candles response: {:?}", e);
-                                        }
+                                        }).await?;
                                     }
                                 } else {
                                     warn!(target: "HistoricalDataApiModule", "Received history data but no req_id was pending. Discarding.");
@@ -514,9 +490,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
                             }
                             ServerResponse::Fail(e) => {
                                 self.pending_request = None;
-                                if let Err(e) = self.command_responder.send(CommandResponse::Error(e)).await {
-                                    warn!(target: "HistoricalDataApiModule", "Failed to send Error response: {:?}", e);
-                                }
+                                self.command_responder.send(CommandResponse::Error(e)).await?;
                             }
                         }
                     } else {
@@ -544,8 +518,8 @@ mod tests {
     use super::*;
     use crate::pocketoption::ssid::Ssid;
     use crate::pocketoption::state::StateBuilder;
-    use binary_options_tools_core_pre::reimports::{bounded_async, Message};
-    use binary_options_tools_core_pre::traits::ApiModule;
+    use binary_options_tools_core::reimports::{bounded_async, Message};
+    use binary_options_tools_core::traits::ApiModule;
     use std::sync::Arc;
     use uuid::Uuid;
 
