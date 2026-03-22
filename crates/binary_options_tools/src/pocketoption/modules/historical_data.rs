@@ -558,23 +558,40 @@ impl ApiModule<State> for HistoricalDataApiModule {
 
 impl HistoricalDataApiModule {
     /// Parses an updateStream message and returns (symbol, timestamp, price) if valid.
-    /// Format: [["SYMBOL", timestamp, price]] or [[symbol, timestamp, price]]
+    /// Handles both direct data format and Socket.IO wrapped format:
+    /// - Direct: [["SYMBOL", timestamp, price]]
+    /// - Socket.IO wrapped: ["updateStream", [["SYMBOL", timestamp, price]]]
     fn parse_update_stream(text: &str) -> Option<(String, i64, f64)> {
         // Try to find JSON array in the text
         let start = text.find('[')?;
         let json_str = &text[start..];
 
-        // Parse as nested array: [["SYMBOL", timestamp, price]]
+        // Parse as JSON array
         let arr: serde_json::Value = serde_json::from_str(json_str).ok()?;
 
-        if let Some(outer) = arr.as_array() {
-            if let Some(inner) = outer.first().and_then(|v| v.as_array()) {
-                if inner.len() >= 3 {
-                    let symbol = inner[0].as_str()?.to_string();
-                    let timestamp = inner[1].as_f64()? as i64;
-                    let price = inner[2].as_f64()?;
-                    return Some((symbol, timestamp, price));
-                }
+        let outer = arr.as_array()?;
+
+        // Check if first element is a string (event name in Socket.IO envelope)
+        // e.g., ["updateStream", [["SYMBOL", ts, price]]]
+        let data_array = if let Some(first) = outer.first() {
+            if first.is_string() && outer.len() >= 2 {
+                // Socket.IO wrapped format - use second element as data
+                outer.get(1)?.as_array()?
+            } else {
+                // Direct data format - use the array as-is
+                outer
+            }
+        } else {
+            return None;
+        };
+
+        // Extract tick data from the inner array
+        if let Some(inner) = data_array.first().and_then(|v| v.as_array()) {
+            if inner.len() >= 3 {
+                let symbol = inner[0].as_str()?.to_string();
+                let timestamp = inner[1].as_f64()? as i64;
+                let price = inner[2].as_f64()?;
+                return Some((symbol, timestamp, price));
             }
         }
         None

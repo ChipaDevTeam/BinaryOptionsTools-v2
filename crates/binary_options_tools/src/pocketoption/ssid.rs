@@ -205,25 +205,52 @@ impl Ssid {
             trimmed
         };
 
+        // Track whether recovery was used and what the recovered string is
+        let mut used_recovery = false;
+        let mut recovered_parsed = String::new();
+
         let mut ssid: Demo = match serde_json::from_str(parsed) {
             Ok(s) => s,
             Err(e) => {
                 // Try recovery: quote unquoted keys and alphanumeric values
                 let recovered = recover_json(parsed);
-                serde_json::from_str(&recovered).map_err(|re| {
-                    tracing::debug!(target: "Ssid", "Recovery failed. Original error: {:?}, Recovery error: {:?}", e, re);
-                    CoreError::SsidParsing(format!("JSON parsing error: {e} (Recovery also failed: {re})"))
-                })?
+                match serde_json::from_str(&recovered) {
+                    Ok(s) => {
+                        tracing::debug!(target: "Ssid", "JSON recovery succeeded for malformed SSID");
+                        used_recovery = true;
+                        recovered_parsed = recovered;
+                        s
+                    }
+                    Err(re) => {
+                        tracing::debug!(target: "Ssid", "Recovery failed. Original error: {:?}, Recovery error: {:?}", e, re);
+                        return Err(CoreError::SsidParsing(format!(
+                            "JSON parsing error: {e} (Recovery also failed: {re})"
+                        )));
+                    }
+                }
             }
         };
 
         // Ensure raw is always in the full 42["auth",...] format for sending over WS
-        ssid.raw = if trimmed.starts_with("42[\"auth\",") {
-            trimmed.to_string()
+        // If recovery was used, build raw from the recovered (valid) JSON to avoid
+        // sending malformed JSON over the WebSocket
+        let effective_parsed = if used_recovery {
+            &recovered_parsed
         } else {
-            format!("42[\"auth\",{}]", trimmed)
+            parsed
         };
-        ssid.json_raw = parsed.to_string();
+
+        ssid.raw = if trimmed.starts_with("42[\"auth\",") {
+            if used_recovery {
+                // Reconstruct the full frame with recovered payload
+                format!("42[\"auth\",{}]", effective_parsed)
+            } else {
+                trimmed.to_string()
+            }
+        } else {
+            format!("42[\"auth\",{}]", effective_parsed)
+        };
+        ssid.json_raw = effective_parsed.to_string();
 
         let is_demo_url = ssid
             .current_url

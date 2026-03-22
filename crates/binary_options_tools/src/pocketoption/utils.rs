@@ -252,15 +252,30 @@ impl SocketIoFrame {
             }
         }
 
-        // 4. Ack ID (optional, numeric)
+        // 4. For BinaryEvent/BinaryAck: attachment count (digits followed by '-')
+        //    For other types: ack ID (optional, numeric)
         let mut id = None;
+        let is_binary = matches!(
+            message_type,
+            Some(SocketIoMessageType::BinaryEvent) | Some(SocketIoMessageType::BinaryAck)
+        );
+
         let id_digits: String = remaining
             .chars()
             .take_while(|c| c.is_ascii_digit())
             .collect();
         if !id_digits.is_empty() {
-            id = id_digits.parse().ok();
-            remaining = remaining[id_digits.len()..].to_string();
+            if is_binary {
+                // Binary attachment count - skip the digits and the following '-' separator
+                remaining = remaining[id_digits.len()..].to_string();
+                if remaining.starts_with('-') {
+                    remaining = remaining[1..].to_string();
+                }
+            } else {
+                // Regular ack ID
+                id = id_digits.parse().ok();
+                remaining = remaining[id_digits.len()..].to_string();
+            }
         }
 
         // 5. Data (optional, usually starts with [ or {)
