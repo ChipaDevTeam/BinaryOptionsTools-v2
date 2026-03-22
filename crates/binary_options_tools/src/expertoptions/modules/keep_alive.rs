@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
+use binary_options_tools_core::Rule;
 use binary_options_tools_core::{
     error::{CoreError, CoreResult},
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{LightweightModule, Rule, RunnerCommand},
 };
-use binary_options_tools_core::Rule;
 use serde_json::Value;
 use tracing::warn;
 

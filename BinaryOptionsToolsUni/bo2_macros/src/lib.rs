@@ -14,5 +14,5 @@ pub fn uniffi_doc(args: Args) -> zyn::TokenStream {
     };
     zyn::zyn! {
         @uniffi_doc(args = args)
-    }   
+    }
 }

@@ -1,4 +1,4 @@
-use binary_options_tools_core::{traits::Rule, Rule, rules::MessageType};
+use binary_options_tools_core::{rules::MessageType, traits::Rule, Rule};
 
 struct TestRuleImpl;
 
@@ -647,9 +647,8 @@ mod tests {
         let rule = SuccessOpenOrderRule::new();
 
         // Step 1: Text header with placeholder (should NOT pass)
-        let header = Message::text(
-            r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let header =
+            Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         assert_eq!(
             rule.call(&header),
             false,
@@ -678,9 +677,8 @@ mod tests {
         let rule = FailOpenOrderRule::new();
 
         // Step 1: Text header with placeholder
-        let header = Message::text(
-            r#"451-["failopenOrder",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let header =
+            Message::text(r#"451-["failopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         assert_eq!(rule.call(&header), false, "Header should not pass");
 
         // Step 2: Binary body
@@ -693,20 +691,18 @@ mod tests {
         let rule = TradeOrderRule::new();
 
         // Test successopenOrder
-        let success_header = Message::text(
-            r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let success_header =
+            Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         assert_eq!(rule.call(&success_header), false);
-        
+
         let success_body = Message::binary(b"success_data".to_vec());
         assert_eq!(rule.call(&success_body), true);
 
         // Test failopenOrder
-        let fail_header = Message::text(
-            r#"451-["failopenOrder",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let fail_header =
+            Message::text(r#"451-["failopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         assert_eq!(rule.call(&fail_header), false);
-        
+
         let fail_body = Message::binary(b"fail_data".to_vec());
         assert_eq!(rule.call(&fail_body), true);
     }
@@ -716,7 +712,7 @@ mod tests {
         let rule = UpdateBalanceRule::new();
 
         let header = Message::text(
-            r#"451-["successupdateBalance",{"_placeholder":true,"num":0}]"#.to_string()
+            r#"451-["successupdateBalance",{"_placeholder":true,"num":0}]"#.to_string(),
         );
         let body = Message::binary(br#"{"balance":1500.50,"demo":false}"#.to_vec());
 
@@ -728,9 +724,8 @@ mod tests {
     fn test_update_stream_two_step() {
         let rule = UpdateStreamRule::new();
 
-        let header = Message::text(
-            r#"451-["updateStream",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let header =
+            Message::text(r#"451-["updateStream",{"_placeholder":true,"num":0}]"#.to_string());
         let body = Message::binary(br#"[["AUDCHF_otc",1773834518.929,0.55218]]"#.to_vec());
 
         assert_eq!(rule.call(&header), false);
@@ -742,33 +737,30 @@ mod tests {
         let rule = MultiSubscriptionRule::new();
 
         // Test updateStream
-        let stream_header = Message::text(
-            r#"451-["updateHistory",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let stream_header =
+            Message::text(r#"451-["updateHistory",{"_placeholder":true,"num":0}]"#.to_string());
         let stream_body = Message::binary(b"stream_data".to_vec());
         assert_eq!(rule.call(&stream_header), false);
         assert_eq!(rule.call(&stream_body), true);
 
         // Test updateHistory
-        let history_header = Message::text(
-            r#"451-["updateHistory",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let history_header =
+            Message::text(r#"451-["updateHistory",{"_placeholder":true,"num":0}]"#.to_string());
         let history_body = Message::binary(b"history_data".to_vec());
         assert_eq!(rule.call(&history_header), false);
         assert_eq!(rule.call(&history_body), true);
 
         // Test updateHistoryNewFast
         let fast_header = Message::text(
-            r#"451-["updateHistoryNewFast",{"_placeholder":true,"num":0}]"#.to_string()
+            r#"451-["updateHistoryNewFast",{"_placeholder":true,"num":0}]"#.to_string(),
         );
         let fast_body = Message::binary(b"fast_data".to_vec());
         assert_eq!(rule.call(&fast_header), false);
         assert_eq!(rule.call(&fast_body), true);
 
         // Test updateHistoryNew
-        let new_header = Message::text(
-            r#"451-["updateHistoryNew",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let new_header =
+            Message::text(r#"451-["updateHistoryNew",{"_placeholder":true,"num":0}]"#.to_string());
         let new_body = Message::binary(b"new_data".to_vec());
         assert_eq!(rule.call(&new_header), false);
         assert_eq!(rule.call(&new_body), true);
@@ -779,9 +771,8 @@ mod tests {
         let rule = SuccessOpenOrderRule::new();
 
         // Different event name should not match
-        let wrong_header = Message::text(
-            r#"451-["wrongEventName",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let wrong_header =
+            Message::text(r#"451-["wrongEventName",{"_placeholder":true,"num":0}]"#.to_string());
         assert_eq!(
             rule.call(&wrong_header),
             false,
@@ -802,9 +793,8 @@ mod tests {
         let rule = TradeOrderRule::new();
 
         // successopenOrder header
-        let success_header = Message::text(
-            r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let success_header =
+            Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         assert_eq!(rule.call(&success_header), false);
 
         // Some unrelated text message (should not pass, but should not affect state)
@@ -824,9 +814,8 @@ mod tests {
         let rule = SuccessOpenOrderRule::new();
 
         // Set up the two-step sequence
-        let header = Message::text(
-            r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let header =
+            Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         assert_eq!(rule.call(&header), false);
 
         // Reset the rule
@@ -846,25 +835,22 @@ mod tests {
         let rule = TradeOrderRule::new();
 
         // First pair: successopenOrder
-        let header1 = Message::text(
-            r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let header1 =
+            Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         let body1 = Message::binary(b"data1".to_vec());
         assert_eq!(rule.call(&header1), false);
         assert_eq!(rule.call(&body1), true);
 
         // Second pair: failopenOrder
-        let header2 = Message::text(
-            r#"451-["failopenOrder",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let header2 =
+            Message::text(r#"451-["failopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         let body2 = Message::binary(b"data2".to_vec());
         assert_eq!(rule.call(&header2), false);
         assert_eq!(rule.call(&body2), true);
 
         // Third pair: successopenOrder again
-        let header3 = Message::text(
-            r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string()
-        );
+        let header3 =
+            Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         let body3 = Message::binary(b"data3".to_vec());
         assert_eq!(rule.call(&header3), false);
         assert_eq!(rule.call(&body3), true);

@@ -14,7 +14,6 @@ pub enum MessageType {
     Pong,
 }
 
-
 impl MessageType {
     fn matches(&self, msg: &Message) -> bool {
         match (self, msg) {
@@ -30,7 +29,7 @@ impl MessageType {
 
 impl TryFrom<String> for MessageType {
     type Error = CoreError;
-    
+
     fn try_from(value: String) -> CoreResult<MessageType> {
         match value.as_str() {
             "Text" => Ok(MessageType::Text),

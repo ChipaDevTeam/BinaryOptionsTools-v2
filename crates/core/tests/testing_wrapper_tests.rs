@@ -2,9 +2,7 @@ use async_trait::async_trait;
 use binary_options_tools_core::builder::ClientBuilder;
 use binary_options_tools_core::connector::{Connector, ConnectorResult, WsStream};
 use binary_options_tools_core::error::CoreResult;
-use binary_options_tools_core::testing::{
-    TestingConfig, TestingWrapper, TestingWrapperBuilder,
-};
+use binary_options_tools_core::testing::{TestingConfig, TestingWrapper, TestingWrapperBuilder};
 use binary_options_tools_core::traits::{ApiModule, Rule, RunnerCommand};
 use kanal::{AsyncReceiver, AsyncSender};
 use std::sync::Arc;

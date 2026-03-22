@@ -3,9 +3,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use binary_options_tools_core::error::CoreError;
-use binary_options_tools_core::reimports::{
-    bounded_async, AsyncReceiver, AsyncSender, Message,
-};
+use binary_options_tools_core::reimports::{bounded_async, AsyncReceiver, AsyncSender, Message};
 use binary_options_tools_core::traits::{ApiModule, Rule, RunnerCommand};
 use tokio::select;
 use tokio::sync::RwLock;

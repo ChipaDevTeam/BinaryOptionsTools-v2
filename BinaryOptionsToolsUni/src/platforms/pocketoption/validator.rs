@@ -18,10 +18,7 @@ pub struct Validator {
 #[uniffi::export]
 impl Validator {
     /// Creates a default validator that accepts all messages.
-    #[uniffi_doc(
-        name = "new",
-        path = "BinaryOptionsToolsUni/docs_json/validator.json"
-    )]
+    #[uniffi_doc(name = "new", path = "BinaryOptionsToolsUni/docs_json/validator.json")]
     #[uniffi::constructor]
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
