@@ -832,22 +832,44 @@ impl PocketOption {
     }
 
     /// Gets historical tick data (timestamp, price) for a specific asset and period.
+    ///
+    /// This method uses `loadHistoryPeriod` with pagination to fetch tick data going back
+    /// as far as needed, overcoming the limited window returned by `changeSymbol`.
+    ///
     /// # Arguments
     /// * `asset` - The asset to get historical data for.
-    /// * `period` - The time period for each tick in seconds.
+    /// * `lookback_seconds` - How many seconds of tick history to fetch.
+    ///
     /// # Returns
     /// A `PocketResult` containing a vector of `(timestamp, price)` if successful, or an error if the request fails.
-    pub async fn ticks(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<(i64, f64)>> {
-        let handle = self
-            .require_handle::<HistoricalDataApiModule>("HistoricalDataApiModule")
-            .await?;
+    pub async fn ticks(
+        &self,
+        asset: impl ToString,
+        lookback_seconds: u32,
+    ) -> PocketResult<Vec<(i64, f64)>> {
+        let asset_str = asset.to_string();
+
+        if !self.is_connected() {
+            return Err(PocketError::General(
+                "Not connected to server. The connection may have dropped; wait for reconnection or create a new client.".into(),
+            ));
+        }
 
         if let Some(assets) = self.assets().await {
-            if assets.get(&asset.to_string()).is_none() {
-                return Err(PocketError::InvalidAsset(asset.to_string()));
+            if assets.get(&asset_str).is_none() {
+                return Err(PocketError::InvalidAsset(asset_str.clone()));
             }
         }
-        handle.ticks(asset.to_string(), period).await
+
+        // Use GetCandlesApiModule with loadHistoryPeriod for paginated tick fetching
+        let handle = self
+            .require_handle::<GetCandlesApiModule>("GetCandlesApiModule")
+            .await?;
+
+        // Use a 1-second period context for the server
+        handle
+            .get_ticks(asset_str, 1, lookback_seconds as i64)
+            .await
     }
 
     /// Gets historical candle data for a specific asset and period.

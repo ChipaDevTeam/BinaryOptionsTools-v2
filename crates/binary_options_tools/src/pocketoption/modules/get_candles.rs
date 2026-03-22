@@ -11,16 +11,12 @@ use tokio::select;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::{
-    error::BinaryOptionsError,
-    pocketoption::{
-        candle::Candle,
-        error::{PocketError, PocketResult},
-        state::State,
-        types::MultiPatternRule,
-        utils::get_index,
-    },
-    utils::f64_to_decimal,
+use crate::pocketoption::{
+    candle::{BaseCandle, Candle},
+    error::{PocketError, PocketResult},
+    state::State,
+    types::MultiPatternRule,
+    utils::get_index,
 };
 
 const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = ["loadHistoryPeriodFast", "loadHistoryPeriod"];
@@ -53,46 +49,29 @@ impl std::fmt::Display for LoadHistoryPeriod {
     }
 }
 
+/// Represents a single tick/trade data point from loadHistoryPeriod.
+/// Format: { "asset": "...", "time": timestamp, "price": value }
 #[derive(Debug, Deserialize, Clone)]
-pub struct CandleData {
-    pub symbol_id: u32,
-    pub time: i64,
-    pub open: f64,
-    pub close: f64,
-    pub high: f64,
-    pub low: f64,
+pub struct TickData {
+    pub asset: String,
+    pub time: f64,
+    pub price: f64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct LoadHistoryPeriodResult {
     pub asset: String,
     pub index: u64,
-    pub data: Vec<CandleData>,
+    #[serde(default)]
+    pub data: Vec<TickData>,
     pub period: i64,
 }
 
-impl TryFrom<CandleData> for Candle {
-    type Error = BinaryOptionsError;
-
-    fn try_from(candle_data: CandleData) -> Result<Self, Self::Error> {
-        Ok(Candle {
-            symbol: String::new(), // Will be filled by the caller
-            timestamp: candle_data.time,
-            open: f64_to_decimal(candle_data.open).ok_or(BinaryOptionsError::General(
-                "Couldn't parse f64 to Decimal".to_string(),
-            ))?,
-            high: f64_to_decimal(candle_data.high).ok_or(BinaryOptionsError::General(
-                "Couldn't parse f64 to Decimal".to_string(),
-            ))?,
-            low: f64_to_decimal(candle_data.low).ok_or(BinaryOptionsError::General(
-                "Couldn't parse f64 to Decimal".to_string(),
-            ))?,
-            close: f64_to_decimal(candle_data.close).ok_or(BinaryOptionsError::General(
-                "Couldn't parse f64 to Decimal".to_string(),
-            ))?,
-            volume: None,
-        })
-    }
+/// The type of request being made.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RequestKind {
+    Candles,
+    Ticks,
 }
 
 #[derive(Debug)]
@@ -104,12 +83,29 @@ pub enum Command {
         offset: i64,
         req_id: Uuid,
     },
+    GetTicks {
+        asset: String,
+        period: i64,
+        time: i64,
+        offset: i64,
+        req_id: Uuid,
+    },
 }
 
 #[derive(Debug)]
 pub enum CommandResponse {
-    CandlesResult { req_id: Uuid, candles: Vec<Candle> },
-    Error { req_id: Uuid, error: String },
+    CandlesResult {
+        req_id: Uuid,
+        candles: Vec<Candle>,
+    },
+    TicksResult {
+        req_id: Uuid,
+        ticks: Vec<(i64, f64)>,
+    },
+    Error {
+        req_id: Uuid,
+        error: String,
+    },
 }
 
 #[derive(Clone)]
@@ -190,9 +186,111 @@ impl GetCandlesHandle {
                     }
                     // Continue waiting for the correct response
                 }
+                Ok(_) => continue, // Ignore other response types
                 Err(e) => return Err(CoreError::from(e).into()),
             }
         }
+    }
+
+    /// Gets historical tick data (timestamp, price) for a specific asset with pagination.
+    ///
+    /// This method uses `loadHistoryPeriod` with pagination to fetch tick data going back
+    /// as far as needed, overcoming the limited window returned by `changeSymbol`.
+    ///
+    /// # Arguments
+    /// * `asset` - Trading symbol (e.g., "EURUSD_otc")
+    /// * `period` - Time period in seconds (used as context for the server)
+    /// * `lookback_seconds` - How many seconds of tick history to fetch
+    ///
+    /// # Returns
+    /// A vector of (timestamp, price) tuples sorted by timestamp
+    pub async fn get_ticks(
+        &self,
+        asset: impl ToString,
+        period: i64,
+        lookback_seconds: i64,
+    ) -> PocketResult<Vec<(i64, f64)>> {
+        let asset_str = asset.to_string();
+        let now = chrono::Utc::now().timestamp();
+        let target_time = now - lookback_seconds;
+        let page_offset: i64 = 1000; // Fetch 1000 ticks per page
+
+        let mut all_ticks: Vec<(i64, f64)> = Vec::new();
+        let mut current_time = now;
+        let mut max_pages = 20; // Safety limit to prevent infinite loops
+
+        loop {
+            let req_id = Uuid::new_v4();
+            info!(target: "GetCandlesHandle", "Requesting ticks for asset: {}, period: {}, time: {}, offset: {}", asset_str, period, current_time, page_offset);
+
+            self.sender
+                .send(Command::GetTicks {
+                    asset: asset_str.clone(),
+                    period,
+                    time: current_time,
+                    offset: page_offset,
+                    req_id,
+                })
+                .await
+                .map_err(CoreError::from)?;
+
+            // Wait for the response
+            let ticks = loop {
+                match self.receiver.recv().await {
+                    Ok(CommandResponse::TicksResult {
+                        req_id: response_id,
+                        ticks,
+                    }) => {
+                        if req_id == response_id {
+                            break ticks;
+                        }
+                    }
+                    Ok(CommandResponse::Error {
+                        req_id: response_id,
+                        error,
+                    }) => {
+                        if req_id == response_id {
+                            return Err(PocketError::General(error));
+                        }
+                    }
+                    Ok(_) => continue,
+                    Err(e) => return Err(CoreError::from(e).into()),
+                }
+            };
+
+            if ticks.is_empty() {
+                break; // No more data
+            }
+
+            let earliest_tick_time = ticks.first().map(|(t, _)| *t).unwrap_or(current_time);
+
+            // Add ticks that are within our lookback window
+            for (ts, price) in &ticks {
+                if *ts >= target_time {
+                    all_ticks.push((*ts, *price));
+                }
+            }
+
+            // Check if we've covered the lookback period
+            if earliest_tick_time <= target_time {
+                break;
+            }
+
+            // Move to the next page
+            current_time = earliest_tick_time;
+            max_pages -= 1;
+            if max_pages <= 0 {
+                warn!(target: "GetCandlesHandle", "Reached max pagination pages for {}", asset_str);
+                break;
+            }
+        }
+
+        // Sort by timestamp and deduplicate
+        all_ticks.sort_by(|a, b| a.0.cmp(&b.0));
+        all_ticks.dedup_by(|a, b| a.0 == b.0);
+
+        info!(target: "GetCandlesHandle", "Collected {} ticks for {} covering {} seconds", all_ticks.len(), asset_str, lookback_seconds);
+        Ok(all_ticks)
     }
 }
 
@@ -204,7 +302,7 @@ pub struct GetCandlesApiModule {
     ws_sender: AsyncSender<Message>,
     command_receiver: AsyncReceiver<Command>,
     command_responder: AsyncSender<CommandResponse>,
-    pending_requests: std::collections::HashMap<u64, (Uuid, String)>, // index -> (req_id, asset)
+    pending_requests: std::collections::HashMap<u64, (Uuid, String, RequestKind)>, // index -> (req_id, asset, kind)
 }
 
 #[async_trait]
@@ -245,20 +343,20 @@ impl ApiModule<State> for GetCandlesApiModule {
                     match msg.as_ref() {
                         Message::Binary(data) => {
                             if let Ok(result) = serde_json::from_slice::<LoadHistoryPeriodResult>(data) {
-                                self.process_candle_result(result).await?;
+                                self.process_result(result).await?;
                             } else {
                                 warn!("Failed to parse LoadHistoryPeriodResult (binary)");
                             }
                         }
                         Message::Text(text) => {
                             if let Ok(result) = serde_json::from_str::<LoadHistoryPeriodResult>(text) {
-                                self.process_candle_result(result).await?;
+                                self.process_result(result).await?;
                             } else if let Some(start) = text.find('[') {
                                 // Try parsing as a 1-step Socket.IO message: 42["loadHistoryPeriod", {...}]
                                 if let Ok(serde_json::Value::Array(arr)) = serde_json::from_str::<serde_json::Value>(&text[start..]) {
                                     if arr.len() >= 2 && (arr[0] == "loadHistoryPeriod" || arr[0] == "loadHistoryPeriodFast") {
                                         if let Ok(result) = serde_json::from_value::<LoadHistoryPeriodResult>(arr[1].clone()) {
-                                            self.process_candle_result(result).await?;
+                                            self.process_result(result).await?;
                                         }
                                     }
                                 }
@@ -273,12 +371,40 @@ impl ApiModule<State> for GetCandlesApiModule {
                             match LoadHistoryPeriod::new(&asset, time, period, offset) {
                                 Ok(load_history) => {
                                     // Store the request mapping
-                                    self.pending_requests.insert(load_history.index, (req_id, asset));
+                                    self.pending_requests.insert(load_history.index, (req_id, asset, RequestKind::Candles));
 
                                     // Send the WebSocket message
                                     let message = Message::text(load_history.to_string());
                                     if let Err(e) = self.ws_sender.send(message).await {
-                                        // Remove the pending request on error
+                                        self.pending_requests.remove(&load_history.index);
+
+                                        if let Err(resp_err) = self.command_responder.send(CommandResponse::Error {
+                                            req_id,
+                                            error: format!("Failed to send WebSocket message: {e}"),
+                                        }).await {
+                                            warn!("Failed to send error response: {}", resp_err);
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    if let Err(resp_err) = self.command_responder.send(CommandResponse::Error {
+                                        req_id,
+                                        error: format!("Failed to create LoadHistoryPeriod: {e}"),
+                                    }).await {
+                                        warn!("Failed to send error response: {}", resp_err);
+                                    }
+                                }
+                            }
+                        }
+                        Command::GetTicks { asset, period, time, offset, req_id } => {
+                            match LoadHistoryPeriod::new(&asset, time, period, offset) {
+                                Ok(load_history) => {
+                                    // Store the request mapping
+                                    self.pending_requests.insert(load_history.index, (req_id, asset, RequestKind::Ticks));
+
+                                    // Send the WebSocket message
+                                    let message = Message::text(load_history.to_string());
+                                    if let Err(e) = self.ws_sender.send(message).await {
                                         self.pending_requests.remove(&load_history.index);
 
                                         if let Err(resp_err) = self.command_responder.send(CommandResponse::Error {
@@ -313,35 +439,57 @@ impl ApiModule<State> for GetCandlesApiModule {
 }
 
 impl GetCandlesApiModule {
-    async fn process_candle_result(&mut self, result: LoadHistoryPeriodResult) -> CoreResult<()> {
+    async fn process_result(&mut self, result: LoadHistoryPeriodResult) -> CoreResult<()> {
         // Find the pending request by index
-        if let Some((req_id, asset)) = self.pending_requests.remove(&result.index) {
-            let candles: Vec<Candle> = result
-                .data
-                .into_iter()
-                .map(|candle_data| {
-                    Candle::try_from(candle_data)
-                        .map_err(|e| CoreError::Other(e.to_string()))
-                        .map(|mut c| {
-                            c.symbol = asset.clone();
-                            c
+        if let Some((req_id, asset, request_kind)) = self.pending_requests.remove(&result.index) {
+            match request_kind {
+                RequestKind::Candles => {
+                    let candles: Vec<Candle> = result
+                        .data
+                        .into_iter()
+                        .filter_map(|tick_data| {
+                            // Convert tick data to a single-price candle
+                            // This maintains backwards compatibility when the server returns
+                            // tick data instead of OHLC candles
+                            let base_candle = BaseCandle {
+                                timestamp: tick_data.time as i64,
+                                open: tick_data.price,
+                                high: tick_data.price,
+                                low: tick_data.price,
+                                close: tick_data.price,
+                                volume: None,
+                            };
+                            let symbol = asset.clone();
+                            Candle::try_from((base_candle, symbol)).ok()
                         })
-                })
-                .collect::<Result<Vec<Candle>, _>>()?;
+                        .collect();
 
-            // Send the response
-            if let Err(e) = self
-                .command_responder
-                .send(CommandResponse::CandlesResult { req_id, candles })
-                .await
-            {
-                warn!("Failed to send candles result: {}", e);
+                    if let Err(e) = self
+                        .command_responder
+                        .send(CommandResponse::CandlesResult { req_id, candles })
+                        .await
+                    {
+                        warn!("Failed to send candles result: {}", e);
+                    }
+                }
+                RequestKind::Ticks => {
+                    let ticks: Vec<(i64, f64)> = result
+                        .data
+                        .into_iter()
+                        .map(|tick_data| (tick_data.time as i64, tick_data.price))
+                        .collect();
+
+                    if let Err(e) = self
+                        .command_responder
+                        .send(CommandResponse::TicksResult { req_id, ticks })
+                        .await
+                    {
+                        warn!("Failed to send ticks result: {}", e);
+                    }
+                }
             }
         } else {
-            warn!(
-                "Received candles for unknown request index: {}",
-                result.index
-            );
+            warn!("Received data for unknown request index: {}", result.index);
         }
         Ok(())
     }

@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use binary_options_tools_core::{
@@ -244,6 +244,9 @@ pub struct HistoricalDataApiModule {
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
     pending_request: Option<(Uuid, String, u32, RequestType)>,
+    /// Stores the latest tick (timestamp, price) received from updateStream for each asset.
+    /// This is used to append the current/forming candle to historical data.
+    latest_ticks: HashMap<String, (i64, f64)>,
 }
 
 #[async_trait]
@@ -267,6 +270,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
             message_receiver,
             to_ws_sender,
             pending_request: None,
+            latest_ticks: HashMap::new(),
         }
     }
 
@@ -328,7 +332,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
                             if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
                                 Some(res)
                             } else if let Some(start) = text.find('[') {
-                                // Try parsing as a 1-step Socket.IO message: 42["updateHistory", {...}]
+                                // Try parsing as a 1-step Socket.IO message
                                 if let Ok(serde_json::Value::Array(arr)) = serde_json::from_str::<serde_json::Value>(&text[start..]) {
                                     if arr.len() >= 2 && arr[0].as_str().map(|s| s.starts_with("updateHistory")).unwrap_or(false) {
                                         // Check for binary placeholder
@@ -354,6 +358,25 @@ impl ApiModule<State> for HistoricalDataApiModule {
                     if is_binary_placeholder {
                         // Wait for the next message (the binary payload)
                         continue;
+                    }
+
+                    // Try to parse as updateStream data if response parsing failed
+                    if response.is_none() {
+                        if let Message::Text(text) = &*msg {
+                            if let Some(stream_tick) = Self::parse_update_stream(text) {
+                                let (symbol, timestamp, price) = stream_tick;
+                                self.latest_ticks.insert(symbol, (timestamp, price));
+                                continue;
+                            }
+                        } else if let Message::Binary(data) = &*msg {
+                            if let Ok(text) = std::str::from_utf8(data) {
+                                if let Some(stream_tick) = Self::parse_update_stream(text) {
+                                    let (symbol, timestamp, price) = stream_tick;
+                                    self.latest_ticks.insert(symbol, (timestamp, price));
+                                    continue;
+                                }
+                            }
+                        }
                     }
 
                     if let Some(response) = response {
@@ -419,6 +442,14 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                              }
                                         }
 
+                                        // Append the latest tick from updateStream if it's newer
+                                        if let Some(&(latest_ts, latest_price)) = self.latest_ticks.get(&symbol) {
+                                            let last_history_ts = ticks.last().map(|(t, _)| *t).unwrap_or(0);
+                                            if latest_ts > last_history_ts {
+                                                ticks.push((latest_ts, latest_price));
+                                            }
+                                        }
+
                                         self.command_responder.send(CommandResponse::Ticks {
                                             req_id,
                                             ticks,
@@ -450,8 +481,19 @@ impl ApiModule<State> for HistoricalDataApiModule {
 
                                         if !has_candles {
                                             if let Some(history_items) = history_response.history {
+                                                // Append latest tick from updateStream if available
+                                                let mut all_items = history_items.clone();
+                                                if let Some(&(latest_ts, latest_price)) = self.latest_ticks.get(&symbol) {
+                                                    let last_history_ts = all_items.last().map(|item| item.to_tick().0).unwrap_or(0);
+                                                    if latest_ts > last_history_ts {
+                                                        all_items.push(HistoryItem::Tick([
+                                                            serde_json::Value::from(latest_ts as f64),
+                                                            serde_json::Value::from(latest_price),
+                                                        ]));
+                                                    }
+                                                }
                                                 // Handle nested array ticks format - compile to candles
-                                                candles = compile_candles_from_ticks(&history_items, history_response.period, &symbol);
+                                                candles = compile_candles_from_ticks(&all_items, history_response.period, &symbol);
                                             } else if let (Some(timestamps), Some(o), Some(h), Some(l), Some(c)) = (
                                                 history_response.timestamps,
                                                 history_response.o,
@@ -509,7 +551,33 @@ impl ApiModule<State> for HistoricalDataApiModule {
             "updateHistory",
             "updateHistoryNewFast",
             "updateHistoryNew",
+            "updateStream",
         ]))
+    }
+}
+
+impl HistoricalDataApiModule {
+    /// Parses an updateStream message and returns (symbol, timestamp, price) if valid.
+    /// Format: [["SYMBOL", timestamp, price]] or [[symbol, timestamp, price]]
+    fn parse_update_stream(text: &str) -> Option<(String, i64, f64)> {
+        // Try to find JSON array in the text
+        let start = text.find('[')?;
+        let json_str = &text[start..];
+
+        // Parse as nested array: [["SYMBOL", timestamp, price]]
+        let arr: serde_json::Value = serde_json::from_str(json_str).ok()?;
+
+        if let Some(outer) = arr.as_array() {
+            if let Some(inner) = outer.first().and_then(|v| v.as_array()) {
+                if inner.len() >= 3 {
+                    let symbol = inner[0].as_str()?.to_string();
+                    let timestamp = inner[1].as_f64()? as i64;
+                    let price = inner[2].as_f64()?;
+                    return Some((symbol, timestamp, price));
+                }
+            }
+        }
+        None
     }
 }
 
