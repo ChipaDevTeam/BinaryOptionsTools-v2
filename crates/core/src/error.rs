@@ -4,9 +4,11 @@ use std::time::Duration;
 pub enum CoreError {
     #[error("WebSocket error: {0}")]
     WebSocket(Box<tokio_tungstenite::tungstenite::Error>),
-    #[error("Channel receiver error: {0}")]
+    #[error(
+        "Channel receiver error: {0}. This typically occurs when the sender has been dropped."
+    )]
     ChannelReceiver(#[from] kanal::ReceiveError),
-    #[error("Channel sender error: {0}")]
+    #[error("Channel sender error: {0}. This typically occurs when the connection has dropped or a module has shut down.")]
     ChannelSender(#[from] kanal::SendError),
     #[error("Connection error: {0}")]
     Connection(#[from] super::connector::ConnectorError),

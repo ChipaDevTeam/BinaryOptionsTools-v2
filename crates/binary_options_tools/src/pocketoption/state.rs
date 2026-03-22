@@ -70,6 +70,8 @@ pub struct State {
     pub raw_keep_alive: Arc<RwLock<HashMap<Uuid, Outgoing>>>,
     /// List of fallback WebSocket URLs
     pub urls: Vec<String>,
+    /// Maximum number of concurrent asset subscriptions allowed
+    pub max_subscriptions: usize,
 }
 
 /// Builder pattern for creating State instances
@@ -82,6 +84,7 @@ pub struct StateBuilder {
     default_connection_url: Option<String>,
     default_symbol: Option<String>,
     urls: Vec<String>,
+    max_subscriptions: Option<usize>,
 }
 
 impl StateBuilder {
@@ -118,6 +121,15 @@ impl StateBuilder {
         self
     }
 
+    /// Set the maximum number of concurrent asset subscriptions
+    ///
+    /// # Arguments
+    /// * `max` - Maximum subscriptions allowed (default: 4)
+    pub fn max_subscriptions(mut self, max: usize) -> Self {
+        self.max_subscriptions = Some(max);
+        self
+    }
+
     /// Build the final State instance
     pub fn build(self) -> PocketResult<State> {
         self.build_with_trade_state(Arc::new(TradeState::default()))
@@ -145,6 +157,7 @@ impl StateBuilder {
             raw_sinks: RwLock::new(HashMap::new()),
             raw_keep_alive: Arc::new(RwLock::new(HashMap::new())),
             urls: self.urls,
+            max_subscriptions: self.max_subscriptions.unwrap_or(4),
         })
     }
 }
@@ -312,7 +325,7 @@ pub struct TradeState {
     /// A map of market orders sent but not yet confirmed by the server.
     /// Key: Request UUID. Value: (OpenOrder, Timestamp sent)
     pub pending_market_orders: RwLock<HashMap<Uuid, (OpenOrder, Instant)>>,
-    /// Cache of recent trades 
+    /// Cache of recent trades
     /// Key: (Asset, Action, Time, Amount). Value: (Trade ID, Timestamp)
     pub recent_trades: RwLock<HashMap<RecentTradeKey, (Uuid, Instant)>>,
 }

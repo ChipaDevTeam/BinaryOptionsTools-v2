@@ -35,6 +35,7 @@ class Config:
     connection_initialization_timeout_secs: int = 60
     timeout_secs: int = 30
     urls: List[str] = field(default_factory=list)
+    max_subscriptions: int = 4
 
     # Logging configuration
     terminal_logging: bool = False
@@ -82,6 +83,7 @@ class Config:
         self._pyconfig.connection_initialization_timeout_secs = self.connection_initialization_timeout_secs
         self._pyconfig.timeout_secs = self.timeout_secs
         self._pyconfig.urls = self.urls
+        self._pyconfig.max_subscriptions = self.max_subscriptions
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "Config":
@@ -123,6 +125,7 @@ class Config:
             "connection_initialization_timeout_secs": self.connection_initialization_timeout_secs,
             "timeout_secs": self.timeout_secs,
             "urls": self.urls,
+            "max_subscriptions": self.max_subscriptions,
             "terminal_logging": self.terminal_logging,
             "log_level": self.log_level,
         }

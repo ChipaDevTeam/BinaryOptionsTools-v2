@@ -64,6 +64,7 @@ fn create_mock_state() -> Arc<State> {
         raw_sinks: tokio::sync::RwLock::new(HashMap::new()),
         raw_keep_alive: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
         urls: Vec::new(),
+        max_subscriptions: 4,
     })
 }
 

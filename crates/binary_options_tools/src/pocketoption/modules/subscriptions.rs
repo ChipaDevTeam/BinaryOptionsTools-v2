@@ -13,6 +13,7 @@ use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::select;
@@ -116,8 +117,6 @@ impl fmt::Display for ChangeSymbol {
     }
 }
 
-/// Maximum number of concurrent subscriptions allowed
-const MAX_SUBSCRIPTIONS: usize = 4;
 const MAX_CHANNEL_CAPACITY: usize = 64;
 const RECONNECT_INITIAL_DELAY: Duration = Duration::from_secs(2);
 
@@ -179,8 +178,12 @@ pub enum CommandResponse {
         command_id: Uuid,
         error: Box<PocketError>,
     },
-    /// Returns the number of active subscriptions
-    SubscriptionCount { command_id: Uuid, count: u32 },
+    /// Returns the number of active subscriptions and the configured maximum
+    SubscriptionCount {
+        command_id: Uuid,
+        count: u32,
+        max: usize,
+    },
     /// History failed
     HistoryFailed {
         command_id: Uuid,
@@ -241,6 +244,7 @@ impl ReconnectCallback<State> for SubscriptionCallback {
 pub struct SubscriptionsHandle {
     sender: AsyncSender<Command>,
     router: Arc<ResponseRouter>,
+    cached_max: Arc<AtomicUsize>,
 }
 
 impl SubscriptionsHandle {
@@ -342,7 +346,10 @@ impl SubscriptionsHandle {
             .await
             .map_err(|_| PocketError::General("Response router channel closed".into()))?
         {
-            CommandResponse::SubscriptionCount { count, .. } => Ok(count),
+            CommandResponse::SubscriptionCount { count, max, .. } => {
+                self.cached_max.store(max, Ordering::Relaxed);
+                Ok(count)
+            }
             _ => Err(PocketError::General(
                 "Unexpected response to subscription count command".into(),
             )),
@@ -354,9 +361,9 @@ impl SubscriptionsHandle {
     /// # Returns
     /// * `PocketResult<bool>` - True if limit reached
     pub async fn is_max_subscriptions_reached(&self) -> PocketResult<bool> {
-        self.get_active_subscriptions_count()
-            .await
-            .map(|count| count as usize == MAX_SUBSCRIPTIONS)
+        let count = self.get_active_subscriptions_count().await?;
+        let max = self.cached_max.load(Ordering::Relaxed);
+        Ok(count as usize >= max)
     }
 
     /// Gets the history for an asset with its period
@@ -434,6 +441,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
         SubscriptionsHandle {
             sender,
             router: ResponseRouter::new(receiver),
+            cached_max: Arc::new(AtomicUsize::new(4)),
         }
     }
 
@@ -538,7 +546,11 @@ impl ApiModule<State> for SubscriptionsApiModule {
                         Command::SubscriptionCount { command_id } => {
                             let subscriptions = self.state.active_subscriptions.read().await;
                             let count = subscriptions.values().map(|v| v.len()).sum::<usize>() as u32;
-                            self.command_responder.send(CommandResponse::SubscriptionCount { command_id, count }).await?;
+                            self.command_responder.send(CommandResponse::SubscriptionCount {
+                                command_id,
+                                count,
+                                max: self.state.max_subscriptions,
+                            }).await?;
                         },
                         Command::History { asset, period, command_id } => {
                             // Enforce single request
@@ -667,7 +679,7 @@ impl SubscriptionsApiModule {
     async fn is_max_subscriptions_reached(&self) -> bool {
         let subscriptions = self.state.active_subscriptions.read().await;
         let total_count: usize = subscriptions.values().map(|v| v.len()).sum();
-        total_count >= MAX_SUBSCRIPTIONS
+        total_count >= self.state.max_subscriptions
     }
 
     /// Add a new subscription.

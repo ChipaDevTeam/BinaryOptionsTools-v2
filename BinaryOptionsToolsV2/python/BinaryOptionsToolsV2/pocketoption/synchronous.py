@@ -554,6 +554,27 @@ class PocketOption:
         """
         return self._client.is_demo()
 
+    def is_connected(self) -> bool:
+        """
+        Checks if the client is currently connected to the WebSocket server.
+
+        Use this before performing operations to avoid "channel closed" errors
+        when the connection has dropped.
+
+        Returns:
+            bool: True if connected, False otherwise
+        """
+        return self._client.is_connected()
+
+    def max_subscriptions(self) -> int:
+        """
+        Returns the configured maximum number of concurrent subscriptions.
+
+        Returns:
+            int: Maximum number of concurrent asset subscriptions allowed
+        """
+        return self._client.max_subscriptions()
+
     def wait_for_assets(self, timeout: float = 60.0) -> None:
         """
         Waits for the assets to be loaded from the server.

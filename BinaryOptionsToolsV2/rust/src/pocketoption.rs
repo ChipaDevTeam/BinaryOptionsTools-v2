@@ -198,6 +198,16 @@ impl RawPocketOption {
         self.client.is_demo()
     }
 
+    /// Returns true if the client is currently connected to the WebSocket server.
+    pub fn is_connected(&self) -> bool {
+        self.client.is_connected()
+    }
+
+    /// Returns the configured maximum number of concurrent subscriptions.
+    pub fn max_subscriptions(&self) -> usize {
+        self.client.max_subscriptions()
+    }
+
     pub fn buy<'py>(
         &self,
         py: Python<'py>,

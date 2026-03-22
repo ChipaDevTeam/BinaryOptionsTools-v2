@@ -199,6 +199,7 @@ impl PocketOption {
         let state = StateBuilder::default()
             .ssid(Ssid::parse(ssid)?)
             .default_connection_url(url)
+            .max_subscriptions(config.max_subscriptions)
             .build()?;
 
         let builder = Self::configure_common_modules(ClientBuilder::new(PocketConnect, state));
@@ -229,7 +230,9 @@ impl PocketOption {
         }
 
         // Pass all URLs as fallbacks
-        builder = builder.urls(config.urls.iter().map(|u| u.to_string()).collect());
+        builder = builder
+            .urls(config.urls.iter().map(|u| u.to_string()).collect())
+            .max_subscriptions(config.max_subscriptions);
 
         let state = builder.build()?;
         let client_builder =
@@ -316,6 +319,22 @@ impl PocketOption {
     pub fn is_demo(&self) -> bool {
         let state = &self.client.state;
         state.ssid.demo()
+    }
+
+    /// Checks if the client is currently connected to the WebSocket server.
+    ///
+    /// Use this before performing operations to avoid "channel closed" errors
+    /// when the connection has dropped.
+    ///
+    /// # Returns
+    /// `true` if connected, `false` otherwise.
+    pub fn is_connected(&self) -> bool {
+        self.client.is_connected()
+    }
+
+    /// Returns the configured maximum number of concurrent subscriptions.
+    pub fn max_subscriptions(&self) -> usize {
+        self.client.state.max_subscriptions
     }
 
     /// Subscribes to an asset's stream and prepends historical data.
@@ -699,6 +718,11 @@ impl PocketOption {
         asset: impl ToString,
         sub_type: SubscriptionType,
     ) -> PocketResult<SubscriptionStream> {
+        if !self.is_connected() {
+            return Err(PocketError::General(
+                "Not connected to server. The connection may have dropped; wait for reconnection or create a new client.".into(),
+            ));
+        }
         let handle = self
             .require_handle::<SubscriptionsApiModule>("SubscriptionsApiModule")
             .await?;
@@ -833,6 +857,11 @@ impl PocketOption {
     /// # Returns
     /// A `PocketResult` containing a vector of `Candle` if successful, or an error if the request fails.
     pub async fn candles(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<Candle>> {
+        if !self.is_connected() {
+            return Err(PocketError::General(
+                "Not connected to server. The connection may have dropped; wait for reconnection or create a new client.".into(),
+            ));
+        }
         let handle = self
             .require_handle::<HistoricalDataApiModule>("HistoricalDataApiModule")
             .await?;

@@ -1008,6 +1008,27 @@ class PocketOptionAsync:
         """
         return self.client.is_demo()
 
+    def is_connected(self) -> bool:
+        """
+        Checks if the client is currently connected to the WebSocket server.
+
+        Use this before performing operations to avoid "channel closed" errors
+        when the connection has dropped.
+
+        Returns:
+            bool: True if connected, False otherwise
+        """
+        return self.client.is_connected()
+
+    def max_subscriptions(self) -> int:
+        """
+        Returns the configured maximum number of concurrent subscriptions.
+
+        Returns:
+            int: Maximum number of concurrent asset subscriptions allowed
+        """
+        return self.client.max_subscriptions()
+
     async def disconnect(self) -> None:
         """
         Disconnects the client while keeping the configuration intact.

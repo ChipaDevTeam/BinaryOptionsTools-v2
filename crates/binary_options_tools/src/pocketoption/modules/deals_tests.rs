@@ -5,7 +5,7 @@ mod tests {
         state::TradeState,
         types::Deal,
     };
-    use binary_options_tools_core_pre::{
+    use binary_options_tools_core::{
         reimports::{AsyncReceiver, AsyncSender, Message},
         traits::{ApiModule, RunnerCommand},
     };

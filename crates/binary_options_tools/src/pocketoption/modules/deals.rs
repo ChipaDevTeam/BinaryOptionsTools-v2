@@ -29,6 +29,9 @@ use crate::pocketoption::{
 const UPDATE_OPENED_DEALS: &str = r#"451-["updateOpenedDeals","#;
 const UPDATE_CLOSED_DEALS: &str = r#"451-["updateClosedDeals","#;
 const SUCCESS_CLOSE_ORDER: &str = r#"451-["successcloseOrder","#;
+const UPDATE_OPENED_DEALS_42: &str = r#"42["updateOpenedDeals","#;
+const UPDATE_CLOSED_DEALS_42: &str = r#"42["updateClosedDeals","#;
+const SUCCESS_CLOSE_ORDER_42: &str = r#"42["successcloseOrder","#;
 
 #[derive(Debug)]
 pub enum Command {
@@ -231,14 +234,13 @@ impl ApiModule<State> for DealsApiModule {
                             tracing::debug!("Received message: {:?}", msg);
                             match msg.as_ref() {
                                 Message::Text(text) => {
-<<<<<<< HEAD
                                     if let Some(frame) = SocketIoFrame::parse(text) {
                                         if let Some((event, payload)) = frame.extract_event() {
-                                            let current_expected = if event == EV_UPDATE_OPENED_DEALS {
+                                            let current_expected = if event == "updateOpenedDeals" {
                                                 ExpectedMessage::UpdateOpenedDeals
-                                            } else if event == EV_UPDATE_CLOSED_DEALS {
+                                            } else if event == "updateClosedDeals" {
                                                 ExpectedMessage::UpdateClosedDeals
-                                            } else if event == EV_SUCCESS_CLOSE_ORDER {
+                                            } else if event == "successcloseOrder" {
                                                 ExpectedMessage::SuccessCloseOrder
                                             } else {
                                                 ExpectedMessage::None
@@ -261,41 +263,6 @@ impl ApiModule<State> for DealsApiModule {
                                                     }
                                                 }
                                             }
-=======
-                                    let mut data_text = None;
-                                    let mut current_expected = ExpectedMessage::None;
-                                    if text.starts_with(UPDATE_OPENED_DEALS) {
-                                        current_expected = ExpectedMessage::UpdateOpenedDeals;
-                                        data_text = text.strip_prefix(UPDATE_OPENED_DEALS);
-                                    } else if text.starts_with(UPDATE_CLOSED_DEALS) {
-                                        current_expected = ExpectedMessage::UpdateClosedDeals;
-                                        data_text = text.strip_prefix(UPDATE_CLOSED_DEALS);
-                                    } else if text.starts_with(SUCCESS_CLOSE_ORDER) {
-                                        current_expected = ExpectedMessage::SuccessCloseOrder;
-                                        data_text = text.strip_prefix(SUCCESS_CLOSE_ORDER);
-                                    }
-
-                                    if let Some(data) = data_text {
-                                        let trimmed = data.trim();
-
-                                        // Socket.IO 4.x binary placeholder check
-                                        if trimmed.contains(r#""_placeholder":true"#) {
-                                            tracing::debug!(target: "DealsApiModule", "Detected binary placeholder, waiting for binary payload for {:?}", current_expected);
-                                            expected = current_expected;
-                                            continue;
-                                        }
-
-                                        if !trimmed.is_empty() && trimmed != "]" && trimmed != ",]" {
-                                            // It's a 1-step message, process the data now
-                                            let json_data = trimmed.strip_suffix(']').unwrap_or(trimmed);
-                                            self.process_text_data(json_data, current_expected).await;
-                                            expected = ExpectedMessage::None;
-                                            continue;
-                                        } else {
-                                            // Header-only, wait for data
-                                            expected = current_expected;
-                                            continue;
->>>>>>> 69046758c55ad74f97c50c5c06fd0506712bc0fa
                                         }
                                     }
 
@@ -424,6 +391,9 @@ impl ApiModule<State> for DealsApiModule {
             UPDATE_CLOSED_DEALS,
             UPDATE_OPENED_DEALS,
             SUCCESS_CLOSE_ORDER,
+            UPDATE_CLOSED_DEALS_42,
+            UPDATE_OPENED_DEALS_42,
+            SUCCESS_CLOSE_ORDER_42,
         ]))
     }
 }

@@ -191,9 +191,16 @@ impl Ssid {
         let prefix = "42[\"auth\",";
 
         let parsed = if let Some(stripped) = trimmed.strip_prefix(prefix) {
-            stripped.strip_suffix("]").ok_or_else(|| {
+            let inner = stripped.strip_suffix("]").ok_or_else(|| {
                 CoreError::SsidParsing("Error parsing ssid: missing closing bracket".into())
-            })?
+            })?;
+            // Detect double-encoding: payload is a quoted string literal (JSON-in-JSON)
+            if inner.starts_with('"') && inner.ends_with('"') {
+                return Err(CoreError::SsidParsing(
+                    "Invalid SSID format: double-encoding detected".into(),
+                ));
+            }
+            inner
         } else {
             trimmed
         };
@@ -439,10 +446,10 @@ mod tests {
     #[test]
     fn test_parse_ssid_recovery() -> Result<(), Box<dyn Error>> {
         // SSID with unquoted keys and unquoted alphanumeric values (simulating shell stripping)
-        let stripped_ssid = r#"42["auth", {session: 1v072jiqj90u7sf82u22a1odns, isDemo: 1, uid: 69982301, platform: 2, isFastHistory: true, isOptimized: true}]"#;
+        let stripped_ssid = r#"42["auth", {session: swag, isDemo: 1, uid: 12345678, platform: 2, isFastHistory: true, isOptimized: true}]"#;
 
         let parsed = Ssid::parse(stripped_ssid)?;
-        assert_eq!(parsed.session_id(), "1v072jiqj90u7sf82u22a1odns");
+        assert_eq!(parsed.session_id(), "swag");
         assert_eq!(parsed.demo(), true);
 
         Ok(())

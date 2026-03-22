@@ -98,4 +98,14 @@ impl PyConfig {
         self.url_cache = self.inner.urls.iter().map(|u| u.to_string()).collect();
         Ok(())
     }
+
+    #[getter]
+    fn max_subscriptions(&self) -> usize {
+        self.inner.max_subscriptions
+    }
+
+    #[setter]
+    fn set_max_subscriptions(&mut self, value: usize) {
+        self.inner.max_subscriptions = value;
+    }
 }
