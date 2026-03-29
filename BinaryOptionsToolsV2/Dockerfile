@@ -30,6 +30,7 @@ RUN rustup target add aarch64-linux-android
 
 COPY . .
 
+ENV ANDROID_API_LEVEL=21
 ENV CC_aarch64_linux_android=aarch64-linux-android21-clang
 ENV CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=aarch64-linux-android21-clang
 
