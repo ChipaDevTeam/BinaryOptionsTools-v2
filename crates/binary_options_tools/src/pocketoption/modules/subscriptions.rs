@@ -34,6 +34,9 @@ use crate::pocketoption::{
     state::State,
 };
 
+/// Default maximum cached subscriptions, mirrors [`State`] default `max_subscriptions`.
+const DEFAULT_CACHED_MAX: usize = 4;
+
 /// Internal router to distribute command responses to multiple waiters.
 pub struct ResponseRouter {
     pending: TokioMutex<HashMap<Uuid, oneshot::Sender<CommandResponse>>>,
@@ -119,6 +122,8 @@ impl fmt::Display for ChangeSymbol {
 
 const MAX_CHANNEL_CAPACITY: usize = 64;
 const RECONNECT_INITIAL_DELAY: Duration = Duration::from_secs(2);
+const SUBSCRIBE_TIMEOUT: Duration = Duration::from_secs(30);
+const DEFAULT_RECEIVE_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Debug, thiserror::Error)]
 pub enum SubscriptionError {
@@ -274,10 +279,15 @@ impl SubscriptionsHandle {
             })
             .await
             .map_err(CoreError::from)?;
-        // Wait for the subscription response
-
-        match receiver
+        // Wait for the subscription response with timeout
+        match tokio::time::timeout(SUBSCRIBE_TIMEOUT, receiver)
             .await
+            .map_err(|_| {
+                PocketError::General(format!(
+                    "Subscription timed out after {:?} waiting for server response for asset: {}",
+                    SUBSCRIBE_TIMEOUT, asset
+                ))
+            })?
             .map_err(|_| PocketError::General("Response router channel closed".into()))?
         {
             CommandResponse::SubscriptionSuccess {
@@ -317,9 +327,15 @@ impl SubscriptionsHandle {
             })
             .await
             .map_err(CoreError::from)?;
-        // Wait for the unsubscription response
-        match receiver
+        // Wait for the unsubscription response with timeout
+        match tokio::time::timeout(SUBSCRIBE_TIMEOUT, receiver)
             .await
+            .map_err(|_| {
+                PocketError::General(format!(
+                    "Unsubscribe timed out after {:?} waiting for server response",
+                    SUBSCRIBE_TIMEOUT
+                ))
+            })?
             .map_err(|_| PocketError::General("Response router channel closed".into()))?
         {
             CommandResponse::UnsubscriptionSuccess { .. } => Ok(()),
@@ -341,9 +357,15 @@ impl SubscriptionsHandle {
             .send(Command::SubscriptionCount { command_id: id })
             .await
             .map_err(CoreError::from)?;
-        // Wait for the subscription count response
-        match receiver
+        // Wait for the subscription count response with timeout
+        match tokio::time::timeout(SUBSCRIBE_TIMEOUT, receiver)
             .await
+            .map_err(|_| {
+                PocketError::General(format!(
+                    "Subscription count request timed out after {:?} waiting for server response",
+                    SUBSCRIBE_TIMEOUT
+                ))
+            })?
             .map_err(|_| PocketError::General("Response router channel closed".into()))?
         {
             CommandResponse::SubscriptionCount { count, max, .. } => {
@@ -388,9 +410,15 @@ impl SubscriptionsHandle {
             })
             .await
             .map_err(CoreError::from)?;
-        // Wait for the history response
-        match receiver
+        // Wait for the history response with timeout
+        match tokio::time::timeout(SUBSCRIBE_TIMEOUT, receiver)
             .await
+            .map_err(|_| {
+                PocketError::General(format!(
+                    "History request timed out after {:?} waiting for server response",
+                    SUBSCRIBE_TIMEOUT
+                ))
+            })?
             .map_err(|_| PocketError::General("Response router channel closed".into()))?
         {
             CommandResponse::History { data, .. } => Ok(data),
@@ -441,7 +469,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
         SubscriptionsHandle {
             sender,
             router: ResponseRouter::new(receiver),
-            cached_max: Arc::new(AtomicUsize::new(4)),
+            cached_max: Arc::new(AtomicUsize::new(DEFAULT_CACHED_MAX)),
         }
     }
 
@@ -662,11 +690,19 @@ impl ApiModule<State> for SubscriptionsApiModule {
         // - updateHistory: historical data updates
         // - updateHistoryNewFast: fast history updates
         // - updateHistoryNew: new history updates
+        // - successChangeSymbol: confirmation that symbol was changed
+        // - successSubfor: confirmation that subscription was created
+        // - history: historical data response
+        // - loadHistoryPeriod: paginated history data
         Box::new(MultiPatternRule::new(vec![
             "updateStream",
             "updateHistory",
             "updateHistoryNewFast",
             "updateHistoryNew",
+            "successChangeSymbol",
+            "successSubfor",
+            "history",
+            "loadHistoryPeriod",
         ]))
     }
 }
@@ -836,9 +872,15 @@ impl SubscriptionStream {
             return Ok(());
         }
 
-        // Wait for response
-        match receiver
+        // Wait for response with timeout
+        match tokio::time::timeout(SUBSCRIBE_TIMEOUT, receiver)
             .await
+            .map_err(|_| {
+                PocketError::General(format!(
+                    "Unsubscribe timed out after {:?} waiting for server response",
+                    SUBSCRIBE_TIMEOUT
+                ))
+            })?
             .map_err(|_| PocketError::General("Response router channel closed".into()))?
         {
             CommandResponse::UnsubscriptionSuccess { .. } => Ok(()),
@@ -851,13 +893,18 @@ impl SubscriptionStream {
 
     /// Receive the next candle from the stream
     pub async fn receive(&mut self) -> PocketResult<Candle> {
+        self.receive_with_timeout(DEFAULT_RECEIVE_TIMEOUT).await
+    }
+
+    /// Receive the next candle from the stream with a custom timeout
+    pub async fn receive_with_timeout(&mut self, timeout: Duration) -> PocketResult<Candle> {
         loop {
-            match self.receiver.recv().await {
-                Ok(crate::pocketoption::types::SubscriptionEvent::Update {
+            match tokio::time::timeout(timeout, self.receiver.recv()).await {
+                Ok(Ok(crate::pocketoption::types::SubscriptionEvent::Update {
                     asset,
                     price,
                     timestamp,
-                }) => {
+                })) => {
                     if asset == self.asset {
                         let candle = self.process_update(timestamp, price)?;
                         if let Some(candle) = candle {
@@ -867,11 +914,17 @@ impl SubscriptionStream {
                     }
                     // Continue if asset doesn't match (shouldn't happen but safety check)
                 }
-                Ok(crate::pocketoption::types::SubscriptionEvent::Terminated { reason }) => {
+                Ok(Ok(crate::pocketoption::types::SubscriptionEvent::Terminated { reason })) => {
                     return Err(PocketError::General(format!("Stream terminated: {reason}")));
                 }
-                Err(e) => {
+                Ok(Err(e)) => {
                     return Err(CoreError::from(e).into());
+                }
+                Err(_) => {
+                    return Err(PocketError::General(format!(
+                        "Subscription stream timed out after {:?} waiting for data from {}",
+                        timeout, self.asset
+                    )));
                 }
             }
         }
@@ -978,16 +1031,16 @@ impl Drop for SubscriptionStream {
         // This will notify the main module to remove this subscription
         // We use try_send here to avoid blocking during drop if the channel is full.
         if let Some(sender) = &self.sender {
-            let _ = sender
-                .as_sync()
-                .try_send(Command::Unsubscribe {
-                    asset: self.asset.clone(),
-                    subscription_id: Some(self.subscription_id),
-                    command_id: Uuid::new_v4(),
-                })
-                .inspect_err(|e| {
-                    warn!(target: "SubscriptionStream", "Failed to send unsubscribe command during drop: {}", e);
-                });
+            // Use a nil UUID for drop-triggered unsubscriptions since we don't need a response
+            let drop_command = Command::Unsubscribe {
+                asset: self.asset.clone(),
+                subscription_id: Some(self.subscription_id),
+                command_id: Uuid::nil(),
+            };
+            if let Err(e) = sender.as_sync().try_send(drop_command) {
+                // Channel may be full or closed; this is expected during shutdown
+                debug!(target: "SubscriptionStream", "Could not send unsubscribe during drop (channel full/closed): {}", e);
+            }
         }
     }
 }

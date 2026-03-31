@@ -138,14 +138,14 @@ class RawHandler:
         """
         Close this handler and clean up resources.
         Note: The handler is automatically cleaned up when it goes out of scope.
+        This method is a no-op; resource cleanup is handled by the Rust Drop implementation.
         """
-        # The Rust Drop implementation handles cleanup automatically
-        pass
+        self._handler = None  # Release reference to allow Rust Drop
 
 
 # This file contains all the async code for the PocketOption Module
 class PocketOptionAsync:
-    def __init__(self, ssid: str, url: Optional[str] = None, config: Union[Config, dict, str] = None, **_):
+    def __init__(self, ssid: str, url: Optional[str] = None, config: Optional[Union[Config, dict, str]] = None, **_):
         """
         Initializes a new PocketOptionAsync instance.
 
@@ -190,13 +190,20 @@ class PocketOptionAsync:
             from ..BinaryOptionsToolsV2 import RawPocketOption
         except ImportError:
             from BinaryOptionsToolsV2 import RawPocketOption
-        # SSID Sanitizer: fix common shell-stripping issues (missing quotes around "auth")
-        if ssid is not None:
-            ssid = re.sub(r"42\[['\"]?auth['\"]?,", '42["auth",', ssid, count=1)
 
         from ..tracing import Logger
 
         self.logger = Logger()
+
+        # SSID Sanitizer: fix common shell-stripping issues (missing quotes around "auth")
+        if ssid is not None:
+            ssid = re.sub(r"""42\[['"]?auth['"]?\s*,""", '42["auth",', ssid, count=1)
+            # Validate that the SSID is parseable JSON after the 42 prefix
+            if ssid.startswith("42["):
+                try:
+                    json.loads(ssid[2:])  # Validate JSON payload
+                except json.JSONDecodeError:
+                    self.logger.warn(f"SSID payload is not valid JSON after sanitization")
 
         # Ensure it looks like a Socket.IO message
         if ssid is not None and not ssid.startswith("42["):
@@ -276,7 +283,7 @@ class PocketOptionAsync:
         """
         (trade_id, trade) = await self.client.buy(asset, amount, time)
         if check_win:
-            return trade_id, await self.check_win(trade_id)
+            return trade_id, await self.check_win(trade_id, timeout_seconds=time + 15)
         else:
             trade = json.loads(trade)
             return trade_id, trade
@@ -308,17 +315,21 @@ class PocketOptionAsync:
         """
         (trade_id, trade) = await self.client.sell(asset, amount, time)
         if check_win:
-            return trade_id, await self.check_win(trade_id)
+            return trade_id, await self.check_win(trade_id, timeout_seconds=time + 15)
         else:
             trade = json.loads(trade)
             return trade_id, trade
 
-    async def check_win(self, id: str) -> dict:
+    async def check_win(self, id: str, timeout_seconds: Optional[int] = None) -> dict:
         """
         Checks the result of a specific trade.
 
         Args:
-            trade_id (str): ID of the trade to check
+            id (str): ID of the trade to check.
+            timeout_seconds (Optional[int]): Maximum time in seconds to wait for the trade result.
+                If None, uses the configured default (default: 300s).
+                When called from buy()/sell() with check_win=True, this is automatically
+                set to trade_duration + 15 seconds to account for server processing.
 
         Returns:
             dict: Trade result containing:
@@ -330,10 +341,18 @@ class PocketOptionAsync:
         Raises:
             ValueError: If trade_id is invalid
             TimeoutError: If result check times out
+
+        Example:
+            ```python
+            # For a 60-second trade, use a 75-second timeout
+            result = await client.check_win(trade_id, timeout_seconds=75)
+            ```
         """
 
         # Set a reasonable timeout to prevent hanging
-        timeout_seconds = 60  # Increased timeout to accommodate longer trade durations
+        # Default to 300 seconds to accommodate longer trade durations (e.g., 300s timeframes)
+        if timeout_seconds is None:
+            timeout_seconds = getattr(self.config, "check_win_timeout_secs", 300)
 
         try:
             # Use asyncio.wait_for as additional protection against hanging
@@ -350,7 +369,27 @@ class PocketOptionAsync:
         return await self.client.get_deal_end_time(trade_id)
 
     async def _get_trade_result(self, id: str) -> dict:
-        """Internal method to get trade result with timeout protection"""
+        """Internal method to retrieve and classify trade result with timeout protection.
+
+        Fetches the trade result from the Rust backend, parses the JSON response,
+        and classifies the outcome as 'win', 'loss', or 'draw' based on the profit value.
+
+        Args:
+            id (str): The unique trade identifier to look up.
+
+        Returns:
+            dict: Trade result dictionary containing:
+                - id (str): The trade identifier
+                - profit (float): The profit/loss amount
+                - result (str): Classified outcome ("win", "loss", or "draw")
+                - Additional fields from the server response
+
+        Raises:
+            Exception: Wraps any error from the Rust client with context about the trade ID.
+            ValueError: If the profit field cannot be converted to float.
+            KeyError: If the response dict is missing required fields.
+            json.JSONDecodeError: If the server response is not valid JSON.
+        """
         try:
             # The Rust client should handle its own timeout, but we'll add a safeguard
             trade = await self.client.check_win(id)
@@ -529,6 +568,63 @@ class PocketOptionAsync:
             open_type, amount, asset, open_time, open_price, timeframe, min_payout, command
         )
         return json.loads(order)
+
+    async def cancel_pending_order(self, ticket: str) -> Dict:
+        """
+        Cancels a pending order by its ticket identifier.
+
+        Args:
+            ticket (str): The unique ticket string identifying the pending order to cancel.
+
+        Returns:
+            Dict: Cancellation result containing:
+                - ticket: The ticket of the cancelled order
+                - status: "cancelled"
+
+        Raises:
+            ValueError: If the ticket is invalid
+            TimeoutError: If the cancellation times out
+            RuntimeError: If the order cannot be cancelled (e.g., already executed)
+
+        Example:
+            ```python
+            # Cancel a pending order
+            result = await client.cancel_pending_order("order-ticket-123")
+            print(f"Cancelled: {result['ticket']}")
+            ```
+        """
+        result = await self.client.cancel_pending_order(ticket)
+        return json.loads(result)
+
+    async def cancel_pending_orders(self, tickets: List[str]) -> Dict:
+        """
+        Cancels multiple pending orders in a single batch operation.
+
+        Args:
+            tickets (List[str]): A list of ticket strings identifying the pending orders to cancel.
+
+        Returns:
+            Dict: Batch cancellation result containing:
+                - cancelled: List of tickets that were successfully cancelled
+                - failed: List of tickets that failed to cancel (if any)
+
+        Raises:
+            ValueError: If any ticket is invalid
+            TimeoutError: If the batch cancellation times out
+
+        Note:
+            Partial success is possible: some orders may be cancelled while others fail.
+
+        Example:
+            ```python
+            # Cancel multiple pending orders
+            tickets = ["order-1", "order-2", "order-3"]
+            result = await client.cancel_pending_orders(tickets)
+            print(f"Cancelled {len(result['cancelled'])} orders")
+            ```
+        """
+        result = await self.client.cancel_pending_orders(tickets)
+        return json.loads(result)
 
     async def closed_deals(self) -> List[Dict]:
         """Retrieves a list of all closed/completed deals.

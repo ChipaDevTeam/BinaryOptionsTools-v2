@@ -293,6 +293,7 @@ async fn test_open_pending_order_mismatch_retry() {
     let cmd = command_task.await.unwrap();
     let req_id = match cmd {
         Command::OpenPendingOrder { req_id, .. } => req_id,
+        _ => panic!("Expected OpenPendingOrder command"),
     };
 
     // Send two mismatched responses followed by the correct one

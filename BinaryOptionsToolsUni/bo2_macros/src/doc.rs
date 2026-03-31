@@ -17,7 +17,7 @@ pub fn uniffi_doc(#[zyn(input)] code: zyn::syn::Item, args: UniffiDocArgs) -> zy
             all_data
                 .get(name)
                 .cloned()
-                .expect(&format!("Documentation for '{}' not found in JSON", name))
+                .unwrap_or_else(|| panic!("Documentation for '{}' not found in JSON", name))
         }
         None => serde_json::from_str(&content).expect("Failed to parse documentation JSON"),
     };

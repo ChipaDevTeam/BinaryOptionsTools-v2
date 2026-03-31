@@ -231,26 +231,22 @@ impl Ssid {
             }
         };
 
-        // Ensure raw is always in the full 42["auth",...] format for sending over WS
-        // If recovery was used, build raw from the recovered (valid) JSON to avoid
-        // sending malformed JSON over the WebSocket
-        let effective_parsed = if used_recovery {
-            &recovered_parsed
+        // Normalize raw to well-formed JSON. When recovery was used, re-serialize
+        // the parsed Demo struct so ssid.raw always contains canonical JSON rather
+        // than the original malformed input that triggered recovery.
+        if used_recovery {
+            let canonical =
+                serde_json::to_string(&ssid).unwrap_or_else(|_| recovered_parsed.clone());
+            ssid.raw = format!("42[\"auth\",{}]", canonical);
+            ssid.json_raw = canonical;
         } else {
-            parsed
-        };
-
-        ssid.raw = if trimmed.starts_with("42[\"auth\",") {
-            if used_recovery {
-                // Reconstruct the full frame with recovered payload
-                format!("42[\"auth\",{}]", effective_parsed)
-            } else {
+            ssid.raw = if trimmed.starts_with("42[\"auth\",") {
                 trimmed.to_string()
-            }
-        } else {
-            format!("42[\"auth\",{}]", effective_parsed)
-        };
-        ssid.json_raw = effective_parsed.to_string();
+            } else {
+                format!("42[\"auth\",{}]", parsed)
+            };
+            ssid.json_raw = parsed.to_string();
+        }
 
         let is_demo_url = ssid
             .current_url
@@ -478,6 +474,13 @@ mod tests {
         let parsed = Ssid::parse(stripped_ssid)?;
         assert_eq!(parsed.session_id(), "swag");
         assert_eq!(parsed.demo(), true);
+
+        // Round-trip: to_string() should produce valid JSON that re-parses identically
+        let emitted = parsed.to_string();
+        let reparsed = Ssid::parse(&emitted)?;
+        assert_eq!(reparsed.session_id(), parsed.session_id());
+        assert_eq!(reparsed.demo(), parsed.demo());
+        assert!(emitted.starts_with("42[\"auth\","));
 
         Ok(())
     }

@@ -8,9 +8,26 @@ use crate::error::CoreResult;
 
 #[derive(Debug, Clone, Copy)]
 pub enum RunnerCommand {
+    /// Disconnect from the WebSocket server and attempt automatic reconnection.
     Disconnect,
-    Shutdown, // This can be used to gracefully shut down the runner
+    /// Disconnect from the WebSocket server and remain disconnected.
+    ///
+    /// Unlike `Disconnect`, this command prevents automatic reconnection.
+    /// The runner will enter a "hold" state where it waits for an explicit
+    /// `Connect` or `Reconnect` command before attempting to establish a new connection.
+    ///
+    /// Use this when you need to pause network activity without shutting down the client,
+    /// for example during maintenance windows or when switching between trading sessions.
+    ///
+    /// # Transitions
+    /// - Current: Connected → After: Disconnected (hold)
+    /// - Requires: `Connect` or `Reconnect` to resume
+    DisconnectAndHold,
+    /// Gracefully shut down the runner and client permanently.
+    Shutdown,
+    /// Establish a new connection after a hold-disconnect.
     Connect,
+    /// Attempt to reconnect (alias for Connect with soft semantics).
     Reconnect,
 }
 

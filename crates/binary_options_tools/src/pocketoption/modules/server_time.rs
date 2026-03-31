@@ -18,6 +18,14 @@ pub struct ServerTimeModule {
     state: Arc<State>,
 }
 
+impl ServerTimeModule {
+    /// Processes a successfully deserialized StreamData by logging and updating server time.
+    async fn handle_stream_data(&self, candle: StreamData) {
+        debug!("Received candle data: {:?}", candle);
+        self.state.update_server_time(candle.timestamp).await;
+    }
+}
+
 #[async_trait]
 impl LightweightModule<State> for ServerTimeModule {
     fn new(
@@ -39,18 +47,26 @@ impl LightweightModule<State> for ServerTimeModule {
     async fn run(&mut self) -> CoreResult<()> {
         while let Ok(msg) = self.receiver.recv().await {
             match msg.as_ref() {
-                Message::Binary(data) => {
-                    if let Ok(candle) = serde_json::from_slice::<StreamData>(data) {
-                        debug!("Received candle data (binary): {:?}", candle);
-                        self.state.update_server_time(candle.timestamp).await;
+                Message::Binary(data) => match serde_json::from_slice::<StreamData>(data) {
+                    Ok(candle) => self.handle_stream_data(candle).await,
+                    Err(e) => {
+                        debug!(
+                            "Failed to parse StreamData (binary, {} bytes): {}",
+                            data.len(),
+                            e
+                        );
                     }
-                }
-                Message::Text(text) => {
-                    if let Ok(candle) = serde_json::from_str::<StreamData>(text) {
-                        debug!("Received candle data (text): {:?}", candle);
-                        self.state.update_server_time(candle.timestamp).await;
+                },
+                Message::Text(text) => match serde_json::from_str::<StreamData>(text) {
+                    Ok(candle) => self.handle_stream_data(candle).await,
+                    Err(e) => {
+                        debug!(
+                            "Failed to parse StreamData (text, {} chars): {}",
+                            text.len(),
+                            e
+                        );
                     }
-                }
+                },
                 _ => {}
             }
         }

@@ -210,6 +210,25 @@ impl<S: AppState> Client<S> {
             .await?)
     }
 
+    /// Commands the runner to disconnect and stay disconnected until explicitly commanded to reconnect.
+    ///
+    /// Unlike `disconnect()`, this prevents automatic reconnection.
+    /// Use `connect()` to resume the connection.
+    pub async fn disconnect_and_hold(&self) -> CoreResult<()> {
+        Ok(self
+            .runner_command_tx
+            .send(RunnerCommand::DisconnectAndHold)
+            .await?)
+    }
+
+    /// Commands the runner to establish a new connection after a hold-disconnect.
+    ///
+    /// This command is only effective after `disconnect_and_hold()` has been called.
+    /// In other states, it may be ignored or treated as a no-op.
+    pub async fn connect(&self) -> CoreResult<()> {
+        Ok(self.runner_command_tx.send(RunnerCommand::Connect).await?)
+    }
+
     /// Commands the runner to disconnect, and perform a "soft" reconnect.
     pub async fn reconnect(&self) -> CoreResult<()> {
         Ok(self
@@ -274,6 +293,8 @@ pub struct ClientRunner<S: AppState> {
     pub(crate) is_hard_disconnect: bool,
     // Flag to terminate the main run loop.
     pub(crate) shutdown_requested: bool,
+    // Flag to hold connection in disconnected state until explicit Connect command.
+    pub(crate) is_hold_disconnect: bool,
 
     pub(crate) connection_callback: ConnectionCallback<S>,
     pub(crate) to_ws_sender: AsyncSender<Message>,
@@ -289,10 +310,55 @@ pub struct ClientRunner<S: AppState> {
 
 impl<S: AppState> ClientRunner<S> {
     /// Main client runner loop that manages WebSocket connections and message processing.
+    ///
+    /// This method implements the complete connection lifecycle with the following states:
+    ///
+    /// # Connection States
+    /// - **Connected**: Active WebSocket session with reader/writer tasks
+    /// - **Disconnected (auto)**: Will automatically attempt reconnection with exponential backoff
+    /// - **Disconnected (hold)**: Will NOT reconnect until explicitly commanded via `Connect`
+    /// - **Shutdown**: Terminates the runner permanently
+    ///
+    /// # Middleware Hooks
+    /// The following middleware hooks are called at specific lifecycle points:
+    /// - `on_connect`: After successful WebSocket connection
+    /// - `on_disconnect`: Before connection termination (manual or unexpected)
+    /// - `on_send`: For each outgoing message
+    /// - `on_receive`: For each incoming message
+    ///
+    /// # Exponential Backoff
+    /// Connection failures trigger exponential backoff with the formula:
+    /// `delay = min(base_delay * 2^attempts, 300) * jitter(0.8..1.2)`
+    /// where `attempts` is capped at 10 to prevent overflow.
     pub async fn run(&mut self) {
-        // TODO: Add a way to disconnect and keep the connection closed intill specified otherwhise
         // The outermost loop runs until a shutdown is commanded.
         while !self.shutdown_requested {
+            // If in hold-disconnect mode, wait for explicit Connect command
+            if self.is_hold_disconnect {
+                debug!(target: "Runner", "In hold-disconnect mode, waiting for Connect command...");
+                match self.runner_command_rx.recv().await {
+                    Ok(RunnerCommand::Connect) | Ok(RunnerCommand::Reconnect) => {
+                        debug!(target: "Runner", "Connect command received, exiting hold mode.");
+                        self.is_hold_disconnect = false;
+                        self.is_hard_disconnect = true;
+                        continue;
+                    }
+                    Ok(RunnerCommand::Shutdown) => {
+                        debug!(target: "Runner", "Shutdown command received while in hold mode.");
+                        self.shutdown_requested = true;
+                        break;
+                    }
+                    Ok(cmd) => {
+                        debug!(target: "Runner", "Ignoring {:?} while in hold-disconnect mode. Send Connect or Shutdown.", cmd);
+                        continue;
+                    }
+                    Err(_) => {
+                        error!(target: "Runner", "Runner command channel closed while in hold mode.");
+                        self.shutdown_requested = true;
+                        break;
+                    }
+                }
+            }
             // Execute middleware on_connect hook
             let middleware_context =
                 MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
@@ -331,12 +397,11 @@ impl<S: AppState> ClientRunner<S> {
                         5
                     };
 
-                    let delay_secs = std::cmp::min(
-                        base_delay
-                            .saturating_mul(2u64.saturating_pow(self.reconnect_attempts.min(10))),
-                        300,
-                    );
-                    // Add jitter
+                    // Exponential backoff: delay = base * 2^attempts, capped at 300 seconds
+                    // Jitter (±20%) prevents thundering herd when multiple clients reconnect simultaneously
+                    let exponent = self.reconnect_attempts.min(10); // Cap exponent to prevent overflow
+                    let multiplier = 2u64.saturating_pow(exponent);
+                    let delay_secs = base_delay.saturating_mul(multiplier).min(300); // Hard cap at 5 minutes
                     let jitter = rand::rng().random_range(0.8..1.2);
                     let delay = std::time::Duration::from_secs_f64(delay_secs as f64 * jitter);
 
@@ -455,9 +520,9 @@ impl<S: AppState> ClientRunner<S> {
                     Ok(cmd) = self.runner_command_rx.recv() => {
                         match cmd {
                             RunnerCommand::Disconnect => {
-                                // 🎯 MIDDLEWARE HOOK: on_disconnect - manual disconnect
+                                // 🎯 MIDDLEWARE HOOK: on_disconnect - manual disconnect (will reconnect)
 
-                                debug!(target: "Runner", "Disconnect command received.");
+                                debug!(target: "Runner", "Disconnect command received (will reconnect).");
 
                                 // Execute middleware on_disconnect hook
                                 let middleware_context = MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
@@ -468,9 +533,34 @@ impl<S: AppState> ClientRunner<S> {
                                     warn!(target: "Runner", "Connector disconnect failed: {e}");
                                 }
 
+                                self.state.clear_temporal_data().await;
+                                self.is_hard_disconnect = true;
+                                if let Some(writer_task) = writer_task_opt.take() {
+                                    writer_task.abort();
+                                }
+                                if let Some(reader_task) = reader_task_opt.take() {
+                                    reader_task.abort();
+                                }
+                                self.signal.set_disconnected();
+                                session_active = false;
+                            },
+                            RunnerCommand::DisconnectAndHold => {
+                                // 🎯 MIDDLEWARE HOOK: on_disconnect - manual disconnect (hold mode)
+
+                                debug!(target: "Runner", "DisconnectAndHold command received (will NOT reconnect).");
+
+                                // Execute middleware on_disconnect hook
+                                let middleware_context = MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
+                                self.router.middleware_stack.on_disconnect(&middleware_context).await;
+
+                                // Call connector's disconnect method to properly close the connection
+                                if let Err(e) = self.connector.disconnect().await {
+                                    warn!(target: "Runner", "Connector disconnect failed: {e}");
+                                }
 
                                 self.state.clear_temporal_data().await;
                                 self.is_hard_disconnect = true;
+                                self.is_hold_disconnect = true;
                                 if let Some(writer_task) = writer_task_opt.take() {
                                     writer_task.abort();
                                 }

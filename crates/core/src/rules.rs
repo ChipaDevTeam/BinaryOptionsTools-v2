@@ -16,14 +16,14 @@ pub enum MessageType {
 
 impl MessageType {
     fn matches(&self, msg: &Message) -> bool {
-        match (self, msg) {
-            (MessageType::Text, Message::Text(_)) => true,
-            (MessageType::Binary, Message::Binary(_)) => true,
-            (MessageType::Close, Message::Close(_)) => true,
-            (MessageType::Ping, Message::Ping(_)) => true,
-            (MessageType::Pong, Message::Pong(_)) => true,
-            _ => false,
-        }
+        matches!(
+            (self, msg),
+            (MessageType::Text, Message::Text(_))
+                | (MessageType::Binary, Message::Binary(_))
+                | (MessageType::Close, Message::Close(_))
+                | (MessageType::Ping, Message::Ping(_))
+                | (MessageType::Pong, Message::Pong(_))
+        )
     }
 }
 
@@ -183,6 +183,8 @@ impl Condition {
     }
 }
 
+type MessageTransform = Arc<dyn Fn(&Message) -> Option<Message> + Send + Sync>;
+
 /// Modifiers that transform the message before passing to inner rules.
 #[derive(Clone)]
 pub enum Modifier {
@@ -190,7 +192,7 @@ pub enum Modifier {
     RstripThen { suffix: SmolStr, inner: Box<Rule> },
     LstripUntil { target: SmolStr, inner: Box<Rule> },
     RstripUntil { target: SmolStr, inner: Box<Rule> },
-    Custom(Arc<dyn Fn(&Message) -> Option<Message> + Send + Sync>),
+    Custom(MessageTransform),
 }
 
 impl Modifier {
@@ -634,20 +636,25 @@ impl RuleBuilder {
         }
     }
 
-    pub fn not(self) -> Self {
+    pub fn build(self) -> Rule {
+        self.inner
+    }
+}
+
+impl std::ops::Not for RuleBuilder {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
         Self {
             inner: Rule::Combinator(Combinator::Not(Box::new(self.inner))),
         }
-    }
-
-    pub fn build(self) -> Rule {
-        self.inner
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ops::Not;
 
     #[test]
     fn test_text_starts_with() {

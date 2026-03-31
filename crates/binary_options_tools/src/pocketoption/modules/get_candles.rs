@@ -16,10 +16,13 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
     types::MultiPatternRule,
-    utils::get_index,
+    utils::{get_index, SocketIoFrame},
 };
 
 const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = ["loadHistoryPeriodFast", "loadHistoryPeriod"];
+
+/// Default number of ticks/candles to fetch per pagination page.
+const DEFAULT_PAGE_OFFSET: i64 = 1000;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoadHistoryPeriod {
@@ -213,7 +216,7 @@ impl GetCandlesHandle {
         let asset_str = asset.to_string();
         let now = chrono::Utc::now().timestamp();
         let target_time = now - lookback_seconds;
-        let page_offset: i64 = 1000; // Fetch 1000 ticks per page
+        let page_offset: i64 = DEFAULT_PAGE_OFFSET; // Fetch ticks per page
 
         let mut all_ticks: Vec<(i64, f64)> = Vec::new();
         let mut current_time = now;
@@ -351,12 +354,16 @@ impl ApiModule<State> for GetCandlesApiModule {
                         Message::Text(text) => {
                             if let Ok(result) = serde_json::from_str::<LoadHistoryPeriodResult>(text) {
                                 self.process_result(result).await?;
-                            } else if let Some(start) = text.find('[') {
-                                // Try parsing as a 1-step Socket.IO message: 42["loadHistoryPeriod", {...}]
-                                if let Ok(serde_json::Value::Array(arr)) = serde_json::from_str::<serde_json::Value>(&text[start..]) {
-                                    if arr.len() >= 2 && (arr[0] == "loadHistoryPeriod" || arr[0] == "loadHistoryPeriodFast") {
-                                        if let Ok(result) = serde_json::from_value::<LoadHistoryPeriodResult>(arr[1].clone()) {
-                                            self.process_result(result).await?;
+                            } else if let Some(frame) = SocketIoFrame::parse(text) {
+                                if let Some((event_name, payload)) = frame.extract_event() {
+                                    if event_name == "loadHistoryPeriod" || event_name == "loadHistoryPeriodFast" {
+                                        match serde_json::from_value::<LoadHistoryPeriodResult>(payload) {
+                                            Ok(result) => {
+                                                self.process_result(result).await?;
+                                            }
+                                            Err(e) => {
+                                                warn!("Failed to deserialize LoadHistoryPeriodResult from Socket.IO frame (event: {}): {}", event_name, e);
+                                            }
                                         }
                                     }
                                 }
@@ -452,7 +459,7 @@ impl GetCandlesApiModule {
                             // This maintains backwards compatibility when the server returns
                             // tick data instead of OHLC candles
                             let base_candle = BaseCandle {
-                                timestamp: tick_data.time as i64,
+                                timestamp: tick_data.time.round() as i64,
                                 open: tick_data.price,
                                 high: tick_data.price,
                                 low: tick_data.price,
@@ -476,7 +483,7 @@ impl GetCandlesApiModule {
                     let ticks: Vec<(i64, f64)> = result
                         .data
                         .into_iter()
-                        .map(|tick_data| (tick_data.time as i64, tick_data.price))
+                        .map(|tick_data| (tick_data.time.round() as i64, tick_data.price))
                         .collect();
 
                     if let Err(e) = self

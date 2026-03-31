@@ -386,9 +386,9 @@ impl PocketOption {
     ///
     /// This method performs the following steps:
     /// 1. Validates the trade amount and asset availability.
-    /// 2. Employs a 2-second debounce window using trade fingerprints to prevent accidental double-trades.
+    /// 2. Generates a trade fingerprint for post-trade tracking and reconciliation.
     /// 3. Registers the trade in `pending_market_orders` to allow for reconciliation if the connection drops.
-    /// 4. Dispatches the trade request to the `TradesApiModule`.
+    /// 4. Dispatches the trade request to the `TradesApiModule` and records the result in `recent_trades`.
     ///
     /// # Arguments
     /// * `asset` - The symbol to trade (e.g., "EURUSD_otc").
@@ -401,7 +401,7 @@ impl PocketOption {
     ///
     /// # Errors
     /// * `PocketError::InvalidAsset` - If the asset is inactive or the timeframe is invalid.
-    /// * `PocketError::General` - If the amount is out of bounds or a duplicate is detected.
+    /// * `PocketError::General` - If the amount is out of bounds.
     pub async fn trade(
         &self,
         asset: impl ToString,

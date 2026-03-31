@@ -1,9 +1,9 @@
 use zyn::{
-    FromInput, Input,
     syn::{
-        self, Expr, ExprClosure, ExprPath, Ident, LitStr, Token, Type, braced, parenthesized,
-        parse::Parse, token::Paren,
+        self, braced, parenthesized, parse::Parse, token::Paren, Expr, ExprClosure, ExprPath,
+        Ident, LitStr, Token, Type,
     },
+    FromInput, Input,
 };
 
 /// Parsed form of the `#[rule(...)]` attribute payload.
@@ -70,7 +70,7 @@ pub(crate) enum DslNode {
 
     /// Terminal matcher expression with optional chained methods:
     /// `starts_with("42").wait(1).lstrip_until("{")`
-    MethodChain(MethodChain),
+    MethodChain(Box<MethodChain>),
 }
 
 /// Terminal DSL element:
@@ -257,7 +257,7 @@ impl DslNode {
         }
 
         let chain = MethodChain::parse(input)?;
-        Ok(DslNode::MethodChain(chain))
+        Ok(DslNode::MethodChain(Box::new(chain)))
     }
 
     /// Produce a fully built `Rule` expression.
@@ -302,7 +302,7 @@ impl DslNode {
             }
             Self::Not(node) => {
                 zyn::zyn! {
-                    {{ node.to_tokens_inner() }}.not().build()
+                    ::std::ops::Not::not({{ node.to_tokens_inner() }}).build()
                 }
             }
             Self::MethodChain(node) => {
@@ -353,7 +353,7 @@ impl DslNode {
             }
             .into(),
             Self::Not(node) => zyn::zyn! {
-                {{ node.to_tokens_inner() }}.not()
+                ::std::ops::Not::not({{ node.to_tokens_inner() }})
             }
             .into(),
             Self::MethodChain(node) => zyn::zyn! {

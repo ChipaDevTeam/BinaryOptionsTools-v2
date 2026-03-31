@@ -170,7 +170,12 @@ class Validator:
 
         Returns:
             Validator: A new validator instance using the provided callback.
+
+        Raises:
+            TypeError: If func is not callable.
         """
+        if not callable(func):
+            raise TypeError("func must be callable")
         v = Validator()
         v._validator = _get_raw_validator().custom(func)
         return v

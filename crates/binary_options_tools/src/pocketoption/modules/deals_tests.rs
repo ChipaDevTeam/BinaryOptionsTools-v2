@@ -1,12 +1,12 @@
 #[cfg(test)]
 mod tests {
     use crate::pocketoption::{
-        modules::deals::{Command, CommandResponse, DealsApiModule, DealsHandle},
+        modules::deals::{Command, CommandResponse, DealsApiModule},
         state::TradeState,
         types::Deal,
     };
     use binary_options_tools_core::{
-        reimports::{AsyncReceiver, AsyncSender, Message},
+        reimports::Message,
         traits::{ApiModule, RunnerCommand},
     };
     use kanal::bounded_async;
@@ -61,9 +61,9 @@ mod tests {
                 .unwrap(),
         );
 
-        let (ws_tx, ws_rx) = bounded_async::<Arc<Message>>(1);
+        let (_ws_tx, ws_rx) = bounded_async::<Arc<Message>>(1);
         let (cmd_tx, cmd_rx) = bounded_async::<Command>(1);
-        let (res_tx, res_rx) = bounded_async::<CommandResponse>(1);
+        let (res_tx, _res_rx) = bounded_async::<CommandResponse>(1);
         let (ws_sender_tx, _ws_sender_rx) = bounded_async::<Message>(1);
         let (runner_tx, _runner_rx) = bounded_async::<RunnerCommand>(1);
 
@@ -76,8 +76,8 @@ mod tests {
             .await
             .unwrap();
 
-        // Run module for a bit
-        let _ = tokio::time::timeout(tokio::time::Duration::from_millis(10), module.run()).await;
+        // Run module for a bit (timeout must be long enough to process the command)
+        let _ = tokio::time::timeout(tokio::time::Duration::from_millis(500), module.run()).await;
 
         let result = rx.await.unwrap();
         assert!(result.is_ok());
@@ -107,7 +107,7 @@ mod tests {
 
         let (ws_tx, ws_rx) = bounded_async::<Arc<Message>>(10);
         let (cmd_tx, cmd_rx) = bounded_async::<Command>(10);
-        let (res_tx, res_rx) = bounded_async::<CommandResponse>(10);
+        let (res_tx, _res_rx) = bounded_async::<CommandResponse>(10);
         let (ws_sender_tx, _ws_sender_rx) = bounded_async::<Message>(1);
         let (runner_tx, _runner_rx) = bounded_async::<RunnerCommand>(1);
 

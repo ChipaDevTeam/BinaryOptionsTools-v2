@@ -22,7 +22,7 @@ use uuid::Uuid;
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
-    types::{Deal, MultiPatternRule},
+    types::Deal,
     utils::SocketIoFrame,
 };
 

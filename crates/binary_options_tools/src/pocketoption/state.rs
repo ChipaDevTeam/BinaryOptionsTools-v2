@@ -317,9 +317,9 @@ type RecentTradeKey = (String, Action, u32, Decimal);
 #[derive(Debug, Default)]
 pub struct TradeState {
     /// A map of currently opened deals, keyed by their UUID.
-    pub opened_deals: RwLock<HashMap<Uuid, Deal>>,
+    opened_deals: RwLock<HashMap<Uuid, Deal>>,
     /// A map of recently closed deals, keyed by their UUID.
-    pub closed_deals: RwLock<HashMap<Uuid, Deal>>,
+    closed_deals: RwLock<HashMap<Uuid, Deal>>,
     /// A map of pending deals, keyed by their UUID.
     pub pending_deals: RwLock<HashMap<Uuid, PendingOrder>>,
     /// A map of market orders sent but not yet confirmed by the server.

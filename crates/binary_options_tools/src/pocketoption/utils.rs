@@ -253,7 +253,7 @@ impl SocketIoFrame {
         }
 
         // 4. For BinaryEvent/BinaryAck: attachment count (digits followed by '-')
-        //    For other types: ack ID (optional, numeric)
+        //    For other types: ack ID (optional, numeric, only if not followed by '-')
         let mut id = None;
         let is_binary = matches!(
             message_type,
@@ -272,9 +272,16 @@ impl SocketIoFrame {
                     remaining = remaining[1..].to_string();
                 }
             } else {
-                // Regular ack ID
-                id = id_digits.parse().ok();
-                remaining = remaining[id_digits.len()..].to_string();
+                // For non-binary types, only treat digits as ack ID when NOT followed by '-'
+                // (which indicates binary attachment syntax, e.g. "451-[...]")
+                let after_digits = remaining.chars().nth(id_digits.len());
+                if after_digits == Some('-') {
+                    // Digits are part of binary/attachment syntax, not an ack ID;
+                    // leave remaining untouched so the payload is preserved intact.
+                } else {
+                    id = id_digits.parse().ok();
+                    remaining = remaining[id_digits.len()..].to_string();
+                }
             }
         }
 

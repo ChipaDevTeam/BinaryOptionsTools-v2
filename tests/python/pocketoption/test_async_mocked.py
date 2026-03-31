@@ -247,6 +247,11 @@ class MockRawValidator:
         self.condition = condition
 
     def __call__(self, message):
+        if hasattr(self, "_custom_func") and self._custom_func is not None:
+            try:
+                return self._custom_func(message)
+            except Exception:
+                return False
         return True
 
     def __repr__(self):
@@ -269,10 +274,13 @@ class MockRawValidator:
 
     @classmethod
     def custom(cls, func):
-        """Mock custom validator factory."""
+        """Mock custom validator factory - mirrors Rust RawValidator.custom() behavior."""
         if not callable(func):
             raise TypeError("func must be callable")
-        return cls(condition=f"custom:{func}")
+        instance = cls(condition=f"custom:{func}")
+        # Store the callable for check() delegation
+        instance._custom_func = func
+        return instance
 
 
 class MockLogger:
@@ -370,44 +378,49 @@ async def async_client(mock_raw_pocketoption):
 class TestPocketOptionAsyncInit:
     """Tests for PocketOptionAsync initialization."""
 
-    def test_init_with_ssid_only(self, mock_raw_pocketoption):
+    @pytest.mark.asyncio
+    async def test_init_with_ssid_only(self, mock_raw_pocketoption):
         """Test initialization with just SSID."""
         client = PocketOptionAsync("test_ssid")
         assert client.client is mock_raw_pocketoption
-        asyncio.get_event_loop().run_until_complete(client.shutdown())
+        await client.shutdown()
 
-    def test_init_with_config_dict(self, mock_raw_pocketoption):
+    @pytest.mark.asyncio
+    async def test_init_with_config_dict(self, mock_raw_pocketoption):
         """Test initialization with config dict."""
         config = {"terminal_logging": False, "log_level": "INFO"}
         client = PocketOptionAsync("test_ssid", config=config)
         assert client.config.terminal_logging is False
-        asyncio.get_event_loop().run_until_complete(client.shutdown())
+        await client.shutdown()
 
-    def test_init_with_config_json(self, mock_raw_pocketoption):
+    @pytest.mark.asyncio
+    async def test_init_with_config_json(self, mock_raw_pocketoption):
         """Test initialization with config JSON string."""
         config_json = '{"terminal_logging": false, "log_level": "DEBUG"}'
         client = PocketOptionAsync("test_ssid", config=config_json)
         assert client.config.terminal_logging is False
-        asyncio.get_event_loop().run_until_complete(client.shutdown())
+        await client.shutdown()
 
-    def test_init_with_config_object(self, mock_raw_pocketoption):
+    @pytest.mark.asyncio
+    async def test_init_with_config_object(self, mock_raw_pocketoption):
         """Test initialization with Config object."""
         cfg = Config()
         cfg.terminal_logging = False
         client = PocketOptionAsync("test_ssid", config=cfg)
         assert client.config.terminal_logging is False
-        asyncio.get_event_loop().run_until_complete(client.shutdown())
+        await client.shutdown()
 
-    def test_init_with_invalid_config_type(self):
+    def test_init_with_invalid_config_type(self, mock_raw_pocketoption):
         """Test initialization with invalid config type raises ValueError."""
         with pytest.raises(ValueError, match="Config type mismatch"):
             PocketOptionAsync("test_ssid", config=123)
 
-    def test_init_with_custom_url(self, mock_raw_pocketoption):
+    @pytest.mark.asyncio
+    async def test_init_with_custom_url(self, mock_raw_pocketoption):
         """Test that custom URL is added to config."""
         client = PocketOptionAsync("test_ssid", url="wss://custom.com")
         assert "wss://custom.com" in client.config.urls
-        asyncio.get_event_loop().run_until_complete(client.shutdown())
+        await client.shutdown()
 
 
 class TestBuyAndSell:
@@ -1005,7 +1018,7 @@ class TestContextManager:
     """Tests for async context manager."""
 
     @pytest.mark.asyncio
-    async def test_async_context_manager(self):
+    async def test_async_context_manager(self, mock_raw_pocketoption):
         """Test async context manager enter and exit."""
         async with PocketOptionAsync("test_ssid") as client:
             assert client.client is not None
@@ -1045,3 +1058,59 @@ class TestConcurrentOperations:
         assert isinstance(balance, float)
         assert isinstance(assets, list)
         assert isinstance(candles, list)
+
+
+class TestGetTradeResultEdgeCases:
+    """Tests for internal _get_trade_result edge cases."""
+
+    @pytest.mark.asyncio
+    async def test_get_trade_result_invalid_profit_type(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Test _get_trade_result when profit is not a number."""
+        mock_raw_pocketoption.check_win = AsyncMock(
+            return_value=json.dumps({"id": "trade_123", "profit": "not_a_number"})
+        )
+        with pytest.raises(Exception, match="Error getting trade result"):
+            await async_client._get_trade_result("trade_123")
+
+    @pytest.mark.asyncio
+    async def test_get_trade_result_missing_profit_key(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Test _get_trade_result when profit key is missing."""
+        mock_raw_pocketoption.check_win = AsyncMock(
+            return_value=json.dumps({"id": "trade_123"})
+        )
+        with pytest.raises(Exception, match="Error getting trade result"):
+            await async_client._get_trade_result("trade_123")
+
+    @pytest.mark.asyncio
+    async def test_get_trade_result_non_dict_response(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Test _get_trade_result when response is not a dict."""
+        mock_raw_pocketoption.check_win = AsyncMock(
+            return_value=json.dumps(["not", "a", "dict"])
+        )
+        with pytest.raises(Exception, match="Error getting trade result"):
+            await async_client._get_trade_result("trade_123")
+
+    @pytest.mark.asyncio
+    async def test_get_trade_result_draw(self, async_client, mock_raw_pocketoption):
+        """Test _get_trade_result correctly classifies draw (profit == 0)."""
+        mock_raw_pocketoption.check_win = AsyncMock(
+            return_value=json.dumps({"id": "trade_123", "profit": 0})
+        )
+        result = await async_client._get_trade_result("trade_123")
+        assert result["result"] == "draw"
+
+    @pytest.mark.asyncio
+    async def test_get_trade_result_loss(self, async_client, mock_raw_pocketoption):
+        """Test _get_trade_result correctly classifies loss (profit < 0)."""
+        mock_raw_pocketoption.check_win = AsyncMock(
+            return_value=json.dumps({"id": "trade_123", "profit": -1.5})
+        )
+        result = await async_client._get_trade_result("trade_123")
+        assert result["result"] == "loss"
+        assert result["profit"] == -1.5

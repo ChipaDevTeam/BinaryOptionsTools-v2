@@ -10,11 +10,12 @@ Set the POCKET_OPTION_SSID environment variable before running:
 import os
 import asyncio
 import pytest
+import pytest_asyncio
 
 SSID = os.getenv("POCKET_OPTION_SSID")
 
 
-@pytest.fixture(scope="module")
+@pytest_asyncio.fixture(loop_scope="module")  # type: ignore[misc]
 def event_loop():
     loop = asyncio.new_event_loop()
     yield loop

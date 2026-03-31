@@ -123,7 +123,7 @@ impl PyStrategy {
             .collect()
     }
 
-    pub fn update<'py>(&mut self, candle: String) -> PyResult<()> {
+    pub fn update(&mut self, candle: String) -> PyResult<()> {
         self.current_candle += 1;
         for indicator in self.indicators.values() {
             Python::attach(|py| {

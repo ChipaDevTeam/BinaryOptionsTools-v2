@@ -455,6 +455,7 @@ impl<S: AppState> ClientBuilder<S> {
             router: Arc::new(router),
             is_hard_disconnect: true,
             shutdown_requested: false,
+            is_hold_disconnect: false,
             to_ws_sender: to_ws_tx,
             to_ws_receiver: to_ws_rx,
             runner_command_rx: runner_cmd_rx,

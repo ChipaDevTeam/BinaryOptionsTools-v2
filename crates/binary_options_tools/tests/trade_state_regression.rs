@@ -2,8 +2,6 @@ use binary_options_tools::pocketoption::state::TradeState;
 use binary_options_tools::pocketoption::types::Deal;
 use serde_json;
 use std::sync::Arc;
-use tokio::time::{sleep, Duration};
-use uuid::Uuid;
 
 #[tokio::test]
 async fn test_trade_state_transition_atomicity() {

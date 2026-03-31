@@ -1,7 +1,9 @@
-use binary_options_tools_core::{rules::MessageType, traits::Rule, Rule};
+use binary_options_tools_core::{traits::Rule, Rule};
 
+#[allow(dead_code)]
 struct TestRuleImpl;
 
+#[allow(dead_code)]
 impl TestRuleImpl {
     pub fn new() -> Self {
         Self
@@ -9,7 +11,7 @@ impl TestRuleImpl {
 }
 
 impl Rule for TestRuleImpl {
-    fn call(&self, msg: &tokio_tungstenite::tungstenite::Message) -> bool {
+    fn call(&self, _msg: &tokio_tungstenite::tungstenite::Message) -> bool {
         true
     }
 

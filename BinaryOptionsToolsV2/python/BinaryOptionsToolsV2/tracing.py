@@ -54,6 +54,22 @@ class Logger:
         RustLogger = _get_rust_attr("Logger")
         self.logger = RustLogger()
 
+    def debug(self, message: str) -> None:
+        """Log a debug message."""
+        self.logger.debug(message)
+
+    def info(self, message: str) -> None:
+        """Log an info message."""
+        self.logger.info(message)
+
+    def warn(self, message: str) -> None:
+        """Log a warning message."""
+        self.logger.warn(message)
+
+    def error(self, message: str) -> None:
+        """Log an error message."""
+        self.logger.error(message)
+
 
 class LogBuilder:
     """

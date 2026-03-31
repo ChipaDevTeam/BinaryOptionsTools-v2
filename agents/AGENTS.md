@@ -1,181 +1,163 @@
-# Agent Guidelines for BinaryOptionsTools-v2
+# AGENTS.md — BinaryOptionsTools-v2
+
+This is a dual-language project: **Rust** core with **Python** bindings (via PyO3/maturin) and optional **UniFFI** bindings for Kotlin/Swift/C#/Go.
+
+## Project Structure
+
+- `crates/` — Rust workspace crates
+  - `core/` — Low-level utilities, config, WebSocket base
+  - `macros/` — Proc-macros (`Config`, `RegionImpl`, `ActionImpl`, `#[timeout]`)
+  - `binary_options_tools/` — Platform implementations (PocketOption, ExpertOption), `framework` module for bots
+- `BinaryOptionsToolsV2/` — Python package (maturin/PyO3). Rust source in `rust/`, Python wrapper in `python/`
+- `BinaryOptionsToolsUni/` — UniFFI multi-language bindings
+- `tests/` — Python tests (`tests/python/`), Rust tests inline
+- `docs/` — MkDocs documentation
+- `data/` — Test fixtures and JSON data
 
 ## Build Commands
 
 ### Rust
 
-- Build all crates: `cargo build`
-- Build release: `cargo build --release`
-- Build specific crate: `cargo build -p binary_options_tools`
-- Build UniFFI bindings: `cargo build -p binary_options_tools_uni`
-- Build Python extension (from BinaryOptionsToolsV2): `maturin build --release`
-- Build free-threaded Python: `maturin build --release -i python3.13t`
-- Build sdist: `maturin sdist`
-- Build with stub generation: `cargo build -p BinaryOptionsToolsV2 --features stubgen`
-- Generate stubs only: `cargo build -p BinaryOptionsToolsV2 --features stubgen --target-dir target/stubgen`
-- Clean build artifacts: `cargo clean`
+```bash
+cargo build                              # Debug build all crates
+cargo build --release                    # Release build (LTO thin, opt-level 3)
+cargo build -p binary_options_tools      # Specific crate
+cargo build -p BinaryOptionsToolsV2 --features stubgen  # Build with .pyi stub generation
+cargo clean                              # Clean artifacts
+```
 
-### UniFFI Bindings (Multi-language)
+### Python (maturin)
 
-- Generate bindings (from BinaryOptionsToolsUni):
-  - Kotlin: `cargo run -p uniffi-bindgen generate src/binary_options_tools_uni.udl --language kotlin --out-dir out/kotlin`
-  - Swift: `cargo run -p uniffi-bindgen generate src/binary_options_tools_uni.udl --language swift --out-dir out/swift`
-  - C#: `cargo run -p uniffi-bindgen generate src/binary_options_tools_uni.udl --language cs --out-dir out/cs`
-  - Go: `cargo run -p uniffi-bindgen generate src/binary_options_tools_uni.udl --language go --out-dir out/go`
-- Note: Requires the `.udl` or `uniffi::setup_scaffolding!` macros to be correctly configured in `src/lib.rs`.
+```bash
+maturin develop                          # Dev install (from BinaryOptionsToolsV2/)
+maturin build --release                  # Build wheel
+maturin build --release -i python3.13t   # Free-threaded Python build
+maturin sdist                            # Source distribution
+```
 
-### Python Stub Generation
+### UniFFI Bindings
 
-- Enable stubgen feature to auto-generate `.pyi` files via build script
-- Stubs are placed in `BinaryOptionsToolsV2/python/BinaryOptionsToolsV2/`
-- Stub files are automatically included in wheel via `pyproject.toml` maturin config
-- Manual generation (alternative): Use `pyo3-stub-gen` CLI tool if needed
-
-### Python
-
-- Install in dev mode (from BinaryOptionsToolsV2): `maturin develop`
-- Install from wheel: `pip install BinaryOptionsToolsV2 --find-links dist --force-reinstall`
-- Create virtualenv: `python3 -m venv .venv`
+```bash
+cargo run -p uniffi-bindgen generate src/binary_options_tools_uni.udl --language kotlin --out-dir out/kotlin
+cargo run -p uniffi-bindgen generate src/binary_options_tools_uni.udl --language swift --out-dir out/swift
+```
 
 ## Test Commands
 
-### Python Tests (pytest)
+### Python (pytest)
 
-- Run all tests: `pytest`
-- Run with verbose: `pytest -v`
-- Run specific test file: `pytest tests/python/pocketoption/test_synchronous.py`
-- Run specific test function: `pytest tests/python/pocketoption/test_synchronous.py::test_sync_manual_connect_shutdown`
-- Run with marker: `pytest -m "pocketoption"`
-- Run with output: `pytest -s`
-- Run with coverage: `pytest --cov=BinaryOptionsToolsV2`
+```bash
+pytest                                   # All tests (testpaths in pytest.ini)
+pytest -v                                # Verbose
+pytest -s                                # Show print output
+pytest tests/python/pocketoption/test_synchronous.py::test_sync_manual_connect_shutdown  # Single test
+pytest -m "pocketoption"                 # By marker
+pytest --cov=BinaryOptionsToolsV2        # With coverage
+```
 
-### Rust Tests
+- Config: `pytest.ini` sets `asyncio_mode = auto`, `timeout = 60`, testpaths = `tests/python/core tests/python/pocketoption tests/python/tracing`
+- `conftest.py` loads `.env` for `POCKET_OPTION_SSID`; tests skip if not set
+- Fixtures: `api` (async), `api_sync` — module-scoped, reuse connections
 
-- Run all tests: `cargo test`
-- Run specific crate tests: `cargo test -p binary_options_tools`
-- Run specific test: `cargo test test_name`
-- Run with output: `cargo test -- --nocapture`
+### Rust
 
-### Note on Test Setup
+```bash
+cargo test                               # All tests
+cargo test -p binary_options_tools       # Specific crate
+cargo test test_name                     # By name
+cargo test -- --nocapture                # Show output
+cargo test --package binary_options_tools --lib framework::tests  # Framework tests
+```
 
-Python tests rely on `POCKET_OPTION_SSID` environment variable (optional). Tests skip if not set. Tests create a `test_run` subdirectory. Configuration in `BinaryOptionsToolsV2/pyproject.toml` sets `asyncio_mode = "auto"` and testpaths to `../tests`.
-
-## Lint/Format Commands
+## Lint & Format
 
 ### Python (Ruff)
 
-- Lint all: `ruff check .`
-- Lint with fix: `ruff check --fix .`
-- Format: `ruff format .`
-- Check formatting only: `ruff format --check .`
-- Lint staged files (git): `lint-staged` (configured in package.json)
-- Target Python: 3.8+, line length: 120
+```bash
+ruff check .                             # Lint
+ruff check --fix .                       # Lint + auto-fix
+ruff format .                            # Format
+ruff format --check .                    # Check formatting
+```
+
+- Line length: 120, target Python: 3.8+
+- Config in `BinaryOptionsToolsV2/pyproject.toml`
 
 ### Rust
 
-- Format: `cargo fmt` or `rustfmt`
-- Check formatting: `cargo fmt -- --check`
-- Lint: `cargo clippy --all-targets --all-features -- -D warnings`
-- Lint specific crate: `cargo clippy -p binary_options_tools`
+```bash
+cargo fmt                                # Format (edition 2021 per .rustfmt.toml)
+cargo fmt -- --check                     # Check formatting
+cargo clippy --all-targets --all-features -- -D warnings  # Lint (deny warnings)
+```
 
 ### Markdown
 
-- Lint: `markdownlint-cli2 "**/*.md"` or `markdownlint-cli "**/*.md"`
+```bash
+markdownlint-cli2 "**/*.md"              # Lint markdown
+```
 
-## Code Style Guidelines
+### Pre-commit (husky + lint-staged)
 
-### Rust
+Runs on commit via `package.json` lint-staged config:
+
+- `*.py` → `ruff check --fix` then `ruff format`
+- `*.rs` → `rustfmt`
+
+Install hooks: `bun install` (uses `bun@1.3.10`)
+
+## Code Style — Rust
 
 - **Edition**: 2021
-- **Formatting**: rustfmt with default settings (`.rustfmt.toml` minimal)
-- **Imports**: Group std, external crates, internal modules; use `use` statements at top of file
-- **Naming**: snake_case for functions/variables, CamelCase for types, SCREAMING_SNAKE_CASE for constants
-- **Error Handling**: Use `thiserror` for custom errors, `anyhow::Result<T>` for application-level
-- **Types**: Prefer explicit types in public APIs, type inference allowed in local scope
-- **Async**: Use `tokio` runtime; mark test functions with `#[tokio::test]`
-- **Modules**: One module per file, use `mod.rs` for submodules
-- **Traits**: Use `async_trait` for async trait methods
-- **Logging**: Use `tracing` crate with `debug!`, `info!`, `warn!`, `error!`
-- **Serialization**: Use `serde` with `derive` feature; custom serializers in `utils/serialize.rs`
-- **Dependencies**: Keep minimal; prefer `reqwest` with `rustls-tls` (no native deps)
-- **Stub generation**: Add `pyo3-stub-gen` as optional dependency with `stubgen` feature; use build script to generate `.pyi` files automatically on build
-- **Proc-macros**: Use `darling` for attribute parsing; follow existing patterns in `crates/macros`
+- **Imports**: Group by std → external crates → internal modules; `use` at top of file
+- **Naming**: `snake_case` functions/variables, `CamelCase` types, `SCREAMING_SNAKE_CASE` constants
+- **Errors**: `thiserror` for custom error types, `anyhow::Result<T>` for app-level
+- **Async**: `tokio` runtime; `#[tokio::test]` for async tests; `async_trait` for async trait methods
+- **Logging**: `tracing` crate (`debug!`, `info!`, `warn!`, `error!`)
+- **Serialization**: `serde` with `derive`; custom serializers in `utils/serialize.rs`
+- **HTTP**: `reqwest` with `rustls-tls` (no native OpenSSL dependency)
+- **WebSockets**: `tokio-tungstenite` with `rustls`
+- **Proc-macros**: Use `darling` for attribute parsing; see `crates/macros`
+- **Modules**: One module per file; `mod.rs` for submodules
+- **Public APIs**: Explicit types; type inference OK in local scope
+- **Python interop**: `#[pyfunction]`, `#[pymodule]`, `#[pyclass]`; convert errors with `PyErr::new::<PyRuntimeError, _>(msg)`
 
-### Python
+## Code Style — Python
 
 - **Version**: 3.8+
-- **Formatter/Linter**: Ruff (fast, replaces black + flake8 + isort)
+- **Formatter/Linter**: Ruff (replaces black + flake8 + isort)
 - **Line length**: 120
-- **Imports**: ruff handles ordering (standard library, third-party, local)
-- **Naming**: snake_case for functions/variables, PascalCase for classes, UPPER_SNAKE_CASE for constants
-- **Type hints**: Use type annotations for function signatures; prefer explicit imports from `typing`
-- **Error handling**: Use try/except with specific exception types; avoid bare `except:`
-- **Async**: Use `async def` and `await`; `pytest-asyncio` for tests with `@pytest.mark.asyncio` optional (asyncio_mode=auto)
-- **Docstrings**: Google or NumPy style recommended; minimum: brief description + args/returns
-- **Logging**: Use `tracing` bridge via `BinaryOptionsToolsV2.tracing` module; avoid `print()` in library code
-- **Stub files**: Generated `.pyi` files from Rust provide type hints; Python wrapper should be thin
+- **Imports**: Ruff handles ordering (stdlib → third-party → local)
+- **Naming**: `snake_case` functions/variables, `PascalCase` classes, `UPPER_SNAKE_CASE` constants
+- **Type hints**: Required on function signatures; explicit imports from `typing`
+- **Error handling**: `try/except` with specific exception types; no bare `except:`
+- **Async**: `async def`/`await`; pytest-asyncio with `asyncio_mode=auto`
+- **Docstrings**: Google or NumPy style; minimum: brief description + args/returns
+- **Logging**: Use `BinaryOptionsToolsV2.tracing` bridge; avoid `print()` in library code
+- **Stub files**: `.pyi` files generated from Rust via `stubgen` feature; Python wrapper should be thin
 
-### Cross-language (Rust <-> Python)
+## Cross-language Conventions
 
-- Python bindings via PyO3; API surface defined in Rust crates
-- Keep Python wrapper thin; business logic in Rust
-- Use `#[pyfunction]`, `#[pymodule]`, `#[pyclass]` attributes
-- Convert errors with `PyErr::new::<PyRuntimeError, _>(msg)`
-- Use `maturin` for build/distribution; version managed in Cargo.toml
-- Stub generation enabled via `stubgen` feature flag on `BinaryOptionsToolsV2` crate
-- Stub files placed in python package dir and included via maturin `include` config
+- Business logic lives in Rust; Python wrapper is thin
+- Keep API surface consistent between sync and async Python variants
+- Errors surface as Python exceptions via PyO3 conversion
+- Version managed in Cargo.toml; maturin reads it for Python package
+- Stub generation: `stubgen` feature on `BinaryOptionsToolsV2` crate → `.pyi` in `python/BinaryOptionsToolsV2/`
 
-## Project Structure
+## Commit Messages
 
-- `crates/`: Rust crates (core, macros, binary_options_tools)
-  - `core/`: Low-level utilities, configuration, and WebSocket base.
-  - `binary_options_tools/`: High-level platform implementations (PocketOption, ExpertOption) and Framework.
-- `BinaryOptionsToolsV2/`: Python package with maturin build (PyO3).
-- `BinaryOptionsToolsUni/`: UniFFI bindings for multi-language support (Kotlin, Swift, Go, C#, Ruby, etc.).
-- `tests/`: Python and Rust tests (mirrors package structure).
-- `data/`: Test fixtures and JSON data.
-- `docs/`: MkDocs documentation.
+- Present tense, imperative mood: "Add feature" not "Added feature"
+- First line ≤ 72 chars
+- Reference issues: `Fixes #123`
 
-## Framework & High-Level API
+## CI
 
-The `framework` module in `binary_options_tools` provides an event-driven system for building trading bots.
+- Builds wheels for Linux (manylinux, musllinux), Windows, macOS
+- Runs pytest on x86
+- Integration tests use isolated `test_run` directory
 
-- **Bot**: Manages the event loop and strategy execution.
-- **Strategy**: Trait for implementing custom trading logic (on_candle, on_tick, etc.).
-- **Context**: Provides a unified API to interact with any market (Real or Virtual).
-- **VirtualMarket**: A simulated market for backtesting without live connections or SSIDs.
+## Environment
 
-### Running Framework Tests
-- Rust: `cargo test --package binary_options_tools --lib framework::tests`
-
-## Conventions Observed
-
-- Rust macros in `crates/macros` with `darling` for attribute parsing
-- Timeout handling via `#[timeout(secs)]` macro
-- Config structs derive `Config` macro for validation
-- Regions/actions use derive macros `RegionImpl`, `ActionImpl`
-- WebSocket client uses tokio-tungstenite with rustls
-- Tests often skip without live credentials; use mocking where possible
-- Python tests use fixtures from `conftest.py`; module-scoped fixtures for connection reuse
-- CI builds wheels for Linux (manylinux, musllinux), Windows, macOS; runs pytest on x86
-
-## Running a Single Test
-
-- Python: `pytest tests/python/pocketoption/test_synchronous.py::test_sync_manual_connect_shutdown`
-- Rust: `cargo test test_deserialize_macro --package binary_options_tools`
-
-## Pre-commit Hooks
-
-husky + lint-staged configured to run:
-
-- Python: `ruff check --fix` then `ruff format`
-- Rust: `rustfmt`
-
-Install with `bun install` (package.json present for tooling).
-
-## Notes
-
-- No Cursor rules or Copilot instructions found in repository.
-- Keep Rust edition consistent (2021).
-- Use maturin for Python packaging; do not manually compile extension modules.
-- For CI, tests run in isolated `test_run` directory; follow this pattern for integration tests.
+- Package manager: `bun@1.3.10` (for dev tooling only — husky, lint-staged, markdownlint)
+- Virtual env: `.venv/` (gitignored)
+- `.env` file for secrets (`POCKET_OPTION_SSID`); never commit it
