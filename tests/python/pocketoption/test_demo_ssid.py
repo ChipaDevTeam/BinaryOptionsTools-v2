@@ -31,11 +31,15 @@ async def api():
 
     config = {
         "connection_initialization_timeout_secs": 30,
-        "max_allowed_loops": 10,
+        "max_allowed_loops": 0,  # Unlimited reconnection attempts
         "timeout_secs": 60,
     }
     client = PocketOptionAsync(SSID, config=config)
-    await asyncio.sleep(3)
+    # Wait for connection to stabilize and assets to load
+    await asyncio.sleep(5)
+    # Verify connection is established
+    if not client.is_connected():
+        print("Warning: Client not connected after 5 seconds")
     yield client
     await client.shutdown()
 
@@ -65,10 +69,17 @@ class TestDemoConnection:
     @pytest.mark.asyncio
     async def test_balance(self, api):
         """Test getting balance."""
-        balance = await api.balance()
+        import asyncio
+        # Wait for balance to update from -1 to actual value
+        balance = -1.0
+        for _ in range(10):  # Try for up to 10 seconds
+            balance = await api.balance()
+            if balance >= 0:
+                break
+            await asyncio.sleep(1)
         print(f"  balance: {balance}")
         assert isinstance(balance, (int, float)), "Expected numeric balance"
-        assert balance >= 0, "Balance should not be negative"
+        assert balance >= 0, f"Expected non-negative balance, got {balance}"
 
     @pytest.mark.asyncio
     async def test_candles(self, api):
@@ -102,12 +113,13 @@ async def test_custom_max_subscriptions():
 
     config = {
         "connection_initialization_timeout_secs": 30,
-        "max_allowed_loops": 10,
+        "max_allowed_loops": 0,  # Unlimited reconnection attempts
         "timeout_secs": 60,
         "max_subscriptions": 8,
     }
     client = PocketOptionAsync(SSID, config=config)
-    await asyncio.sleep(3)
+    # Wait for connection to stabilize
+    await asyncio.sleep(5)
 
     max_subs = client.max_subscriptions()
     print(f"  max_subscriptions: {max_subs}")

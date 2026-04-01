@@ -239,26 +239,30 @@ impl<S: AppState> Client<S> {
 
     /// Commands the runner to shutdown, this action is final as the runner and client will stop working and will be dropped.
     pub async fn shutdown(self) -> CoreResult<()> {
-        self.runner_command_tx
-            .send(RunnerCommand::Shutdown)
-            .await
-            .inspect_err(|e| {
-                error!(target: "Client", "Failed to send shutdown command: {e}");
-            })?;
+        match self.runner_command_tx.send(RunnerCommand::Shutdown).await {
+            Ok(_) => {
+                info!(target: "Client", "Runner shutdown command sent.");
+            }
+            Err(e) => {
+                // Channel may already be closed if connection dropped
+                warn!(target: "Client", "Failed to send shutdown command (channel may be closed): {e}");
+            }
+        }
         drop(self);
-        info!(target: "Client", "Runner shutdown command sent.");
         Ok(())
     }
 
     /// Commands the runner to shutdown without consuming the client.
     pub async fn shutdown_ref(&self) -> CoreResult<()> {
-        self.runner_command_tx
-            .send(RunnerCommand::Shutdown)
-            .await
-            .inspect_err(|e| {
-                error!(target: "Client", "Failed to send shutdown command: {e}");
-            })?;
-        info!(target: "Client", "Runner shutdown command sent (via ref).");
+        match self.runner_command_tx.send(RunnerCommand::Shutdown).await {
+            Ok(_) => {
+                info!(target: "Client", "Runner shutdown command sent (via ref).");
+            }
+            Err(e) => {
+                // Channel may already be closed if connection dropped
+                warn!(target: "Client", "Failed to send shutdown command (channel may be closed): {e}");
+            }
+        }
         Ok(())
     }
 

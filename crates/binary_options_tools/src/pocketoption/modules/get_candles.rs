@@ -53,20 +53,50 @@ impl std::fmt::Display for LoadHistoryPeriod {
 }
 
 /// Represents a single tick/trade data point from loadHistoryPeriod.
-/// Format: { "asset": "...", "time": timestamp, "price": value }
+/// Supports two formats:
+/// 1. Tick format: { "asset": "...", "time": timestamp, "price": value }
+/// 2. Candle format: { "symbol_id": 123, "time": timestamp, "open": value, "close": value, "high": value, "low": value, "volume": value }
 #[derive(Debug, Deserialize, Clone)]
 pub struct TickData {
-    pub asset: String,
+    #[serde(default)]
+    pub asset: Option<String>,
+    #[serde(default)]
+    pub symbol_id: Option<u64>,
     pub time: f64,
-    pub price: f64,
+    #[serde(default)]
+    pub price: Option<f64>,
+    #[serde(default)]
+    pub open: Option<f64>,
+    #[serde(default)]
+    pub close: Option<f64>,
+    #[serde(default)]
+    pub high: Option<f64>,
+    #[serde(default)]
+    pub low: Option<f64>,
+    #[serde(default)]
+    pub volume: Option<f64>,
+}
+
+impl TickData {
+    /// Get the price for tick data (uses close price if available, otherwise price field)
+    pub fn get_price(&self) -> f64 {
+        self.close.or(self.price).unwrap_or(0.0)
+    }
+    
+    /// Get the asset name
+    pub fn get_asset(&self) -> String {
+        self.asset.clone().unwrap_or_default()
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct LoadHistoryPeriodResult {
+    #[serde(default)]
     pub asset: String,
     pub index: u64,
     #[serde(default)]
     pub data: Vec<TickData>,
+    #[serde(default)]
     pub period: i64,
 }
 
@@ -434,8 +464,14 @@ impl ApiModule<State> for GetCandlesApiModule {
                         }
                     }
                 }
+                else => {
+                    // Both channels are closed, exit the loop
+                    warn!("GetCandlesApiModule: Both channels closed, exiting");
+                    break;
+                }
             }
         }
+        Ok(())
     }
 
     fn rule(_: Arc<State>) -> Box<dyn Rule + Send + Sync> {
@@ -455,19 +491,34 @@ impl GetCandlesApiModule {
                         .data
                         .into_iter()
                         .filter_map(|tick_data| {
-                            // Convert tick data to a single-price candle
-                            // This maintains backwards compatibility when the server returns
-                            // tick data instead of OHLC candles
-                            let base_candle = BaseCandle {
-                                timestamp: tick_data.time.round() as i64,
-                                open: tick_data.price,
-                                high: tick_data.price,
-                                low: tick_data.price,
-                                close: tick_data.price,
-                                volume: None,
-                            };
-                            let symbol = asset.clone();
-                            Candle::try_from((base_candle, symbol)).ok()
+                            // Check if this is candle data (has OHLC fields) or tick data
+                            if let (Some(open), Some(high), Some(low), Some(close)) = 
+                                (tick_data.open, tick_data.high, tick_data.low, tick_data.close) {
+                                // This is candle data with OHLC
+                                let base_candle = BaseCandle {
+                                    timestamp: tick_data.time.round() as i64,
+                                    open,
+                                    high,
+                                    low,
+                                    close,
+                                    volume: tick_data.volume,
+                                };
+                                let symbol = asset.clone();
+                                Candle::try_from((base_candle, symbol)).ok()
+                            } else {
+                                // This is tick data, convert to single-price candle
+                                let price = tick_data.get_price();
+                                let base_candle = BaseCandle {
+                                    timestamp: tick_data.time.round() as i64,
+                                    open: price,
+                                    high: price,
+                                    low: price,
+                                    close: price,
+                                    volume: None,
+                                };
+                                let symbol = asset.clone();
+                                Candle::try_from((base_candle, symbol)).ok()
+                            }
                         })
                         .collect();
 
@@ -483,7 +534,7 @@ impl GetCandlesApiModule {
                     let ticks: Vec<(i64, f64)> = result
                         .data
                         .into_iter()
-                        .map(|tick_data| (tick_data.time.round() as i64, tick_data.price))
+                        .map(|tick_data| (tick_data.time.round() as i64, tick_data.get_price()))
                         .collect();
 
                     if let Err(e) = self

@@ -74,7 +74,7 @@ async def api():
 
     config = {
         "connection_initialization_timeout_secs": 30,  # Reduced from 60
-        "max_allowed_loops": 10,
+        "max_allowed_loops": 0,  # Unlimited reconnection attempts
         "timeout_secs": 60,
         "terminal_logging": False,
         "log_level": "WARN",
@@ -96,7 +96,7 @@ def api_sync():
 
     config = {
         "connection_initialization_timeout_secs": 30,
-        "max_allowed_loops": 10,
+        "max_allowed_loops": 0,  # Unlimited reconnection attempts
         "timeout_secs": 60,
         "terminal_logging": False,
         "log_level": "WARN",
