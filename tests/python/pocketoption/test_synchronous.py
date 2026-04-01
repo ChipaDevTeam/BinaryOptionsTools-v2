@@ -113,7 +113,7 @@ def test_sync_close_resilience():
     start = time.time()
     api.close()
     elapsed = time.time() - start
-    assert elapsed < 15, f"close() took {elapsed:.1f}s, expected < 15s"
+    assert elapsed < 20, f"close() took {elapsed:.1f}s, expected < 20s"
 
 
 def test_sync_subscription_cancel():

@@ -83,6 +83,22 @@ class LogBuilder:
         RustLogBuilder = _get_rust_attr("LogBuilder")
         self.builder = RustLogBuilder()
 
+    def log_file(self, path: str, level: str) -> None:
+        """Configure log file output with the specified path and level."""
+        self.builder.log_file(path, level)
+
+    def terminal(self, level: str) -> None:
+        """Configure terminal output with the specified log level."""
+        self.builder.terminal(level)
+
+    def build(self) -> None:
+        """Build and initialize the logging system with configured layers."""
+        self.builder.build()
+
+    def create_logs_iterator(self, level: str, timeout=None):
+        """Create a log subscription iterator at the specified level."""
+        return self.builder.create_logs_iterator(level, timeout)
+
 
 def start_logs(path: str, level: str = "DEBUG", terminal: bool = True, layers: list = None):
     """

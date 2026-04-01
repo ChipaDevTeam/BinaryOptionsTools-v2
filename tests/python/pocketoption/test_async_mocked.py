@@ -1114,3 +1114,104 @@ class TestGetTradeResultEdgeCases:
         result = await async_client._get_trade_result("trade_123")
         assert result["result"] == "loss"
         assert result["profit"] == -1.5
+
+
+class TestSsidValidation:
+    """Tests for SSID semantic validation in _sanitize_and_validate_ssid."""
+
+    def test_valid_ssid_passes(self):
+        """A well-formed SSID with all required fields passes validation."""
+        ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":1,"platform":2}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_valid_ssid_with_optional_fields(self):
+        """SSID with optional fields like isFastHistory and isOptimized passes."""
+        ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":1,"platform":2,"isFastHistory":true,"isOptimized":true}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_missing_session_raises(self):
+        """SSID missing the 'session' field raises ValueError."""
+        ssid = '42["auth",{"uid":69982301,"isDemo":1}]'
+        with pytest.raises(ValueError, match="missing required field 'session'"):
+            PocketOptionAsync(ssid, config={"terminal_logging": False})
+
+    def test_missing_uid_raises(self):
+        """SSID missing the 'uid' field raises ValueError."""
+        ssid = '42["auth",{"session":"abc123def456","isDemo":1}]'
+        with pytest.raises(ValueError, match="missing required field 'uid'"):
+            PocketOptionAsync(ssid, config={"terminal_logging": False})
+
+    def test_missing_both_required_raises(self):
+        """SSID missing both session and uid raises ValueError."""
+        ssid = '42["auth",{"isDemo":1}]'
+        with pytest.raises(ValueError, match="Invalid SSID"):
+            PocketOptionAsync(ssid, config={"terminal_logging": False})
+
+    def test_invalid_session_format_warns_but_proceeds(self):
+        """A session token with unexpected format emits a warning but does not raise."""
+        ssid = '42["auth",{"session":"!!!","uid":69982301}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        # Should not raise, just warn
+        assert client.is_ssid_valid() is True
+
+    def test_negative_uid_warns_but_proceeds(self):
+        """A negative uid emits a warning but does not raise."""
+        ssid = '42["auth",{"session":"abc123def456","uid":-1}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_non_integer_uid_warns_but_proceeds(self):
+        """A non-integer uid emits a warning but does not raise."""
+        ssid = '42["auth",{"session":"abc123def456","uid":"not_a_number"}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_invalid_is_demo_warns_but_proceeds(self):
+        """An isDemo value that is not 0 or 1 emits a warning but does not raise."""
+        ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":5}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_invalid_platform_warns_but_proceeds(self):
+        """A platform value that is not 1 or 2 emits a warning but does not raise."""
+        ssid = '42["auth",{"session":"abc123def456","uid":69982301,"platform":99}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_non_42_prefix_returns_unchanged(self):
+        """An SSID not starting with 42[ is returned as-is with validation skipped."""
+        ssid = 'not_a_valid_ssid'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is False
+
+    def test_invalid_json_returns_unchanged(self):
+        """An SSID with invalid JSON after 42[ is returned as-is with validation skipped."""
+        ssid = '42[not valid json'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is False
+
+    def test_ssid_with_single_quotes_normalized(self):
+        """An SSID using single quotes around 'auth' is normalized to double quotes."""
+        ssid = '42[\'auth\',{"session":"abc123def456","uid":69982301,"isDemo":1}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_shell_stripped_auth_normalized(self):
+        """An SSID where auth lost its quotes due to shell expansion is normalized."""
+        ssid = '42[auth,{"session":"abc123def456","uid":69982301,"isDemo":1}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_payload_not_array_warns(self):
+        """A payload that is not a [event, data] array is handled gracefully."""
+        ssid = '42[{"session":"abc123def456","uid":69982301}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        # Payload is a dict, not an array — warns but proceeds
+        assert client.is_ssid_valid() is False
+
+    def test_none_ssid_skips_validation(self):
+        """A None SSID skips validation and marks as invalid."""
+        client = PocketOptionAsync(None, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is False

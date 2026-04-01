@@ -82,7 +82,7 @@ class MockPocketOptionAsync:
             trade["profit"] = 1.5
         return trade_id, trade
 
-    async def check_win(self, trade_id):
+    async def check_win(self, trade_id, timeout_seconds=None):
         if trade_id == "not_found":
             raise Exception("Failed to find deal with ID: not_found")
         return {"id": trade_id, "profit": 1.5, "result": "win"}

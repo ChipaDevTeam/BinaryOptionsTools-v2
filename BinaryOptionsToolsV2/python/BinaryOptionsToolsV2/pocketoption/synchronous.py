@@ -298,22 +298,64 @@ class PocketOption:
         exit was skipped due to an exception. This prevents thread leaks
         in long-running processes or test suites.
 
+        Unlike close(), __del__ uses aggressive timeouts and skips the
+        client shutdown (which requires a network connection that may
+        already be dropped). It only stops the loop and joins the thread.
+
         Note: Relying on __del__ is not deterministic. Always prefer
         explicit close() or using the context manager protocol.
         """
         try:
             if hasattr(self, "loop") and self.loop is not None and not self.loop.is_closed():
-                self.close()
+                with self._lock:
+                    if self.loop is None or self.loop.is_closed():
+                        return
+                    try:
+                        pending = asyncio.run_coroutine_threadsafe(
+                            self._cancel_all_tasks(), self.loop
+                        )
+                        pending.result(timeout=2)
+                    except Exception:
+                        pass
+                    if not self.loop.is_closed():
+                        self.loop.call_soon_threadsafe(self.loop.stop)
+                    if hasattr(self, "_loop_thread") and self._loop_thread.is_alive():
+                        self._loop_thread.join(timeout=2)
+                    if not self.loop.is_closed():
+                        self.loop.close()
+                    self.loop = None
         except Exception:
             pass
 
     async def _cancel_all_tasks(self):
-        """Cancel all pending asyncio tasks on the event loop."""
-        tasks = [t for t in asyncio.all_tasks(self.loop) if not t.done()]
-        for task in tasks:
-            task.cancel()
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        """Cancel all pending asyncio tasks on the event loop.
+
+        Python 3.11+ asyncio.Task.cancel() recursively cancels child tasks,
+        which causes RecursionError with deeply nested task trees. We work
+        around this by temporarily increasing the recursion limit during
+        cancellation, then stopping the event loop immediately.
+        """
+        import sys
+
+        try:
+            tasks = [t for t in asyncio.all_tasks(self.loop) if not t.done()]
+        except (RuntimeError, RecursionError):
+            self.loop.stop()
+            return
+        if not tasks:
+            self.loop.stop()
+            return
+        # Temporarily increase recursion limit to handle deeply nested cancel trees
+        old_limit = sys.getrecursionlimit()
+        try:
+            sys.setrecursionlimit(max(old_limit * 4, 10000))
+            for task in tasks:
+                task.cancel(msg="PocketOption client shutting down")
+        except RecursionError:
+            pass
+        finally:
+            sys.setrecursionlimit(old_limit)
+        self.loop.stop()
 
     def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         with self._lock:
@@ -422,6 +464,9 @@ class PocketOption:
 
     def is_connected(self) -> bool:
         return self._client.is_connected()
+
+    def is_ssid_valid(self) -> bool:
+        return self._client.is_ssid_valid()
 
     def max_subscriptions(self) -> int:
         return self._client.max_subscriptions()

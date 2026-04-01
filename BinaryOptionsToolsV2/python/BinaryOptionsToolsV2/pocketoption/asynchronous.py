@@ -195,19 +195,10 @@ class PocketOptionAsync:
 
         self.logger = Logger()
 
-        # SSID Sanitizer: fix common shell-stripping issues (missing quotes around "auth")
+        # SSID Sanitizer and semantic validator
+        self._ssid_valid = False
         if ssid is not None:
-            ssid = re.sub(r"""42\[['"]?auth['"]?\s*,""", '42["auth",', ssid, count=1)
-            # Validate that the SSID is parseable JSON after the 42 prefix
-            if ssid.startswith("42["):
-                try:
-                    json.loads(ssid[2:])  # Validate JSON payload
-                except json.JSONDecodeError:
-                    self.logger.warn(f"SSID payload is not valid JSON after sanitization")
-
-        # Ensure it looks like a Socket.IO message
-        if ssid is not None and not ssid.startswith("42["):
-            self.logger.warn(f"SSID does not start with '42[': {ssid[:20]}...")
+            ssid = self._sanitize_and_validate_ssid(ssid)
         elif ssid is None:
             self.logger.warn("SSID is None, connection will likely fail")
 
@@ -242,6 +233,100 @@ class PocketOptionAsync:
 
         # Link to Rust Backend
         self.client: "RawPocketOption" = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
+
+    def _sanitize_and_validate_ssid(self, ssid: str) -> str:
+        """Sanitize SSID format and validate session payload semantics.
+
+        Performs three layers of validation:
+        1. Format normalization (fix shell-stripped quotes)
+        2. JSON structure validation (parseable payload)
+        3. Semantic validation (required fields, session format, expiration heuristics)
+
+        Args:
+            ssid: Raw SSID string from user input
+
+        Returns:
+            str: Sanitized SSID string ready for the Rust backend
+
+        Raises:
+            ValueError: If the SSID payload is semantically invalid (e.g., missing
+                required fields or malformed session token)
+        """
+        # Layer 1: Format normalization
+        ssid = re.sub(r"""42\[['"]?auth['"]?\s*,""", '42["auth",', ssid, count=1)
+
+        # Check Socket.IO envelope
+        if not ssid.startswith("42["):
+            self.logger.warn(f"SSID does not start with '42[': {ssid[:20]}...")
+            return ssid
+
+        # Layer 2: JSON structure validation
+        try:
+            payload = json.loads(ssid[2:])
+        except json.JSONDecodeError:
+            self.logger.warn("SSID payload is not valid JSON after sanitization")
+            return ssid
+
+        # The payload should be an array: ["auth", { ... }]
+        if not isinstance(payload, list) or len(payload) < 2:
+            self.logger.warn("SSID payload is not a valid Socket.IO auth array")
+            return ssid
+
+        auth_event = payload[0]
+        auth_data = payload[1] if len(payload) > 1 else {}
+
+        if not isinstance(auth_data, dict):
+            self.logger.warn("SSID auth data is not a dictionary")
+            return ssid
+
+        # Layer 3: Semantic validation
+        warnings = []
+
+        # Required fields check
+        required_fields = ["session", "uid"]
+        for field in required_fields:
+            if field not in auth_data:
+                warnings.append(f"missing required field '{field}'")
+
+        # Session token format: should be alphanumeric, typically 20-40 chars
+        session = auth_data.get("session", "")
+        if session and not re.match(r'^[a-zA-Z0-9_\-]{10,}$', str(session)):
+            warnings.append(f"session token has unexpected format (length={len(str(session))})")
+
+        # UID should be a positive integer
+        uid = auth_data.get("uid")
+        if uid is not None:
+            try:
+                uid_int = int(uid)
+                if uid_int <= 0:
+                    warnings.append(f"uid should be a positive integer, got {uid_int}")
+            except (ValueError, TypeError):
+                warnings.append(f"uid is not a valid integer: {uid!r}")
+
+        # Platform field (optional but if present should be 1 or 2)
+        platform = auth_data.get("platform")
+        if platform is not None and platform not in (1, 2):
+            warnings.append(f"unexpected platform value: {platform}")
+
+        # isDemo should be 0 or 1 if present
+        is_demo = auth_data.get("isDemo")
+        if is_demo is not None and is_demo not in (0, 1):
+            warnings.append(f"isDemo should be 0 or 1, got {is_demo}")
+
+        # Emit warnings
+        if warnings:
+            for w in warnings:
+                self.logger.warn(f"SSID validation: {w}")
+            # Only raise on critical issues (missing session/uid)
+            critical = [w for w in warnings if "missing required field" in w]
+            if critical:
+                raise ValueError(
+                    "Invalid SSID: " + "; ".join(critical) + ". "
+                    "The SSID payload must contain 'session' and 'uid' fields. "
+                    "Ensure your SSID follows the format: 42['auth',{{'session':'...','uid':123,...}}]")
+
+        self._ssid_valid = True
+        return ssid
 
     async def __aenter__(self):
         """
@@ -1115,6 +1200,23 @@ class PocketOptionAsync:
             bool: True if connected, False otherwise
         """
         return self.client.is_connected()
+
+    def is_ssid_valid(self) -> bool:
+        """
+        Checks if the SSID passed semantic validation during initialization.
+
+        Returns True if the SSID had all required fields (session, uid) and
+        passed format checks. Returns False if the SSID was malformed or
+        missing required fields (warnings were emitted but initialization
+        was allowed to proceed for backward compatibility).
+
+        Returns:
+            bool: True if SSID passed semantic validation, False otherwise
+
+        Example:
+            
+        """
+        return self._ssid_valid
 
     def max_subscriptions(self) -> int:
         """

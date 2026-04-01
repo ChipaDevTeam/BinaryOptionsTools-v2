@@ -69,14 +69,18 @@ async def test_async_raw_handler(api):
 
     # Read a few messages from stream
     print("Waiting for messages from stream...")
-    for i in range(3):
-        try:
-            message = await asyncio.wait_for(stream.__anext__(), timeout=30.0)
-            print(f"✓ Stream message {i + 1}: {message[:100]}...")
-            assert "EURUSD_otc" in message
-        except asyncio.TimeoutError:
-            print(f"✗ Timeout waiting for stream message {i + 1}")
-            raise
+    try:
+        for i in range(3):
+            try:
+                message = await asyncio.wait_for(stream.__anext__(), timeout=30.0)
+                print(f"✓ Stream message {i + 1}: {message[:100]}...")
+                assert "EURUSD_otc" in message
+            except asyncio.TimeoutError:
+                print(f"✗ Timeout waiting for stream message {i + 1}")
+                raise
+    finally:
+        if hasattr(stream, "cancel"):
+            stream.cancel()
 
     print("✓ Raw handler test completed")
 
@@ -163,10 +167,14 @@ def test_sync_raw_handler(api_sync):
 
     # Read a few messages from stream
     print("Waiting for messages from stream...")
-    for i in range(3):
-        message = next(stream)
-        print(f"✓ Stream message {i + 1}: {message[:100]}...")
-        assert "EURUSD_otc" in message
+    try:
+        for i in range(3):
+            message = next(stream)
+            print(f"✓ Stream message {i + 1}: {message[:100]}...")
+            assert "EURUSD_otc" in message
+    finally:
+        if hasattr(stream, "cancel"):
+            stream.cancel()
 
     print("✓ Sync raw handler test completed")
 
