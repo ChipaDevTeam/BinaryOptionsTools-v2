@@ -230,7 +230,16 @@ class PocketOption:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         self._lock = threading.RLock()
-        self._loop_thread = threading.Thread(target=self._run_loop, daemon=True)
+        # Use a closure to avoid creating a reference cycle through bound methods.
+        # The thread must not hold a strong reference to self, otherwise __del__
+        # is never triggered when del api is called.
+        loop = self.loop
+
+        def _run_loop():
+            asyncio.set_event_loop(loop)
+            loop.run_forever()
+
+        self._loop_thread = threading.Thread(target=_run_loop, daemon=True)
         self._loop_thread.start()
         # Small delay to ensure the background thread's run_forever is active
         import time
@@ -298,32 +307,22 @@ class PocketOption:
         exit was skipped due to an exception. This prevents thread leaks
         in long-running processes or test suites.
 
-        Unlike close(), __del__ uses aggressive timeouts and skips the
-        client shutdown (which requires a network connection that may
-        already be dropped). It only stops the loop and joins the thread.
+        Unlike close(), __del__ skips the client shutdown (which requires
+        a network connection) and directly stops the event loop. The daemon
+        thread will exit when the loop stops.
 
         Note: Relying on __del__ is not deterministic. Always prefer
         explicit close() or using the context manager protocol.
         """
         try:
-            if hasattr(self, "loop") and self.loop is not None and not self.loop.is_closed():
-                with self._lock:
-                    if self.loop is None or self.loop.is_closed():
-                        return
-                    try:
-                        pending = asyncio.run_coroutine_threadsafe(
-                            self._cancel_all_tasks(), self.loop
-                        )
-                        pending.result(timeout=2)
-                    except Exception:
-                        pass
-                    if not self.loop.is_closed():
-                        self.loop.call_soon_threadsafe(self.loop.stop)
-                    if hasattr(self, "_loop_thread") and self._loop_thread.is_alive():
-                        self._loop_thread.join(timeout=2)
-                    if not self.loop.is_closed():
-                        self.loop.close()
-                    self.loop = None
+            loop = getattr(self, "loop", None)
+            thread = getattr(self, "_loop_thread", None)
+            if loop is not None and not loop.is_closed():
+                loop.call_soon_threadsafe(loop.stop)
+                if thread is not None and thread.is_alive():
+                    thread.join(timeout=3)
+                if not loop.is_closed():
+                    loop.close()
         except Exception:
             pass
 
