@@ -82,7 +82,7 @@ impl TickData {
     pub fn get_price(&self) -> f64 {
         self.close.or(self.price).unwrap_or(0.0)
     }
-    
+
     /// Get the asset name
     pub fn get_asset(&self) -> String {
         self.asset.clone().unwrap_or_default()
@@ -492,11 +492,20 @@ impl GetCandlesApiModule {
                         .into_iter()
                         .filter_map(|tick_data| {
                             // Check if this is candle data (has OHLC fields) or tick data
-                            if let (Some(open), Some(high), Some(low), Some(close)) = 
-                                (tick_data.open, tick_data.high, tick_data.low, tick_data.close) {
+                            let timestamp = if tick_data.time > 1_000_000_000_000.0 {
+                                (tick_data.time / 1000.0).round() as i64
+                            } else {
+                                tick_data.time.round() as i64
+                            };
+                            if let (Some(open), Some(high), Some(low), Some(close)) = (
+                                tick_data.open,
+                                tick_data.high,
+                                tick_data.low,
+                                tick_data.close,
+                            ) {
                                 // This is candle data with OHLC
                                 let base_candle = BaseCandle {
-                                    timestamp: tick_data.time.round() as i64,
+                                    timestamp,
                                     open,
                                     high,
                                     low,
@@ -509,7 +518,7 @@ impl GetCandlesApiModule {
                                 // This is tick data, convert to single-price candle
                                 let price = tick_data.get_price();
                                 let base_candle = BaseCandle {
-                                    timestamp: tick_data.time.round() as i64,
+                                    timestamp,
                                     open: price,
                                     high: price,
                                     low: price,
@@ -534,7 +543,14 @@ impl GetCandlesApiModule {
                     let ticks: Vec<(i64, f64)> = result
                         .data
                         .into_iter()
-                        .map(|tick_data| (tick_data.time.round() as i64, tick_data.get_price()))
+                        .map(|tick_data| {
+                            let timestamp = if tick_data.time > 1_000_000_000_000.0 {
+                                (tick_data.time / 1000.0).round() as i64
+                            } else {
+                                tick_data.time.round() as i64
+                            };
+                            (timestamp, tick_data.get_price())
+                        })
                         .collect();
 
                     if let Err(e) = self

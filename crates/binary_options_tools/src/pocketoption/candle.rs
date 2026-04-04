@@ -80,7 +80,13 @@ impl<'de> Deserialize<'de> for BaseCandle {
                 let timestamp_raw: f64 = seq
                     .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
-                let timestamp = timestamp_raw as i64;
+
+                // Normalize all timestamps to seconds
+                let timestamp = if timestamp_raw > 1_000_000_000_000.0 {
+                    (timestamp_raw / 1000.0) as i64
+                } else {
+                    timestamp_raw as i64
+                };
                 let open = seq
                     .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
@@ -121,14 +127,24 @@ pub enum HistoryItem {
 impl HistoryItem {
     pub fn to_tick(&self) -> (i64, f64) {
         match self {
-            HistoryItem::Tick([t, p]) => (
-                t.as_f64().unwrap_or_default() as i64,
-                p.as_f64().unwrap_or_default(),
-            ),
-            HistoryItem::TickWithNull([t, p, _]) => (
-                t.as_f64().unwrap_or_default() as i64,
-                p.as_f64().unwrap_or_default(),
-            ),
+            HistoryItem::Tick([t, p]) => {
+                let ts = t.as_f64().unwrap_or_default();
+                let timestamp = if ts > 1_000_000_000_000.0 {
+                    (ts / 1000.0) as i64
+                } else {
+                    ts as i64
+                };
+                (timestamp, p.as_f64().unwrap_or_default())
+            }
+            HistoryItem::TickWithNull([t, p, _]) => {
+                let ts = t.as_f64().unwrap_or_default();
+                let timestamp = if ts > 1_000_000_000_000.0 {
+                    (ts / 1000.0) as i64
+                } else {
+                    ts as i64
+                };
+                (timestamp, p.as_f64().unwrap_or_default())
+            }
         }
     }
 }
@@ -396,6 +412,7 @@ pub fn compile_candles_from_ticks(ticks: &[HistoryItem], period: u32, symbol: &s
     let mut current_boundary_idx: Option<i64> = None;
 
     for (timestamp, price) in sorted_ticks {
+        // Timestamps are already normalized to seconds by to_tick()
         let boundary_idx = timestamp / period_i64;
         let boundary = boundary_idx * period_i64;
 
@@ -506,9 +523,11 @@ impl SubscriptionType {
                 candle,
             } => {
                 if *current == 0 {
+                    // First candle in chunk - preserve its timestamp as the chunk start time
                     *candle = new_candle.clone();
                 } else {
-                    candle.timestamp = new_candle.timestamp;
+                    // Keep the original chunk start timestamp - DO NOT update with latest candle time
+                    // This ensures aggregated candles are properly aligned to their start boundary
                     candle.high = candle.high.max(new_candle.high);
                     candle.low = candle.low.min(new_candle.low);
                     candle.close = new_candle.close;
@@ -716,6 +735,22 @@ mod tests {
         assert_eq!(c.high.to_string(), "1.5");
         assert_eq!(c.low.to_string(), "1.5");
         assert_eq!(c.close.to_string(), "1.5");
+    }
+
+    #[test]
+    fn test_compile_candles_millisecond_timestamps() {
+        // Timestamps in milliseconds (1.7e12 is year 2024)
+        let ticks = vec![
+            HistoryItem::Tick([1714529180000u64.into(), 1.0.into()]),
+            HistoryItem::Tick([1714529181000u64.into(), 1.1.into()]),
+            HistoryItem::Tick([1714529240000u64.into(), 1.2.into()]),
+        ];
+        let candles = compile_candles_from_ticks(&ticks, 60, "TEST");
+
+        assert_eq!(candles.len(), 2);
+        // Should be normalized to seconds boundaries
+        assert_eq!(candles[0].timestamp, 1714529160);
+        assert_eq!(candles[1].timestamp, 1714529220);
     }
 
     #[test]
