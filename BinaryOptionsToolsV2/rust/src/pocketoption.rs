@@ -401,6 +401,51 @@ impl RawPocketOption {
         })
     }
 
+    pub fn cancel_pending_order<'py>(
+        &self,
+        py: Python<'py>,
+        ticket: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let res = client
+                .cancel_pending_order(ticket)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| {
+                let result = serde_json::json!({
+                    "ticket": res,
+                    "status": "cancelled"
+                });
+                serde_json::to_string(&result)
+                    .map_err(BinaryErrorPy::from)?
+                    .into_py_any(py)
+            })
+        })
+    }
+
+    pub fn cancel_pending_orders<'py>(
+        &self,
+        py: Python<'py>,
+        tickets: Vec<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let res = client
+                .cancel_pending_orders(tickets)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| {
+                let result = serde_json::json!({
+                    "cancelled": res
+                });
+                serde_json::to_string(&result)
+                    .map_err(BinaryErrorPy::from)?
+                    .into_py_any(py)
+            })
+        })
+    }
+
     pub fn closed_deals<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {

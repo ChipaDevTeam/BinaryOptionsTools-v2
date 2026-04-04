@@ -368,7 +368,7 @@ class PocketOptionAsync:
         """
         (trade_id, trade) = await self.client.buy(asset, amount, time)
         if check_win:
-            return trade_id, await self.check_win(trade_id, timeout_seconds=time + 15)
+            return trade_id, await self.check_win(trade_id, timeout_seconds=time + 30)
         else:
             trade = json.loads(trade)
             return trade_id, trade
@@ -400,7 +400,7 @@ class PocketOptionAsync:
         """
         (trade_id, trade) = await self.client.sell(asset, amount, time)
         if check_win:
-            return trade_id, await self.check_win(trade_id, timeout_seconds=time + 15)
+            return trade_id, await self.check_win(trade_id, timeout_seconds=time + 30)
         else:
             trade = json.loads(trade)
             return trade_id, trade
@@ -439,9 +439,12 @@ class PocketOptionAsync:
         if timeout_seconds is None:
             timeout_seconds = getattr(self.config, "check_win_timeout_secs", 300)
 
+        # If timeout_seconds is 0, we wait indefinitely
+        actual_timeout = timeout_seconds if timeout_seconds > 0 else None
+
         try:
             # Use asyncio.wait_for as additional protection against hanging
-            trade = await asyncio.wait_for(self._get_trade_result(id), timeout=timeout_seconds)
+            trade = await asyncio.wait_for(self._get_trade_result(id), timeout=actual_timeout)
             return trade
         except asyncio.TimeoutError:
             raise TimeoutError(f"Timeout waiting for trade result for ID: {id}")

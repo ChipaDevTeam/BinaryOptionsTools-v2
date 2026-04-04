@@ -639,7 +639,7 @@ impl fmt::Display for OpenOrder {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingOrder {
     pub ticket: Uuid,

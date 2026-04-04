@@ -455,6 +455,26 @@ impl ApiModule<State> for PendingTradesApiModule {
                                 if let Some((event, payload)) = frame.extract_event() {
                                     if event == "successopenPendingOrder" || event == "failopenPendingOrder" {
                                         serde_json::from_value::<ServerResponse>(payload).map_err(|e| e.to_string())
+                                    } else if event == "successcancelPendingOrder" || event == "failcancelPendingOrder" || 
+                                              event == "successcancelPendingOrders" || event == "failcancelPendingOrders" {
+                                        // Handle cancellation responses
+                                        match serde_json::from_value::<CancelServerResponse>(payload) {
+                                            Ok(cancel_res) => {
+                                                if let Some(req_id) = self.pending_requests.pop_front() {
+                                                    let resp = match cancel_res {
+                                                        CancelServerResponse::SingleSuccess { ticket } => CommandResponse::CancelSuccess { req_id, ticket },
+                                                        CancelServerResponse::BatchSuccess { cancelled } => CommandResponse::BatchCancelSuccess { req_id, cancelled },
+                                                        CancelServerResponse::Error { error } => CommandResponse::CancelError { req_id, error },
+                                                    };
+                                                    if let Err(e) = self.command_responder.send(resp).await {
+                                                        warn!(target: "PendingTradesApiModule", "Failed to send cancel response: {}", e);
+                                                    }
+                                                }
+                                                // Return a dummy Success to satisfy the outer match, but we already sent the command response
+                                                Ok(ServerResponse::Success(Box::new(PendingOrder::default())))
+                                            }
+                                            Err(e) => Err(e.to_string()),
+                                        }
                                     } else {
                                         serde_json::from_str::<ServerResponse>(text).map_err(|e| e.to_string())
                                     }

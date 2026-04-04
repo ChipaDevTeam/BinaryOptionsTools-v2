@@ -712,6 +712,36 @@ impl PocketOption {
             .await
     }
 
+    /// Cancels a pending order by its ticket identifier.
+    ///
+    /// # Arguments
+    /// * `ticket` - The unique ticket string identifying the pending order to cancel.
+    ///
+    /// # Returns
+    /// * `Ok(String)` - The ticket of the successfully cancelled order.
+    pub async fn cancel_pending_order(&self, ticket: String) -> PocketResult<String> {
+        self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
+            .await?
+            .with_lock(self.pending_trades_lock.clone())
+            .cancel_pending_order(ticket)
+            .await
+    }
+
+    /// Cancels multiple pending orders in a single batch operation.
+    ///
+    /// # Arguments
+    /// * `tickets` - A vector of ticket strings identifying the pending orders to cancel.
+    ///
+    /// # Returns
+    /// * `Ok(Vec<String>)` - A vector of tickets that were successfully cancelled.
+    pub async fn cancel_pending_orders(&self, tickets: Vec<String>) -> PocketResult<Vec<String>> {
+        self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
+            .await?
+            .with_lock(self.pending_trades_lock.clone())
+            .cancel_pending_orders(tickets)
+            .await
+    }
+
     /// Subscribes to a specific asset's updates.
     pub async fn subscribe(
         &self,
