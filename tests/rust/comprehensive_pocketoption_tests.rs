@@ -419,9 +419,18 @@ async fn test_pending_order_functions() {
 
                     // Test cancel_pending_order
                     println!("\n--- Testing Cancel Pending Order ---");
-                    // Note: cancel_pending_order is on the PendingTradesHandle
-                    // For this test, we'll just verify the order exists
-                    println!("✓ Pending order exists and can be cancelled");
+                    match tokio::time::timeout(
+                        Duration::from_secs(30),
+                        api.cancel_pending_order(pending_order.ticket.to_string()),
+                    )
+                    .await
+                    {
+                        Ok(Ok(cancelled_ticket)) => {
+                            println!("✓ Pending order cancelled: {}", cancelled_ticket);
+                        }
+                        Ok(Err(e)) => println!("⚠ Cancel pending order failed: {}", e),
+                        Err(_) => println!("⚠ Cancel pending order timed out"),
+                    }
                 }
                 Ok(Err(e)) => println!("⚠ Open pending order failed: {}", e),
                 Err(_) => println!("⚠ Open pending order timed out"),
@@ -449,6 +458,21 @@ async fn test_pending_order_functions() {
                     println!("✓ Pending order created (price-based)");
                     println!("  Ticket: {}", pending_order.ticket);
                     println!("  Target price: {}", target_price);
+
+                    // Test cancel_pending_orders (batch multi-order cancellation)
+                    println!("\n--- Testing Cancel Pending Orders (Batch) ---");
+                    match tokio::time::timeout(
+                        Duration::from_secs(30),
+                        api.cancel_pending_orders(vec![pending_order.ticket.to_string()]),
+                    )
+                    .await
+                    {
+                        Ok(Ok(cancelled_tickets)) => {
+                            println!("✓ Batch cancelled tickets: {:?}", cancelled_tickets);
+                        }
+                        Ok(Err(e)) => println!("⚠ Batch cancel pending orders failed: {}", e),
+                        Err(_) => println!("⚠ Batch cancel pending orders timed out"),
+                    }
                 }
                 Ok(Err(e)) => println!("⚠ Open pending order (price) failed: {}", e),
                 Err(_) => println!("⚠ Open pending order (price) timed out"),

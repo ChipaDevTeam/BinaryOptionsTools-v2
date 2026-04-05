@@ -28,6 +28,8 @@ use crate::pocketoption::modules::pending_trades::{
     Command, CommandResponse, PendingTradesApiModule, PendingTradesHandle,
 };
 
+use crate::pocketoption::modules::pending_trades::CancelServerResponse;
+
 // ============== Mock Helpers ==============
 
 /// Creates a minimal mock State with only the fields needed for testing
@@ -804,4 +806,223 @@ fn test_rule_returns_multi_pattern_rule() {
     assert!(rule.call(&Message::Text("42[\"successopenPendingOrder\",{}]".into())));
     assert!(rule.call(&Message::Text("42[\"failopenPendingOrder\",{}]".into())));
     assert!(!rule.call(&Message::Text("42[\"unknown\",{}]".into())));
+}
+
+#[tokio::test]
+async fn test_cancel_pending_order_success() {
+    let (cmd_tx, cmd_rx) = kanal::bounded_async(1);
+    let (resp_tx, resp_rx) = kanal::bounded_async(1);
+    let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
+    let (ws_tx, ws_rx) = kanal::bounded_async(1);
+    let (runner_tx, _) = kanal::bounded_async(1);
+
+    let state = create_mock_state();
+
+    let mut module = PendingTradesApiModule::new(
+        state.clone(),
+        cmd_rx,
+        resp_tx.clone(),
+        msg_rx,
+        ws_tx.clone(),
+        runner_tx,
+    );
+
+    let client_handle = PendingTradesApiModule::create_handle(cmd_tx, resp_rx);
+
+    let module_task = tokio::spawn(async move {
+        module.run().await.ok();
+    });
+
+    let ticket = Uuid::new_v4().to_string();
+    let ticket_for_response = ticket.clone();
+    let ticket_for_assert = ticket.clone();
+
+    let result_handle =
+        tokio::spawn(async move { client_handle.cancel_pending_order(ticket).await });
+
+    tokio::time::sleep(Duration::from_millis(10)).await;
+
+    let server_response = CancelServerResponse::SingleSuccess {
+        ticket: ticket_for_response,
+    };
+    let response_json = create_socket_io_text_message(
+        "successcancelPendingOrder",
+        &serde_json::to_value(server_response).unwrap(),
+    );
+
+    msg_tx
+        .send(Arc::new(Message::Text(response_json.into())))
+        .await
+        .unwrap();
+
+    let result = result_handle.await.unwrap();
+
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), ticket_for_assert);
+
+    module_task.abort();
+}
+
+#[tokio::test]
+async fn test_cancel_pending_order_failure() {
+    let (cmd_tx, cmd_rx) = kanal::bounded_async(1);
+    let (resp_tx, resp_rx) = kanal::bounded_async(1);
+    let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
+    let (ws_tx, ws_rx) = kanal::bounded_async(1);
+    let (runner_tx, _) = kanal::bounded_async(1);
+
+    let state = create_mock_state();
+
+    let mut module = PendingTradesApiModule::new(
+        state.clone(),
+        cmd_rx,
+        resp_tx.clone(),
+        msg_rx,
+        ws_tx.clone(),
+        runner_tx,
+    );
+
+    let client_handle = PendingTradesApiModule::create_handle(cmd_tx, resp_rx);
+
+    let module_task = tokio::spawn(async move {
+        module.run().await.ok();
+    });
+
+    let ticket = Uuid::new_v4().to_string();
+
+    let result_handle =
+        tokio::spawn(async move { client_handle.cancel_pending_order(ticket.clone()).await });
+
+    tokio::time::sleep(Duration::from_millis(10)).await;
+
+    let server_response = CancelServerResponse::Error {
+        error: "Deal not found".to_string(),
+    };
+    let response_json = create_socket_io_text_message(
+        "failcancelPendingOrder",
+        &serde_json::to_value(server_response).unwrap(),
+    );
+
+    msg_tx
+        .send(Arc::new(Message::Text(response_json.into())))
+        .await
+        .unwrap();
+
+    let result = result_handle.await.unwrap();
+
+    assert!(result.is_err());
+
+    module_task.abort();
+}
+
+#[tokio::test]
+async fn test_cancel_pending_orders_batch_success() {
+    let (cmd_tx, cmd_rx) = kanal::bounded_async(1);
+    let (resp_tx, resp_rx) = kanal::bounded_async(1);
+    let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
+    let (ws_tx, ws_rx) = kanal::bounded_async(1);
+    let (runner_tx, _) = kanal::bounded_async(1);
+
+    let state = create_mock_state();
+
+    let mut module = PendingTradesApiModule::new(
+        state.clone(),
+        cmd_rx,
+        resp_tx.clone(),
+        msg_rx,
+        ws_tx.clone(),
+        runner_tx,
+    );
+
+    let client_handle = PendingTradesApiModule::create_handle(cmd_tx, resp_rx);
+
+    let module_task = tokio::spawn(async move {
+        module.run().await.ok();
+    });
+
+    let ticket1 = Uuid::new_v4().to_string();
+    let ticket2 = Uuid::new_v4().to_string();
+    let tickets = vec![ticket1.clone(), ticket2.clone()];
+    let tickets_response = tickets.clone();
+
+    let result_handle =
+        tokio::spawn(async move { client_handle.cancel_pending_orders(tickets).await });
+
+    tokio::time::sleep(Duration::from_millis(10)).await;
+
+    let server_response = CancelServerResponse::BatchSuccess {
+        cancelled: tickets_response,
+    };
+    let response_json = create_socket_io_text_message(
+        "successcancelPendingOrders",
+        &serde_json::to_value(server_response).unwrap(),
+    );
+
+    msg_tx
+        .send(Arc::new(Message::Text(response_json.into())))
+        .await
+        .unwrap();
+
+    let result = result_handle.await.unwrap();
+
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().len(), 2);
+
+    module_task.abort();
+}
+
+#[tokio::test]
+async fn test_cancel_pending_orders_batch_partial_success() {
+    let (cmd_tx, cmd_rx) = kanal::bounded_async(1);
+    let (resp_tx, resp_rx) = kanal::bounded_async(1);
+    let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
+    let (ws_tx, ws_rx) = kanal::bounded_async(1);
+    let (runner_tx, _) = kanal::bounded_async(1);
+
+    let state = create_mock_state();
+
+    let mut module = PendingTradesApiModule::new(
+        state.clone(),
+        cmd_rx,
+        resp_tx.clone(),
+        msg_rx,
+        ws_tx.clone(),
+        runner_tx,
+    );
+
+    let client_handle = PendingTradesApiModule::create_handle(cmd_tx, resp_rx);
+
+    let module_task = tokio::spawn(async move {
+        module.run().await.ok();
+    });
+
+    let ticket1 = Uuid::new_v4().to_string();
+    let ticket2 = Uuid::new_v4().to_string();
+    let tickets = vec![ticket1.clone(), ticket2.clone()];
+
+    let result_handle =
+        tokio::spawn(async move { client_handle.cancel_pending_orders(tickets.clone()).await });
+
+    tokio::time::sleep(Duration::from_millis(10)).await;
+
+    let server_response = CancelServerResponse::BatchSuccess {
+        cancelled: vec![ticket1],
+    };
+    let response_json = create_socket_io_text_message(
+        "successcancelPendingOrders",
+        &serde_json::to_value(server_response).unwrap(),
+    );
+
+    msg_tx
+        .send(Arc::new(Message::Text(response_json.into())))
+        .await
+        .unwrap();
+
+    let result = result_handle.await.unwrap();
+
+    assert!(result.is_ok());
+    let cancelled = result.unwrap();
+    assert_eq!(cancelled.len(), 1);
+
+    module_task.abort();
 }

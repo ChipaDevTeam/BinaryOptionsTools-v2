@@ -81,6 +81,12 @@ class MockRawClient:
     ):
         return json.dumps({"id": "pending_1", "status": "pending"})
 
+    async def cancel_pending_order(self, ticket):
+        return json.dumps({"ticket": ticket, "status": "cancelled"})
+
+    async def cancel_pending_orders(self, tickets):
+        return json.dumps({"cancelled": tickets})
+
     async def closed_deals(self):
         return json.dumps(
             [
@@ -635,6 +641,77 @@ class TestOpenPendingOrder:
             )
 
 
+class TestCancelPendingOrder:
+    """Tests for cancel_pending_order method."""
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_order_success(self, async_client):
+        """Test successful pending order cancellation."""
+        result = await async_client.cancel_pending_order("12345")
+        assert isinstance(result, dict)
+        assert result["ticket"] == "12345"
+        assert result["status"] == "cancelled"
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_order_with_uuid(self, async_client):
+        """Test cancellation with UUID ticket."""
+        ticket = "550e8400-e29b-41d4-a716-446655440000"
+        result = await async_client.cancel_pending_order(ticket)
+        assert isinstance(result, dict)
+        assert result["ticket"] == ticket
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_order_error(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Test cancel_pending_order when cancellation fails."""
+        mock_raw_pocketoption.cancel_pending_order = AsyncMock(
+            side_effect=Exception("Deal not found")
+        )
+        with pytest.raises(Exception, match="Deal not found"):
+            await async_client.cancel_pending_order("99999")
+
+
+class TestCancelPendingOrders:
+    """Tests for cancel_pending_orders (multi-order) method."""
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_orders_success(self, async_client):
+        """Test successful batch pending order cancellation."""
+        tickets = ["12345", "12346", "12347"]
+        result = await async_client.cancel_pending_orders(tickets)
+        assert isinstance(result, dict)
+        assert "cancelled" in result
+        assert len(result["cancelled"]) == 3
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_orders_partial(self, async_client):
+        """Test batch cancellation with partial success."""
+        tickets = ["12345", "12346"]
+        result = await async_client.cancel_pending_orders(tickets)
+        assert isinstance(result, dict)
+        assert "cancelled" in result
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_orders_empty(self, async_client):
+        """Test batch cancellation with empty list."""
+        result = await async_client.cancel_pending_orders([])
+        assert isinstance(result, dict)
+        assert "cancelled" in result
+        assert len(result["cancelled"]) == 0
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_orders_error(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Test cancel_pending_orders when batch cancellation fails."""
+        mock_raw_pocketoption.cancel_pending_orders = AsyncMock(
+            side_effect=Exception("Batch cancellation failed")
+        )
+        with pytest.raises(Exception, match="Batch cancellation failed"):
+            await async_client.cancel_pending_orders(["12345", "12346"])
+
+
 class TestClosedDeals:
     """Tests for closed_deals method."""
 
@@ -1182,13 +1259,13 @@ class TestSsidValidation:
 
     def test_non_42_prefix_returns_unchanged(self):
         """An SSID not starting with 42[ is returned as-is with validation skipped."""
-        ssid = 'not_a_valid_ssid'
+        ssid = "not_a_valid_ssid"
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
         assert client.is_ssid_valid() is False
 
     def test_invalid_json_returns_unchanged(self):
         """An SSID with invalid JSON after 42[ is returned as-is with validation skipped."""
-        ssid = '42[not valid json'
+        ssid = "42[not valid json"
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
         assert client.is_ssid_valid() is False
 

@@ -128,6 +128,12 @@ class MockPocketOptionAsync:
     ):
         return {"id": "pending_1", "status": "pending"}
 
+    async def cancel_pending_order(self, ticket):
+        return {"ticket": ticket, "status": "cancelled"}
+
+    async def cancel_pending_orders(self, tickets):
+        return {"cancelled": tickets}
+
     async def closed_deals(self):
         return [
             {
@@ -690,6 +696,66 @@ class TestOpenPendingOrder:
             sync_client.open_pending_order(
                 0, -1.0, "EURUSD_otc", 1700000000, 1.1, 60, 80, 0
             )
+
+
+class TestCancelPendingOrder:
+    """Tests for cancel_pending_order method."""
+
+    def test_cancel_pending_order_success(self, sync_client):
+        """Test successful pending order cancellation."""
+        result = sync_client.cancel_pending_order("12345")
+        assert isinstance(result, dict)
+        assert result["ticket"] == "12345"
+        assert result["status"] == "cancelled"
+
+    def test_cancel_pending_order_with_uuid(self, sync_client):
+        """Test cancellation with UUID ticket."""
+        ticket = "550e8400-e29b-41d4-a716-446655440000"
+        result = sync_client.cancel_pending_order(ticket)
+        assert isinstance(result, dict)
+        assert result["ticket"] == ticket
+
+    def test_cancel_pending_order_error(self, sync_client, mock_pocketoption_async):
+        """Test cancel_pending_order when cancellation fails."""
+        mock_pocketoption_async.cancel_pending_order = AsyncMock(
+            side_effect=Exception("Deal not found")
+        )
+        with pytest.raises(Exception, match="Deal not found"):
+            sync_client.cancel_pending_order("99999")
+
+
+class TestCancelPendingOrders:
+    """Tests for cancel_pending_orders (multi-order) method."""
+
+    def test_cancel_pending_orders_success(self, sync_client):
+        """Test successful batch pending order cancellation."""
+        tickets = ["12345", "12346", "12347"]
+        result = sync_client.cancel_pending_orders(tickets)
+        assert isinstance(result, dict)
+        assert "cancelled" in result
+        assert len(result["cancelled"]) == 3
+
+    def test_cancel_pending_orders_partial(self, sync_client):
+        """Test batch cancellation with partial success."""
+        tickets = ["12345", "12346"]
+        result = sync_client.cancel_pending_orders(tickets)
+        assert isinstance(result, dict)
+        assert "cancelled" in result
+
+    def test_cancel_pending_orders_empty(self, sync_client):
+        """Test batch cancellation with empty list."""
+        result = sync_client.cancel_pending_orders([])
+        assert isinstance(result, dict)
+        assert "cancelled" in result
+        assert len(result["cancelled"]) == 0
+
+    def test_cancel_pending_orders_error(self, sync_client, mock_pocketoption_async):
+        """Test cancel_pending_orders when batch cancellation fails."""
+        mock_pocketoption_async.cancel_pending_orders = AsyncMock(
+            side_effect=Exception("Batch cancellation failed")
+        )
+        with pytest.raises(Exception, match="Batch cancellation failed"):
+            sync_client.cancel_pending_orders(["12345", "12346"])
 
 
 class TestClosedDeals:
