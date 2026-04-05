@@ -14,6 +14,7 @@ use tracing::warn;
 use crate::{
     error::{BinaryOptionsError, BinaryOptionsResult},
     pocketoption::error::{PocketError, PocketResult},
+    pocketoption::utils::normalize_timestamp,
 };
 
 /// Candle data structure for PocketOption price data
@@ -81,12 +82,7 @@ impl<'de> Deserialize<'de> for BaseCandle {
                     .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
 
-                // Normalize all timestamps to seconds
-                let timestamp = if timestamp_raw > 1_000_000_000_000.0 {
-                    (timestamp_raw / 1000.0) as i64
-                } else {
-                    timestamp_raw as i64
-                };
+                let timestamp = normalize_timestamp(timestamp_raw);
                 let open = seq
                     .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
@@ -129,28 +125,84 @@ impl HistoryItem {
         match self {
             HistoryItem::Tick([t, p]) => {
                 let ts = t.as_f64().unwrap_or_default();
-                let timestamp = if ts > 1_000_000_000_000.0 {
-                    (ts / 1000.0) as i64
-                } else {
-                    ts as i64
-                };
+                let timestamp = normalize_timestamp(ts);
                 (timestamp, p.as_f64().unwrap_or_default())
             }
             HistoryItem::TickWithNull([t, p, _]) => {
                 let ts = t.as_f64().unwrap_or_default();
-                let timestamp = if ts > 1_000_000_000_000.0 {
-                    (ts / 1000.0) as i64
-                } else {
-                    ts as i64
-                };
+                let timestamp = normalize_timestamp(ts);
                 (timestamp, p.as_f64().unwrap_or_default())
             }
         }
     }
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
-pub struct CandleItem(pub f64, pub f64, pub f64, pub f64, pub f64, pub f64); // timestamp, open, close, high, low, volume
+/// Raw candle item from server responses: [timestamp, open, close, high, low, volume]
+/// Timestamp is automatically normalized from milliseconds if needed.
+#[derive(Debug, Clone)]
+pub struct CandleItem {
+    pub timestamp: i64,
+    pub open: f64,
+    pub close: f64,
+    pub high: f64,
+    pub low: f64,
+    pub volume: f64,
+}
+
+impl<'de> Deserialize<'de> for CandleItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct CandleItemVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for CandleItemVisitor {
+            type Value = CandleItem;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str(
+                    "a sequence of 6 elements: [timestamp, open, close, high, low, volume]",
+                )
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let timestamp_raw: f64 = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
+                let timestamp = normalize_timestamp(timestamp_raw);
+                let open = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
+                let close = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(2, &self))?;
+                let high = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(3, &self))?;
+                let low = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(4, &self))?;
+                let volume = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(5, &self))?;
+
+                Ok(CandleItem {
+                    timestamp,
+                    open,
+                    close,
+                    high,
+                    low,
+                    volume,
+                })
+            }
+        }
+
+        deserializer.deserialize_seq(CandleItemVisitor)
+    }
+}
 
 impl Candle {
     /// Create a new candle with initial price
@@ -553,8 +605,7 @@ impl SubscriptionType {
                     return Ok(None);
                 }
 
-                // Update the aggregated candle
-                candle.timestamp = new_candle.timestamp;
+                // Update the aggregated candle - preserve the start timestamp (industry standard for OHLC)
                 candle.high = candle.high.max(new_candle.high);
                 candle.low = candle.low.min(new_candle.low);
                 candle.close = new_candle.close;
@@ -596,10 +647,10 @@ impl SubscriptionType {
 
                 if new_candle.timestamp < boundary {
                     // The new candle is within the current time window. Aggregate its data.
+                    // Do NOT update the timestamp - preserve the start of the aggregation window.
                     candle.high = candle.high.max(new_candle.high);
                     candle.low = candle.low.min(new_candle.low);
                     candle.close = new_candle.close;
-                    candle.timestamp = new_candle.timestamp;
                     if let (Some(v_agg), Some(v_new)) = (&mut candle.volume, new_candle.volume) {
                         *v_agg += v_new;
                     } else if new_candle.volume.is_some() {
@@ -812,6 +863,172 @@ mod tests {
         assert_eq!(candles[0].timestamp, 1000);
         assert_eq!(candles[1].timestamp, 1020);
         assert_eq!(candles[2].timestamp, 1040);
+    }
+
+    #[test]
+    fn test_normalize_timestamp_seconds_rounding() {
+        use crate::pocketoption::utils::normalize_timestamp;
+        // Sub-second timestamps should be rounded, not truncated
+        assert_eq!(normalize_timestamp(1774789371.94), 1774789372);
+        assert_eq!(normalize_timestamp(1774789371.50), 1774789372);
+        assert_eq!(normalize_timestamp(1774789371.49), 1774789371);
+        assert_eq!(normalize_timestamp(1774789371.00), 1774789371);
+    }
+
+    #[test]
+    fn test_normalize_timestamp_milliseconds() {
+        use crate::pocketoption::utils::normalize_timestamp;
+        // Millisecond timestamps should be divided by 1000 and rounded
+        assert_eq!(normalize_timestamp(1714529180000.0), 1714529180);
+        assert_eq!(normalize_timestamp(1714529180500.0), 1714529181);
+        assert_eq!(normalize_timestamp(1714529180400.0), 1714529180);
+    }
+
+    #[test]
+    fn test_base_candle_ms_timestamp_rounding() {
+        // BaseCandle deserializer should round (not truncate) ms timestamps
+        let data = r#"[1714529180500.0,0.92124,0.92155,0.92162,0.92124]"#;
+        let candle: BaseCandle = serde_json::from_str(data).unwrap();
+        // 1714529180500 / 1000 = 1714529180.5 -> rounds to 1714529181
+        assert_eq!(candle.timestamp, 1714529181);
+    }
+
+    #[test]
+    fn test_base_candle_second_timestamp_rounding() {
+        // BaseCandle deserializer should round sub-second timestamps
+        let data = r#"[1774789371.94,0.92124,0.92155,0.92162,0.92124]"#;
+        let candle: BaseCandle = serde_json::from_str(data).unwrap();
+        // 1774789371.94 -> rounds to 1774789372
+        assert_eq!(candle.timestamp, 1774789372);
+    }
+
+    #[test]
+    fn test_history_item_ms_timestamp_rounding() {
+        // HistoryItem::to_tick() should round ms timestamps
+        let item = HistoryItem::Tick([serde_json::json!(1714529180500.0), serde_json::json!(1.5)]);
+        let (ts, _price) = item.to_tick();
+        assert_eq!(ts, 1714529181);
+    }
+
+    #[test]
+    fn test_history_item_second_timestamp_rounding() {
+        // HistoryItem::to_tick() should round sub-second timestamps
+        let item = HistoryItem::Tick([serde_json::json!(1774789371.94), serde_json::json!(1.5)]);
+        let (ts, _price) = item.to_tick();
+        assert_eq!(ts, 1774789372);
+    }
+
+    #[test]
+    fn test_candle_item_ms_timestamp_normalization() {
+        // CandleItem deserializer should normalize ms timestamps
+        let data = r#"[1714529180500.0,0.92124,0.92155,0.92162,0.92124,100.0]"#;
+        let item: CandleItem = serde_json::from_str(data).unwrap();
+        assert_eq!(item.timestamp, 1714529181);
+    }
+
+    #[test]
+    fn test_candle_item_second_timestamp_normalization() {
+        // CandleItem deserializer should round sub-second timestamps
+        let data = r#"[1774789371.94,0.92124,0.92155,0.92162,0.92124,100.0]"#;
+        let item: CandleItem = serde_json::from_str(data).unwrap();
+        assert_eq!(item.timestamp, 1774789372);
+    }
+
+    #[test]
+    fn test_subscription_time_preserves_start_timestamp() {
+        use std::time::Duration as StdDuration;
+        let mut sub = SubscriptionType::time(StdDuration::from_secs(60));
+
+        // First tick at t=1000 - initializes the window
+        let tick1 = BaseCandle::new(1000, 1.0, 1.0, 1.0, 1.0, None);
+        assert!(sub.update(&tick1).unwrap().is_none());
+
+        // Second tick at t=1030 (within 60s window, updates OHLC but NOT timestamp)
+        let tick2 = BaseCandle::new(1030, 1.1, 1.1, 1.1, 1.1, None);
+        assert!(sub.update(&tick2).unwrap().is_none());
+
+        // Third tick at t=1060 (exceeds 60s window, should complete candle)
+        let tick3 = BaseCandle::new(1060, 1.2, 1.2, 1.2, 1.2, None);
+        let completed = sub.update(&tick3).unwrap();
+        assert!(completed.is_some());
+        let candle = completed.unwrap();
+        // Timestamp should be the START of the aggregation window (1000), not the latest tick (1060)
+        assert_eq!(candle.timestamp, 1000);
+        // Close price includes tick3's data (the candle is completed when tick3 triggers the boundary)
+        assert_eq!(candle.close, 1.2);
+    }
+
+    #[test]
+    fn test_subscription_time_aligned_preserves_start_timestamp() {
+        use std::time::Duration as StdDuration;
+        let mut sub = SubscriptionType::time_aligned(StdDuration::from_secs(60)).unwrap();
+
+        // First tick at t=1000 - initializes window
+        // bucket_id = 1000/60 = 16, boundary = 17*60 = 1020
+        let tick1 = BaseCandle::new(1000, 1.0, 1.0, 1.0, 1.0, None);
+        assert!(sub.update(&tick1).unwrap().is_none());
+
+        // Second tick at t=1010 (within same 60s window, 1010 < 1020)
+        let tick2 = BaseCandle::new(1010, 1.1, 1.1, 1.1, 1.1, None);
+        assert!(sub.update(&tick2).unwrap().is_none());
+
+        // Third tick at t=1020 (at boundary, should complete first candle)
+        let tick3 = BaseCandle::new(1020, 1.2, 1.2, 1.2, 1.2, None);
+        let completed = sub.update(&tick3).unwrap();
+        assert!(completed.is_some());
+        let candle = completed.unwrap();
+        // Timestamp should be the START of the completed period
+        // boundary was 1020, duration=60, so start = 1020 - 60 = 960
+        assert_eq!(candle.timestamp, 960);
+    }
+
+    #[test]
+    fn test_get_index_uniqueness() {
+        use crate::pocketoption::utils::get_index;
+        // Generate 1000 indices and verify all are unique
+        let indices: Vec<u64> = (0..1000).map(|_| get_index().unwrap()).collect();
+        let unique: std::collections::HashSet<u64> = indices.iter().copied().collect();
+        assert_eq!(indices.len(), unique.len(), "All indices should be unique");
+    }
+
+    #[test]
+    fn test_cross_path_timestamp_consistency() {
+        use crate::pocketoption::utils::normalize_timestamp;
+        // Verify that all code paths produce the same result for the same input
+        let raw_seconds = 1774789371.94;
+        let raw_ms = 1774789371940.0;
+
+        // Both should normalize to the same second
+        let from_seconds = normalize_timestamp(raw_seconds);
+        let from_ms = normalize_timestamp(raw_ms);
+        assert_eq!(
+            from_seconds, from_ms,
+            "Second and ms paths should produce same result"
+        );
+
+        // BaseCandle deserializer should match
+        let data_sec = format!(r#"[{raw_seconds},0.92124,0.92155,0.92162,0.92124]"#);
+        let candle: BaseCandle = serde_json::from_str(&data_sec).unwrap();
+        assert_eq!(
+            candle.timestamp, from_seconds,
+            "BaseCandle should match normalize_timestamp"
+        );
+
+        // HistoryItem should match
+        let item = HistoryItem::Tick([serde_json::json!(raw_seconds), serde_json::json!(1.5)]);
+        let (ts, _) = item.to_tick();
+        assert_eq!(
+            ts, from_seconds,
+            "HistoryItem should match normalize_timestamp"
+        );
+
+        // CandleItem should match
+        let ci_data = format!(r#"[{raw_seconds},0.92124,0.92155,0.92162,0.92124,100.0]"#);
+        let ci: CandleItem = serde_json::from_str(&ci_data).unwrap();
+        assert_eq!(
+            ci.timestamp, from_seconds,
+            "CandleItem should match normalize_timestamp"
+        );
     }
 }
 

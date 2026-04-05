@@ -1,11 +1,11 @@
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use binary_options_tools_core::connector::{ConnectorError, ConnectorResult};
 use binary_options_tools_core::error::{CoreError, CoreResult};
 use binary_options_tools_core::reimports::{
     connect_async_tls_with_config, generate_key, Connector, MaybeTlsStream, Request,
     WebSocketStream,
 };
-use chrono::Utc;
-use rand::Rng;
 use std::sync::OnceLock;
 use std::time::Duration as StdDuration;
 
@@ -59,14 +59,34 @@ const IP_PROVIDERS: &[&str] = &[
 ];
 const EARTH_RADIUS_KM: f64 = 6371.0;
 
-pub fn get_index() -> PocketResult<u64> {
-    let mut rng = rand::rng();
+/// Threshold for distinguishing millisecond timestamps from second timestamps.
+/// 1_000_000_000_000.0 (~year 33658 in seconds) is far beyond any valid second-based
+/// Unix timestamp, so any value above this is treated as milliseconds.
+const MS_THRESHOLD: f64 = 1_000_000_000_000.0;
 
-    let rand = rng.random_range(10..99);
-    let time = Utc::now().timestamp();
-    format!("{time}{rand}")
-        .parse::<u64>()
-        .map_err(|e| PocketError::General(e.to_string()))
+/// Normalizes a raw timestamp value to Unix seconds (i64).
+///
+/// Handles both second-based and millisecond-based timestamps automatically.
+/// Uses rounding (not truncation) to avoid off-by-one-second errors.
+///
+/// # Arguments
+/// * `raw` - Raw timestamp as f64 (either seconds or milliseconds)
+///
+/// # Returns
+/// Normalized Unix timestamp in seconds as i64
+#[inline]
+pub fn normalize_timestamp(raw: f64) -> i64 {
+    if raw > MS_THRESHOLD {
+        (raw / 1000.0).round() as i64
+    } else {
+        raw.round() as i64
+    }
+}
+
+static INDEX_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+pub fn get_index() -> PocketResult<u64> {
+    Ok(INDEX_COUNTER.fetch_add(1, Ordering::Relaxed))
 }
 
 pub async fn get_user_location(ip_address: &str) -> PocketResult<(f64, f64)> {
@@ -75,7 +95,6 @@ pub async fn get_user_location(ip_address: &str) -> PocketResult<(f64, f64)> {
         .build()
         .map_err(|e| PocketError::General(format!("Failed to build HTTP client: {e}")))?;
 
-    // Try providers that give geolocation data
     for url in IP_PROVIDERS {
         let target = if url.contains("ipapi.co") {
             format!("{}{}/json/", url, ip_address)

@@ -16,7 +16,7 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
     types::MultiPatternRule,
-    utils::{get_index, SocketIoFrame},
+    utils::{get_index, normalize_timestamp, SocketIoFrame},
 };
 
 const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = ["loadHistoryPeriodFast", "loadHistoryPeriod"];
@@ -492,11 +492,7 @@ impl GetCandlesApiModule {
                         .into_iter()
                         .filter_map(|tick_data| {
                             // Check if this is candle data (has OHLC fields) or tick data
-                            let timestamp = if tick_data.time > 1_000_000_000_000.0 {
-                                (tick_data.time / 1000.0).round() as i64
-                            } else {
-                                tick_data.time.round() as i64
-                            };
+                            let timestamp = normalize_timestamp(tick_data.time);
                             if let (Some(open), Some(high), Some(low), Some(close)) = (
                                 tick_data.open,
                                 tick_data.high,
@@ -544,11 +540,7 @@ impl GetCandlesApiModule {
                         .data
                         .into_iter()
                         .map(|tick_data| {
-                            let timestamp = if tick_data.time > 1_000_000_000_000.0 {
-                                (tick_data.time / 1000.0).round() as i64
-                            } else {
-                                tick_data.time.round() as i64
-                            };
+                            let timestamp = normalize_timestamp(tick_data.time);
                             (timestamp, tick_data.get_price())
                         })
                         .collect();

@@ -17,6 +17,7 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
     types::MultiPatternRule,
+    utils::normalize_timestamp,
 };
 
 const HISTORICAL_DATA_TIMEOUT: Duration = Duration::from_secs(30);
@@ -432,14 +433,14 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                     if req_type == RequestType::Ticks {
                                         // If we only have candles, try to get ticks from them
                                         if ticks.is_empty() {
-                                             if let Some(candle_items) = history_response.candles {
-                                                ticks = candle_items.iter().map(|item| (item.0 as i64, item.2)).collect(); // timestamp, close
-                                             } else if let (Some(timestamps), Some(c)) = (history_response.timestamps, history_response.c) {
+                                            if let Some(candle_items) = history_response.candles {
+                                                ticks = candle_items.iter().map(|item| (item.timestamp, item.close)).collect();
+                                            } else if let (Some(timestamps), Some(c)) = (history_response.timestamps, history_response.c) {
                                                 let len = timestamps.len().min(c.len());
                                                 for i in 0..len {
-                                                    ticks.push((timestamps[i] as i64, c[i]));
+                                                    ticks.push((normalize_timestamp(timestamps[i]), c[i]));
                                                 }
-                                             }
+                                            }
                                         }
 
                                         // Append the latest tick from updateStream if it's newer
@@ -465,12 +466,12 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                                 // Format: [timestamp, open, close, high, low, volume]
                                                 for item in candle_items {
                                                     let base_candle = BaseCandle {
-                                                        timestamp: item.0 as i64,
-                                                        open: item.1,
-                                                        close: item.2,
-                                                        high: item.3,
-                                                        low: item.4,
-                                                        volume: Some(item.5),
+                                                        timestamp: item.timestamp,
+                                                        open: item.open,
+                                                        close: item.close,
+                                                        high: item.high,
+                                                        low: item.low,
+                                                        volume: Some(item.volume),
                                                     };
                                                     if let Ok(candle) = Candle::try_from((base_candle, symbol.clone())) {
                                                         candles.push(candle);
@@ -507,7 +508,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
 
                                                 for i in 0..min_len {
                                                     let base_candle = BaseCandle {
-                                                        timestamp: timestamps[i] as i64,
+                                                        timestamp: normalize_timestamp(timestamps[i]),
                                                         open: o[i],
                                                         close: c[i],
                                                         high: h[i],
@@ -589,7 +590,7 @@ impl HistoricalDataApiModule {
         if let Some(inner) = data_array.first().and_then(|v| v.as_array()) {
             if inner.len() >= 3 {
                 let symbol = inner[0].as_str()?.to_string();
-                let timestamp = inner[1].as_f64()? as i64;
+                let timestamp = normalize_timestamp(inner[1].as_f64()?);
                 let price = inner[2].as_f64()?;
                 return Some((symbol, timestamp, price));
             }

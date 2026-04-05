@@ -13,6 +13,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::pocketoption::error::{PocketError, PocketResult};
+use crate::pocketoption::utils::normalize_timestamp;
 
 // 🚨 CRITICAL AUDIT NOTE:
 // Financial values (amount, price, profit) are currently represented as `f64`.
@@ -155,7 +156,7 @@ impl<'de> Deserialize<'de> for StreamData {
 
         Ok(StreamData {
             symbol: vec[0][0].as_str().unwrap_or_default().to_string(),
-            timestamp: vec[0][1].as_f64().unwrap_or(0.0) as i64,
+            timestamp: normalize_timestamp(vec[0][1].as_f64().unwrap_or(0.0)),
             price,
         })
     }
