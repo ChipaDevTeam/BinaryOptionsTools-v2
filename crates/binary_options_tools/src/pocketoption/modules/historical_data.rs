@@ -245,9 +245,9 @@ pub struct HistoricalDataApiModule {
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
     pending_request: Option<(Uuid, String, u32, RequestType)>,
-    /// Stores the latest tick (timestamp, price) received from updateStream for each asset.
+    /// Stores recent ticks (timestamp, price) received from updateStream for each asset.
     /// This is used to append the current/forming candle to historical data.
-    latest_ticks: HashMap<String, (i64, f64)>,
+    latest_ticks: HashMap<String, Vec<(i64, f64)>>,
 }
 
 #[async_trait]
@@ -295,6 +295,8 @@ impl ApiModule<State> for HistoricalDataApiModule {
                             if self.pending_request.is_some() {
                                 warn!(target: "HistoricalDataApiModule", "Overwriting a pending request. Concurrent calls are not supported.");
                             }
+                            // Clear buffered ticks for this asset to ensure we only get fresh ones
+                            self.latest_ticks.remove(&asset);
                             self.pending_request = Some((req_id, asset.clone(), period, RequestType::Ticks));
                             let payload = serde_json::json!([
                                 "changeSymbol",
@@ -311,6 +313,8 @@ impl ApiModule<State> for HistoricalDataApiModule {
                             if self.pending_request.is_some() {
                                 warn!(target: "HistoricalDataApiModule", "Overwriting a pending request. Concurrent calls are not supported.");
                             }
+                            // Clear buffered ticks for this asset
+                            self.latest_ticks.remove(&asset);
                             self.pending_request = Some((req_id, asset.clone(), period, RequestType::Candles));
                             let payload = serde_json::json!([
                                 "changeSymbol",
@@ -366,14 +370,14 @@ impl ApiModule<State> for HistoricalDataApiModule {
                         if let Message::Text(text) = &*msg {
                             if let Some(stream_tick) = Self::parse_update_stream(text) {
                                 let (symbol, timestamp, price) = stream_tick;
-                                self.latest_ticks.insert(symbol, (timestamp, price));
+                                self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
                                 continue;
                             }
                         } else if let Message::Binary(data) = &*msg {
                             if let Ok(text) = std::str::from_utf8(data) {
                                 if let Some(stream_tick) = Self::parse_update_stream(text) {
                                     let (symbol, timestamp, price) = stream_tick;
-                                    self.latest_ticks.insert(symbol, (timestamp, price));
+                                    self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
                                     continue;
                                 }
                             }
@@ -443,11 +447,13 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                             }
                                         }
 
-                                        // Append the latest tick from updateStream if it's newer
-                                        if let Some(&(latest_ts, latest_price)) = self.latest_ticks.get(&symbol) {
+                                        // Append buffered ticks from updateStream if they are newer
+                                        if let Some(stream_ticks) = self.latest_ticks.get(&symbol) {
                                             let last_history_ts = ticks.last().map(|(t, _)| *t).unwrap_or(0);
-                                            if latest_ts > last_history_ts {
-                                                ticks.push((latest_ts, latest_price));
+                                            for &(ts, price) in stream_ticks {
+                                                if ts > last_history_ts {
+                                                    ticks.push((ts, price));
+                                                }
                                             }
                                         }
 
@@ -458,69 +464,72 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                     } else {
                                         // RequestType::Candles
                                         let mut candles = Vec::new();
-                                        let mut has_candles = false;
+                                        
+                                        // 1. Get candles from response if available (primary source)
                                         if let Some(candle_items) = history_response.candles {
-                                            if !candle_items.is_empty() {
-                                                has_candles = true;
-                                                // Handle nested array candles format
-                                                // Format: [timestamp, open, close, high, low, volume]
-                                                for item in candle_items {
-                                                    let base_candle = BaseCandle {
-                                                        timestamp: item.timestamp,
-                                                        open: item.open,
-                                                        close: item.close,
-                                                        high: item.high,
-                                                        low: item.low,
-                                                        volume: Some(item.volume),
-                                                    };
-                                                    if let Ok(candle) = Candle::try_from((base_candle, symbol.clone())) {
-                                                        candles.push(candle);
-                                                    }
+                                            for item in candle_items {
+                                                let base_candle = BaseCandle {
+                                                    timestamp: item.timestamp,
+                                                    open: item.open,
+                                                    close: item.close,
+                                                    high: item.high,
+                                                    low: item.low,
+                                                    volume: Some(item.volume),
+                                                };
+                                                if let Ok(candle) = Candle::try_from((base_candle, symbol.clone())) {
+                                                    candles.push(candle);
+                                                }
+                                            }
+                                        } else if let (Some(timestamps), Some(o), Some(h), Some(l), Some(c)) = (
+                                            history_response.timestamps,
+                                            history_response.o,
+                                            history_response.h,
+                                            history_response.l,
+                                            history_response.c,
+                                        ) {
+                                            // Handle legacy separate arrays format
+                                            let len = timestamps.len();
+                                            let min_len = len.min(o.len()).min(h.len()).min(l.len()).min(c.len());
+                                            for i in 0..min_len {
+                                                let base_candle = BaseCandle {
+                                                    timestamp: normalize_timestamp(timestamps[i]),
+                                                    open: o[i],
+                                                    close: c[i],
+                                                    high: h[i],
+                                                    low: l[i],
+                                                    volume: history_response.v.as_ref().and_then(|v| v.get(i).cloned()),
+                                                };
+                                                if let Ok(candle) = Candle::try_from((base_candle, symbol.clone())) {
+                                                    candles.push(candle);
                                                 }
                                             }
                                         }
 
-                                        if !has_candles {
-                                            if let Some(history_items) = history_response.history {
-                                                // Append latest tick from updateStream if available
-                                                let mut all_items = history_items.clone();
-                                                if let Some(&(latest_ts, latest_price)) = self.latest_ticks.get(&symbol) {
-                                                    let last_history_ts = all_items.last().map(|item| item.to_tick().0).unwrap_or(0);
-                                                    if latest_ts > last_history_ts {
-                                                        all_items.push(HistoryItem::Tick([
-                                                            serde_json::Value::from(latest_ts as f64),
-                                                            serde_json::Value::from(latest_price),
-                                                        ]));
-                                                    }
-                                                }
-                                                // Handle nested array ticks format - compile to candles
-                                                candles = compile_candles_from_ticks(&all_items, history_response.period, &symbol);
-                                            } else if let (Some(timestamps), Some(o), Some(h), Some(l), Some(c)) = (
-                                                history_response.timestamps,
-                                                history_response.o,
-                                                history_response.h,
-                                                history_response.l,
-                                                history_response.c,
-                                            ) {
-                                                // Handle legacy separate arrays format
-                                                let len = timestamps.len();
-                                                let min_len = len.min(o.len()).min(h.len()).min(l.len()).min(c.len());
+                                        // 2. Collect all available ticks (from history and stream buffer)
+                                        let mut history_items = history_response.history.unwrap_or_default();
+                                        if let Some(stream_ticks) = self.latest_ticks.get(&symbol) {
+                                            for &(ts, price) in stream_ticks {
+                                                history_items.push(HistoryItem::Tick([
+                                                    serde_json::Value::from(ts as f64),
+                                                    serde_json::Value::from(price),
+                                                ]));
+                                            }
+                                        }
 
-                                                for i in 0..min_len {
-                                                    let base_candle = BaseCandle {
-                                                        timestamp: normalize_timestamp(timestamps[i]),
-                                                        open: o[i],
-                                                        close: c[i],
-                                                        high: h[i],
-                                                        low: l[i],
-                                                        volume: history_response.v.as_ref().and_then(|v| v.get(i).cloned()),
-                                                    };
-                                                    if let Ok(candle) = Candle::try_from((base_candle, symbol.clone())) {
-                                                        candles.push(candle);
-                                                    }
+                                        // 3. Compile additional candles from ticks if they are newer
+                                        if !history_items.is_empty() {
+                                            let compiled = compile_candles_from_ticks(&history_items, history_response.period, &symbol);
+                                            let last_candle_ts = candles.iter().map(|c| c.timestamp).max().unwrap_or(0);
+                                            
+                                            for compiled_candle in compiled {
+                                                if compiled_candle.timestamp > last_candle_ts {
+                                                    candles.push(compiled_candle);
                                                 }
                                             }
                                         }
+
+                                        // 4. Ensure candles are sorted (server often sends newest-first, we want consistent output)
+                                        candles.sort_by_key(|c| c.timestamp);
 
                                         self.command_responder.send(CommandResponse::Candles {
                                             req_id,

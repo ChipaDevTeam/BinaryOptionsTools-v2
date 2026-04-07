@@ -866,11 +866,11 @@ mod tests {
     }
 
     #[test]
-    fn test_normalize_timestamp_seconds_rounding() {
+    fn test_normalize_timestamp_seconds_truncation() {
         use crate::pocketoption::utils::normalize_timestamp;
-        // Sub-second timestamps should be rounded, not truncated
-        assert_eq!(normalize_timestamp(1774789371.94), 1774789372);
-        assert_eq!(normalize_timestamp(1774789371.50), 1774789372);
+        // Sub-second timestamps should be truncated, not rounded
+        assert_eq!(normalize_timestamp(1774789371.94), 1774789371);
+        assert_eq!(normalize_timestamp(1774789371.50), 1774789371);
         assert_eq!(normalize_timestamp(1774789371.49), 1774789371);
         assert_eq!(normalize_timestamp(1774789371.00), 1774789371);
     }
@@ -878,44 +878,44 @@ mod tests {
     #[test]
     fn test_normalize_timestamp_milliseconds() {
         use crate::pocketoption::utils::normalize_timestamp;
-        // Millisecond timestamps should be divided by 1000 and rounded
+        // Millisecond timestamps should be divided by 1000 and truncated
         assert_eq!(normalize_timestamp(1714529180000.0), 1714529180);
-        assert_eq!(normalize_timestamp(1714529180500.0), 1714529181);
-        assert_eq!(normalize_timestamp(1714529180400.0), 1714529180);
+        assert_eq!(normalize_timestamp(1714529180500.0), 1714529180);
+        assert_eq!(normalize_timestamp(1714529180900.0), 1714529180);
     }
 
     #[test]
-    fn test_base_candle_ms_timestamp_rounding() {
-        // BaseCandle deserializer should round (not truncate) ms timestamps
+    fn test_base_candle_ms_timestamp_truncation() {
+        // BaseCandle deserializer should truncate (not round) ms timestamps
         let data = r#"[1714529180500.0,0.92124,0.92155,0.92162,0.92124]"#;
         let candle: BaseCandle = serde_json::from_str(data).unwrap();
-        // 1714529180500 / 1000 = 1714529180.5 -> rounds to 1714529181
-        assert_eq!(candle.timestamp, 1714529181);
+        // 1714529180500 / 1000 = 1714529180.5 -> truncates to 1714529180
+        assert_eq!(candle.timestamp, 1714529180);
     }
 
     #[test]
-    fn test_base_candle_second_timestamp_rounding() {
-        // BaseCandle deserializer should round sub-second timestamps
+    fn test_base_candle_second_timestamp_truncation() {
+        // BaseCandle deserializer should truncate sub-second timestamps
         let data = r#"[1774789371.94,0.92124,0.92155,0.92162,0.92124]"#;
         let candle: BaseCandle = serde_json::from_str(data).unwrap();
-        // 1774789371.94 -> rounds to 1774789372
-        assert_eq!(candle.timestamp, 1774789372);
+        // 1774789371.94 -> truncates to 1774789371
+        assert_eq!(candle.timestamp, 1774789371);
     }
 
     #[test]
-    fn test_history_item_ms_timestamp_rounding() {
-        // HistoryItem::to_tick() should round ms timestamps
+    fn test_history_item_ms_timestamp_truncation() {
+        // HistoryItem::to_tick() should truncate ms timestamps
         let item = HistoryItem::Tick([serde_json::json!(1714529180500.0), serde_json::json!(1.5)]);
         let (ts, _price) = item.to_tick();
-        assert_eq!(ts, 1714529181);
+        assert_eq!(ts, 1714529180);
     }
 
     #[test]
-    fn test_history_item_second_timestamp_rounding() {
-        // HistoryItem::to_tick() should round sub-second timestamps
+    fn test_history_item_second_timestamp_truncation() {
+        // HistoryItem::to_tick() should truncate sub-second timestamps
         let item = HistoryItem::Tick([serde_json::json!(1774789371.94), serde_json::json!(1.5)]);
         let (ts, _price) = item.to_tick();
-        assert_eq!(ts, 1774789372);
+        assert_eq!(ts, 1774789371);
     }
 
     #[test]
@@ -923,15 +923,15 @@ mod tests {
         // CandleItem deserializer should normalize ms timestamps
         let data = r#"[1714529180500.0,0.92124,0.92155,0.92162,0.92124,100.0]"#;
         let item: CandleItem = serde_json::from_str(data).unwrap();
-        assert_eq!(item.timestamp, 1714529181);
+        assert_eq!(item.timestamp, 1714529180);
     }
 
     #[test]
     fn test_candle_item_second_timestamp_normalization() {
-        // CandleItem deserializer should round sub-second timestamps
+        // CandleItem deserializer should truncate sub-second timestamps
         let data = r#"[1774789371.94,0.92124,0.92155,0.92162,0.92124,100.0]"#;
         let item: CandleItem = serde_json::from_str(data).unwrap();
-        assert_eq!(item.timestamp, 1774789372);
+        assert_eq!(item.timestamp, 1774789371);
     }
 
     #[test]

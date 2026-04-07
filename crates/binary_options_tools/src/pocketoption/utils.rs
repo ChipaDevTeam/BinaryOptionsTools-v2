@@ -77,9 +77,9 @@ const MS_THRESHOLD: f64 = 1_000_000_000_000.0;
 #[inline]
 pub fn normalize_timestamp(raw: f64) -> i64 {
     if raw > MS_THRESHOLD {
-        (raw / 1000.0).round() as i64
+        (raw / 1000.0).trunc() as i64
     } else {
-        raw.round() as i64
+        raw.trunc() as i64
     }
 }
 
