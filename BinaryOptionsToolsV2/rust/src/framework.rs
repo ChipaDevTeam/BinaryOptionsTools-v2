@@ -234,7 +234,7 @@ impl Strategy for StrategyWrapper {
                     .call_method1(py, "update", (candle_json.clone(),))
                     .map_err(|e| PocketError::General(format!("Python update error: {}", e)))
             })?;
-            info!(target: "StrategyWrapper", "Loading period: candle {} of {}", current_candle +1, period);
+            info!(target: "StrategyWrapper", "Loading period: candle {} of {}", current_candle + 1, period);
             return Ok(());
         }
 

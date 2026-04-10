@@ -12,7 +12,7 @@ pub enum BinaryErrorPy {
 
     #[error("Uninitialized, {0}")]
     Uninitialized(String),
-    #[error("Error descerializing data, {0}")]
+    #[error("Error deserializing data, {0}")]
     DeserializingError(#[from] serde_json::Error),
     #[error("UUID parsing error, {0}")]
     UuidParsingError(#[from] uuid::Error),

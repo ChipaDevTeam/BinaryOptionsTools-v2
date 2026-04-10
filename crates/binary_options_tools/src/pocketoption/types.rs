@@ -15,13 +15,8 @@ use uuid::Uuid;
 use crate::pocketoption::error::{PocketError, PocketResult};
 use crate::pocketoption::utils::normalize_timestamp;
 
-// 🚨 CRITICAL AUDIT NOTE:
-// Financial values (amount, price, profit) are currently represented as `f64`.
-// This can lead to floating-point precision errors in financial calculations.
-// While the upstream PocketOption API uses JSON numbers (which are often treated as floats),
-// best practice would be to use `rust_decimal::Decimal`.
-// Migration to `Decimal` is recommended for future versions but requires updating
-// the Python bindings and verifying JSON serialization compatibility.
+// Audit Note: Financial values (amount, price, profit) have been migrated to
+// `rust_decimal::Decimal` to prevent precision errors in financial calculations.
 
 /// Server time management structure for synchronizing with PocketOption servers
 ///
@@ -218,13 +213,24 @@ impl Rule for TwoStepRule {
         match msg {
             Message::Text(text) => {
                 if text.starts_with(&self.pattern) {
-                    // Check if it's a 1-step message (ends with ']') or contains JSON data '{'
+                    // Check for binary placeholder in Socket.IO format
+                    let has_placeholder = text.contains(r#""_placeholder":true"#);
+                    
+                    // If it has a placeholder, we MUST wait for the next (binary) message
+                    if has_placeholder {
+                        tracing::debug!(target: "TwoStepRule", "Detected binary placeholder for pattern '{}'. Waiting for next message.", self.pattern);
+                        self.valid.store(true, Ordering::SeqCst);
+                        return false;
+                    }
+
+                    // Check if it's a 1-step message (ends with ']') or contains other JSON data '{'
                     if text.ends_with(']') || text.contains('{') {
-                        tracing::debug!(target: "TwoStepRule", "1-step message matched pattern! Allowing through.");
+                        tracing::debug!(target: "TwoStepRule", "1-step message matched pattern '{}'! Allowing through.", self.pattern);
                         self.valid.store(false, Ordering::SeqCst);
                         return true;
                     }
-                    tracing::debug!(target: "TwoStepRule", "Pattern matched! Next message will be accepted.");
+                    
+                    tracing::debug!(target: "TwoStepRule", "Pattern '{}' matched! Next message will be accepted.", self.pattern);
                     self.valid.store(true, Ordering::SeqCst);
                     return false;
                 }
@@ -662,7 +668,7 @@ pub struct OpenPendingOrder {
     pub open_type: u32,
     pub amount: Decimal,
     pub asset: String,
-    pub open_time: u32,
+    pub open_time: String,
     pub open_price: Decimal,
     pub timeframe: u32,
     pub min_payout: u32,
@@ -675,7 +681,7 @@ impl OpenPendingOrder {
         open_type: u32,
         amount: Decimal,
         asset: String,
-        open_time: u32,
+        open_time: String,
         open_price: Decimal,
         timeframe: u32,
         min_payout: u32,

@@ -25,6 +25,7 @@ else:
         print(f"[DEBUG] sys.path: {sys.path}")
 
 # Import submodules for re-export
+from .config import Config as Config  # noqa: E402
 from . import tracing as tracing  # noqa: E402
 from . import validator as validator  # noqa: E402
 from .pocketoption import *  # noqa: F403, E402
@@ -43,6 +44,7 @@ _core_names = [
     "PyStrategy",
     "PyContext",
     "PyVirtualMarket",
+    "Action",
     "StreamLogsIterator",
     "StreamLogsLayer",
     "StreamIterator",

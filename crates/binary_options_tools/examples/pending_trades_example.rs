@@ -158,7 +158,7 @@ async fn example_basic_pending_order() -> PocketResult<()> {
             1,                                         // open_type: 1 = typical for binary options
             Decimal::from_f64_retain(100.0).unwrap(),  // amount
             "EURUSD_otc".to_string(),                  // asset (OTC EUR/USD)
-            60,                                        // open_time: 60 seconds until expiration
+            "2026-04-07 22:50:00".to_string(),          // open_time: specific trigger time (for openType 0) or expiration (for openType 1)
             Decimal::from_f64_retain(1.1950).unwrap(), // open_price: current market price
             60,                                        // timeframe: 60 seconds
             85,                                        // min_payout: 85% minimum payout
@@ -255,22 +255,6 @@ async fn example_concurrent_pending_orders() -> PocketResult<()> {
             let amount = Decimal::from_f64_retain(50.0 + (i as f64 * 20.0)).unwrap();
             let asset = format!("ASSET_{}", i % 3);
 
-            // Create a pending order response for this request
-            let req_id = Uuid::new_v4();
-            let _pending_order = PendingOrder {
-                ticket: req_id,
-                open_type: 1,
-                amount,
-                symbol: asset.clone(),
-                open_time: "2024-01-01 10:00:00".to_string(),
-                open_price: Decimal::from_f64_retain(1.0 + (i as f64 * 0.01)).unwrap(),
-                timeframe: 60,
-                min_payout: 85,
-                command: 0,
-                date_created: "2024-01-01 10:00:00".to_string(),
-                id: (1000 + i) as u64,
-            };
-
             // Call open_pending_order in a separate task so we can simulate response concurrently
             let handle_clone2 = handle_clone.clone();
             let amount2 = amount;
@@ -282,7 +266,7 @@ async fn example_concurrent_pending_orders() -> PocketResult<()> {
                         1,
                         amount2,
                         asset2,
-                        60,
+                        "2026-04-07 22:50:00".to_string(),
                         Decimal::from_f64_retain(1.0).unwrap(),
                         60,
                         85,
@@ -476,7 +460,7 @@ async fn example_integration_with_pocketclient() -> PocketResult<()> {
             1,
             Decimal::from_f64_retain(250.0).unwrap(),
             "EURUSD_otc".to_string(),
-            60,
+            "2026-04-07 22:50:00".to_string(),
             Decimal::from_f64_retain(1.1850).unwrap(),
             60,
             90,

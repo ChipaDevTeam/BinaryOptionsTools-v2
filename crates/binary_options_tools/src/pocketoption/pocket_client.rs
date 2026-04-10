@@ -677,7 +677,7 @@ impl PocketOption {
         open_type: u32,
         amount: Decimal,
         asset: String,
-        open_time: u32,
+        open_time: String,
         open_price: Decimal,
         timeframe: u32,
         min_payout: u32,

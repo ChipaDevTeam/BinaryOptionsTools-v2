@@ -179,7 +179,7 @@ class MockPocketOptionAsync:
 
         return subscription()
 
-    async def subscribe_symbol_chuncked(self, asset, chunk_size):
+    async def subscribe_symbol_chunked(self, asset, chunk_size):
         async def subscription():
             yield {"chunk": 1, "open": 1.1, "close": 1.2}
 
@@ -200,8 +200,8 @@ class MockPocketOptionAsync:
     async def _subscribe_symbol_inner(self, asset: str):
         return await self.subscribe_symbol(asset)
 
-    async def _subscribe_symbol_chuncked_inner(self, asset: str, chunk_size: int):
-        return await self.subscribe_symbol_chuncked(asset, chunk_size)
+    async def _subscribe_symbol_chunked_inner(self, asset: str, chunk_size: int):
+        return await self.subscribe_symbol_chunked(asset, chunk_size)
 
     async def _subscribe_symbol_timed_inner(self, asset: str, time):
         return await self.subscribe_symbol_timed(asset, time)
@@ -868,15 +868,15 @@ class TestSubscriptions:
         assert sub is not None
         assert hasattr(sub, "__aiter__")
 
-    def test_subscribe_symbol_chuncked_success(self, sync_client):
-        """Test subscribe_symbol_chuncked with valid chunk size."""
-        sub = sync_client.subscribe_symbol_chuncked("EURUSD_otc", 10)
+    def test_subscribe_symbol_chunked_success(self, sync_client):
+        """Test subscribe_symbol_chunked with valid chunk size."""
+        sub = sync_client.subscribe_symbol_chunked("EURUSD_otc", 10)
         assert sub is not None
         assert hasattr(sub, "__aiter__")
 
-    def test_subscribe_symbol_chuncked_invalid_chunk(self, sync_client):
-        """Test subscribe_symbol_chuncked with invalid chunk size."""
-        sub = sync_client.subscribe_symbol_chuncked("EURUSD_otc", 0)
+    def test_subscribe_symbol_chunked_invalid_chunk(self, sync_client):
+        """Test subscribe_symbol_chunked with invalid chunk size."""
+        sub = sync_client.subscribe_symbol_chunked("EURUSD_otc", 0)
         assert sub is not None
 
     def test_subscribe_symbol_timed_success(self, sync_client):

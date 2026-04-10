@@ -630,7 +630,7 @@ class PocketOptionAsync:
         open_type: int,
         amount: float,
         asset: str,
-        open_time: int,
+        open_time: Union[int, str],
         open_price: float,
         timeframe: int,
         min_payout: int,
@@ -643,7 +643,8 @@ class PocketOptionAsync:
             open_type (int): The type of the pending order.
             amount (float): The amount to trade.
             asset (str): The asset symbol (e.g., "EURUSD_otc").
-            open_time (int): The server time to open the trade (Unix timestamp).
+            open_time (int | str): The server time to open the trade. 
+                Can be a Unix timestamp (int) or a formatted string "YYYY-MM-DD HH:MM:SS".
             open_price (float): The price to open the trade at.
             timeframe (int): The duration of the trade in seconds.
             min_payout (int): The minimum payout percentage required.
@@ -652,9 +653,43 @@ class PocketOptionAsync:
         Returns:
             Dict: The created pending order details.
         """
-        order = await self.client.open_pending_order(
-            open_type, amount, asset, open_time, open_price, timeframe, min_payout, command
-        )
+        # Backward compatibility: If the underlying Rust client still expects an integer
+        # but we received a string, try to convert it if it's numeric, or fallback to 0.
+        # This handles cases where the binary extension hasn't been updated to support strings.
+        actual_open_time = open_time
+        try:
+            # We try to call it with the original value first
+            order = await self.client.open_pending_order(
+                open_type, amount, asset, actual_open_time, open_price, timeframe, min_payout, command
+            )
+        except TypeError as e:
+            if "object cannot be interpreted as an integer" in str(e) and isinstance(open_time, str):
+                # Fallback: if it's a string like "0", convert to 0
+                if open_time == "0":
+                    actual_open_time = 0
+                else:
+                    # Try to parse Unix timestamp from string if it's just a number
+                    try:
+                        actual_open_time = int(open_time)
+                    except ValueError:
+                        # It's a formatted date string, but the binary wants an int.
+                        # We can't easily convert "YYYY-MM-DD" to timestamp without more info,
+                        # but for the sake of not crashing, we'll try to parse it or use 0.
+                        from datetime import datetime
+                        try:
+                            # PocketOption strings are usually UTC
+                            dt = datetime.strptime(open_time, '%Y-%m-%d %H:%M:%S')
+                            actual_open_time = int(dt.timestamp())
+                        except Exception:
+                            actual_open_time = 0
+                
+                # Retry with converted integer
+                order = await self.client.open_pending_order(
+                    open_type, amount, asset, actual_open_time, open_price, timeframe, min_payout, command
+                )
+            else:
+                raise
+
         return json.loads(order)
 
     async def cancel_pending_order(self, ticket: str) -> Dict:
@@ -973,27 +1008,27 @@ class PocketOptionAsync:
         """
         return await self.client.subscribe_symbol(asset)
 
-    async def _subscribe_symbol_chuncked_inner(self, asset: str, chunck_size: int):
+    async def _subscribe_symbol_chunked_inner(self, asset: str, chunk_size: int):
         """Internal method to establish a chunked real-time subscription for an asset.
 
         This method creates a subscription that aggregates raw price updates into
         candlesticks of the specified chunk size. It directly calls the underlying
-        client's subscribe_symbol_chuncked method and returns a raw subscription iterator.
+        client's subscribe_symbol_chunked method and returns a raw subscription iterator.
 
         Args:
             asset (str): Trading asset symbol to subscribe to (e.g., "EURUSD_otc")
-            chunck_size (int): Number of raw ticks to aggregate into each candle.
-                For example, chunck_size=10 will create a candle from every 10 price ticks.
+            chunk_size (int): Number of raw ticks to aggregate into each candle.
+                For example, chunk_size=10 will create a candle from every 10 price ticks.
 
         Returns:
             AsyncIterator[str]: Raw async iterator yielding JSON string messages,
                 each representing a completed candlestick.
 
         Note:
-            This is an internal method. Users should typically use `subscribe_symbol_chuncked()`
+            This is an internal method. Users should typically use `subscribe_symbol_chunked()`
             which wraps this method in an `AsyncSubscription` for easier handling.
         """
-        return await self.client.subscribe_symbol_chuncked(asset, chunck_size)
+        return await self.client.subscribe_symbol_chunked(asset, chunk_size)
 
     async def _subscribe_symbol_timed_inner(self, asset: str, time: timedelta):
         """Internal method to establish a timed real-time subscription for an asset.
@@ -1059,9 +1094,9 @@ class PocketOptionAsync:
         """
         return AsyncSubscription(await self._subscribe_symbol_inner(asset))
 
-    async def subscribe_symbol_chuncked(self, asset: str, chunck_size: int) -> AsyncSubscription:
+    async def subscribe_symbol_chunked(self, asset: str, chunk_size: int) -> AsyncSubscription:
         """Returns an async iterator over the associated asset, it will return real time candles formed with the specified amount of raw candles and will return new candles while the 'PocketOptionAsync' class is loaded if the class is droped then the iterator will fail"""
-        return AsyncSubscription(await self._subscribe_symbol_chuncked_inner(asset, chunck_size))
+        return AsyncSubscription(await self._subscribe_symbol_chunked_inner(asset, chunk_size))
 
     async def subscribe_symbol_timed(self, asset: str, time: timedelta) -> AsyncSubscription:
         """

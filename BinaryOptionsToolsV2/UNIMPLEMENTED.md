@@ -18,7 +18,7 @@ This document tracks features that are currently unimplemented, partially implem
 
 ### Client Runner (`crates/core/src/client.rs`)
 
-- **Disconnect Control** (`client.rs:293`): `TODO`: Add a way to disconnect and keep the connection closed until explicitly specified otherwise. Currently the runner will always attempt to reconnect.
+- **Disconnect Control**: Implemented via `RunnerCommand::DisconnectAndHold`. This allows the client to remain disconnected without automatic reconnection until an explicit `Connect` or `Reconnect` command is received.
 
 ### API Module Traits (`crates/core-pre/src/traits.rs`)
 
@@ -62,8 +62,7 @@ Only `#[uniffi_doc]` is implemented.
 
 ### Validator (`src/validator.rs`)
 
-- **Validation Methods**: `TODO`: Restore validation methods (e.g., `is_valid`, `validate_json`) when the new API supports it.
-- **BoxedValidator/RegexValidator**: `TODO`: Restore these implementations.
+- **Validation Methods**: High-level `Validator` class in Python (`BinaryOptionsToolsV2/validator.py`) is fully functional, supporting regex, prefix/suffix, and custom logic.
 
 ### PocketOption Client
 

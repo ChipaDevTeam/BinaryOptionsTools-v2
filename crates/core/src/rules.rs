@@ -49,7 +49,7 @@ pub enum TextMatcher {
     EndsWith(SmolStr),
     Contains(SmolStr),
     Exact(SmolStr),
-    Regex(String),
+    Regex(regex::Regex),
 }
 
 impl TextMatcher {
@@ -59,9 +59,7 @@ impl TextMatcher {
             TextMatcher::EndsWith(s) => text.ends_with(s.as_str()),
             TextMatcher::Contains(s) => text.contains(s.as_str()),
             TextMatcher::Exact(s) => text == s.as_str(),
-            TextMatcher::Regex(pattern) => regex::Regex::new(pattern)
-                .map(|re| re.is_match(text))
-                .unwrap_or(false),
+            TextMatcher::Regex(re) => re.is_match(text),
         }
     }
 }
@@ -429,10 +427,12 @@ impl RuleBuilder {
         }
     }
 
-    pub fn text_regex(pattern: impl Into<String>) -> Self {
+    pub fn text_regex(pattern: impl AsRef<str>) -> Self {
         Self {
             inner: Rule::Matcher {
-                matcher: Matcher::Text(TextMatcher::Regex(pattern.into())),
+                matcher: Matcher::Text(TextMatcher::Regex(
+                    regex::Regex::new(pattern.as_ref()).expect("Invalid regex in RuleBuilder"),
+                )),
                 conditions: vec![],
             },
         }

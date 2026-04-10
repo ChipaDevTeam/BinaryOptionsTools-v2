@@ -42,7 +42,7 @@ pub fn start_tracing(
         .flat_map(|l| Arc::try_unwrap(l.layer))
         .collect::<Vec<Box<dyn Layer<Registry> + Send + Sync>>>();
     layers.push(default);
-    println!("Length of layers: {}", layers.len());
+    debug!("Length of layers: {}", layers.len());
     let subscriber = tracing_subscriber::registry()
         // .with(filtered_layer)
         .with(layers)
@@ -300,8 +300,8 @@ mod tests {
             }
         }
 
-        async fn reciever_fn(reciever: StreamLogsIterator) {
-            let mut stream = reciever.stream.lock().await;
+        async fn receiver_fn(receiver: StreamLogsIterator) {
+            let mut stream = receiver.stream.lock().await;
 
             while let Ok(Some(Ok(message))) =
                 tokio::time::timeout(Duration::from_secs(15), stream.next()).await
@@ -316,6 +316,6 @@ mod tests {
             }
         }
 
-        join(log(), reciever_fn(receiver)).await;
+        join(log(), receiver_fn(receiver)).await;
     }
 }

@@ -484,4 +484,29 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_provided_auth_message() -> Result<(), Box<dyn std::error::Error>> {
+        let auth_msg = r#"42["auth",{"session":"dummy_session_id","isDemo":1,"uid":12345678,"platform":2,"isFastHistory":true,"isOptimized":true}]"#;
+        let parsed = Ssid::parse(auth_msg)?;
+        
+        match parsed {
+            Ssid::Demo(ref demo) => {
+                assert_eq!(demo.session, "dummy_session_id");
+                assert_eq!(demo.uid, 12345678);
+                assert_eq!(demo.is_demo, 1);
+                assert_eq!(demo.platform, 2);
+                assert_eq!(demo.is_fast_history, Some(true));
+                assert_eq!(demo.is_optimized, Some(true));
+            },
+            Ssid::Real(_) => panic!("Expected Demo SSID, got Real"),
+        }
+        
+        let reconstructed = parsed.to_string();
+        assert!(reconstructed.starts_with("42[\"auth\","));
+        assert!(reconstructed.contains("\"isFastHistory\":true"));
+        assert!(reconstructed.contains("\"isOptimized\":true"));
+        
+        Ok(())
+    }
 }

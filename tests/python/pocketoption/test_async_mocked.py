@@ -133,7 +133,7 @@ class MockRawClient:
 
         return subscription()
 
-    async def subscribe_symbol_chuncked(self, asset, chunk_size):
+    async def subscribe_symbol_chunked(self, asset, chunk_size):
         async def subscription():
             yield json.dumps({"chunk": 1, "open": 1.1, "close": 1.2})
 
@@ -837,16 +837,16 @@ class TestSubscriptions:
         assert hasattr(sub, "__aiter__")
 
     @pytest.mark.asyncio
-    async def test_subscribe_symbol_chuncked_success(self, async_client):
-        """Test subscribe_symbol_chuncked with valid chunk size."""
-        sub = await async_client.subscribe_symbol_chuncked("EURUSD_otc", 10)
+    async def test_subscribe_symbol_chunked_success(self, async_client):
+        """Test subscribe_symbol_chunked with valid chunk size."""
+        sub = await async_client.subscribe_symbol_chunked("EURUSD_otc", 10)
         assert sub is not None
         assert hasattr(sub, "__aiter__")
 
     @pytest.mark.asyncio
-    async def test_subscribe_symbol_chuncked_invalid_chunk(self, async_client):
-        """Test subscribe_symbol_chuncked with invalid chunk size."""
-        sub = await async_client.subscribe_symbol_chuncked("EURUSD_otc", 0)
+    async def test_subscribe_symbol_chunked_invalid_chunk(self, async_client):
+        """Test subscribe_symbol_chunked with invalid chunk size."""
+        sub = await async_client.subscribe_symbol_chunked("EURUSD_otc", 0)
         assert sub is not None
 
     @pytest.mark.asyncio

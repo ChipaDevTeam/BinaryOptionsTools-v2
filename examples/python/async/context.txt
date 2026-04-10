@@ -440,7 +440,7 @@ if __name__ == '__main__':
 
 
 
-# start of the subscribe symbol chuncked - this is the function that subscribes to a symbol and gets the candles in real time
+# start of the subscribe symbol chunked - this is the function that subscribes to a symbol and gets the candles in real time
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
 import asyncio
@@ -448,7 +448,7 @@ import asyncio
 async def main(ssid: str):
     # The api automatically detects if the 'ssid' is for real or demo account
     api = PocketOptionAsync(ssid)    
-    stream = await api.subscribe_symbol_chuncked("EURUSD_otc", 15) # Returns a candle obtained from combining 15 (chunk_size) candles
+    stream = await api.subscribe_symbol_chunked("EURUSD_otc", 15) # Returns a candle obtained from combining 15 (chunk_size) candles
     
     # This should run forever so you will need to force close the program
     async for candle in stream:
@@ -457,7 +457,7 @@ async def main(ssid: str):
 if __name__ == '__main__':
     ssid = input('Please enter your ssid: ')
     asyncio.run(main(ssid))
-# end of the subscribe symbol chuncked - this is the function that subscribes to a symbol and gets the candles in real time
+# end of the subscribe symbol chunked - this is the function that subscribes to a symbol and gets the candles in real time
 
 
 # start of the subscribe symbol timed - this is the function that subscribes to a symbol and gets the candles in real time

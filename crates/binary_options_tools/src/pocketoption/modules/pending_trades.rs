@@ -28,7 +28,7 @@ pub enum Command {
         open_type: u32,
         amount: Decimal,
         asset: String,
-        open_time: u32,
+        open_time: String,
         open_price: Decimal,
         timeframe: u32,
         min_payout: u32,
@@ -86,6 +86,13 @@ pub enum CancelServerResponse {
     BatchSuccess {
         #[serde(rename = "cancelled")]
         cancelled: Vec<String>,
+    },
+    /// Placeholder success response seen in some cases
+    Placeholder {
+        #[serde(rename = "_placeholder")]
+        placeholder: bool,
+        #[serde(rename = "num")]
+        num: u32,
     },
     /// Cancellation failure
     Error {
@@ -267,7 +274,7 @@ impl PendingTradesHandle {
         open_type: u32,
         amount: Decimal,
         asset: String,
-        open_time: u32,
+        open_time: String,
         open_price: Decimal,
         timeframe: u32,
         min_payout: u32,
@@ -426,20 +433,18 @@ impl ApiModule<State> for PendingTradesApiModule {
                             self.pending_requests.push_back(req_id);
                             tracing::debug!(target: "PendingTradesApiModule", "Added cancel req_id to queue: {:?}. Queue size: {}", req_id, self.pending_requests.len());
                             // Send cancel pending order message to WebSocket
-                            let cancel_msg = serde_json::json!({
-                                "action": "cancelPendingOrder",
+                            let cancel_msg = serde_json::json!(["cancelPendingOrder", {
                                 "ticket": ticket
-                            });
+                            }]);
                             self.to_ws_sender.send(Message::text(format!("42{}", cancel_msg))).await?;
                         }
                         Command::CancelPendingOrders { tickets, req_id } => {
                             self.pending_requests.push_back(req_id);
                             tracing::debug!(target: "PendingTradesApiModule", "Added batch cancel req_id to queue: {:?}. Queue size: {}", req_id, self.pending_requests.len());
                             // Send batch cancel pending orders message to WebSocket
-                            let cancel_msg = serde_json::json!({
-                                "action": "cancelPendingOrders",
+                            let cancel_msg = serde_json::json!(["cancelPendingOrders", {
                                 "tickets": tickets
-                            });
+                            }]);
                             self.to_ws_sender.send(Message::text(format!("42{}", cancel_msg))).await?;
                         }
                     }
@@ -464,6 +469,7 @@ impl ApiModule<State> for PendingTradesApiModule {
                                                     let resp = match cancel_res {
                                                         CancelServerResponse::SingleSuccess { ticket } => CommandResponse::CancelSuccess { req_id, ticket },
                                                         CancelServerResponse::BatchSuccess { cancelled } => CommandResponse::BatchCancelSuccess { req_id, cancelled },
+                                                        CancelServerResponse::Placeholder { .. } => CommandResponse::CancelSuccess { req_id, ticket: String::new() },
                                                         CancelServerResponse::Error { error } => CommandResponse::CancelError { req_id, error },
                                                     };
                                                     if let Err(e) = self.command_responder.send(resp).await {

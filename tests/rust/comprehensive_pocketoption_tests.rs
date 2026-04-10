@@ -12,12 +12,10 @@
 
 use chrono::Utc;
 use futures_util::StreamExt;
-use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use std::time::Duration;
-use uuid::Uuid;
 
-use binary_options_tools::pocketoption::{candle::SubscriptionType, types::Action, PocketOption};
+use binary_options_tools::pocketoption::{candle::SubscriptionType, PocketOption};
 
 /// Demo SSID for testing - provided by user
 const DEMO_SSID: &str = "swap-ssid-for-testing-1234567890abcdef";
@@ -393,11 +391,11 @@ async fn test_pending_order_functions() {
                     1,         // open_type: 1 = time-based
                     dec!(1.0), // amount
                     test_asset.to_string(),
-                    60,            // open_time in seconds
-                    current_price, // open_price
-                    60,            // timeframe
-                    0,             // min_payout
-                    0,             // command: 0 = Call
+                    "60".to_string(), // open_time in seconds
+                    current_price,    // open_price
+                    60,               // timeframe
+                    0,                // min_payout
+                    0,                // command: 0 = Call
                 ),
             )
             .await
@@ -445,11 +443,11 @@ async fn test_pending_order_functions() {
                     2,         // open_type: 2 = price-based
                     dec!(1.0), // amount
                     test_asset.to_string(),
-                    0,            // open_time (not used for price-based)
-                    target_price, // open_price (target price)
-                    60,           // timeframe
-                    0,            // min_payout
-                    1,            // command: 1 = Put
+                    "0".to_string(), // open_time (not used for price-based)
+                    target_price,    // open_price (target price)
+                    60,              // timeframe
+                    0,               // min_payout
+                    1,               // command: 1 = Put
                 ),
             )
             .await
@@ -724,7 +722,7 @@ async fn test_comprehensive_workflow() {
                     1,
                     dec!(1.0),
                     test_asset.to_string(),
-                    60,
+                    "60".to_string(),
                     dec!(1.1000),
                     60,
                     0,

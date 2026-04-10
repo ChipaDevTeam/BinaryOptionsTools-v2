@@ -370,7 +370,7 @@ impl RawPocketOption {
         open_type: u32,
         amount: f64,
         asset: String,
-        open_time: u32,
+        open_time: String,
         open_price: f64,
         timeframe: u32,
         min_payout: u32,
@@ -603,16 +603,16 @@ impl RawPocketOption {
         })
     }
 
-    pub fn subscribe_symbol_chuncked<'py>(
+    pub fn subscribe_symbol_chunked<'py>(
         &self,
         py: Python<'py>,
         symbol: String,
-        chunck_size: usize,
+        chunk_size: usize,
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
             let subscription = client
-                .subscribe(symbol, SubscriptionType::chunk(chunck_size))
+                .subscribe(symbol, SubscriptionType::chunk(chunk_size))
                 .await
                 .map_err(BinaryErrorPy::from)?;
 

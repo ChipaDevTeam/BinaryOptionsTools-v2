@@ -439,9 +439,9 @@ class PocketOption:
             subscription = self._run_async(self._client._subscribe_symbol_inner(asset))
         return SyncSubscription(subscription, self.loop)
 
-    def subscribe_symbol_chuncked(self, asset: str, chunck_size: int) -> SyncSubscription:
+    def subscribe_symbol_chunked(self, asset: str, chunk_size: int) -> SyncSubscription:
         with self._lock:
-            subscription = self._run_async(self._client._subscribe_symbol_chuncked_inner(asset, chunck_size))
+            subscription = self._run_async(self._client._subscribe_symbol_chunked_inner(asset, chunk_size))
         return SyncSubscription(subscription, self.loop)
 
     def subscribe_symbol_timed(self, asset: str, time: timedelta) -> SyncSubscription:

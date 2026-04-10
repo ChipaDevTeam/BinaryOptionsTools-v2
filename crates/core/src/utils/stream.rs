@@ -33,7 +33,7 @@ impl RecieverStream {
         Self { inner, timeout }
     }
 
-    async fn receive(&self) -> CoreResult<Message> {
+    pub async fn receive(&self) -> CoreResult<Message> {
         match self.timeout {
             Some(time) => timeout(time, self.inner.recv(), "RecieverStream".to_string()).await,
             None => Ok(self.inner.recv().await?),
@@ -79,7 +79,7 @@ impl FilteredRecieverStream {
         Self::new(inner, None, filter)
     }
 
-    async fn recv(&self) -> CoreResult<Message> {
+    pub async fn recv(&self) -> CoreResult<Message> {
         while let Ok(msg) = self.inner.recv().await {
             if self.filter.call(&msg) {
                 return Ok(msg);
@@ -88,11 +88,15 @@ impl FilteredRecieverStream {
         Err(CoreError::ChannelReceiver(ReceiveError::Closed))
     }
 
-    async fn receive(&self) -> CoreResult<Message> {
+    pub async fn receive(&self) -> CoreResult<Message> {
         match self.timeout {
             Some(time) => timeout(time, self.recv(), "RecieverStream".to_string()).await,
-            None => Ok(self.inner.recv().await?),
+            None => self.recv().await,
         }
+    }
+
+    pub fn set_timeout(&mut self, timeout: Duration) {
+        self.timeout = Some(timeout);
     }
 
     pub fn to_stream(&self) -> impl Stream<Item = CoreResult<Message>> + '_ {

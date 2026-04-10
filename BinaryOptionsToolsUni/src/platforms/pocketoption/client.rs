@@ -178,13 +178,13 @@ impl PocketOption {
 
     /// Returns all closed deals stored in the client's state.
     #[uniffi::method]
-    pub async fn get_closed_deals(&self) -> Vec<Deal> {
-        self.inner
+    pub async fn get_closed_deals(&self) -> Result<Vec<Deal>, UniError> {
+        Ok(self.inner
             .get_closed_deals()
             .await
             .into_values()
             .map(Deal::from)
-            .collect()
+            .collect())
     }
 
     #[uniffi_doc(
@@ -192,13 +192,12 @@ impl PocketOption {
         path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
     )]
     #[allow(clippy::too_many_arguments)]
-    #[uniffi::method]
     pub async fn open_pending_order(
         &self,
         open_type: u32,
         amount: f64,
         asset: String,
-        open_time: u32,
+        open_time: String,
         open_price: f64,
         timeframe: u32,
         min_payout: u32,
@@ -221,9 +220,8 @@ impl PocketOption {
                 min_payout,
                 command,
             )
-            .await
-            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
-        Ok(PendingOrder::from(order))
+            .await?;
+        Ok(order.into())
     }
 
     /// Returns all currently pending orders.
@@ -388,7 +386,7 @@ impl PocketOption {
 
     /// Returns all closed deals. Alias for `get_closed_deals`.
     #[uniffi::method]
-    pub async fn get_trade_history(&self) -> Vec<Deal> {
+    pub async fn get_trade_history(&self) -> Result<Vec<Deal>, UniError> {
         self.get_closed_deals().await
     }
 
