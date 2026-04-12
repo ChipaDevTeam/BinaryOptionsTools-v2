@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::collections::HashMap;
 
 use async_trait::async_trait;
 use binary_options_tools_core::{
@@ -12,7 +13,7 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::pocketoption::{
-    candle::{BaseCandle, Candle},
+    candle::{BaseCandle, Candle, compile_candles_from_ticks, HistoryItem},
     error::{PocketError, PocketResult},
     state::State,
     types::MultiPatternRule,
@@ -335,7 +336,8 @@ pub struct GetCandlesApiModule {
     ws_sender: AsyncSender<Message>,
     command_receiver: AsyncReceiver<Command>,
     command_responder: AsyncSender<CommandResponse>,
-    pending_requests: std::collections::HashMap<u64, (Uuid, String, RequestKind)>, // index -> (req_id, asset, kind)
+    pending_requests: HashMap<u64, (Uuid, String, RequestKind, u32)>, // index -> (req_id, asset, kind, period)
+    latest_ticks: HashMap<String, Vec<(i64, f64)>>,
 }
 
 #[async_trait]
@@ -358,7 +360,8 @@ impl ApiModule<State> for GetCandlesApiModule {
             ws_sender,
             command_receiver,
             command_responder,
-            pending_requests: std::collections::HashMap::new(),
+            pending_requests: HashMap::new(),
+            latest_ticks: HashMap::new(),
         }
     }
 
@@ -378,7 +381,12 @@ impl ApiModule<State> for GetCandlesApiModule {
                             if let Ok(result) = serde_json::from_slice::<LoadHistoryPeriodResult>(data) {
                                 self.process_result(result).await?;
                             } else {
-                                warn!("Failed to parse LoadHistoryPeriodResult (binary)");
+                                // Try parsing as updateStream tick data
+                                if let Ok(text) = std::str::from_utf8(data) {
+                                    if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
+                                        self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
+                                    }
+                                }
                             }
                         }
                         Message::Text(text) => {
@@ -397,6 +405,8 @@ impl ApiModule<State> for GetCandlesApiModule {
                                         }
                                     }
                                 }
+                            } else if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
+                                self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
                             }
                         }
                         _ => {}
@@ -407,8 +417,11 @@ impl ApiModule<State> for GetCandlesApiModule {
                         Command::GetCandles { asset, period, time, offset, req_id } => {
                             match LoadHistoryPeriod::new(&asset, time, period, offset) {
                                 Ok(load_history) => {
+                                    // Clear buffered ticks for this asset to ensure we get fresh ones after the historical request
+                                    self.latest_ticks.remove(&asset);
+                                    
                                     // Store the request mapping
-                                    self.pending_requests.insert(load_history.index, (req_id, asset, RequestKind::Candles));
+                                    self.pending_requests.insert(load_history.index, (req_id, asset, RequestKind::Candles, period as u32));
 
                                     // Send the WebSocket message
                                     let message = Message::text(load_history.to_string());
@@ -436,8 +449,10 @@ impl ApiModule<State> for GetCandlesApiModule {
                         Command::GetTicks { asset, period, time, offset, req_id } => {
                             match LoadHistoryPeriod::new(&asset, time, period, offset) {
                                 Ok(load_history) => {
+                                    self.latest_ticks.remove(&asset);
+                                    
                                     // Store the request mapping
-                                    self.pending_requests.insert(load_history.index, (req_id, asset, RequestKind::Ticks));
+                                    self.pending_requests.insert(load_history.index, (req_id, asset, RequestKind::Ticks, period as u32));
 
                                     // Send the WebSocket message
                                     let message = Message::text(load_history.to_string());
@@ -482,50 +497,93 @@ impl ApiModule<State> for GetCandlesApiModule {
 }
 
 impl GetCandlesApiModule {
+    /// Parses an updateStream message into (symbol, timestamp, price).
+    fn parse_update_stream(&self, text: &str) -> Option<(String, i64, f64)> {
+        // Handle Socket.IO array format: [["symbol", timestamp, price]]
+        if let Ok(serde_json::Value::Array(outer_arr)) = serde_json::from_str::<serde_json::Value>(text) {
+            if let Some(inner_arr) = outer_arr.first().and_then(|v| v.as_array()) {
+                if inner_arr.len() >= 3 {
+                    let symbol = inner_arr[0].as_str()?.to_string();
+                    let timestamp = normalize_timestamp(inner_arr[1].as_f64()?);
+                    let price = inner_arr[2].as_f64()?;
+                    return Some((symbol, timestamp, price));
+                }
+            }
+        }
+        None
+    }
+
     async fn process_result(&mut self, result: LoadHistoryPeriodResult) -> CoreResult<()> {
         // Find the pending request by index
-        if let Some((req_id, asset, request_kind)) = self.pending_requests.remove(&result.index) {
+        if let Some((req_id, asset, request_kind, requested_period)) = self.pending_requests.remove(&result.index) {
             match request_kind {
                 RequestKind::Candles => {
-                    let candles: Vec<Candle> = result
-                        .data
-                        .into_iter()
-                        .filter_map(|tick_data| {
-                            // Check if this is candle data (has OHLC fields) or tick data
-                            let timestamp = normalize_timestamp(tick_data.time);
-                            if let (Some(open), Some(high), Some(low), Some(close)) = (
-                                tick_data.open,
-                                tick_data.high,
-                                tick_data.low,
-                                tick_data.close,
-                            ) {
-                                // This is candle data with OHLC
-                                let base_candle = BaseCandle {
-                                    timestamp,
-                                    open,
-                                    high,
-                                    low,
-                                    close,
-                                    volume: tick_data.volume,
-                                };
-                                let symbol = asset.clone();
-                                Candle::try_from((base_candle, symbol)).ok()
-                            } else {
-                                // This is tick data, convert to single-price candle
-                                let price = tick_data.get_price();
-                                let base_candle = BaseCandle {
-                                    timestamp,
-                                    open: price,
-                                    high: price,
-                                    low: price,
-                                    close: price,
-                                    volume: None,
-                                };
-                                let symbol = asset.clone();
-                                Candle::try_from((base_candle, symbol)).ok()
+                    // Check if the data is already OHLC candles
+                    let has_ohlc = result.data.iter().any(|d| {
+                        d.open.is_some() && d.high.is_some() && d.low.is_some() && d.close.is_some()
+                    });
+
+                    let mut history_items: Vec<HistoryItem> = if has_ohlc {
+                        result
+                            .data
+                            .into_iter()
+                            .map(|tick_data| {
+                                let timestamp = normalize_timestamp(tick_data.time);
+                                if let (Some(open), Some(high), Some(low), Some(close)) = (
+                                    tick_data.open,
+                                    tick_data.high,
+                                    tick_data.low,
+                                    tick_data.close,
+                                ) {
+                                    HistoryItem::Candle(crate::pocketoption::candle::CandleItem {
+                                        timestamp,
+                                        open,
+                                        high,
+                                        low,
+                                        close,
+                                        volume: tick_data.volume.unwrap_or(0.0),
+                                    })
+                                } else {
+                                    let price = tick_data.get_price();
+                                    HistoryItem::Tick([
+                                        serde_json::Value::from(tick_data.time),
+                                        serde_json::Value::from(price),
+                                    ])
+                                }
+                            })
+                            .collect()
+                    } else {
+                        result
+                            .data
+                            .into_iter()
+                            .map(|td| {
+                                HistoryItem::Tick([
+                                    serde_json::Value::from(td.time),
+                                    serde_json::Value::from(td.get_price()),
+                                ])
+                            })
+                            .collect()
+                    };
+
+                    // Append buffered ticks from updateStream if they are newer
+                    if let Some(stream_ticks) = self.latest_ticks.remove(&asset) {
+                        let last_ts = match history_items.last() {
+                            Some(HistoryItem::Candle(c)) => c.timestamp,
+                            Some(HistoryItem::Tick(t)) => normalize_timestamp(t[0].as_f64().unwrap_or(0.0)),
+                            None => 0,
+                        };
+                        
+                        for (ts, price) in stream_ticks {
+                            if ts > last_ts {
+                                history_items.push(HistoryItem::Tick([
+                                    serde_json::Value::from(ts as f64),
+                                    serde_json::Value::from(price),
+                                ]));
                             }
-                        })
-                        .collect();
+                        }
+                    }
+
+                    let candles = compile_candles_from_ticks(&history_items, requested_period, &asset);
 
                     if let Err(e) = self
                         .command_responder
@@ -536,7 +594,7 @@ impl GetCandlesApiModule {
                     }
                 }
                 RequestKind::Ticks => {
-                    let ticks: Vec<(i64, f64)> = result
+                    let mut ticks: Vec<(i64, f64)> = result
                         .data
                         .into_iter()
                         .map(|tick_data| {
@@ -544,6 +602,16 @@ impl GetCandlesApiModule {
                             (timestamp, tick_data.get_price())
                         })
                         .collect();
+
+                    // Append buffered ticks from updateStream
+                    if let Some(stream_ticks) = self.latest_ticks.remove(&asset) {
+                        let last_ts = ticks.last().map(|(t, _)| *t).unwrap_or(0);
+                        for (ts, price) in stream_ticks {
+                            if ts > last_ts {
+                                ticks.push((ts, price));
+                            }
+                        }
+                    }
 
                     if let Err(e) = self
                         .command_responder

@@ -317,8 +317,6 @@ impl RawPocketOption {
         period: i64,
         offset: i64,
     ) -> PyResult<Bound<'py, PyAny>> {
-        // Work in progress - this feature is not yet implemented in the new API
-
         let client = self.client.clone();
         future_into_py(py, async move {
             let res = client
