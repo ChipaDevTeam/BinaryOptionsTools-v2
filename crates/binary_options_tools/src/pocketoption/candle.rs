@@ -118,6 +118,7 @@ impl<'de> Deserialize<'de> for BaseCandle {
 pub enum HistoryItem {
     Tick([serde_json::Value; 2]),
     TickWithNull([serde_json::Value; 3]),
+    Candle(CandleItem),
 }
 
 impl HistoryItem {
@@ -133,6 +134,7 @@ impl HistoryItem {
                 let timestamp = normalize_timestamp(ts);
                 (timestamp, p.as_f64().unwrap_or_default())
             }
+            HistoryItem::Candle(c) => (c.timestamp, c.close),
         }
     }
 }
@@ -1029,6 +1031,22 @@ mod tests {
             ci.timestamp, from_seconds,
             "CandleItem should match normalize_timestamp"
         );
+    }
+
+    #[test]
+    fn test_history_item_candle() {
+        let candle_item = CandleItem {
+            timestamp: 1000,
+            open: 1.0,
+            high: 2.0,
+            low: 0.5,
+            close: 1.5,
+            volume: 100.0,
+        };
+        let item = HistoryItem::Candle(candle_item);
+        let (ts, price) = item.to_tick();
+        assert_eq!(ts, 1000);
+        assert_eq!(price, 1.5);
     }
 }
 

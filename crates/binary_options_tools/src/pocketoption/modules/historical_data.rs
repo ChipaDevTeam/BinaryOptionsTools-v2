@@ -707,10 +707,12 @@ mod tests {
             } => {
                 assert_eq!(r_id, req_id);
                 assert_eq!(candles.len(), 2);
-                assert_eq!(candles[0].timestamp, 1766378160);
+                // After sorting, candles[0] should be the oldest one (1766378100)
+                assert_eq!(candles[0].timestamp, 1766378100);
+                assert_eq!(candles[1].timestamp, 1766378160);
                 // Use from_str to ensure precise decimal representation matching the input string
                 assert_eq!(
-                    candles[0].open,
+                    candles[1].open,
                     rust_decimal::Decimal::from_str_exact("122.24").unwrap()
                 );
             }

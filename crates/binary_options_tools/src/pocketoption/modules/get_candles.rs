@@ -13,7 +13,7 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::pocketoption::{
-    candle::{BaseCandle, Candle, compile_candles_from_ticks, HistoryItem},
+    candle::{Candle, compile_candles_from_ticks, HistoryItem},
     error::{PocketError, PocketResult},
     state::State,
     types::MultiPatternRule,
@@ -567,11 +567,7 @@ impl GetCandlesApiModule {
 
                     // Append buffered ticks from updateStream if they are newer
                     if let Some(stream_ticks) = self.latest_ticks.remove(&asset) {
-                        let last_ts = match history_items.last() {
-                            Some(HistoryItem::Candle(c)) => c.timestamp,
-                            Some(HistoryItem::Tick(t)) => normalize_timestamp(t[0].as_f64().unwrap_or(0.0)),
-                            None => 0,
-                        };
+                        let last_ts = history_items.last().map(|i| i.to_tick().0).unwrap_or(0);
                         
                         for (ts, price) in stream_ticks {
                             if ts > last_ts {
