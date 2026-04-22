@@ -425,6 +425,16 @@ class PocketOption:
                 )
             )
 
+    def cancel_pending_order(self, ticket: str) -> Dict:
+        """Cancels a pending order by ticket UUID."""
+        with self._lock:
+            return self.loop.run_until_complete(self._client.cancel_pending_order(ticket))
+
+    def cancel_pending_orders(self, tickets: List[str]) -> List[Dict]:
+        """Cancels multiple pending orders by ticket UUID."""
+        with self._lock:
+            return self.loop.run_until_complete(self._client.cancel_pending_orders(tickets))
+
     def closed_deals(self) -> List[Dict]:
         "Returns a list of all the closed deals as dictionaries"
         with self._lock:

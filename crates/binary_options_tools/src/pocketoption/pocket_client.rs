@@ -37,7 +37,7 @@ use crate::{
         },
         ssid::Ssid,
         state::{State, StateBuilder},
-        types::{Action, Assets, Deal, PendingOrder},
+        types::{Action, Assets, CancelPendingOrderResult, Deal, PendingOrder},
     },
     utils::print_handler,
 };
@@ -692,10 +692,31 @@ impl PocketOption {
     ) -> PocketResult<PendingOrder> {
         self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
             .await?
-            .with_lock(self.pending_trades_lock.clone())
             .open_pending_order(
                 open_type, amount, asset, open_time, open_price, timeframe, min_payout, command,
             )
+            .await
+    }
+
+    /// Cancels a pending order by ticket.
+    pub async fn cancel_pending_order(
+        &self,
+        ticket: Uuid,
+    ) -> PocketResult<CancelPendingOrderResult> {
+        self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
+            .await?
+            .cancel_pending_order(ticket)
+            .await
+    }
+
+    /// Cancels multiple pending orders by ticket.
+    pub async fn cancel_pending_orders(
+        &self,
+        tickets: Vec<Uuid>,
+    ) -> PocketResult<Vec<CancelPendingOrderResult>> {
+        self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
+            .await?
+            .cancel_pending_orders(tickets)
             .await
     }
 

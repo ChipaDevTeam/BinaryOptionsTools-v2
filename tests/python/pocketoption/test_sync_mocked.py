@@ -128,6 +128,12 @@ class MockPocketOptionAsync:
     ):
         return {"id": "pending_1", "status": "pending"}
 
+    async def cancel_pending_order(self, ticket):
+        return {"ticket": ticket, "status": "cancelled"}
+
+    async def cancel_pending_orders(self, tickets):
+        return [{"ticket": ticket, "status": "cancelled"} for ticket in tickets]
+
     async def closed_deals(self):
         return [
             {
@@ -690,6 +696,26 @@ class TestOpenPendingOrder:
             sync_client.open_pending_order(
                 0, -1.0, "EURUSD_otc", 1700000000, 1.1, 60, 80, 0
             )
+
+
+class TestCancelPendingOrder:
+    """Tests for pending order cancellation methods."""
+
+    def test_cancel_pending_order_success(self, sync_client):
+        result = sync_client.cancel_pending_order(
+            "11111111-1111-1111-1111-111111111111"
+        )
+        assert result["status"] == "cancelled"
+
+    def test_cancel_pending_orders_success(self, sync_client):
+        results = sync_client.cancel_pending_orders(
+            [
+                "11111111-1111-1111-1111-111111111111",
+                "22222222-2222-2222-2222-222222222222",
+            ]
+        )
+        assert len(results) == 2
+        assert all(result["status"] == "cancelled" for result in results)
 
 
 class TestClosedDeals:

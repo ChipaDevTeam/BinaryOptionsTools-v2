@@ -651,6 +651,8 @@ pub struct PendingOrder {
     pub timeframe: u32,
     pub min_payout: u32,
     pub command: u32,
+    #[serde(default)]
+    pub status: Option<String>,
     pub date_created: String,
     pub id: u64,
 }
@@ -698,6 +700,32 @@ impl fmt::Display for OpenPendingOrder {
         let data = serde_json::to_string(&self).map_err(|_| fmt::Error)?;
         write!(f, "42[\"openPendingOrder\",{data}]")
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CancelPendingOrder {
+    pub ticket: Uuid,
+}
+
+impl CancelPendingOrder {
+    pub fn new(ticket: Uuid) -> Self {
+        Self { ticket }
+    }
+}
+
+impl fmt::Display for CancelPendingOrder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let data = serde_json::to_string(&self).map_err(|_| fmt::Error)?;
+        write!(f, "42[\"cancelPendingOrder\",{data}]")
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CancelPendingOrderResult {
+    pub ticket: Uuid,
+    pub status: String,
 }
 #[derive(Debug, Clone)]
 pub enum SubscriptionEvent {
