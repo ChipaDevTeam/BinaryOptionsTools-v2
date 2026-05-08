@@ -7,9 +7,10 @@ use binary_options_tools_core::reimports::{bounded_async, AsyncReceiver, AsyncSe
 use binary_options_tools_core::traits::{ApiModule, Rule, RunnerCommand};
 use tokio::select;
 use tokio::sync::RwLock;
+use tracing::warn;
 use uuid::Uuid;
 
-use crate::pocketoption::error::PocketResult;
+use crate::pocketoption::error::{PocketError, PocketResult};
 use crate::pocketoption::state::State;
 use crate::traits::ValidatorTrait;
 use crate::validator::Validator;
@@ -50,6 +51,10 @@ pub enum CommandResponse {
         id: Uuid,
         existed: bool,
     },
+    /// The module has stopped and cannot fulfill the request.
+    Shutdown {
+        command_id: Uuid,
+    },
 }
 
 /// Handle used by clients to create per-validator RawHandlers
@@ -88,6 +93,12 @@ impl RawHandle {
                         receiver: stream_receiver,
                     });
                 }
+                Ok(CommandResponse::Shutdown { command_id: cid }) if cid == command_id => {
+                    return Err(PocketError::ModuleStopped {
+                        module_name: "RawApiModule".to_string(),
+                        context: "RawApiModule stopped during create".to_string(),
+                    });
+                }
                 Ok(_) => continue,
                 Err(e) => return Err(CoreError::from(e).into()),
             }
@@ -108,6 +119,12 @@ impl RawHandle {
                     id: rid,
                     existed,
                 }) if cid == command_id && rid == id => return Ok(existed),
+                Ok(CommandResponse::Shutdown { command_id: cid }) if cid == command_id => {
+                    return Err(PocketError::ModuleStopped {
+                        module_name: "RawApiModule".to_string(),
+                        context: "RawApiModule stopped during remove".to_string(),
+                    });
+                }
                 Ok(_) => continue,
                 Err(e) => return Err(CoreError::from(e).into()),
             }
@@ -254,62 +271,83 @@ impl ApiModule<State> for RawApiModule {
     async fn run(&mut self) -> binary_options_tools_core::error::CoreResult<()> {
         loop {
             select! {
-                Ok(cmd) = self.command_receiver.recv() => {
-                    match cmd {
-                        Command::Create { validator, keep_alive, command_id } => {
-                            let id = Uuid::new_v4();
-                            self.state.add_raw_validator(id, validator);
-                            if let Some(msg) = keep_alive.clone() {
-                                self.keep_alive_msgs.write().await.insert(id, msg);
+                cmd_res = self.command_receiver.recv() => {
+                    match cmd_res {
+                        Ok(cmd) => {
+                            match cmd {
+                                Command::Create { validator, keep_alive, command_id } => {
+                                    let id = Uuid::new_v4();
+                                    self.state.add_raw_validator(id, validator);
+                                    if let Some(msg) = keep_alive.clone() {
+                                        self.keep_alive_msgs.write().await.insert(id, msg);
+                                    }
+                                    let (tx, rx) = bounded_async(64);
+                                    self.sinks.write().await.insert(id, Arc::new(tx));
+                                    let _ = self.command_responder.send(CommandResponse::Created { command_id, id, stream_receiver: rx }).await;
+                                }
+                                Command::Remove { id, command_id } => {
+                                    let existed_state = self.state.remove_raw_validator(&id);
+                                    let existed_sink = self.sinks.write().await.remove(&id).is_some();
+                                    self.keep_alive_msgs.write().await.remove(&id);
+                                    let _ = self.command_responder.send(CommandResponse::Removed { command_id, id, existed: existed_state || existed_sink }).await;
+                                }
+                                Command::Send(Outgoing::Text(text)) => {
+                                    if let Err(e) = self.to_ws_sender.send(Message::text(text)).await {
+                                        warn!(target: "RawApiModule", "Failed to send raw text: {}", e);
+                                    }
+                                }
+                                Command::Send(Outgoing::Binary(data)) => {
+                                    if let Err(e) = self.to_ws_sender.send(Message::binary(data)).await {
+                                        warn!(target: "RawApiModule", "Failed to send raw binary: {}", e);
+                                    }
+                                }
                             }
-                            let (tx, rx) = bounded_async(64);
-                            self.sinks.write().await.insert(id, Arc::new(tx));
-                            self.command_responder.send(CommandResponse::Created { command_id, id, stream_receiver: rx }).await?;
                         }
-                        Command::Remove { id, command_id } => {
-                            let existed_state = self.state.remove_raw_validator(&id);
-                            let existed_sink = self.sinks.write().await.remove(&id).is_some();
-                            self.keep_alive_msgs.write().await.remove(&id);
-                            self.command_responder.send(CommandResponse::Removed { command_id, id, existed: existed_state || existed_sink }).await?;
-                        }
-                        Command::Send(Outgoing::Text(text)) => {
-                            self.to_ws_sender.send(Message::text(text)).await.map_err(CoreError::from)?;
-                        }
-                        Command::Send(Outgoing::Binary(data)) => {
-                            self.to_ws_sender.send(Message::binary(data)).await.map_err(CoreError::from)?;
+                        Err(_) => {
+                            self.notify_waiters_module_stopped().await;
+                            break;
                         }
                     }
                 },
-                Ok(msg) = self.message_receiver.recv() => {
-                    // When a message arrives, route it to all matching validators
-                    let content = match msg.as_ref() {
-                        Message::Binary(bin) => String::from_utf8_lossy(bin.as_ref()).into_owned(),
-                        Message::Text(t) => t.to_string(),
-                        _ => String::new(),
-                    };
-                    if content.is_empty() { continue; }
+                msg_res = self.message_receiver.recv() => {
+                    match msg_res {
+                        Ok(msg) => {
+                            // When a message arrives, route it to all matching validators
+                            let content = match msg.as_ref() {
+                                Message::Binary(bin) => String::from_utf8_lossy(bin.as_ref()).into_owned(),
+                                Message::Text(t) => t.to_string(),
+                                _ => String::new(),
+                            };
+                            if content.is_empty() { continue; }
 
-                    let mut targets = Vec::new();
-                    {
-                        let validators = self.state.raw_validators.read().expect("Failed to acquire read lock");
-                        for (id, validator) in validators.iter() {
-                            if validator.call(content.as_str()) {
-                                targets.push(*id);
+                            let mut targets = Vec::new();
+                            {
+                                let validators = self.state.raw_validators.read().expect("Failed to acquire read lock");
+                                for (id, validator) in validators.iter() {
+                                    if validator.call(content.as_str()) {
+                                        targets.push(*id);
+                                    }
+                                }
+                            }
+
+                            if !targets.is_empty() {
+                                let sinks = self.sinks.read().await;
+                                for id in targets {
+                                    if let Some(tx) = sinks.get(&id) {
+                                        let _ = tx.send(msg.clone()).await; // best effort
+                                    }
+                                }
                             }
                         }
-                    }
-
-                    if !targets.is_empty() {
-                        let sinks = self.sinks.read().await;
-                        for id in targets {
-                            if let Some(tx) = sinks.get(&id) {
-                                let _ = tx.send(msg.clone()).await; // best effort
-                            }
+                        Err(_) => {
+                            self.notify_waiters_module_stopped().await;
+                            break;
                         }
                     }
                 }
             }
         }
+        Ok(())
     }
 
     fn rule(state: Arc<State>) -> Box<dyn Rule + Send + Sync> {
@@ -353,5 +391,20 @@ impl ApiModule<State> for RawApiModule {
         Ok(Some(Box::new(CB {
             msgs: shared_state.raw_keep_alive.clone(),
         })))
+    }
+}
+
+impl RawApiModule {
+    async fn notify_waiters_module_stopped(&mut self) {
+        // RawApiModule doesn't keep a list of pending command_ids for Handle yet,
+        // but we clear sinks to drop streams.
+        let mut sinks = self.sinks.write().await;
+        sinks.clear();
+    }
+}
+
+impl Drop for RawApiModule {
+    fn drop(&mut self) {
+        // Cannot async notify here easily, but run() handles it.
     }
 }

@@ -37,9 +37,9 @@ pytest_cache/
 
 # ---- Node (if used) ----
 node_modules/
+*.node
 bun-debug.log*
 bun-error.log*
-# npm/yarn legacy
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -77,5 +77,5 @@ pyvenv.cfg
 debug/
 .agents
 
-# serena
-.serena/
+# omg
+.omg/

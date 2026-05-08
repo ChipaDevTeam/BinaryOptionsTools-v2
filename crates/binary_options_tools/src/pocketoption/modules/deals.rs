@@ -188,6 +188,30 @@ impl DealsApiModule {
             ExpectedMessage::None => {}
         }
     }
+
+    /// Notifies all pending waiters that the module has stopped.
+    /// This prevents "responder dropped" errors by properly cleaning up pending requests.
+    fn notify_waiters_module_stopped(&mut self) {
+        let waiters = std::mem::take(&mut self.waiting_requests);
+        if !waiters.is_empty() {
+            tracing::info!("DealsApiModule: Notifying {} pending waiters that module has stopped", waiters.len());
+        }
+        for (trade_id, responders) in waiters {
+            for responder in responders {
+                let error = PocketError::ModuleStopped {
+                    module_name: "DealsApiModule".to_string(),
+                    context: format!("Trade ID: {}", trade_id),
+                };
+                let _ = responder.send(Err(error));
+            }
+        }
+    }
+}
+
+impl Drop for DealsApiModule {
+    fn drop(&mut self) {
+        self.notify_waiters_module_stopped();
+    }
 }
 
 #[async_trait]
@@ -352,7 +376,11 @@ impl ApiModule<State> for DealsApiModule {
                                 _ => {}
                             }
                         }
-                        Err(_) => break,
+                        Err(_) => {
+                            tracing::info!("DealsApiModule: WebSocket receiver closed, shutting down...");
+                            self.notify_waiters_module_stopped();
+                            break;
+                        }
                     }
                 }
                 cmd_res = self.command_receiver.recv() => {
@@ -373,11 +401,16 @@ impl ApiModule<State> for DealsApiModule {
                                 }
                             }
                         }
-                        Err(_) => break,
+                        Err(_) => {
+                            tracing::info!("DealsApiModule: Command receiver closed, shutting down...");
+                            self.notify_waiters_module_stopped();
+                            break;
+                        }
                     }
                 }
             }
         }
+        tracing::info!("DealsApiModule: Run loop exited.");
         Ok(())
     }
 

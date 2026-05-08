@@ -42,6 +42,12 @@ pub enum PocketError {
     #[error("Module not found: {0}")]
     ModuleNotFound(String),
 
+    #[error("Module {module_name} stopped: {context}")]
+    ModuleStopped {
+        module_name: String,
+        context: String,
+    },
+
     #[error("Configuration error: {0}")]
     Configuration(String),
 

@@ -140,6 +140,10 @@ pub enum CommandResponse {
         req_id: Uuid,
         error: String,
     },
+    /// The module has stopped and cannot fulfill the request.
+    Shutdown {
+        req_id: Uuid,
+    },
 }
 
 #[derive(Clone)]
@@ -220,6 +224,14 @@ impl GetCandlesHandle {
                     }
                     // Continue waiting for the correct response
                 }
+                Ok(CommandResponse::Shutdown { req_id: response_id }) => {
+                    if req_id == response_id {
+                        return Err(PocketError::ModuleStopped {
+                            module_name: "GetCandlesApiModule".to_string(),
+                            context: "GetCandlesApiModule stopped during request".to_string(),
+                        });
+                    }
+                }
                 Ok(_) => continue, // Ignore other response types
                 Err(e) => return Err(CoreError::from(e).into()),
             }
@@ -285,6 +297,14 @@ impl GetCandlesHandle {
                     }) => {
                         if req_id == response_id {
                             return Err(PocketError::General(error));
+                        }
+                    }
+                    Ok(CommandResponse::Shutdown { req_id: response_id }) => {
+                        if req_id == response_id {
+                            return Err(PocketError::ModuleStopped {
+                                module_name: "GetCandlesApiModule".to_string(),
+                                context: "GetCandlesApiModule stopped during request".to_string(),
+                            });
                         }
                     }
                     Ok(_) => continue,
@@ -375,114 +395,131 @@ impl ApiModule<State> for GetCandlesApiModule {
     async fn run(&mut self) -> CoreResult<()> {
         loop {
             select! {
-                Ok(msg) = self.ws_receiver.recv() => {
-                    match msg.as_ref() {
-                        Message::Binary(data) => {
-                            if let Ok(result) = serde_json::from_slice::<LoadHistoryPeriodResult>(data) {
-                                self.process_result(result).await?;
-                            } else {
-                                // Try parsing as updateStream tick data
-                                if let Ok(text) = std::str::from_utf8(data) {
-                                    if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
+                msg_res = self.ws_receiver.recv() => {
+                    match msg_res {
+                        Ok(msg) => {
+                            match msg.as_ref() {
+                                Message::Binary(data) => {
+                                    if let Ok(result) = serde_json::from_slice::<LoadHistoryPeriodResult>(data) {
+                                        if let Err(e) = self.process_result(result).await {
+                                            warn!(target: "GetCandlesApiModule", "Error processing binary result: {}", e);
+                                        }
+                                    } else {
+                                        // Try parsing as updateStream tick data
+                                        if let Ok(text) = std::str::from_utf8(data) {
+                                            if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
+                                                self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
+                                            }
+                                        }
+                                    }
+                                }
+                                Message::Text(text) => {
+                                    if let Ok(result) = serde_json::from_str::<LoadHistoryPeriodResult>(text) {
+                                        if let Err(e) = self.process_result(result).await {
+                                            warn!(target: "GetCandlesApiModule", "Error processing text result: {}", e);
+                                        }
+                                    } else if let Some(frame) = SocketIoFrame::parse(text) {
+                                        if let Some((event_name, payload)) = frame.extract_event() {
+                                            if event_name == "loadHistoryPeriod" || event_name == "loadHistoryPeriodFast" {
+                                                match serde_json::from_value::<LoadHistoryPeriodResult>(payload) {
+                                                    Ok(result) => {
+                                                        if let Err(e) = self.process_result(result).await {
+                                                            warn!(target: "GetCandlesApiModule", "Error processing event result: {}", e);
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        warn!("Failed to deserialize LoadHistoryPeriodResult from Socket.IO frame (event: {}): {}", event_name, e);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
                                         self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
                                     }
                                 }
+                                _ => {}
                             }
                         }
-                        Message::Text(text) => {
-                            if let Ok(result) = serde_json::from_str::<LoadHistoryPeriodResult>(text) {
-                                self.process_result(result).await?;
-                            } else if let Some(frame) = SocketIoFrame::parse(text) {
-                                if let Some((event_name, payload)) = frame.extract_event() {
-                                    if event_name == "loadHistoryPeriod" || event_name == "loadHistoryPeriodFast" {
-                                        match serde_json::from_value::<LoadHistoryPeriodResult>(payload) {
-                                            Ok(result) => {
-                                                self.process_result(result).await?;
-                                            }
-                                            Err(e) => {
-                                                warn!("Failed to deserialize LoadHistoryPeriodResult from Socket.IO frame (event: {}): {}", event_name, e);
-                                            }
-                                        }
-                                    }
-                                }
-                            } else if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
-                                self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                Ok(cmd) = self.command_receiver.recv() => {
-                    match cmd {
-                        Command::GetCandles { asset, period, time, offset, req_id } => {
-                            match LoadHistoryPeriod::new(&asset, time, period, offset) {
-                                Ok(load_history) => {
-                                    // Clear buffered ticks for this asset to ensure we get fresh ones after the historical request
-                                    self.latest_ticks.remove(&asset);
-                                    
-                                    // Store the request mapping
-                                    self.pending_requests.insert(load_history.index, (req_id, asset, RequestKind::Candles, period as u32));
-
-                                    // Send the WebSocket message
-                                    let message = Message::text(load_history.to_string());
-                                    if let Err(e) = self.ws_sender.send(message).await {
-                                        self.pending_requests.remove(&load_history.index);
-
-                                        if let Err(resp_err) = self.command_responder.send(CommandResponse::Error {
-                                            req_id,
-                                            error: format!("Failed to send WebSocket message: {e}"),
-                                        }).await {
-                                            warn!("Failed to send error response: {}", resp_err);
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    if let Err(resp_err) = self.command_responder.send(CommandResponse::Error {
-                                        req_id,
-                                        error: format!("Failed to create LoadHistoryPeriod: {e}"),
-                                    }).await {
-                                        warn!("Failed to send error response: {}", resp_err);
-                                    }
-                                }
-                            }
-                        }
-                        Command::GetTicks { asset, period, time, offset, req_id } => {
-                            match LoadHistoryPeriod::new(&asset, time, period, offset) {
-                                Ok(load_history) => {
-                                    self.latest_ticks.remove(&asset);
-                                    
-                                    // Store the request mapping
-                                    self.pending_requests.insert(load_history.index, (req_id, asset, RequestKind::Ticks, period as u32));
-
-                                    // Send the WebSocket message
-                                    let message = Message::text(load_history.to_string());
-                                    if let Err(e) = self.ws_sender.send(message).await {
-                                        self.pending_requests.remove(&load_history.index);
-
-                                        if let Err(resp_err) = self.command_responder.send(CommandResponse::Error {
-                                            req_id,
-                                            error: format!("Failed to send WebSocket message: {e}"),
-                                        }).await {
-                                            warn!("Failed to send error response: {}", resp_err);
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    if let Err(resp_err) = self.command_responder.send(CommandResponse::Error {
-                                        req_id,
-                                        error: format!("Failed to create LoadHistoryPeriod: {e}"),
-                                    }).await {
-                                        warn!("Failed to send error response: {}", resp_err);
-                                    }
-                                }
-                            }
+                        Err(_) => {
+                            self.notify_waiters_module_stopped().await;
+                            break;
                         }
                     }
                 }
-                else => {
-                    // Both channels are closed, exit the loop
-                    warn!("GetCandlesApiModule: Both channels closed, exiting");
-                    break;
+                cmd_res = self.command_receiver.recv() => {
+                    match cmd_res {
+                        Ok(cmd) => {
+                            match cmd {
+                                Command::GetCandles { asset, period, time, offset, req_id } => {
+                                    match LoadHistoryPeriod::new(&asset, time, period, offset) {
+                                        Ok(load_history) => {
+                                            // Clear buffered ticks for this asset to ensure we get fresh ones after the historical request
+                                            self.latest_ticks.remove(&asset);
+                                            
+                                            // Store the request mapping
+                                            self.pending_requests.insert(load_history.index, (req_id, asset, RequestKind::Candles, period as u32));
+
+                                            // Send the WebSocket message
+                                            let message = Message::text(load_history.to_string());
+                                            if let Err(e) = self.ws_sender.send(message).await {
+                                                self.pending_requests.remove(&load_history.index);
+
+                                                if let Err(resp_err) = self.command_responder.send(CommandResponse::Error {
+                                                    req_id,
+                                                    error: format!("Failed to send WebSocket message: {e}"),
+                                                }).await {
+                                                    warn!("Failed to send error response: {}", resp_err);
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            if let Err(resp_err) = self.command_responder.send(CommandResponse::Error {
+                                                req_id,
+                                                error: format!("Failed to create LoadHistoryPeriod: {e}"),
+                                            }).await {
+                                                warn!("Failed to send error response: {}", resp_err);
+                                            }
+                                        }
+                                    }
+                                }
+                                Command::GetTicks { asset, period, time, offset, req_id } => {
+                                    match LoadHistoryPeriod::new(&asset, time, period, offset) {
+                                        Ok(load_history) => {
+                                            self.latest_ticks.remove(&asset);
+                                            
+                                            // Store the request mapping
+                                            self.pending_requests.insert(load_history.index, (req_id, asset, RequestKind::Ticks, period as u32));
+
+                                            // Send the WebSocket message
+                                            let message = Message::text(load_history.to_string());
+                                            if let Err(e) = self.ws_sender.send(message).await {
+                                                self.pending_requests.remove(&load_history.index);
+
+                                                if let Err(resp_err) = self.command_responder.send(CommandResponse::Error {
+                                                    req_id,
+                                                    error: format!("Failed to send WebSocket message: {e}"),
+                                                }).await {
+                                                    warn!("Failed to send error response: {}", resp_err);
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            if let Err(resp_err) = self.command_responder.send(CommandResponse::Error {
+                                                req_id,
+                                                error: format!("Failed to create LoadHistoryPeriod: {e}"),
+                                            }).await {
+                                                warn!("Failed to send error response: {}", resp_err);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            self.notify_waiters_module_stopped().await;
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -497,6 +534,16 @@ impl ApiModule<State> for GetCandlesApiModule {
 }
 
 impl GetCandlesApiModule {
+    /// Notifies all pending waiters that the module has stopped.
+    async fn notify_waiters_module_stopped(&mut self) {
+        let waiters = std::mem::take(&mut self.pending_requests);
+        for (_, (req_id, _, _, _)) in waiters {
+            let _ = self
+                .command_responder
+                .send(CommandResponse::Shutdown { req_id })
+                .await;
+        }
+    }
     /// Parses an updateStream message into (symbol, timestamp, price).
     fn parse_update_stream(&self, text: &str) -> Option<(String, i64, f64)> {
         // Handle Socket.IO array format: [["symbol", timestamp, price]]

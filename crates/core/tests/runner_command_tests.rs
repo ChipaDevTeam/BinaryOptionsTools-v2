@@ -101,7 +101,7 @@ fn test_exponential_backoff_with_zero_base_delay() {
 #[test]
 fn test_jitter_range() {
     // Verify jitter stays within expected bounds (0.8 to 1.2)
-    use rand::Rng;
+    use rand::RngExt;
 
     let mut rng = rand::rng();
     for _ in 0..1000 {

@@ -1,0 +1,159 @@
+impl ApiModule<State> for SubscriptionsApiModule {
+    type Command = Command;
+    type CommandResponse = CommandResponse;
+    type Handle = SubscriptionsHandle;
+
+    fn new(
+        state: Arc<State>,
+        command_receiver: AsyncReceiver<Self::Command>,
+        command_responder: AsyncSender<Self::CommandResponse>,
+        message_receiver: AsyncReceiver<Arc<Message>>,
+        to_ws_sender: AsyncSender<Message>,
+        _: AsyncSender<RunnerCommand>,
+    ) -> Self {
+        Self {
+            state,
+            command_receiver,
+            command_responder,
+            message_receiver,
+            to_ws_sender,
+        }
+    }
+
+    fn create_handle(
+        sender: AsyncSender<Self::Command>,
+        receiver: AsyncReceiver<Self::CommandResponse>,
+    ) -> Self::Handle {
+        SubscriptionsHandle {
+            sender,
+            router: ResponseRouter::new(receiver),
+            cached_max: Arc::new(AtomicUsize::new(DEFAULT_CACHED_MAX)),
+        }
+    }
+
+    async fn run(&mut self) -> CoreResult<()> {
+        loop {
+            select! {
+                cmd_res = self.command_receiver.recv() => {
+                    match cmd_res {
+                        Ok(cmd) => {
+                            match cmd {
+                                Command::Subscribe { asset, sub_type, command_id } => {
+                                    if let Err(e) = self.handle_subscribe(asset, sub_type, command_id).await {
+                                        warn!(target: "SubscriptionsApiModule", "Error in handle_subscribe: {}", e);
+                                    }
+                                }
+                                Command::Unsubscribe { asset, subscription_id, command_id } => {
+                                    if let Err(e) = self.handle_unsubscribe(asset, subscription_id, command_id).await {
+                                        warn!(target: "SubscriptionsApiModule", "Error in handle_unsubscribe: {}", e);
+                                    }
+                                }
+                                Command::SubscriptionCount { command_id } => {
+                                    let subscriptions = self.state.active_subscriptions.read().await;
+                                    let count = subscriptions.values().map(|v| v.len()).sum::<usize>() as u32;
+                                    let _ = self.command_responder.send(CommandResponse::SubscriptionCount {
+                                        command_id,
+                                        count,
+                                        max: self.state.max_subscriptions,
+                                    }).await;
+                                },
+                                Command::History { asset, period, command_id } => {
+                                    if let Err(e) = self.handle_history(asset, period, command_id).await {
+                                        warn!(target: "SubscriptionsApiModule", "Error in handle_history: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            self.notify_waiters_module_stopped().await;
+                            break;
+                        }
+                    }
+                }
+                msg_res = self.message_receiver.recv() => {
+                    match msg_res {
+                        Ok(msg) => {
+                            match msg.as_ref() {
+                                Message::Text(text) => {
+                                    if let Some(frame) = SocketIoFrame::parse(text) {
+                                        if let Some((event, payload)) = frame.extract_event() {
+                                            if event == "history" {
+                                                if let Ok(history) = serde_json::from_value::<History>(payload) {
+                                                    if let Err(e) = self.process_history(history).await {
+                                                        warn!(target: "SubscriptionsApiModule", "Error processing history: {}", e);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        if let Some((symbol, timestamp, price)) = crate::pocketoption::utils::parse_update_stream(text) {
+                                            if let Err(e) = self.process_stream_tick(symbol, timestamp, price).await {
+                                                warn!(target: "SubscriptionsApiModule", "Error processing stream tick: {}", e);
+                                            }
+                                        }
+                                    }
+                                }
+                                Message::Binary(data) => {
+                                    if let Ok(res) = serde_json::from_slice::<ServerResponse>(data) {
+                                        match res {
+                                            ServerResponse::History(h) => {
+                                                if let Err(e) = self.process_history(h).await {
+                                                    warn!(target: "SubscriptionsApiModule", "Error processing binary history: {}", e);
+                                                }
+                                            }
+                                            ServerResponse::Candle(c) => {
+                                                if let Err(e) = self.process_stream_tick(c.asset, c.time as i64, c.price).await {
+                                                    warn!(target: "SubscriptionsApiModule", "Error processing binary stream tick: {}", e);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        Err(_) => {
+                            self.notify_waiters_module_stopped().await;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn rule(_: Arc<State>) -> Box<dyn Rule + Send + Sync> {
+        Box::new(MultiPatternRule::new(vec!["history", "updateStream"]))
+    }
+}
+
+impl SubscriptionsApiModule {
+    /// Notifies all pending waiters that the module has stopped.
+    async fn notify_waiters_module_stopped(&mut self) {
+        // Histories are notified via the CommandResponse channel (ResponseRouter handles it)
+        let mut histories_lock = self.state.histories.write().await;
+        let pending = std::mem::take(&mut *histories_lock);
+        for (_, _, command_id) in pending {
+            let _ = self
+                .command_responder
+                .send(CommandResponse::Shutdown { command_id })
+                .await;
+        }
+
+        // Active streams should also be notified
+        let mut subscriptions_lock = self.state.active_subscriptions.write().await;
+        let active = std::mem::take(&mut *subscriptions_lock);
+        for (_, subs) in active {
+            for (sender, _, _) in subs {
+                let _ = sender.send(SubscriptionEvent::Terminated).await;
+            }
+        }
+    }
+}
+
+impl Drop for SubscriptionsApiModule {
+    fn drop(&mut self) {
+        tracing::debug!(target: "SubscriptionsApiModule", "SubscriptionsApiModule dropped");
+    }
+}

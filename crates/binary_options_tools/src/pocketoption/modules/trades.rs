@@ -147,6 +147,28 @@ pub struct TradesApiModule {
     failure_matching: HashMap<(String, Decimal), VecDeque<Uuid>>,
 }
 
+impl TradesApiModule {
+    fn notify_waiters_module_stopped(&mut self) {
+        let pending = std::mem::take(&mut self.pending_orders);
+        if !pending.is_empty() {
+            tracing::info!("TradesApiModule: Notifying {} pending waiters that module has stopped", pending.len());
+        }
+        for (req_id, tracker) in pending {
+            let error = PocketError::ModuleStopped {
+                module_name: "TradesApiModule".to_string(),
+                context: format!("Request ID: {}", req_id),
+            };
+            let _ = tracker.responder.send(Err(error));
+        }
+    }
+}
+
+impl Drop for TradesApiModule {
+    fn drop(&mut self) {
+        self.notify_waiters_module_stopped();
+    }
+}
+
 #[async_trait]
 impl ApiModule<State> for TradesApiModule {
     type Command = Command;
@@ -213,13 +235,19 @@ impl ApiModule<State> for TradesApiModule {
                               }
                           }
                       }
-                      Err(_) => return Ok(()), // Channel closed
+                      Err(_) => {
+                          self.notify_waiters_module_stopped();
+                          return Ok(());
+                      }
                   }
               },
               msg_res = self.message_receiver.recv() => {
                   let msg = match msg_res {
                       Ok(msg) => msg,
-                      Err(_) => return Ok(()), // Channel closed
+                      Err(_) => {
+                          self.notify_waiters_module_stopped();
+                          return Ok(());
+                      }
                   };
                   let response_result = match msg.as_ref() {
                       Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data),

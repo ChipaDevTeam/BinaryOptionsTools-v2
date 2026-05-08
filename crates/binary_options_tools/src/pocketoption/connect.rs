@@ -6,7 +6,7 @@ use binary_options_tools_core::{
     connector::{Connector, ConnectorError, ConnectorResult},
     reimports::{MaybeTlsStream, WebSocketStream},
 };
-use rand::Rng;
+use rand::RngExt;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;

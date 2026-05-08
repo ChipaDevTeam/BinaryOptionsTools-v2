@@ -6,7 +6,7 @@ use crate::signals::Signals;
 use crate::traits::{ApiModule, AppState, ReconnectCallback, Rule, RunnerCommand};
 use futures_util::{stream::StreamExt, SinkExt};
 use kanal::{AsyncReceiver, AsyncSender};
-use rand::Rng;
+use rand::RngExt;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::future::Future;
