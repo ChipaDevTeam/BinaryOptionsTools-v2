@@ -622,9 +622,27 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             return Ok(());
                         }
                     };
+                    
                     let response = match msg.as_ref() {
                         Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data).ok(),
-                        Message::Text(text) => serde_json::from_str::<ServerResponse>(text).ok(),
+                        Message::Text(text) => {
+                            if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
+                                Some(res)
+                            } else if let Some(frame) = SocketIoFrame::parse(text) {
+                                if let Some((event, payload)) = frame.extract_event() {
+                                    match event.as_str() {
+                                        "updateStream" | "updateHistory" | "updateHistoryNewFast" | "updateHistoryNew" | "history" | "loadHistoryPeriod" => {
+                                            serde_json::from_value::<ServerResponse>(payload).ok()
+                                        }
+                                        _ => None
+                                    }
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        }
                         _ => None,
                     };
 
@@ -811,19 +829,21 @@ impl SubscriptionsApiModule {
     ) -> CoreResult<()> {
         let senders: Vec<AsyncSender<SubscriptionEvent>> = {
             let subscriptions = self.state.active_subscriptions.read().await;
-            subscriptions
-                .get(asset)
-                .map(|vec| vec.iter().map(|(sender, _, _)| sender.clone()).collect())
-                .unwrap_or_default()
+            if let Some(vec) = subscriptions.get(asset) {
+                vec.iter().map(|(sender, _, _)| sender.clone()).collect()
+            } else {
+                return Ok(());
+            }
+        };
+
+        let update = SubscriptionEvent::Update {
+            asset: asset.to_string(),
+            price,
+            timestamp,
         };
 
         for stream_sender in senders {
-            let update = SubscriptionEvent::Update {
-                asset: asset.to_string(),
-                price,
-                timestamp,
-            };
-            let _ = stream_sender.send(update).await;
+            let _ = stream_sender.send(update.clone()).await;
         }
         Ok(())
     }

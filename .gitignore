@@ -77,5 +77,8 @@ pyvenv.cfg
 debug/
 .agents
 
-# omg
+# omg n stuff
+assets/
 .omg/
+memory/
+syx/

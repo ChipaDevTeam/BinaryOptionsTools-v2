@@ -32,6 +32,8 @@ pub struct LoadHistoryPeriod {
     pub time: i64,
     pub index: u64,
     pub offset: i64,
+    #[serde(skip)]
+    pub is_fast: bool,
 }
 
 impl LoadHistoryPeriod {
@@ -42,6 +44,18 @@ impl LoadHistoryPeriod {
             time,
             index: get_index()?,
             offset,
+            is_fast: false,
+        })
+    }
+
+    pub fn new_fast(asset: impl ToString, time: i64, period: i64, offset: i64) -> PocketResult<Self> {
+        Ok(LoadHistoryPeriod {
+            asset: asset.to_string(),
+            period,
+            time,
+            index: get_index()?,
+            offset,
+            is_fast: true,
         })
     }
 }
@@ -49,7 +63,8 @@ impl LoadHistoryPeriod {
 impl std::fmt::Display for LoadHistoryPeriod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let data = serde_json::to_string(&self).map_err(|_| std::fmt::Error)?;
-        write!(f, "42[\"loadHistoryPeriod\",{data}]")
+        let event = if self.is_fast { "loadHistoryPeriodFast" } else { "loadHistoryPeriod" };
+        write!(f, "42[\"{event}\",{data}]")
     }
 }
 
@@ -267,6 +282,7 @@ impl GetCandlesHandle {
 
         loop {
             let req_id = Uuid::new_v4();
+            // Use loadHistoryPeriodFast for small offsets if needed, but here we use the module's logic
             info!(target: "GetCandlesHandle", "Requesting ticks for asset: {}, period: {}, time: {}, offset: {}", asset_str, period, current_time, page_offset);
 
             self.sender
@@ -451,7 +467,13 @@ impl ApiModule<State> for GetCandlesApiModule {
                         Ok(cmd) => {
                             match cmd {
                                 Command::GetCandles { asset, period, time, offset, req_id } => {
-                                    match LoadHistoryPeriod::new(&asset, time, period, offset) {
+                                    let load_history_res = if offset <= 100 {
+                                        LoadHistoryPeriod::new_fast(&asset, time, period, offset)
+                                    } else {
+                                        LoadHistoryPeriod::new(&asset, time, period, offset)
+                                    };
+
+                                    match load_history_res {
                                         Ok(load_history) => {
                                             // Clear buffered ticks for this asset to ensure we get fresh ones after the historical request
                                             self.latest_ticks.remove(&asset);
@@ -483,7 +505,13 @@ impl ApiModule<State> for GetCandlesApiModule {
                                     }
                                 }
                                 Command::GetTicks { asset, period, time, offset, req_id } => {
-                                    match LoadHistoryPeriod::new(&asset, time, period, offset) {
+                                    let load_history_res = if offset <= 100 {
+                                        LoadHistoryPeriod::new_fast(&asset, time, period, offset)
+                                    } else {
+                                        LoadHistoryPeriod::new(&asset, time, period, offset)
+                                    };
+
+                                    match load_history_res {
                                         Ok(load_history) => {
                                             self.latest_ticks.remove(&asset);
                                             

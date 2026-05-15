@@ -1,12 +1,11 @@
-use binary_options_tools::pocketoption::modules::pending_trades::{PendingTradesApiModule, PendingTradesHandle};
+use binary_options_tools::pocketoption::modules::pending_trades::PendingTradesApiModule;
 use binary_options_tools::pocketoption::state::StateBuilder;
 use binary_options_tools::pocketoption::ssid::Ssid;
 use binary_options_tools::pocketoption::error::PocketError;
-use binary_options_tools_core::reimports::{bounded_async, Message, AsyncReceiver, AsyncSender};
+use binary_options_tools_core::reimports::bounded_async;
 use kanal::unbounded_async;
 use binary_options_tools_core::traits::ApiModule;
 use std::sync::Arc;
-use uuid::Uuid;
 use tokio::time::timeout;
 use std::time::Duration;
 

@@ -17,10 +17,9 @@ use crate::pocketoption::candle::{
     compile_candles_from_ticks, BaseCandle, Candle, CandleItem, HistoryItem,
 };
 use crate::pocketoption::error::{PocketError, PocketResult};
-use crate::pocketoption::modules::get_candles::LoadHistoryPeriod;
 use crate::pocketoption::state::State;
 use crate::pocketoption::types::{MultiPatternRule};
-use crate::pocketoption::utils::{normalize_timestamp, SocketIoFrame};
+use crate::pocketoption::utils::normalize_timestamp;
 
 const HISTORICAL_DATA_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_MISMATCH_RETRIES: usize = 5;

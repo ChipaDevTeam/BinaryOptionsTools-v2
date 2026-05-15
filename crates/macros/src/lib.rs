@@ -2,7 +2,6 @@ mod action;
 mod config;
 mod deserialize;
 mod impls;
-// mod lightweight_module;
 mod region;
 mod serialize;
 mod timeout;
@@ -17,7 +16,19 @@ use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use quote::quote;
 use serialize::Serializer;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{parse_macro_input, DeriveInput, ItemStruct};
+
+#[proc_macro_attribute]
+pub fn lightweight_module(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemStruct);
+    impls::module_impl::expand_lightweight_module(input).into()
+}
+
+#[proc_macro_attribute]
+pub fn api_module(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemStruct);
+    impls::module_impl::expand_api_module(input).into()
+}
 
 #[proc_macro]
 pub fn deserialize(input: TokenStream) -> TokenStream {

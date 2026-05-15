@@ -9,7 +9,7 @@ use binary_options_tools_core::{
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use tokio::{select, time::timeout};
-use tracing::{info, warn};
+use tracing::warn;
 use uuid::Uuid;
 use tokio::sync::Mutex;
 

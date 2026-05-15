@@ -321,16 +321,33 @@ impl SocketIoFrame {
     }
 
     /// Extracts the event name and payload from the data array.
-    /// Assumes data is a JSON array like ["eventName", {payload}].
+    /// Supports multiple formats:
+    /// 1. Standard: ["eventName", {payload}]
+    /// 2. Nested: [["eventName", {payload}]]
+    /// 3. Multi-event: ["eventName", {payload}, "anotherEvent", ...] (returns first)
     pub fn extract_event(&self) -> Option<(String, serde_json::Value)> {
         let data = self.data.as_ref()?;
-        let arr: serde_json::Value = serde_json::from_str(data).ok()?;
+        let value: serde_json::Value = serde_json::from_str(data).ok()?;
 
-        if let Some(arr) = arr.as_array() {
+        if let Some(arr) = value.as_array() {
+            if arr.is_empty() {
+                return None;
+            }
+
+            // Case 2: Nested array [[...]]
+            if let Some(inner_arr) = arr[0].as_array() {
+                if inner_arr.len() >= 2 {
+                    if let Some(event_name) = inner_arr[0].as_str() {
+                        return Some((event_name.to_string(), inner_arr[1].clone()));
+                    }
+                }
+            }
+
+            // Case 1 & 3: Standard or Multi-event
             if arr.len() >= 2 {
-                let event_name = arr[0].as_str()?.to_string();
-                let payload = arr[1].clone();
-                return Some((event_name, payload));
+                if let Some(event_name) = arr[0].as_str() {
+                    return Some((event_name.to_string(), arr[1].clone()));
+                }
             }
         }
         None
@@ -368,5 +385,32 @@ pub mod unix_timestamp {
         DateTime::from_timestamp(timestamp, 0).ok_or(serde::de::Error::custom(
             "Error parsing timestamp to DateTime",
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_socket_io_frame_parsing() {
+        // Standard format
+        let frame = SocketIoFrame::parse("42[\"event\",{\"data\":1}]").unwrap();
+        let (event, payload) = frame.extract_event().unwrap();
+        assert_eq!(event, "event");
+        assert_eq!(payload, json!({"data":1}));
+
+        // Nested array format
+        let frame = SocketIoFrame::parse("42[[\"nestedEvent\",{\"val\":2}]]").unwrap();
+        let (event, payload) = frame.extract_event().unwrap();
+        assert_eq!(event, "nestedEvent");
+        assert_eq!(payload, json!({"val":2}));
+
+        // Multi-event format (should return first)
+        let frame = SocketIoFrame::parse("42[\"firstEvent\",{\"a\":1},\"secondEvent\",{\"b\":2}]").unwrap();
+        let (event, payload) = frame.extract_event().unwrap();
+        assert_eq!(event, "firstEvent");
+        assert_eq!(payload, json!({"a":1}));
     }
 }

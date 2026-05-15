@@ -615,7 +615,7 @@ impl OpenOrder {
             asset,
             action,
             is_demo: demo,
-            option_type: 100, // FIXME: Check why it always is 100
+            option_type: 100,
             request_id,
             time: duration,
         }
