@@ -77,6 +77,7 @@ fn create_test_pending_order(req_id: Uuid) -> PendingOrder {
         timeframe: 60,
         min_payout: 85,
         command: 0,
+        status: None,
         date_created: "2024-01-01 10:00:00".to_string(),
         id: 12345,
     }
@@ -265,6 +266,7 @@ async fn example_concurrent_pending_orders() -> PocketResult<()> {
                 timeframe: 60,
                 min_payout: 85,
                 command: 0,
+                status: None,
                 date_created: "2024-01-01 10:00:00".to_string(),
                 id: (1000 + i) as u64,
             };
@@ -304,6 +306,7 @@ async fn example_concurrent_pending_orders() -> PocketResult<()> {
                 timeframe: 60,
                 min_payout: 85,
                 command: 0,
+                status: None,
                 date_created: "2024-01-01 10:00:00".to_string(),
                 id: (1000 + i) as u64,
             };

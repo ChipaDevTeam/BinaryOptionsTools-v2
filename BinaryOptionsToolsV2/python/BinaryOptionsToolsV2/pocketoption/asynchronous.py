@@ -332,15 +332,8 @@ class PocketOptionAsync:
             TimeoutError: If result check times out
         """
 
-        # Set a reasonable timeout to prevent hanging
-        timeout_seconds = 60  # Increased timeout to accommodate longer trade durations
-
-        try:
-            # Use asyncio.wait_for as additional protection against hanging
-            trade = await asyncio.wait_for(self._get_trade_result(id), timeout=timeout_seconds)
-            return trade
-        except asyncio.TimeoutError:
-            raise TimeoutError(f"Timeout waiting for trade result for ID: {id}")
+        # Let Rust handle the timeout based on the trade close timestamp.
+        return await self._get_trade_result(id)
 
     async def get_deal_end_time(self, trade_id: str) -> Optional[int]:
         """
@@ -560,6 +553,16 @@ class PocketOptionAsync:
             open_type, amount, asset, open_time, open_price, timeframe, min_payout, command
         )
         return json.loads(order)
+
+    async def cancel_pending_order(self, ticket: str) -> Dict:
+        """Cancels a pending order by ticket UUID."""
+        result = await self.client.cancel_pending_order(ticket)
+        return json.loads(result)
+
+    async def cancel_pending_orders(self, tickets: List[str]) -> List[Dict]:
+        """Cancels multiple pending orders by ticket UUID."""
+        result = await self.client.cancel_pending_orders(tickets)
+        return json.loads(result)
 
     async def closed_deals(self) -> List[str]:
         """Retrieves a list of all closed/completed deals.

@@ -391,6 +391,51 @@ impl RawPocketOption {
         })
     }
 
+    pub fn cancel_pending_order<'py>(
+        &self,
+        py: Python<'py>,
+        ticket: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        let ticket = Uuid::parse_str(&ticket).map_err(|_| {
+            BinaryErrorPy::InvalidParameter(format!("Invalid ticket UUID: {}", ticket))
+        })?;
+
+        future_into_py(py, async move {
+            let res = client
+                .cancel_pending_order(ticket)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let result = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Ok(result)
+        })
+    }
+
+    pub fn cancel_pending_orders<'py>(
+        &self,
+        py: Python<'py>,
+        tickets: Vec<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        let tickets = tickets
+            .into_iter()
+            .map(|ticket| {
+                Uuid::parse_str(&ticket).map_err(|_| {
+                    BinaryErrorPy::InvalidParameter(format!("Invalid ticket UUID: {}", ticket))
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        future_into_py(py, async move {
+            let res = client
+                .cancel_pending_orders(tickets)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let result = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Ok(result)
+        })
+    }
+
     pub fn closed_deals<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {

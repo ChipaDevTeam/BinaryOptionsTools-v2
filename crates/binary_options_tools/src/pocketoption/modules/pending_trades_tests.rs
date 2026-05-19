@@ -79,6 +79,7 @@ fn create_test_pending_order(req_id: Uuid) -> PendingOrder {
         timeframe: 60,
         min_payout: 85,
         command: 0,
+        status: None,
         date_created: "2024-01-01 10:00:00".to_string(),
         id: 12345,
     }
@@ -292,6 +293,7 @@ async fn test_open_pending_order_mismatch_retry() {
     let cmd = command_task.await.unwrap();
     let req_id = match cmd {
         Command::OpenPendingOrder { req_id, .. } => req_id,
+        Command::CancelPendingOrder { .. } => panic!("unexpected cancel command"),
     };
 
     // Send two mismatched responses followed by the correct one
@@ -686,7 +688,7 @@ async fn test_run_handles_failure_response() {
 
     let response = resp_rx.recv().await.unwrap();
     match response {
-        CommandResponse::Error(fail) => {
+        CommandResponse::Error { fail, .. } => {
             assert_eq!(fail.error, fail_order.error);
             assert_eq!(fail.asset, fail_order.asset);
         }
@@ -761,6 +763,123 @@ async fn test_run_success_without_pending_request() {
     module_task.abort();
 }
 
+#[tokio::test]
+async fn test_cancel_pending_order_success_integrated() {
+    let (cmd_tx, cmd_rx) = kanal::bounded_async(1);
+    let (resp_tx, resp_rx) = kanal::bounded_async(1);
+    let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
+    let (ws_tx, _ws_rx) = kanal::bounded_async(1);
+    let (runner_tx, _) = kanal::bounded_async(1);
+
+    let state = create_mock_state();
+    let ticket = Uuid::new_v4();
+    state
+        .trade_state
+        .add_pending_deal(create_test_pending_order(ticket))
+        .await;
+
+    let mut module =
+        PendingTradesApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
+    let handle = PendingTradesApiModule::create_handle(cmd_tx, resp_rx);
+
+    let module_task = tokio::spawn(async move {
+        module.run().await.ok();
+    });
+
+    let cancel_task = tokio::spawn(async move { handle.cancel_pending_order(ticket).await });
+
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    msg_tx
+        .send(Arc::new(Message::Text(
+            format!(
+                "42[\"successcancelPendingOrder\",{{\"ticket\":\"{}\"}}]",
+                ticket
+            )
+            .into(),
+        )))
+        .await
+        .unwrap();
+
+    let result = cancel_task.await.unwrap().unwrap();
+    assert_eq!(result.ticket, ticket);
+    assert_eq!(result.status, "cancelled");
+    assert!(state.trade_state.get_pending_deal(ticket).await.is_none());
+
+    module_task.abort();
+}
+
+#[tokio::test]
+async fn test_open_pending_order_supports_multiple_in_flight_requests() {
+    let (cmd_tx, cmd_rx) = kanal::bounded_async(8);
+    let (resp_tx, resp_rx) = kanal::bounded_async(8);
+    let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(8);
+    let (ws_tx, _ws_rx) = kanal::bounded_async(8);
+    let (runner_tx, _) = kanal::bounded_async(1);
+    let state = create_mock_state();
+
+    let mut module =
+        PendingTradesApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
+    let handle = PendingTradesApiModule::create_handle(cmd_tx, resp_rx);
+    let module_task = tokio::spawn(async move {
+        module.run().await.ok();
+    });
+
+    let h1 = handle.clone();
+    let h2 = handle.clone();
+    let o1 = tokio::spawn(async move {
+        h1.open_pending_order(
+            1,
+            Decimal::from_f64_retain(10.0).unwrap(),
+            "EURUSD_otc".to_string(),
+            60,
+            Decimal::from_f64_retain(1.1000).unwrap(),
+            60,
+            80,
+            0,
+        )
+        .await
+    });
+    let o2 = tokio::spawn(async move {
+        h2.open_pending_order(
+            1,
+            Decimal::from_f64_retain(20.0).unwrap(),
+            "EURUSD_otc".to_string(),
+            60,
+            Decimal::from_f64_retain(1.2000).unwrap(),
+            60,
+            80,
+            0,
+        )
+        .await
+    });
+
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    let order1 = create_test_pending_order(Uuid::new_v4());
+    let order2 = create_test_pending_order(Uuid::new_v4());
+    let msg1 = format!(
+        "42[\"successopenPendingOrder\",{}]",
+        serde_json::to_string(&order1).unwrap()
+    );
+    let msg2 = format!(
+        "42[\"successopenPendingOrder\",{}]",
+        serde_json::to_string(&order2).unwrap()
+    );
+    msg_tx
+        .send(Arc::new(Message::Text(msg1.into())))
+        .await
+        .unwrap();
+    msg_tx
+        .send(Arc::new(Message::Text(msg2.into())))
+        .await
+        .unwrap();
+
+    assert!(o1.await.unwrap().is_ok());
+    assert!(o2.await.unwrap().is_ok());
+    assert_eq!(state.trade_state.get_pending_deals().await.len(), 2);
+
+    module_task.abort();
+}
+
 // ============== Tests for new, create_handle, rule ==============
 
 #[test]
@@ -782,6 +901,10 @@ fn test_new_creates_module() {
     let rule = PendingTradesApiModule::rule(state.clone());
     assert!(rule.call(&Message::Text("42[\"successopenPendingOrder\",{}]".into())));
     assert!(rule.call(&Message::Text("42[\"failopenPendingOrder\",{}]".into())));
+    assert!(rule.call(&Message::Text(
+        "42[\"successcancelPendingOrder\",{}]".into()
+    )));
+    assert!(rule.call(&Message::Text("42[\"failcancelPendingOrder\",{}]".into())));
     assert!(!rule.call(&Message::Text("42[\"unknown\",{}]".into())));
 }
 
@@ -801,5 +924,9 @@ fn test_rule_returns_multi_pattern_rule() {
     // Verify rule patterns by behavioral test
     assert!(rule.call(&Message::Text("42[\"successopenPendingOrder\",{}]".into())));
     assert!(rule.call(&Message::Text("42[\"failopenPendingOrder\",{}]".into())));
+    assert!(rule.call(&Message::Text(
+        "42[\"successcancelPendingOrder\",{}]".into()
+    )));
+    assert!(rule.call(&Message::Text("42[\"failcancelPendingOrder\",{}]".into())));
     assert!(!rule.call(&Message::Text("42[\"unknown\",{}]".into())));
 }
