@@ -376,20 +376,33 @@ class PocketOption:
         with self._lock:
             return self.loop.run_until_complete(self._client.balance())
 
-    def opened_deals(self) -> List[Dict]:
+    def opened_deals(self) -> List[str]:
         "Returns a list of all the opened deals as dictionaries"
         with self._lock:
             return self.loop.run_until_complete(self._client.opened_deals())
 
-    def get_pending_deals(self) -> List[Dict]:
+    def get_opened_deal(self, trade_id: str) -> Optional[Dict]:
         """
-        Retrieves a list of all currently pending trade orders.
+        Retrieves details of an opened deal by its trade ID.
+
+        Args:
+            trade_id (str): The unique identifier of the trade.
 
         Returns:
-            List[Dict]: List of pending orders, each containing order details.
+            Optional[Dict]: A dictionary containing the deal details if found, otherwise None.
         """
         with self._lock:
-            return self.loop.run_until_complete(self._client.get_pending_deals())
+            return self.loop.run_until_complete(self._client.get_opened_deal(trade_id))
+
+    # def get_pending_deals(self) -> List[Dict]:
+    #     """
+    #     Retrieves a list of all currently pending trade orders.
+
+    #     Returns:
+    #         List[Dict]: List of pending orders, each containing order details.
+    #     """
+    #     with self._lock:
+    #         return self.loop.run_until_complete(self._client.get_pending_deals())
 
     def open_pending_order(
         self,
@@ -425,10 +438,23 @@ class PocketOption:
                 )
             )
 
-    def closed_deals(self) -> List[Dict]:
+    def closed_deals(self) -> List[str]:
         "Returns a list of all the closed deals as dictionaries"
         with self._lock:
             return self.loop.run_until_complete(self._client.closed_deals())
+
+    def get_closed_deal(self, trade_id: str) -> Optional[Dict]:
+        """
+        Retrieves details of a closed deal by its trade ID.
+
+        Args:
+            trade_id (str): The unique identifier of the trade.
+
+        Returns:
+            Optional[Dict]: A dictionary containing the deal details if found, otherwise None.
+        """
+        with self._lock:
+            return self.loop.run_until_complete(self._client.get_closed_deal(trade_id))
 
     def clear_closed_deals(self) -> None:
         "Removes all the closed deals from memory, this function doesn't return anything"

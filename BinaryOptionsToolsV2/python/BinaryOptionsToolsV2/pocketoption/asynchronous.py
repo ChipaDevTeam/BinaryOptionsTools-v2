@@ -447,24 +447,14 @@ class PocketOptionAsync:
         """
         return await self.client.balance()
 
-    async def opened_deals(self) -> List[Dict]:
+    async def opened_deals(self) -> List[str]:
         """Retrieves a list of all currently open (active) deals.
 
-        This method returns all deals that are currently active/open on the account,
+        This method returns all deals ids that are currently active/open on the account,
         including both pending and executed trades that have not yet closed.
 
         Returns:
-            List[Dict]: A list of dictionaries, each representing an open deal with details such as:
-                - id: Unique deal identifier
-                - asset: Trading asset symbol
-                - amount: Trade amount
-                - direction: "buy" or "sell"
-                - entry_price: Entry price of the trade
-                - current_price: Current market price
-                - expiry: Expiration timestamp
-                - status: Current status of the deal
-                - timestamp: Deal creation time
-                - profit: Potential or realized profit (may be None for open deals)
+            List[str]: List of currently opened deals IDs in UUID format.
 
         Raises:
             ConnectionError: If the client is not connected to the platform
@@ -474,7 +464,8 @@ class PocketOptionAsync:
             Basic usage:
             ```python
             async with PocketOptionAsync(ssid) as client:
-                open_deals = await client.opened_deals()
+                open_deals_ids = await client.opened_deals()
+                open_deals = [await client.get_opened_deal(deal_id) for deal_id in open_deals_ids]
                 for deal in open_deals:
                     print(f"Deal {deal['id']}: {deal['asset']} {deal['direction']}")
             ```
@@ -482,21 +473,61 @@ class PocketOptionAsync:
             Filtering active deals:
             ```python
             async def monitor_open_deals(client):
-                deals = await client.opened_deals()
+                deals_ids = await client.opened_deals()
+                deals = [await client.get_opened_deal(deal_id) for deal_id in deals_ids]
                 total_value = sum(d['amount'] for d in deals)
                 print(f"Open deals: {len(deals)}, Total exposure: {total_value}")
             ```
         """
         return json.loads(await self.client.opened_deals())
 
-    async def get_pending_deals(self) -> List[Dict]:
+    async def get_opened_deal(self, id: str) -> Optional[Dict]:
         """
-        Retrieves a list of all currently pending trade orders.
+        Retrieves details of a specific opened deal by its ID.
+
+        Args:
+            id (str): The unique identifier of the deal to retrieve
 
         Returns:
-            List[Dict]: List of pending orders, each containing order details.
+            Optional[Dict]: A dictionary containing deal details if found, otherwise None.
+            Deal details include:
+                - id: Unique deal identifier
+                - asset: Trading asset symbol
+                - amount: Trade amount
+                - direction: "buy" or "sell"
+                - entry_price: Entry price of the trade
+                - expiry: Expiration timestamp
+                - timestamp: Deal creation timestamp
+
+        Raises:
+            ConnectionError: If the client is not connected to the platform
+            ValueError: If the response format is invalid
+
+        Examples:
+            Fetch specific deal details:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                deal_id = "123e4567-e89b-12d3-a456-426614174000"
+                deal_details = await client.get_opened_deal(deal_id)
+                if deal_details:
+                    print(f"Deal {deal_details['id']}: {deal_details['asset']} {deal_details['direction']}")
+                else:
+                    print("Deal not found")
+            ```
         """
-        return json.loads(await self.client.get_pending_deals())
+        deal_json = await self.client.get_opened_deal(id)
+        if deal_json is None:
+            return None
+        return json.loads(deal_json)
+    
+    # async def get_pending_deals(self) -> List[Dict]:
+    #     """
+    #     Retrieves a list of all currently pending trade orders.
+
+    #     Returns:
+    #         List[Dict]: List of pending orders, each containing order details.
+    #     """
+    #     return json.loads(await self.client.get_pending_deals())
 
     async def open_pending_order(
         self,
@@ -530,24 +561,14 @@ class PocketOptionAsync:
         )
         return json.loads(order)
 
-    async def closed_deals(self) -> List[Dict]:
+    async def closed_deals(self) -> List[str]:
         """Retrieves a list of all closed/completed deals.
 
-        This method returns all deals that have been completed, including trades
+        This method returns the ID of all deals that have been completed, including trades
         that have expired and reached a final outcome (win, loss, or draw).
 
         Returns:
-            List[Dict]: A list of dictionaries, each representing a closed deal with details such as:
-                - id: Unique deal identifier
-                - asset: Trading asset symbol
-                - amount: Trade amount
-                - direction: "buy" or "sell"
-                - entry_price: Entry price of the trade
-                - close_price: Closing/expiry price
-                - expiry: Expiration timestamp
-                - result: Final outcome ("win", "loss", or "draw")
-                - profit: Profit/loss amount (positive for win, negative for loss, 0 for draw)
-                - timestamp: Deal creation and close timestamps
+            List[str]: A list of IDs, each representing a closed deal with details obtainable with the `get_closed_deal` method.:
 
         Raises:
             ConnectionError: If the client is not connected to the platform
@@ -558,6 +579,7 @@ class PocketOptionAsync:
             ```python
             async with PocketOptionAsync(ssid) as client:
                 closed = await client.closed_deals()
+                closed = [await client.get_closed_deal(deal_id) for deal_id in closed]
                 for deal in closed:
                     print(f"Deal {deal['id']}: {deal['result']} (profit: {deal['profit']})")
             ```
@@ -566,13 +588,54 @@ class PocketOptionAsync:
             ```python
             async def calculate_pnl():
                 async with PocketOptionAsync(ssid) as client:
-                    closed = await client.closed_deals()
+                    closed_ids = await client.closed_deals()
+                    closed = [await client.get_closed_deal(deal_id) for deal_id in closed_ids]
                     total_pnl = sum(d['profit'] for d in closed)
                     wins = sum(1 for d in closed if d['result'] == 'win')
                     print(f"Total P/L: {total_pnl}, Win rate: {wins}/{len(closed)}")
             ```
         """
         return json.loads(await self.client.closed_deals())
+
+    async def get_closed_deal(self, id: str) -> Optional[Dict]:
+        """
+        Retrieves details of a specific closed deal by its ID.
+
+        Args:
+            id (str): The unique identifier of the closed deal to retrieve
+        Returns:
+            Optional[Dict]: The details of the closed deal if found, otherwise None
+            - id: Unique deal identifier
+            - asset: Trading asset symbol
+            - amount: Trade amount
+            - direction: "buy" or "sell"
+            - entry_price: Entry price of the trade
+            - close_price: Closing/expiry price
+            - expiry: Expiration timestamp
+            - result: Final outcome ("win", "loss", or "draw")
+            - profit: Profit/loss amount (positive for win, negative for loss, 0 for draw)
+            - timestamp: Deal creation and close timestamps
+
+        Raises:
+            ConnectionError: If the client is not connected to the platform
+            ValueError: If the response format is invalid
+        Examples:
+            Fetch specific closed deal details:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                deal_id = "123e4567-e89b-12d3-a456-426614174000"
+                deal_details = await client.get_closed_deal(deal_id)
+                if deal_details:
+                    print(f"Closed Deal {deal_details['id']}: {deal_details['result']} (profit: {deal_details['profit']})")
+                else:
+                    print("Closed deal not found")
+            ```
+        """
+        deal_json = await self.client.get_closed_deal(id)
+        if deal_json is None:
+            return None
+        return json.loads(deal_json)
+
 
     async def clear_closed_deals(self) -> None:
         """Removes all closed deals from the client's memory.
