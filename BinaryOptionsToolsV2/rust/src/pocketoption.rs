@@ -456,6 +456,19 @@ impl RawPocketOption {
         })
     }
 
+    pub fn get_closed_deal<'py>(&self, py: Python<'py>, trade_id: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let uuid = Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?;
+            if let Some(deal) = client.get_closed_deal(uuid).await {
+                let res = serde_json::to_string(&deal).map_err(BinaryErrorPy::from)?;
+                Ok(Some(res))
+            } else {
+                Ok(None)
+            }
+        })
+    }
+
     pub fn clear_closed_deals<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
@@ -470,6 +483,19 @@ impl RawPocketOption {
             let deals = client.get_opened_deals().await;
             let res = serde_json::to_string(&deals).map_err(BinaryErrorPy::from)?;
             Ok(res)
+        })
+    }
+
+    pub fn get_opened_deal<'py>(&self, py: Python<'py>, trade_id: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let uuid = Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?;
+            if let Some(deal) = client.get_opened_deal(uuid).await {
+                let res = serde_json::to_string(&deal).map_err(BinaryErrorPy::from)?;
+                Ok(Some(res))
+            } else {
+                Ok(None)
+            }
         })
     }
 

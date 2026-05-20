@@ -4,7 +4,8 @@
 Cargo.lock
 # backups
 **/*.rs.bk
-
+**/*.exe
+**/chipadocs.toml
 # ---- Python ----
 # bytecode/cache
 __pycache__/

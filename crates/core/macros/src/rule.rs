@@ -1,9 +1,8 @@
 use zyn::{
-    syn::{
-        self, braced, parenthesized, parse::Parse, token::Paren, Expr, ExprClosure, ExprPath,
-        Ident, LitStr, Token, Type,
-    },
-    FromInput, Input,
+    FromInput, Input, syn::{
+        self, Expr, ExprClosure, ExprPath, Ident, LitStr, Token, Type, braced, parenthesized,
+        parse::Parse, token::Paren,
+    }
 };
 
 /// Parsed form of the `#[rule(...)]` attribute payload.
