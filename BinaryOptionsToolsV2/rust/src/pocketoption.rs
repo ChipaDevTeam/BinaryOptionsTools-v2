@@ -27,6 +27,8 @@ use crate::stream::next_stream;
 use crate::validator::RawValidator;
 use tokio::sync::Mutex;
 
+const CONNECTION_TIMEOUT_SECS: u64 = 20;
+
 /// Convert a tungstenite message to a string
 fn message_to_string(msg: &tungstenite::Message) -> String {
     match msg {
@@ -99,10 +101,13 @@ impl RawPocketOption {
     pub fn new(ssid: String, py: Python<'_>) -> PyResult<Self> {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
-            let client = tokio::time::timeout(Duration::from_secs(20), PocketOption::new(ssid))
-                .await
-                .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
-                .map_err(BinaryErrorPy::from)?;
+            let client = tokio::time::timeout(
+                Duration::from_secs(CONNECTION_TIMEOUT_SECS),
+                PocketOption::new(ssid),
+            )
+            .await
+            .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
+            .map_err(BinaryErrorPy::from)?;
             Ok(Self { client })
         })
     }
@@ -110,10 +115,13 @@ impl RawPocketOption {
     #[staticmethod]
     pub fn create<'py>(ssid: String, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         future_into_py(py, async move {
-            let client = tokio::time::timeout(Duration::from_secs(20), PocketOption::new(ssid))
-                .await
-                .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
-                .map_err(BinaryErrorPy::from)?;
+            let client = tokio::time::timeout(
+                Duration::from_secs(CONNECTION_TIMEOUT_SECS),
+                PocketOption::new(ssid),
+            )
+            .await
+            .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
+            .map_err(BinaryErrorPy::from)?;
             Ok(RawPocketOption { client })
         })
     }
@@ -124,7 +132,7 @@ impl RawPocketOption {
         let runtime = get_runtime(py)?;
         runtime.block_on(async move {
             let client = tokio::time::timeout(
-                Duration::from_secs(20),
+                Duration::from_secs(CONNECTION_TIMEOUT_SECS),
                 PocketOption::new_with_url(ssid, url),
             )
             .await
@@ -142,7 +150,7 @@ impl RawPocketOption {
     ) -> PyResult<Bound<'py, PyAny>> {
         future_into_py(py, async move {
             let client = tokio::time::timeout(
-                Duration::from_secs(20),
+                Duration::from_secs(CONNECTION_TIMEOUT_SECS),
                 PocketOption::new_with_url(ssid, url),
             )
             .await
@@ -274,18 +282,12 @@ impl RawPocketOption {
         future_into_py(py, async move {
             let uuid = Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?;
 
-            // Check if the deal is in closed deals first
-            if let Some(deal) = client.get_closed_deal(uuid).await {
-                return Ok(Some(deal.close_timestamp.timestamp()));
-            }
+            let deal = match client.get_closed_deal(uuid).await {
+                Some(deal) => Some(deal),
+                None => client.get_opened_deal(uuid).await,
+            };
 
-            // If not found in closed deals, check opened deals
-            if let Some(deal) = client.get_opened_deal(uuid).await {
-                return Ok(Some(deal.close_timestamp.timestamp()));
-            }
-
-            // If not found in either, return None
-            Ok(None) as PyResult<Option<i64>>
+            Ok(deal.map(|d| d.close_timestamp.timestamp()))
         })
     }
 
@@ -757,11 +759,10 @@ impl RawPocketOption {
         let client = self.client.clone();
         let validator = validator.get().clone();
         future_into_py(py, async move {
-            // Retry logic with exponential backoff
             let max_retries = 3;
             let mut delay = Duration::from_millis(100);
 
-            for retries in 0..=max_retries {
+            for retries in 0..max_retries {
                 let send_future =
                     send_raw_message_and_wait(&client, validator.clone(), message.clone());
                 match tokio::time::timeout(timeout, send_future).await {
@@ -769,28 +770,27 @@ impl RawPocketOption {
                         return Python::attach(|py| response.into_py_any(py));
                     }
                     Ok(Err(e)) => {
-                        if retries < max_retries {
+                        if retries + 1 < max_retries {
                             tokio::time::sleep(delay).await;
-                            delay *= 2; // Exponential backoff
+                            delay = delay.saturating_mul(2);
                             continue;
-                        } else {
-                            return Err(e);
                         }
+                        return Err(e);
                     }
                     Err(_) => {
-                        if retries < max_retries {
+                        if retries + 1 < max_retries {
                             tokio::time::sleep(delay).await;
-                            delay *= 2; // Exponential backoff
+                            delay = delay.saturating_mul(2);
                             continue;
-                        } else {
-                            return Err(Into::<pyo3::PyErr>::into(BinaryErrorPy::NotAllowed(
-                                "Operation timed out".into(),
-                            )));
                         }
+                        return Err(BinaryErrorPy::NotAllowed(
+                            "Operation timed out after retries".into(),
+                        )
+                        .into());
                     }
                 }
             }
-            unreachable!()
+            Err(BinaryErrorPy::NotAllowed("Operation failed after all retries".into()).into())
         })
     }
 

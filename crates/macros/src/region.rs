@@ -79,7 +79,16 @@ impl RegionImpl {
 impl ToTokens for RegionImpl {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let name = &self.ident;
-        let implementation = &self.regions().unwrap();
+        let implementation = match self.regions() {
+            Ok(regions) => regions,
+            Err(e) => {
+                let error = e.to_string();
+                tokens.extend(quote! {
+                    compile_error!(#error);
+                });
+                return;
+            }
+        };
 
         tokens.extend(quote! {
             impl #name {

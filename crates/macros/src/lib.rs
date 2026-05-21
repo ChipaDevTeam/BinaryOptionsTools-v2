@@ -62,31 +62,22 @@ pub fn timeout(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(Config, attributes(config))]
 pub fn config(input: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(input as DeriveInput);
-    let config = Config::from_derive_input(&parsed).unwrap();
+    let config = match Config::from_derive_input(&parsed) {
+        Ok(config) => config,
+        Err(e) => return e.write_errors().into(),
+    };
     quote! { #config }.into()
 }
 
 #[proc_macro_derive(RegionImpl, attributes(region))]
 pub fn region(input: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(input as DeriveInput);
-    let region = RegionImpl::from_derive_input(&parsed).unwrap();
+    let region = match RegionImpl::from_derive_input(&parsed) {
+        Ok(region) => region,
+        Err(e) => return e.write_errors().into(),
+    };
     quote! { #region }.into()
 }
-
-// #[proc_macro_attribute]
-// pub fn lightweight_module(attr: TokenStream, item: TokenStream) -> TokenStream {
-//     let attr_args = match darling::ast::NestedMeta::parse_meta_list(attr.into()) {
-//         Ok(v) => v,
-//         Err(e) => return TokenStream::from(darling::Error::from(e).write_errors()),
-//     };
-//     let args = match darling::FromMeta::from_list(&attr_args) {
-//         Ok(v) => v,
-//         Err(e) => return TokenStream::from(e.write_errors()),
-//     };
-
-//     let func = parse_macro_input!(item as syn::ItemFn);
-//     lightweight_module::expand(args, func).into()
-// }
 
 #[proc_macro_derive(ActionImpl, attributes(action))]
 pub fn action_impl(input: TokenStream) -> TokenStream {

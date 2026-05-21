@@ -143,6 +143,87 @@ class RawHandler:
         self._handler = None  # Release reference to allow Rust Drop
 
 
+def sanitize_and_validate_ssid(ssid: str, logger: "Logger") -> str:
+    """Sanitize SSID format and validate session payload semantics.
+
+    Performs three layers of validation:
+    1. Format normalization (fix shell-stripped quotes)
+    2. JSON structure validation (parseable payload)
+    3. Semantic validation (required fields, session format)
+
+    Args:
+        ssid: Raw SSID string from user input
+        logger: Logger instance for warnings
+
+    Returns:
+        Sanitized SSID string ready for the Rust backend
+
+    Raises:
+        ValueError: If the SSID payload is missing required fields
+    """
+    ssid = re.sub(r"""42\[['"]?auth['"]?\s*,""", '42["auth",', ssid, count=1)
+
+    if not ssid.startswith("42["):
+        logger.warn(f"SSID does not start with '42[': {ssid[:20]}...")
+        return ssid
+
+    try:
+        payload = json.loads(ssid[2:])
+    except json.JSONDecodeError:
+        logger.warn("SSID payload is not valid JSON after sanitization")
+        return ssid
+
+    if not isinstance(payload, list) or len(payload) < 2:
+        logger.warn("SSID payload is not a valid Socket.IO auth array")
+        return ssid
+
+    auth_data = payload[1] if len(payload) > 1 else {}
+
+    if not isinstance(auth_data, dict):
+        logger.warn("SSID auth data is not a dictionary")
+        return ssid
+
+    warnings_list = []
+
+    required_fields = ["session", "uid"]
+    for field in required_fields:
+        if field not in auth_data:
+            warnings_list.append(f"missing required field '{field}'")
+
+    session = auth_data.get("session", "")
+    if session and not re.match(r'^[a-zA-Z0-9_\-]{10,}$', str(session)):
+        warnings_list.append(f"session token has unexpected format (length={len(str(session))})")
+
+    uid = auth_data.get("uid")
+    if uid is not None:
+        try:
+            uid_int = int(uid)
+            if uid_int <= 0:
+                warnings_list.append(f"uid should be a positive integer, got {uid_int}")
+        except (ValueError, TypeError):
+            warnings_list.append(f"uid is not a valid integer: {uid!r}")
+
+    platform = auth_data.get("platform")
+    if platform is not None and platform not in (1, 2):
+        warnings_list.append(f"unexpected platform value: {platform}")
+
+    is_demo = auth_data.get("isDemo")
+    if is_demo is not None and is_demo not in (0, 1):
+        warnings_list.append(f"isDemo should be 0 or 1, got {is_demo}")
+
+    for w in warnings_list:
+        logger.warn(f"SSID validation: {w}")
+
+    critical = [w for w in warnings_list if "missing required field" in w]
+    if critical:
+        raise ValueError(
+            "Invalid SSID: " + "; ".join(critical) + ". "
+            "The SSID payload must contain 'session' and 'uid' fields. "
+            "Ensure your SSID follows the format: 42['auth',{{'session':'...','uid':123,...}}]")
+
+    return ssid
+
+
 # This file contains all the async code for the PocketOption Module
 class PocketOptionAsync:
     def __init__(self, ssid: str, url: Optional[str] = None, config: Optional[Union[Config, dict, str]] = None, **_):
@@ -191,18 +272,15 @@ class PocketOptionAsync:
         except ImportError:
             from BinaryOptionsToolsV2 import RawPocketOption
 
-        from ..tracing import Logger
+        from ..tracing import Logger, LogBuilder
 
         self.logger = Logger()
 
-        # SSID Sanitizer and semantic validator
-        self._ssid_valid = False
         if ssid is not None:
-            ssid = self._sanitize_and_validate_ssid(ssid)
-        elif ssid is None:
+            ssid = sanitize_and_validate_ssid(ssid, self.logger)
+        else:
             self.logger.warn("SSID is None, connection will likely fail")
 
-        # Enforce configuration and instantiation
         if config is not None:
             if isinstance(config, dict):
                 self.config = Config.from_dict(config)
@@ -212,7 +290,6 @@ class PocketOptionAsync:
                 self.config = config
             else:
                 raise ValueError("Config type mismatch")
-
             if url is not None:
                 self.config.urls.insert(0, url)
         else:
@@ -220,9 +297,6 @@ class PocketOptionAsync:
             if url is not None:
                 self.config.urls.insert(0, url)
 
-        from ..tracing import LogBuilder
-
-        # Enable terminal logging only if explicitly requested in config
         if self.config.terminal_logging:
             try:
                 lb = LogBuilder()
@@ -231,108 +305,13 @@ class PocketOptionAsync:
             except Exception:
                 pass
 
-        # Link to Rust Backend
         self.client: "RawPocketOption" = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
-
-    def _sanitize_and_validate_ssid(self, ssid: str) -> str:
-        """Sanitize SSID format and validate session payload semantics.
-
-        Performs three layers of validation:
-        1. Format normalization (fix shell-stripped quotes)
-        2. JSON structure validation (parseable payload)
-        3. Semantic validation (required fields, session format, expiration heuristics)
-
-        Args:
-            ssid: Raw SSID string from user input
-
-        Returns:
-            str: Sanitized SSID string ready for the Rust backend
-
-        Raises:
-            ValueError: If the SSID payload is semantically invalid (e.g., missing
-                required fields or malformed session token)
-        """
-        # Layer 1: Format normalization
-        ssid = re.sub(r"""42\[['"]?auth['"]?\s*,""", '42["auth",', ssid, count=1)
-
-        # Check Socket.IO envelope
-        if not ssid.startswith("42["):
-            self.logger.warn(f"SSID does not start with '42[': {ssid[:20]}...")
-            return ssid
-
-        # Layer 2: JSON structure validation
-        try:
-            payload = json.loads(ssid[2:])
-        except json.JSONDecodeError:
-            self.logger.warn("SSID payload is not valid JSON after sanitization")
-            return ssid
-
-        # The payload should be an array: ["auth", { ... }]
-        if not isinstance(payload, list) or len(payload) < 2:
-            self.logger.warn("SSID payload is not a valid Socket.IO auth array")
-            return ssid
-
-        auth_event = payload[0]
-        auth_data = payload[1] if len(payload) > 1 else {}
-
-        if not isinstance(auth_data, dict):
-            self.logger.warn("SSID auth data is not a dictionary")
-            return ssid
-
-        # Layer 3: Semantic validation
-        warnings = []
-
-        # Required fields check
-        required_fields = ["session", "uid"]
-        for field in required_fields:
-            if field not in auth_data:
-                warnings.append(f"missing required field '{field}'")
-
-        # Session token format: should be alphanumeric, typically 20-40 chars
-        session = auth_data.get("session", "")
-        if session and not re.match(r'^[a-zA-Z0-9_\-]{10,}$', str(session)):
-            warnings.append(f"session token has unexpected format (length={len(str(session))})")
-
-        # UID should be a positive integer
-        uid = auth_data.get("uid")
-        if uid is not None:
-            try:
-                uid_int = int(uid)
-                if uid_int <= 0:
-                    warnings.append(f"uid should be a positive integer, got {uid_int}")
-            except (ValueError, TypeError):
-                warnings.append(f"uid is not a valid integer: {uid!r}")
-
-        # Platform field (optional but if present should be 1 or 2)
-        platform = auth_data.get("platform")
-        if platform is not None and platform not in (1, 2):
-            warnings.append(f"unexpected platform value: {platform}")
-
-        # isDemo should be 0 or 1 if present
-        is_demo = auth_data.get("isDemo")
-        if is_demo is not None and is_demo not in (0, 1):
-            warnings.append(f"isDemo should be 0 or 1, got {is_demo}")
-
-        # Emit warnings
-        if warnings:
-            for w in warnings:
-                self.logger.warn(f"SSID validation: {w}")
-            # Only raise on critical issues (missing session/uid)
-            critical = [w for w in warnings if "missing required field" in w]
-            if critical:
-                raise ValueError(
-                    "Invalid SSID: " + "; ".join(critical) + ". "
-                    "The SSID payload must contain 'session' and 'uid' fields. "
-                    "Ensure your SSID follows the format: 42['auth',{{'session':'...','uid':123,...}}]")
-
-        self._ssid_valid = True
-        return ssid
 
     async def __aenter__(self):
         """
         Context manager entry. Waits for assets to be loaded.
         """
-        await self.wait_for_assets(timeout=60.0)
+        await self.wait_for_assets()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -341,69 +320,21 @@ class PocketOptionAsync:
         """
         await self.shutdown()
 
-    async def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
-        """
-        Places a buy (call) order for the specified asset.
-
-        Args:
-            asset (str): Trading asset (e.g., "EURUSD_otc", "EURUSD")
-            amount (float): Trade amount in account currency
-            time (int): Expiry time in seconds (e.g., 60 for 1 minute)
-            check_win (bool): If True, waits for trade result. Defaults to False.
-
-        Returns:
-            Tuple[str, Dict]: Tuple containing (trade_id, trade_details)
-            trade_details includes:
-                - asset: Trading asset
-                - amount: Trade amount
-                - direction: "buy"
-                - expiry: Expiry timestamp
-                - result: Trade result if check_win=True ("win"/"loss"/"draw")
-                - profit: Profit amount if check_win=True
-
-        Raises:
-            ConnectionError: If connection to platform fails
-            ValueError: If invalid parameters are provided
-            TimeoutError: If trade confirmation times out
-        """
-        (trade_id, trade) = await self.client.buy(asset, amount, time)
+    async def _place_trade(self, method, asset: str, amount: float, time: int, check_win: bool) -> Tuple[str, Dict]:
+        """Internal helper to place a trade and optionally wait for the result."""
+        trade_id, trade = await method(asset, amount, time)
         if check_win:
             return trade_id, await self.check_win(trade_id, timeout_seconds=time + 30)
-        else:
-            trade = json.loads(trade)
-            return trade_id, trade
+        trade = json.loads(trade)
+        return trade_id, trade
+
+    async def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
+        """Places a buy (call) order."""
+        return await self._place_trade(self.client.buy, asset, amount, time, check_win)
 
     async def sell(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
-        """
-        Places a sell (put) order for the specified asset.
-
-        Args:
-            asset (str): Trading asset (e.g., "EURUSD_otc", "EURUSD")
-            amount (float): Trade amount in account currency
-            time (int): Expiry time in seconds (e.g., 60 for 1 minute)
-            check_win (bool): If True, waits for trade result. Defaults to False.
-
-        Returns:
-            Tuple[str, Dict]: Tuple containing (trade_id, trade_details)
-            trade_details includes:
-                - asset: Trading asset
-                - amount: Trade amount
-                - direction: "sell"
-                - expiry: Expiry timestamp
-                - result: Trade result if check_win=True ("win"/"loss"/"draw")
-                - profit: Profit amount if check_win=True
-
-        Raises:
-            ConnectionError: If connection to platform fails
-            ValueError: If invalid parameters are provided
-            TimeoutError: If trade confirmation times out
-        """
-        (trade_id, trade) = await self.client.sell(asset, amount, time)
-        if check_win:
-            return trade_id, await self.check_win(trade_id, timeout_seconds=time + 30)
-        else:
-            trade = json.loads(trade)
-            return trade_id, trade
+        """Places a sell (put) order."""
+        return await self._place_trade(self.client.sell, asset, amount, time, check_win)
 
     async def check_win(self, id: str, timeout_seconds: Optional[int] = None) -> dict:
         """
@@ -479,20 +410,21 @@ class PocketOptionAsync:
             json.JSONDecodeError: If the server response is not valid JSON.
         """
         try:
-            # The Rust client should handle its own timeout, but we'll add a safeguard
             trade = await self.client.check_win(id)
             trade = json.loads(trade)
             win = float(trade["profit"])
-            if win > 0:
-                trade["result"] = "win"
-            elif win == 0:
-                trade["result"] = "draw"
-            else:
-                trade["result"] = "loss"
-            return trade
+        except (json.JSONDecodeError, KeyError, ValueError, TypeError) as e:
+            raise ValueError(f"Invalid trade result response for ID {id}: {e}") from e
         except Exception as e:
-            # Catch any other errors from the Rust client
-            raise Exception(f"Error getting trade result for ID {id}: {str(e)}")
+            raise RuntimeError(f"Error getting trade result for ID {id}: {e}") from e
+
+        if win > 0:
+            trade["result"] = "win"
+        elif win == 0:
+            trade["result"] = "draw"
+        else:
+            trade["result"] = "loss"
+        return trade
 
     async def candles(self, asset: str, period: int) -> List[Dict]:
         """
@@ -647,15 +579,6 @@ class PocketOptionAsync:
             return None
         return json.loads(deal_json)
     
-    # async def get_pending_deals(self) -> List[Dict]:
-    #     """
-    #     Retrieves a list of all currently pending trade orders.
-
-    #     Returns:
-    #         List[Dict]: List of pending orders, each containing order details.
-    #     """
-    #     return json.loads(await self.client.get_pending_deals())
-
     async def open_pending_order(
         self,
         open_type: int,
@@ -1052,156 +975,24 @@ class PocketOptionAsync:
 
         return json.loads(await self.client.compile_candles(asset, custom_period, lookback_period))
 
-    async def _subscribe_symbol_inner(self, asset: str):
-        """Internal method to establish a real-time subscription for an asset.
-
-        This method directly calls the underlying client's subscribe_symbol method
-        and is used internally by `subscribe_symbol()`. It returns a raw subscription
-        iterator that yields JSON strings.
-
-        Args:
-            asset (str): Trading asset symbol to subscribe to (e.g., "EURUSD_otc")
-
-        Returns:
-            AsyncIterator[str]: Raw async iterator yielding JSON string messages
-
-        Note:
-            This is an internal method. Users should typically use `subscribe_symbol()`
-            which wraps this method in an `AsyncSubscription` for easier handling.
-        """
-        return await self.client.subscribe_symbol(asset)
-
-    async def _subscribe_symbol_chunked_inner(self, asset: str, chunk_size: int):
-        """Internal method to establish a chunked real-time subscription for an asset.
-
-        This method creates a subscription that aggregates raw price updates into
-        candlesticks of the specified chunk size. It directly calls the underlying
-        client's subscribe_symbol_chunked method and returns a raw subscription iterator.
-
-        Args:
-            asset (str): Trading asset symbol to subscribe to (e.g., "EURUSD_otc")
-            chunk_size (int): Number of raw ticks to aggregate into each candle.
-                For example, chunk_size=10 will create a candle from every 10 price ticks.
-
-        Returns:
-            AsyncIterator[str]: Raw async iterator yielding JSON string messages,
-                each representing a completed candlestick.
-
-        Note:
-            This is an internal method. Users should typically use `subscribe_symbol_chunked()`
-            which wraps this method in an `AsyncSubscription` for easier handling.
-        """
-        return await self.client.subscribe_symbol_chunked(asset, chunk_size)
-
-    async def _subscribe_symbol_timed_inner(self, asset: str, time: timedelta):
-        """Internal method to establish a timed real-time subscription for an asset.
-
-        This method creates a subscription that yields price updates at regular
-        time intervals. It directly calls the underlying client's subscribe_symbol_timed
-        method and returns a raw subscription iterator.
-
-        Args:
-            asset (str): Trading asset symbol to subscribe to (e.g., "EURUSD_otc")
-            time (timedelta): Time interval between updates. For example, timedelta(seconds=5)
-                will yield an update every 5 seconds.
-
-        Returns:
-            AsyncIterator[str]: Raw async iterator yielding JSON string messages
-                at the specified time intervals.
-
-        Note:
-            This is an internal method. Users should typically use `subscribe_symbol_timed()`
-            which wraps this method in an `AsyncSubscription` for easier handling.
-        """
-        return await self.client.subscribe_symbol_timed(asset, time)
-
-    async def _subscribe_symbol_time_aligned_inner(self, asset: str, time: timedelta):
-        """Internal method to establish a time-aligned real-time subscription.
-
-        This method creates a subscription that yields price updates aligned to
-        specific time boundaries (e.g., on the minute, on the hour). It directly
-        calls the underlying client's subscribe_symbol_time_aligned method and
-        returns a raw subscription iterator.
-
-        Args:
-            asset (str): Trading asset symbol to subscribe to (e.g., "EURUSD_otc")
-            time (timedelta): Time alignment interval. For example, timedelta(minutes=1)
-                will align updates to the start of each minute.
-
-        Returns:
-            AsyncIterator[str]: Raw async iterator yielding JSON string messages
-                aligned to the specified time boundaries.
-
-        Note:
-            This is an internal method. Users should typically use `subscribe_symbol_time_aligned()`
-            which wraps this method in an `AsyncSubscription` for easier handling.
-        """
-        return await self.client.subscribe_symbol_time_aligned(asset, time)
-
     async def subscribe_symbol(self, asset: str) -> AsyncSubscription:
+        """Subscribe to real-time raw price updates for an asset.
+
+        Returns an async iterator yielding JSON-parsed price updates.
         """
-        Creates a real-time data subscription for an asset.
-
-        Args:
-            asset (str): Trading asset to subscribe to
-
-        Returns:
-            AsyncSubscription: Async iterator yielding real-time price updates
-
-        Example:
-            ```python
-            async with api.subscribe_symbol("EURUSD_otc") as subscription:
-                async for update in subscription:
-                    print(f"Price update: {update}")
-            ```
-        """
-        return AsyncSubscription(await self._subscribe_symbol_inner(asset))
+        return AsyncSubscription(await self.client.subscribe_symbol(asset))
 
     async def subscribe_symbol_chunked(self, asset: str, chunk_size: int) -> AsyncSubscription:
-        """Returns an async iterator over the associated asset, it will return real time candles formed with the specified amount of raw candles and will return new candles while the 'PocketOptionAsync' class is loaded if the class is droped then the iterator will fail"""
-        return AsyncSubscription(await self._subscribe_symbol_chunked_inner(asset, chunk_size))
+        """Subscribe with chunked candle aggregation (n raw ticks per candle)."""
+        return AsyncSubscription(await self.client.subscribe_symbol_chunked(asset, chunk_size))
 
     async def subscribe_symbol_timed(self, asset: str, time: timedelta) -> AsyncSubscription:
-        """
-        Creates a timed real-time data subscription for an asset.
-
-        Args:
-            asset (str): Trading asset to subscribe to
-            interval (int): Update interval in seconds
-
-        Returns:
-            AsyncSubscription: Async iterator yielding price updates at specified intervals
-
-        Example:
-            ```python
-            # Get updates every 5 seconds
-            async with api.subscribe_symbol_timed("EURUSD_otc", 5) as subscription:
-                async for update in subscription:
-                    print(f"Timed update: {update}")
-            ```
-        """
-        return AsyncSubscription(await self._subscribe_symbol_timed_inner(asset, time))
+        """Subscribe with a fixed time-interval candle window."""
+        return AsyncSubscription(await self.client.subscribe_symbol_timed(asset, time))
 
     async def subscribe_symbol_time_aligned(self, asset: str, time: timedelta) -> AsyncSubscription:
-        """
-        Creates a time-aligned real-time data subscription for an asset.
-
-        Args:
-            asset (str): Trading asset to subscribe to
-            time (timedelta): Time interval for updates
-
-        Returns:
-            AsyncSubscription: Async iterator yielding price updates aligned with specified time intervals
-
-        Example:
-            ```python
-            # Get updates aligned with 1-minute intervals
-            async with api.subscribe_symbol_time_aligned("EURUSD_otc", timedelta(minutes=1)) as subscription:
-                async for update in subscription:
-                    print(f"Time-aligned update: {update}")
-            ```
-        """
-        return AsyncSubscription(await self._subscribe_symbol_time_aligned_inner(asset, time))
+        """Subscribe with candles aligned to clock boundaries."""
+        return AsyncSubscription(await self.client.subscribe_symbol_time_aligned(asset, time))
 
     async def get_server_time(self) -> int:
         """Retrieves the current server time from Pocket Option.
@@ -1301,23 +1092,6 @@ class PocketOptionAsync:
             bool: True if connected, False otherwise
         """
         return self.client.is_connected()
-
-    def is_ssid_valid(self) -> bool:
-        """
-        Checks if the SSID passed semantic validation during initialization.
-
-        Returns True if the SSID had all required fields (session, uid) and
-        passed format checks. Returns False if the SSID was malformed or
-        missing required fields (warnings were emitted but initialization
-        was allowed to proceed for backward compatibility).
-
-        Returns:
-            bool: True if SSID passed semantic validation, False otherwise
-
-        Example:
-            
-        """
-        return self._ssid_valid
 
     def max_subscriptions(self) -> int:
         """
@@ -1714,9 +1488,4 @@ class PocketOptionAsync:
         return await self.client.create_raw_iterator(message, validator.raw_validator, timeout)
 
 
-async def _timeout(future, timeout: int):
-    if sys.version_info[:3] >= (3, 11):
-        async with asyncio.timeout(timeout):
-            return await future
-    else:
-        return await asyncio.wait_for(future, timeout)
+

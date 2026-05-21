@@ -1,25 +1,17 @@
 import json
+import sys
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
 
 def _get_pyconfig():
-    """Helper to get the PyConfig class from the compiled Rust module."""
-    try:
-        # First try to import from the package
-        from . import PyConfig
+    """Get the PyConfig class from the compiled Rust module via package namespace."""
+    pkg = sys.modules.get(__package__ or "")
+    if pkg is not None and hasattr(pkg, "PyConfig"):
+        return pkg.PyConfig
+    import BinaryOptionsToolsV2 as _mod
 
-        return PyConfig
-    except (ImportError, AttributeError):
-        # Fallback to direct import
-        try:
-            from ..BinaryOptionsToolsV2 import PyConfig
-
-            return PyConfig
-        except ImportError:
-            import BinaryOptionsToolsV2
-
-            return getattr(BinaryOptionsToolsV2, "PyConfig")
+    return _mod.PyConfig
 
 
 @dataclass
@@ -50,8 +42,6 @@ class Config:
         self._locked = False
 
     def __setattr__(self, name: str, value: Any) -> None:
-        """Override setattr to check for locked state"""
-        # Allow setting private attributes and during initialization
         if name.startswith("_") or not hasattr(self, "_locked") or not self._locked:
             super().__setattr__(name, value)
         else:
@@ -59,21 +49,15 @@ class Config:
 
     @property
     def pyconfig(self) -> Any:
-        """
-        Returns the PyConfig instance for use in Rust code.
-        Once this is accessed, the configuration becomes locked.
-        """
+        """Returns the PyConfig instance for use in Rust code, then locks config."""
         if self._pyconfig is None:
             self._pyconfig = _get_pyconfig()()
-            self._update_pyconfig()
+            self._sync_pyconfig()
         self._locked = True
         return self._pyconfig
 
-    def _update_pyconfig(self):
-        """Updates the internal PyConfig with current values"""
-        if self._locked:
-            raise RuntimeError("Configuration is locked and cannot be modified after being used")
-
+    def _sync_pyconfig(self):
+        """Sync all Python config fields to the Rust PyConfig instance."""
         if self._pyconfig is None:
             self._pyconfig = _get_pyconfig()()
 
@@ -85,39 +69,35 @@ class Config:
         self._pyconfig.urls = self.urls
         self._pyconfig.max_subscriptions = self.max_subscriptions
 
+    def _validate(self):
+        """Validate config values, raising ValueError on invalid input."""
+        if self.max_allowed_loops < 0:
+            raise ValueError("max_allowed_loops must be non-negative")
+        if self.sleep_interval < 0:
+            raise ValueError("sleep_interval must be non-negative")
+        if self.reconnect_time < 1:
+            raise ValueError("reconnect_time must be at least 1 second")
+        if self.connection_initialization_timeout_secs < 1:
+            raise ValueError("connection_initialization_timeout_secs must be at least 1")
+        if self.timeout_secs < 1:
+            raise ValueError("timeout_secs must be at least 1")
+        if self.max_subscriptions < 1:
+            raise ValueError("max_subscriptions must be at least 1")
+
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "Config":
-        """
-        Creates a Config instance from a dictionary.
-
-        Args:
-            config_dict: Dictionary containing configuration values
-
-        Returns:
-            Config instance
-        """
-        return cls(**{k: v for k, v in config_dict.items() if k in Config.__dataclass_fields__})
+        """Creates a Config instance from a dictionary."""
+        cfg = cls(**{k: v for k, v in config_dict.items() if k in cls.__dataclass_fields__})
+        cfg._validate()
+        return cfg
 
     @classmethod
     def from_json(cls, json_str: str) -> "Config":
-        """
-        Creates a Config instance from a JSON string.
-
-        Args:
-            json_str: JSON string containing configuration values
-
-        Returns:
-            Config instance
-        """
+        """Creates a Config instance from a JSON string."""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Converts the configuration to a dictionary.
-
-        Returns:
-            Dictionary containing all configuration values
-        """
+        """Converts the configuration to a dictionary."""
         return {
             "max_allowed_loops": self.max_allowed_loops,
             "sleep_interval": self.sleep_interval,
@@ -128,27 +108,17 @@ class Config:
             "max_subscriptions": self.max_subscriptions,
             "terminal_logging": self.terminal_logging,
             "log_level": self.log_level,
+            "extra_duration": self.extra_duration,
         }
 
     def to_json(self) -> str:
-        """
-        Converts the configuration to a JSON string.
-
-        Returns:
-            JSON string containing all configuration values
-        """
+        """Converts the configuration to a JSON string."""
         return json.dumps(self.to_dict())
 
     def update(self, config_dict: Dict[str, Any]) -> None:
-        """
-        Updates the configuration with values from a dictionary.
-
-        Args:
-            config_dict: Dictionary containing new configuration values
-        """
+        """Updates config from a dictionary. Raises RuntimeError if locked."""
         if self._locked:
             raise RuntimeError("Configuration is locked and cannot be modified after being used")
-
         for key, value in config_dict.items():
             if hasattr(self, key):
                 setattr(self, key, value)

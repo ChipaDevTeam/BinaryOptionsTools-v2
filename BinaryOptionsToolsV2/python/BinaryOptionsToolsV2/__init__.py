@@ -3,54 +3,35 @@ import os
 import sys
 
 # Import the Rust module and re-export its attributes
+_rust_module = None
 try:
     _rust_module = importlib.import_module(".BinaryOptionsToolsV2", __package__)
 except (ImportError, ValueError):
     try:
-        # Fallback for when it's not in the package
         _rust_module = importlib.import_module("BinaryOptionsToolsV2")
-        # Ensure we didn't just import the package itself
         if _rust_module is sys.modules.get(__package__):
             _rust_module = None
     except ImportError:
-        _rust_module = None
+        pass
 
-if _rust_module:
-    # Update globals with Rust module attributes
+if _rust_module is not None:
     globals().update({k: v for k, v in _rust_module.__dict__.items() if not k.startswith("_")})
-else:
-    # This is often okay during development/type checking, but bad for tests
-    if os.environ.get("PYTEST_CURRENT_TEST"):
-        print(f"[ERROR] Rust extension module 'BinaryOptionsToolsV2' not found! __package__={__package__}")
-        print(f"[DEBUG] sys.path: {sys.path}")
+elif os.environ.get("PYTEST_CURRENT_TEST"):
+    print(f"[ERROR] Rust extension module not found (__package__={__package__})")
 
-# Import submodules for re-export
-from .config import Config as Config  # noqa: E402
-from . import tracing as tracing  # noqa: E402
-from . import validator as validator  # noqa: E402
-from .pocketoption import *  # noqa: F403, E402
-from .pocketoption import __all__ as __pocket_all__  # noqa: E402
+from .config import Config as Config
+from . import tracing as tracing
+from . import validator as validator
+from .pocketoption import PocketOptionAsync, PocketOption, __all__ as __pocket_all__
 
-# Collect all core attributes for __all__
-_core_names = [
-    "RawPocketOption",
-    "RawValidator",
-    "RawHandler",
-    "RawHandle",
-    "Logger",
-    "LogBuilder",
-    "PyConfig",
-    "PyBot",
-    "PyStrategy",
-    "PyContext",
-    "PyVirtualMarket",
-    "Action",
-    "StreamLogsIterator",
-    "StreamLogsLayer",
-    "StreamIterator",
-    "RawStreamIterator",
-    "start_tracing",
+# Names expected from the Rust cdylib; only those actually loaded will be available
+_rust_exported_names = [
+    "RawPocketOption", "RawValidator", "RawHandler", "RawHandle",
+    "Logger", "LogBuilder", "PyConfig", "PyBot", "PyStrategy",
+    "PyContext", "PyVirtualMarket", "Action",
+    "StreamLogsIterator", "StreamLogsLayer", "StreamIterator",
+    "RawStreamIterator", "start_tracing",
 ]
-__core_all__ = [name for name in _core_names if name in globals()]
+__rust_all__ = [n for n in _rust_exported_names if n in globals()]
 
-__all__ = list(set(__pocket_all__ + ["tracing", "validator"] + __core_all__))
+__all__ = list(set(__pocket_all__ + ["tracing", "validator"] + __rust_all__))

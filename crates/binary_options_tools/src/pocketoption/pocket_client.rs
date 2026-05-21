@@ -177,29 +177,11 @@ impl PocketOption {
     }
 
     /// Creates a new PocketOption client with a custom WebSocket URL.
-    ///
-    /// This method allows you to specify a custom WebSocket URL for connecting to the PocketOption platform,
-    /// which can be useful for testing or connecting to alternative endpoints.
-    ///
-    /// # Arguments
-    /// * `ssid` - The session ID (SSID cookie value) for authenticating with PocketOption.
-    /// * `url` - The custom WebSocket URL to connect to.
-    ///
-    /// # Returns
-    /// A `PocketResult` containing the initialized `PocketOption` client.
     pub async fn new_with_url(ssid: impl ToString, url: String) -> PocketResult<Self> {
-        let mut config = Config::default();
-        if let Ok(parsed_url) = url::Url::parse(&url) {
-            config.urls.push(parsed_url);
-        }
-
-        // We still use the state builder for the initial connection URL
-        // because ClientRunner uses the state's URL.
-        // The config.urls are fallbacks or for future use.
+        let parsed_ssid = Ssid::parse(ssid)?;
         let state = StateBuilder::default()
-            .ssid(Ssid::parse(ssid)?)
+            .ssid(parsed_ssid)
             .default_connection_url(url)
-            .max_subscriptions(config.max_subscriptions)
             .build()?;
 
         let builder = Self::configure_common_modules(ClientBuilder::new(PocketConnect, state));
@@ -210,7 +192,7 @@ impl PocketOption {
         Ok(Self {
             client,
             _runner: Arc::new(_runner),
-            config,
+            config: Config::default(),
             pending_trades_lock: Arc::new(tokio::sync::Mutex::new(())),
         })
     }
@@ -382,26 +364,19 @@ impl PocketOption {
         }
     }
 
-    /// Executes a trade on the specified asset
-    ///
-    /// This method performs the following steps:
-    /// 1. Validates the trade amount and asset availability.
-    /// 2. Generates a trade fingerprint for post-trade tracking and reconciliation.
-    /// 3. Registers the trade in `pending_market_orders` to allow for reconciliation if the connection drops.
-    /// 4. Dispatches the trade request to the `TradesApiModule` and records the result in `recent_trades`.
-    ///
-    /// # Arguments
-    /// * `asset` - The symbol to trade (e.g., "EURUSD_otc").
-    /// * `action` - Call (Buy) or Put (Sell).
-    /// * `time` - Expiration duration in seconds. Must be a divisor of 86400.
-    /// * `amount` - Trade amount. Must be between 1.0 and 20000.0.
-    ///
-    /// # Returns
-    /// A `PocketResult` containing the trade UUID and the resulting `Deal`.
-    ///
-    /// # Errors
-    /// * `PocketError::InvalidAsset` - If the asset is inactive or the timeframe is invalid.
-    /// * `PocketError::General` - If the amount is out of bounds.
+    async fn register_pending_trade(&self, asset: &str, action: Action, time: u32, amount: Decimal) -> Uuid {
+        use crate::pocketoption::types::OpenOrder;
+        let request_id = Uuid::new_v4();
+        let order = OpenOrder::new(amount, asset.to_string(), action, time, self.is_demo() as u32, request_id);
+        self.client.state.trade_state.pending_market_orders.write().await.insert(request_id, (order, std::time::Instant::now()));
+        request_id
+    }
+
+    async fn cleanup_trade(&self, fingerprint: &(String, Action, u32, Decimal), request_id: Uuid) {
+        self.client.state.trade_state.recent_trades.write().await.remove(fingerprint);
+        self.client.state.trade_state.pending_market_orders.write().await.remove(&request_id);
+    }
+
     pub async fn trade(
         &self,
         asset: impl ToString,
@@ -428,87 +403,23 @@ impl PocketOption {
             )));
         }
         let fingerprint = (asset_str.clone(), action, time, amount);
-        let request_id = Uuid::new_v4();
+        let request_id = self.register_pending_trade(&asset_str, action, time, amount).await;
 
-        // Populate pending_market_orders for reconciliation
-        {
-            use crate::pocketoption::types::OpenOrder;
-            let order = OpenOrder::new(
-                amount,
-                asset_str.clone(),
-                action,
-                time,
-                self.is_demo() as u32,
-                request_id,
-            );
-            self.client
-                .state
-                .trade_state
-                .pending_market_orders
-                .write()
-                .await
-                .insert(request_id, (order, std::time::Instant::now()));
-        }
-
-        let handle_result = self
-            .require_handle::<TradesApiModule>("TradesApiModule")
-            .await;
-
-        let handle = match handle_result {
+        let handle = match self.require_handle::<TradesApiModule>("TradesApiModule").await {
             Ok(h) => h,
             Err(e) => {
-                // Remove the placeholder if handle retrieval fails
-                self.client
-                    .state
-                    .trade_state
-                    .recent_trades
-                    .write()
-                    .await
-                    .remove(&fingerprint);
-                self.client
-                    .state
-                    .trade_state
-                    .pending_market_orders
-                    .write()
-                    .await
-                    .remove(&request_id);
+                self.cleanup_trade(&fingerprint, request_id).await;
                 return Err(e);
             }
         };
 
-        let deal_result = handle
-            .trade_with_id(asset_str.clone(), action, amount, time, request_id)
-            .await;
-
-        match deal_result {
+        match handle.trade_with_id(asset_str, action, amount, time, request_id).await {
             Ok(deal) => {
-                // Update with the actual deal ID
-                self.client
-                    .state
-                    .trade_state
-                    .recent_trades
-                    .write()
-                    .await
-                    .insert(fingerprint, (deal.id, std::time::Instant::now()));
-                // Note: We keep it in pending_market_orders until it's confirmed by the DealsApiModule or TradesApiModule
+                self.client.state.trade_state.recent_trades.write().await.insert(fingerprint, (deal.id, std::time::Instant::now()));
                 Ok((deal.id, deal))
             }
             Err(e) => {
-                // Remove the placeholder if trade fails
-                self.client
-                    .state
-                    .trade_state
-                    .recent_trades
-                    .write()
-                    .await
-                    .remove(&fingerprint);
-                self.client
-                    .state
-                    .trade_state
-                    .pending_market_orders
-                    .write()
-                    .await
-                    .remove(&request_id);
+                self.cleanup_trade(&fingerprint, request_id).await;
                 Err(e)
             }
         }
