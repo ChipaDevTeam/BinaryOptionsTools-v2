@@ -1,6 +1,6 @@
 use crate::framework::market::Market;
 use crate::pocketoption::error::PocketResult;
-use crate::pocketoption::types::Deal;
+use crate::pocketoption::types::{Deal, RequestId};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
@@ -115,7 +115,7 @@ impl Market for VirtualMarket {
             percent_loss: 100,
             command: 0, // Call
             uid: 0,
-            request_id: Some(id),
+            request_id: Some(RequestId::Uuid(id)),
             open_time: entry_time.to_rfc3339(),
             close_time: (entry_time + chrono::Duration::seconds(time as i64)).to_rfc3339(),
             refund_time: None,
@@ -192,7 +192,7 @@ impl Market for VirtualMarket {
             percent_loss: 100,
             command: 1, // Put
             uid: 0,
-            request_id: Some(id),
+            request_id: Some(RequestId::Uuid(id)),
             open_time: entry_time.to_rfc3339(),
             close_time: (entry_time + chrono::Duration::seconds(time as i64)).to_rfc3339(),
             refund_time: None,
@@ -264,7 +264,7 @@ impl Market for VirtualMarket {
                     Action::Put => 1,
                 },
                 uid: 0,
-                request_id: Some(trade.id),
+                request_id: Some(RequestId::Uuid(trade.id)),
                 open_time: entry_timestamp.to_rfc3339(),
                 close_time: close_timestamp.to_rfc3339(),
                 refund_time: None,
@@ -339,7 +339,7 @@ impl Market for VirtualMarket {
                 Action::Put => 1,
             },
             uid: 0,
-            request_id: Some(trade.id),
+            request_id: Some(RequestId::Uuid(trade.id)),
             open_time: entry_timestamp.to_rfc3339(),
             close_time: close_timestamp.to_rfc3339(),
             refund_time: None,

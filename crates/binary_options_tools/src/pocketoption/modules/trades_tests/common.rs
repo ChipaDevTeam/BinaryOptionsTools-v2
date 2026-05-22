@@ -14,7 +14,7 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     ssid::{Real, SessionData, Ssid as PocketSsid},
     state::{State, StateBuilder, TradeState},
-    types::{Action, Deal, FailOpenOrder, OpenOrder},
+    types::{Action, Deal, FailOpenOrder, OpenOrder, RequestId},
 };
 
 use crate::pocketoption::modules::trades::{
@@ -60,7 +60,7 @@ pub fn create_test_deal(req_id: Uuid, asset: &str) -> Deal {
         refund_time: None,
         refund_timestamp: None,
         uid: 123456789,
-        request_id: Some(req_id),
+        request_id: Some(RequestId::Uuid(req_id)),
         amount: Decimal::from(10),
         profit: Decimal::from(5),
         percent_profit: 50,
