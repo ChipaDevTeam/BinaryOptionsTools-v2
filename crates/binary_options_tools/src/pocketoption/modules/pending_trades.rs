@@ -420,10 +420,12 @@ impl ApiModule<State> for PendingTradesApiModule {
                                             match event.as_str() {
                                                 "successopenPendingOrder" | "failopenPendingOrder" => {
                                                     if let Ok(response) = serde_json::from_value::<ServerResponse>(payload) {
+                                                        if let ServerResponse::Success(ref pending_order) = response {
+                                                            self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
+                                                        }
                                                         if let Some(req_id) = self.pending_requests.pop_front() {
                                                             match response {
                                                                 ServerResponse::Success(pending_order) => {
-                                                                    self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
                                                                     let _ = self.command_responder.send(CommandResponse::Success { req_id, pending_order }).await;
                                                                 }
                                                                 ServerResponse::Fail(fail) => {
@@ -456,10 +458,12 @@ impl ApiModule<State> for PendingTradesApiModule {
                                 }
                                 Message::Binary(data) => {
                                     if let Ok(response) = serde_json::from_slice::<ServerResponse>(data) {
+                                        if let ServerResponse::Success(ref pending_order) = response {
+                                            self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
+                                        }
                                         if let Some(req_id) = self.pending_requests.pop_front() {
                                             match response {
                                                 ServerResponse::Success(pending_order) => {
-                                                    self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
                                                     let _ = self.command_responder.send(CommandResponse::Success { req_id, pending_order }).await;
                                                 }
                                                 ServerResponse::Fail(fail) => {

@@ -275,11 +275,22 @@ class PocketOptionAsync:
         from ..tracing import Logger, LogBuilder
 
         self.logger = Logger()
+        self._ssid_valid = True
 
         if ssid is not None:
             ssid = sanitize_and_validate_ssid(ssid, self.logger)
+            if not ssid.startswith("42["):
+                self._ssid_valid = False
+            else:
+                try:
+                    payload = json.loads(ssid[2:])
+                    if not isinstance(payload, list) or len(payload) < 2:
+                        self._ssid_valid = False
+                except json.JSONDecodeError:
+                    self._ssid_valid = False
         else:
             self.logger.warn("SSID is None, connection will likely fail")
+            self._ssid_valid = False
 
         if config is not None:
             if isinstance(config, dict):
@@ -1051,6 +1062,25 @@ class PocketOptionAsync:
         """
         await self.client.wait_for_assets(timeout)
 
+    async def get_pending_deals(self) -> List[Dict]:
+        """Retrieves a list of all pending orders.
+
+        Returns:
+            List[Dict]: List of pending orders, each containing:
+                - ticket: Order ticket identifier
+                - open_type: Type of pending order
+                - amount: Order amount
+                - symbol: Asset symbol
+                - open_time: Order open time
+                - open_price: Order open price
+                - timeframe: Trade duration
+                - min_payout: Minimum payout percentage
+                - command: Trade direction
+                - date_created: Order creation date
+                - id: Order internal ID
+        """
+        return json.loads(await self.client.get_pending_deals())
+
     def is_demo(self) -> bool:
         """
         Checks if the current account is a demo account.
@@ -1092,6 +1122,10 @@ class PocketOptionAsync:
             bool: True if connected, False otherwise
         """
         return self.client.is_connected()
+
+    def is_ssid_valid(self) -> bool:
+        """Returns whether the SSID passed basic format validation during init."""
+        return self._ssid_valid
 
     def max_subscriptions(self) -> int:
         """

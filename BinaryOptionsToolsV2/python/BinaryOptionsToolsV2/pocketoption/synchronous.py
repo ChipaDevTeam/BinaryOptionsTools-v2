@@ -28,16 +28,12 @@ class SyncSubscription:
 class RawHandlerSync:
     """Synchronous handler for advanced raw WebSocket message operations."""
 
-    def __init__(self, async_handler, loop, lock=None):
+    def __init__(self, async_handler, loop):
         self._handler = async_handler
         self._loop = loop
-        self._lock = lock
 
     def _run(self, coro):
-        if self._lock:
-            with self._lock:
-                return self._loop.run_until_complete(coro)
-        return self._loop.run_until_complete(coro)
+        return asyncio.run_coroutine_threadsafe(coro, self._loop).result()
 
     def send_text(self, message: str) -> None:
         self._run(self._handler.send_text(message))
@@ -83,16 +79,46 @@ class SyncRawSubscription:
 
 class PocketOption:
     def __init__(self, ssid: str, url: Optional[str] = None, config: Union[Config, dict, str] = None, **_):
-        self.loop = asyncio.new_event_loop()
         self._lock = threading.RLock()
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+        self._loop_thread = threading.Thread(target=self._loop.run_forever, daemon=True)
+        self._loop_thread.start()
         self._client = PocketOptionAsync(ssid, url=url, config=config)
-        with self._lock:
-            self.loop.run_until_complete(self._client.wait_for_assets())
+        future = asyncio.run_coroutine_threadsafe(
+            self._client.wait_for_assets(), self._loop
+        )
+        future.result()
+
+    def __del__(self):
+        self._cleanup_loop()
+
+    def _cleanup_loop(self):
+        loop = getattr(self, '_loop', None)
+        if loop is None or loop.is_closed():
+            return
+        try:
+            client = getattr(self, '_client', None)
+            if client is not None:
+                future = asyncio.run_coroutine_threadsafe(
+                    client.shutdown(), loop
+                )
+                future.result(timeout=5)
+        except Exception:
+            pass
+        loop.call_soon_threadsafe(loop.stop)
+        thread = getattr(self, '_loop_thread', None)
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=2)
+        loop.close()
+
+    @property
+    def loop(self):
+        return self._loop
 
     def _run(self, coro):
-        """Run a coroutine under the reentrant lock."""
-        with self._lock:
-            return self.loop.run_until_complete(coro)
+        """Schedule a coroutine on the background event loop and wait for the result."""
+        return asyncio.run_coroutine_threadsafe(coro, self._loop).result()
 
     @property
     def client(self):
@@ -110,9 +136,7 @@ class PocketOption:
 
     def close(self) -> None:
         with self._lock:
-            self.loop.run_until_complete(self._client.shutdown())
-            if self.loop is not None and not self.loop.is_closed():
-                self.loop.close()
+            self._cleanup_loop()
 
     def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
         return self._run(self._client.buy(asset, amount, time, check_win))
@@ -202,6 +226,9 @@ class PocketOption:
     def get_server_time(self) -> int:
         return self._run(self._client.get_server_time())
 
+    def get_pending_deals(self) -> List[Dict]:
+        return self._run(self._client.get_pending_deals())
+
     def is_demo(self) -> bool:
         return self._client.is_demo()
 
@@ -231,7 +258,7 @@ class PocketOption:
 
     def create_raw_handler(self, validator: Validator, keep_alive: Optional[str] = None) -> "RawHandlerSync":
         async_handler = self._run(self._client.create_raw_handler(validator, keep_alive))
-        return RawHandlerSync(async_handler, self.loop, self._lock)
+        return RawHandlerSync(async_handler, self.loop)
 
     def send_raw_message(self, message: str) -> None:
         self._run(self._client.send_raw_message(message))

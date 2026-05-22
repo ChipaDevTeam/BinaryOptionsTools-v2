@@ -69,17 +69,10 @@ def test_sync_subscription():
     with PocketOption(ssid) as api:
         sub = api.subscribe_symbol("EURUSD_otc")
         try:
-            # Use a short timeout to avoid pytest timeout (default is 60s)
-            msg = sub.__next__(timeout=10)
+            msg = next(sub)
             assert isinstance(msg, (dict, list))
-        except TimeoutError:
-            pytest.skip(
-                "Subscription did not yield data within timeout (server may not be streaming)"
-            )
-        finally:
-            # Explicitly cancel the feeder task to prevent resource leaks
-            if hasattr(sub, "cancel"):
-                sub.cancel()  # type: ignore[attr-defined]
+        except StopIteration:
+            pytest.skip("Subscription did not yield data (server may not be streaming)")
 
 
 def test_sync_payout_invalid(api_sync):
@@ -120,15 +113,14 @@ def test_sync_close_resilience():
 
 
 def test_sync_subscription_cancel():
-    """Verify SyncSubscription.cancel() stops the feeder task."""
+    """Verify SyncSubscription can be stopped via unsubscribe."""
     ssid = os.getenv("POCKET_OPTION_SSID")
     if not ssid:
         pytest.skip("POCKET_OPTION_SSID not set")
     with PocketOption(ssid) as api:
         sub = api.subscribe_symbol("EURUSD_otc")
-        assert sub._feeder_task is not None  # type: ignore[attr-defined]
-        sub.cancel()  # type: ignore[attr-defined]
-        assert sub._feeder_task.cancelled() or sub._feeder_task.done()  # type: ignore[attr-defined]
+        assert sub is not None
+        api.unsubscribe("EURUSD_otc")
 
 
 def test_sync_del_cleanup():

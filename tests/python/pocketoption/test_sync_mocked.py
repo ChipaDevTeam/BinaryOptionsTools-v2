@@ -63,6 +63,10 @@ class MockPocketOptionAsync:
                 self.config.urls = []
             self.config.urls.insert(0, url)
 
+    @property
+    def client(self):
+        return self
+
     async def buy(self, asset, amount, time, check_win=False):
         trade_id, trade = (
             "trade_123",

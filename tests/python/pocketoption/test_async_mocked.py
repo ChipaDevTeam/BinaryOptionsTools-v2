@@ -1148,7 +1148,7 @@ class TestGetTradeResultEdgeCases:
         mock_raw_pocketoption.check_win = AsyncMock(
             return_value=json.dumps({"id": "trade_123", "profit": "not_a_number"})
         )
-        with pytest.raises(Exception, match="Error getting trade result"):
+        with pytest.raises(Exception, match="Invalid trade result response"):
             await async_client._get_trade_result("trade_123")
 
     @pytest.mark.asyncio
@@ -1159,7 +1159,7 @@ class TestGetTradeResultEdgeCases:
         mock_raw_pocketoption.check_win = AsyncMock(
             return_value=json.dumps({"id": "trade_123"})
         )
-        with pytest.raises(Exception, match="Error getting trade result"):
+        with pytest.raises(Exception, match="Invalid trade result response"):
             await async_client._get_trade_result("trade_123")
 
     @pytest.mark.asyncio
@@ -1170,7 +1170,7 @@ class TestGetTradeResultEdgeCases:
         mock_raw_pocketoption.check_win = AsyncMock(
             return_value=json.dumps(["not", "a", "dict"])
         )
-        with pytest.raises(Exception, match="Error getting trade result"):
+        with pytest.raises(Exception, match="Invalid trade result response"):
             await async_client._get_trade_result("trade_123")
 
     @pytest.mark.asyncio
