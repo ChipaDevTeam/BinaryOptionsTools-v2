@@ -190,6 +190,28 @@ pub async fn try_connect(
     Ok(ws)
 }
 
+/// Custom serde module for `Option<Uuid>` fields that may be sent as a
+/// numeric value (e.g. `0`) by the server instead of a UUID string.
+/// Numeric values and `null` are treated as `None`; valid UUID strings are
+/// parsed and returned as `Some(uuid)`.
+pub mod optional_uuid {
+    use serde::{Deserialize, Deserializer};
+    use uuid::Uuid;
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Uuid>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        match value {
+            serde_json::Value::String(s) => {
+                s.parse::<Uuid>().map(Some).map_err(serde::de::Error::custom)
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
 pub mod unix_timestamp {
 
     use chrono::{DateTime, Utc};
