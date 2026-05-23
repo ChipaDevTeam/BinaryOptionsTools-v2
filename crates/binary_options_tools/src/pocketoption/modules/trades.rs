@@ -254,23 +254,38 @@ impl ApiModule<State> for TradesApiModule {
                               self.state.trade_state.add_opened_deal(*deal.clone()).await;
                               info!(target: "TradesApiModule", "Trade opened: {}", deal.id);
 
-                              let req_id = deal.request_id.unwrap_or_default();
+                              let req_id = deal.request_id.or_else(|| {
+                                  // Fallback correlation for servers that don't echo UUID request_id.
+                                  let key = (deal.asset.clone(), deal.amount);
+                                  let popped = self
+                                      .failure_matching
+                                      .get_mut(&key)
+                                      .and_then(|queue| queue.pop_front());
+                                  if self.failure_matching.get(&key).is_some_and(|q| q.is_empty()) {
+                                      self.failure_matching.remove(&key);
+                                  }
+                                  popped
+                              });
 
-                              // Clean up pending_market_orders in state
-                              self.state.trade_state.pending_market_orders.write().await.remove(&req_id);
+                              // Clean up pending_market_orders in state and notify responder
+                              if let Some(req_id) = req_id {
+                                  self.state.trade_state.pending_market_orders.write().await.remove(&req_id);
 
-                              if let Some(tracker) = self.pending_orders.remove(&req_id) {
-                                  let _ = tracker.responder.send(Ok(*deal.clone()));
+                                  if let Some(tracker) = self.pending_orders.remove(&req_id) {
+                                      let _ = tracker.responder.send(Ok(*deal.clone()));
 
-                                  let key = (tracker.asset, tracker.amount);
-                                  if let Some(queue) = self.failure_matching.get_mut(&key) {
-                                      queue.retain(|&id| id != req_id);
-                                      if queue.is_empty() {
-                                          self.failure_matching.remove(&key);
+                                      let key = (tracker.asset, tracker.amount);
+                                      if let Some(queue) = self.failure_matching.get_mut(&key) {
+                                          queue.retain(|&id| id != req_id);
+                                          if queue.is_empty() {
+                                              self.failure_matching.remove(&key);
+                                          }
                                       }
+                                  } else {
+                                      warn!(target: "TradesApiModule", "Received success for unknown request ID: {}", req_id);
                                   }
                               } else {
-                                  warn!(target: "TradesApiModule", "Received success for unknown request ID: {}", req_id);
+                                  warn!(target: "TradesApiModule", "Could not correlate successopenOrder for {} {}", deal.asset, deal.amount);
                               }
                           }
                           ServerResponse::Fail(fail) => {

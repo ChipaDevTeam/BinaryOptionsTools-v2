@@ -561,6 +561,7 @@ pub struct Deal {
     pub refund_time: Option<Value>,
     pub refund_timestamp: Option<Value>,
     pub uid: u64,
+    #[serde(default, deserialize_with = "crate::pocketoption::utils::optional_uuid::deserialize")]
     pub request_id: Option<Uuid>,
     pub amount: Decimal,
     pub profit: Decimal,
