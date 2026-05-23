@@ -19,7 +19,7 @@ use uuid::Uuid;
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
-    types::{Action, Deal, FailOpenOrder, MultiPatternRule, OpenOrder},
+    types::{Action, Deal, FailOpenOrder, MultiPatternRule, OpenOrder, RequestId},
 };
 
 /// Command enum for the `TradesApiModule`.
@@ -254,18 +254,10 @@ impl ApiModule<State> for TradesApiModule {
                               self.state.trade_state.add_opened_deal(*deal.clone()).await;
                               info!(target: "TradesApiModule", "Trade opened: {}", deal.id);
 
-                              let req_id = deal.request_id.or_else(|| {
-                                  // Fallback correlation for servers that don't echo UUID request_id.
-                                  let key = (deal.asset.clone(), deal.amount);
-                                  let popped = self
-                                      .failure_matching
-                                      .get_mut(&key)
-                                      .and_then(|queue| queue.pop_front());
-                                  if self.failure_matching.get(&key).is_some_and(|q| q.is_empty()) {
-                                      self.failure_matching.remove(&key);
-                                  }
-                                  popped
-                              });
+                              let req_id = match deal.request_id.as_ref() {
+                                  Some(RequestId::Uuid(id)) => *id,
+                                  Some(RequestId::Number(_)) | None => Uuid::nil(),
+                              };
 
                               // Clean up pending_market_orders in state and notify responder
                               if let Some(req_id) = req_id {
