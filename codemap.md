@@ -9,14 +9,14 @@
 
 ## Architecture Overview
 
-| Layer | Path | Description |
-|-------|------|-------------|
-| Python SDK | `BinaryOptionsToolsV2/python/BinaryOptionsToolsV2/` | User-facing Python API. Two entrypoints: synchronous (`PocketOption`) and asynchronous (`PocketOptionAsync`). Wraps Rust FFI via pyo3. |
-| PyO3 Bindings | `BinaryOptionsToolsV2/rust/src/` | Rust crate compiled as cdylib. Bridges Python ↔ Rust via pyo3 and pyo3-async-runtimes. Exposes `RawPocketOption`, `RawValidator`, `PyBot`, `PyStrategy`, `PyConfig`, `Logger` etc. |
-| Binary Options Tools Crate | `crates/binary_options_tools/` | High-level Rust library. Platform client implementations (PocketOption, ExpertOption), config, validator, framework (Bot/Strategy/Market), all platform-specific modules. |
-| Core Crate | `crates/core/` | Low-level WebSocket client framework. Connection lifecycle (`ClientRunner`), message routing (`Router`), middleware stack, signals, testing utilities, stream utilities. |
-| Macros Crate | `crates/macros/` | Proc macros for serialization (`serialize!`/`deserialize!`), timeout, action, config, region, lightweight_module generation. |
-| UniFFI Bindings | `BinaryOptionsToolsUni/` | Experimental UniFFI bindings for multi-language support (Kotlin, Swift, Go, Python, C#, Ruby, JS). Shares `binary_options_tools` as dependency. |
+| Layer                      | Path                                                | Description                                                                                                                                                                        |
+| -------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Python SDK                 | `BinaryOptionsToolsV2/python/BinaryOptionsToolsV2/` | User-facing Python API. Two entrypoints: synchronous (`PocketOption`) and asynchronous (`PocketOptionAsync`). Wraps Rust FFI via pyo3.                                             |
+| PyO3 Bindings              | `BinaryOptionsToolsV2/rust/src/`                    | Rust crate compiled as cdylib. Bridges Python ↔ Rust via pyo3 and pyo3-async-runtimes. Exposes `RawPocketOption`, `RawValidator`, `PyBot`, `PyStrategy`, `PyConfig`, `Logger` etc. |
+| Binary Options Tools Crate | `crates/binary_options_tools/`                      | High-level Rust library. Platform client implementations (PocketOption, ExpertOption), config, validator, framework (Bot/Strategy/Market), all platform-specific modules.          |
+| Core Crate                 | `crates/core/`                                      | Low-level WebSocket client framework. Connection lifecycle (`ClientRunner`), message routing (`Router`), middleware stack, signals, testing utilities, stream utilities.           |
+| Macros Crate               | `crates/macros/`                                    | Proc macros for serialization (`serialize!`/`deserialize!`), timeout, action, config, region, lightweight_module generation.                                                       |
+| UniFFI Bindings            | `BinaryOptionsToolsUni/`                            | Experimental UniFFI bindings for multi-language support (Kotlin, Swift, Go, Python, C#, Ruby, JS). Shares `binary_options_tools` as dependency.                                    |
 
 ---
 
@@ -24,88 +24,89 @@
 
 ### Python SDK — `BinaryOptionsToolsV2/python/BinaryOptionsToolsV2/`
 
-| File | Description |
-|------|-------------|
-| `__init__.py` | Package entry. Imports Rust cdylib, re-exports all PyO3 classes. Sub-modules: config, tracing, validator, pocketoption. |
-| `config.py` | Python Config dataclass. Wraps `PyConfig` (Rust). Lock-on-use pattern. Supports `from_dict`/`from_json`. Fields: `max_allowed_loops`, `sleep_interval`, `reconnect_time`, `urls`, `max_subscriptions`, `terminal_logging`, `log_level`, `extra_duration`. |
-| `tracing.py` | `Logger`, `LogBuilder`, `StreamLogsIterator`. Wraps Rust Logger/LogBuilder. |
-| `validator.py` | `Validator` class (high-level). Wraps `RawValidator` (Rust). Static methods: `regex`, `starts_with`, `ends_with`, `contains`, `ne` (not), `all`, `any`, `custom(func)`. |
-| `pocketoption/__init__.py` | Re-exports `PocketOptionAsync`, `PocketOption`, `RawHandler`, `RawHandlerSync`. |
-| `pocketoption/asynchronous.py` | `PocketOptionAsync` class. Async context manager. Full API surface including `buy`/`sell`, `subscribe_symbol*` (4 variants), `create_raw_handler`, `create_raw_order*` (3 variants). |
-| `pocketoption/synchronous.py` | `PocketOption` class. Creates new event loop, wraps all `PocketOptionAsync` methods via `run_until_complete`. Thread-safe with `RLock`. |
+| File                           | Description                                                                                                                                                                                                                                               |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `__init__.py`                  | Package entry. Imports Rust cdylib, re-exports all PyO3 classes. Sub-modules: config, tracing, validator, pocketoption.                                                                                                                                   |
+| `config.py`                    | Python Config dataclass. Wraps `PyConfig` (Rust). Lock-on-use pattern. Supports `from_dict`/`from_json`. Fields: `max_allowed_loops`, `sleep_interval`, `reconnect_time`, `urls`, `max_subscriptions`, `terminal_logging`, `log_level`, `extra_duration`. |
+| `tracing.py`                   | `Logger`, `LogBuilder`, `StreamLogsIterator`. Wraps Rust Logger/LogBuilder.                                                                                                                                                                               |
+| `validator.py`                 | `Validator` class (high-level). Wraps `RawValidator` (Rust). Static methods: `regex`, `starts_with`, `ends_with`, `contains`, `ne` (not), `all`, `any`, `custom(func)`.                                                                                   |
+| `pocketoption/__init__.py`     | Re-exports `PocketOptionAsync`, `PocketOption`, `RawHandler`, `RawHandlerSync`.                                                                                                                                                                           |
+| `pocketoption/asynchronous.py` | `PocketOptionAsync` class. Async context manager. Full API surface including `buy`/`sell`, `subscribe_symbol*` (4 variants), `create_raw_handler`, `create_raw_order*` (3 variants).                                                                      |
+| `pocketoption/synchronous.py`  | `PocketOption` class. Creates new event loop, wraps all `PocketOptionAsync` methods via `run_until_complete`. Thread-safe with `RLock`.                                                                                                                   |
 
 ### PyO3 Bindings — `BinaryOptionsToolsV2/rust/src/`
 
-| File | Description |
-|------|-------------|
-| `lib.rs` | PyO3 module entry. Registers all classes and functions with `#[pymodule]`. |
-| `pocketoption.rs` | `RawPocketOption` (~1123 lines). Core PyO3 class. Methods mirror Python API. |
-| `framework.rs` | `PyStrategy` (subclassable), `StrategyWrapper`, `PyContext`, `PyVirtualMarket`, `PyBot`. |
-| `config.rs` | `PyConfig` — wraps `binary_options_tools::config::Config`. |
-| `validator.rs` | `RawValidator` enum. Converts to `CrateValidator`. |
-| `error.rs` | `BinaryErrorPy` enum. Converts from `BinaryOptionsError`, `PocketError`. |
-| `runtime.rs` | Global tokio Runtime singleton via `PyOnceLock`. |
-| `stream.rs` | `next_stream` helper for async/sync iteration. |
-| `logs.rs` | `Logger`, `LogBuilder`, `StreamLogsIterator`, `StreamLogsLayer`. |
+| File              | Description                                                                              |
+| ----------------- | ---------------------------------------------------------------------------------------- |
+| `lib.rs`          | PyO3 module entry. Registers all classes and functions with `#[pymodule]`.               |
+| `pocketoption.rs` | `RawPocketOption` (~1123 lines). Core PyO3 class. Methods mirror Python API.             |
+| `framework.rs`    | `PyStrategy` (subclassable), `StrategyWrapper`, `PyContext`, `PyVirtualMarket`, `PyBot`. |
+| `config.rs`       | `PyConfig` — wraps `binary_options_tools::config::Config`.                               |
+| `validator.rs`    | `RawValidator` enum. Converts to `CrateValidator`.                                       |
+| `error.rs`        | `BinaryErrorPy` enum. Converts from `BinaryOptionsError`, `PocketError`.                 |
+| `runtime.rs`      | Global tokio Runtime singleton via `PyOnceLock`.                                         |
+| `stream.rs`       | `next_stream` helper for async/sync iteration.                                           |
+| `logs.rs`         | `Logger`, `LogBuilder`, `StreamLogsIterator`, `StreamLogsLayer`.                         |
 
 ### Core Crate — `crates/core/src/`
 
-| File/Dir | Description |
-|----------|-------------|
-| `lib.rs` | Re-exports `core_macros::rule` as `Rule`. |
-| `client.rs` | `Client<S: AppState>` — public handle. `Router<S>` — message routing with middleware. `ClientRunner<S>` — WebSocket lifecycle with exponential backoff. |
-| `connector.rs` | `Connector<S>` trait. `ConnectorError`. |
-| `traits.rs` | Core traits: `AppState`, `ApiModule<S>`, `Rule`, `ReconnectCallback`, `RunnerCommand`. |
-| `middleware.rs` | `MiddlewareStack<S>` with hooks: `on_connect`, `on_disconnect`, `on_send`, `on_receive`, `record_connection_attempt`. |
-| `testing.rs` | `TestingWrapper` and `TestingWrapperBuilder` for mocking WebSocket streams. |
-| `signals.rs` | `Signals` — connected/disconnected state notification. |
-| `builder.rs` | `ClientBuilder` for constructing `Client` + `ClientRunner`. |
-| `utils/stream.rs` | `RecieverStream` — wraps kanal receiver as `Stream`. |
-| `utils/tracing.rs` | `stream_logs_layer` — tracing subscriber layer for log streaming. |
+| File/Dir           | Description                                                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib.rs`           | Re-exports `core_macros::rule` as `Rule`.                                                                                                               |
+| `client.rs`        | `Client<S: AppState>` — public handle. `Router<S>` — message routing with middleware. `ClientRunner<S>` — WebSocket lifecycle with exponential backoff. |
+| `connector.rs`     | `Connector<S>` trait. `ConnectorError`.                                                                                                                 |
+| `traits.rs`        | Core traits: `AppState`, `ApiModule<S>`, `Rule`, `ReconnectCallback`, `RunnerCommand`.                                                                  |
+| `middleware.rs`    | `MiddlewareStack<S>` with hooks: `on_connect`, `on_disconnect`, `on_send`, `on_receive`, `record_connection_attempt`.                                   |
+| `testing.rs`       | `TestingWrapper` and `TestingWrapperBuilder` for mocking WebSocket streams.                                                                             |
+| `signals.rs`       | `Signals` — connected/disconnected state notification.                                                                                                  |
+| `builder.rs`       | `ClientBuilder` for constructing `Client` + `ClientRunner`.                                                                                             |
+| `utils/stream.rs`  | `RecieverStream` — wraps kanal receiver as `Stream`.                                                                                                    |
+| `utils/tracing.rs` | `stream_logs_layer` — tracing subscriber layer for log streaming.                                                                                       |
 
 ### Binary Options Tools Crate — `crates/binary_options_tools/src/`
 
-| Path | Description |
-|------|-------------|
-| `lib.rs` | Public modules: config, error, expertoptions, framework, pocketoption, reimports, traits, utils, validator. |
-| `config.rs` | `Config` struct — `max_allowed_loops`, `sleep_interval`, `reconnect_time`, `timeout`, `urls`, `max_subscriptions` etc. |
-| `validator.rs` | `CrateValidator` enum implementing `ValidatorTrait`. |
-| `pocketoption/pocket_client.rs` | `PocketOption` (~1430 lines). Main client. All trading operations. |
-| `pocketoption/modules/` | API modules: `keep_alive`, `balance`, `server_time`, `subscriptions`, `trades`, `deals`, `assets`, `get_candles`, `historical_data`, `pending_trades`, `raw`. |
-| `pocketoption/candle.rs` | `Candle`, `SubscriptionType` (none/chunk/time/time_aligned). |
-| `pocketoption/ssid.rs` | SSID parsing and validation. |
-| `pocketoption/types.rs` | `Action`, `Assets`, `Asset`, `Deal`, `Candle`, `PendingOrder`. |
-| `framework/` | `Context`, `Strategy` trait, `Bot`, `VirtualMarket`. |
-| `expertoptions/` | ExpertOption platform integration (placeholder/stub). |
+| Path                            | Description                                                                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib.rs`                        | Public modules: config, error, expertoptions, framework, pocketoption, reimports, traits, utils, validator.                                                   |
+| `config.rs`                     | `Config` struct — `max_allowed_loops`, `sleep_interval`, `reconnect_time`, `timeout`, `urls`, `max_subscriptions` etc.                                        |
+| `validator.rs`                  | `CrateValidator` enum implementing `ValidatorTrait`.                                                                                                          |
+| `pocketoption/pocket_client.rs` | `PocketOption` (~1430 lines). Main client. All trading operations.                                                                                            |
+| `pocketoption/modules/`         | API modules: `keep_alive`, `balance`, `server_time`, `subscriptions`, `trades`, `deals`, `assets`, `get_candles`, `historical_data`, `pending_trades`, `raw`. |
+| `pocketoption/candle.rs`        | `Candle`, `SubscriptionType` (none/chunk/time/time_aligned).                                                                                                  |
+| `pocketoption/ssid.rs`          | SSID parsing and validation.                                                                                                                                  |
+| `pocketoption/types.rs`         | `Action`, `Assets`, `Asset`, `Deal`, `Candle`, `PendingOrder`.                                                                                                |
+| `framework/`                    | `Context`, `Strategy` trait, `Bot`, `VirtualMarket`.                                                                                                          |
+| `expertoptions/`                | ExpertOption platform integration (placeholder/stub).                                                                                                         |
 
 ### Macros Crate — `crates/macros/src/`
 
-| File | Description |
-|------|-------------|
-| `lib.rs` | Proc macros: `impl_module!`, `impl_config!`, `action`, `region`, `serialize`, `deserialize`, `timeout`. |
-| `action.rs` | `Action` derive macro — implements `ActionName` trait + generates `Rule` struct. |
-| `config.rs` | `Config` derive macro — generates config struct + builder + `From`/`TryFrom` impls. |
-| `region.rs` | `Region` derive macro — generates region-based server URL constants from JSON. |
-| `serialize.rs` | `serialize!` proc macro — wraps `serde_json::to_string`. |
-| `deserialize.rs` | `deserialize!` proc macro — wraps `serde_json::from_str`. |
-| `timeout.rs` | `timeout!` attribute macro for async functions with optional `#[tracing::instrument]`. |
+| File             | Description                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------- |
+| `lib.rs`         | Proc macros: `impl_module!`, `impl_config!`, `action`, `region`, `serialize`, `deserialize`, `timeout`. |
+| `action.rs`      | `Action` derive macro — implements `ActionName` trait + generates `Rule` struct.                        |
+| `config.rs`      | `Config` derive macro — generates config struct + builder + `From`/`TryFrom` impls.                     |
+| `region.rs`      | `Region` derive macro — generates region-based server URL constants from JSON.                          |
+| `serialize.rs`   | `serialize!` proc macro — wraps `serde_json::to_string`.                                                |
+| `deserialize.rs` | `deserialize!` proc macro — wraps `serde_json::from_str`.                                               |
+| `timeout.rs`     | `timeout!` attribute macro for async functions with optional `#[tracing::instrument]`.                  |
 
 ### UniFFI Bindings — `BinaryOptionsToolsUni/src/`
 
-| File | Description |
-|------|-------------|
-| `lib.rs` | Scaffolding. Re-exports `PocketOption`, `RawHandler`, `Action`, `Asset`, `Candle`, `Deal`, `Validator`. |
-| `platforms/pocketoption/client.rs` | PocketOption UniFFI client (subset of full API). |
-| `platforms/pocketoption/types.rs` | UniFFI-compatible types. |
-| `platforms/pocketoption/validator.rs` | Validator for UniFFI. |
-| `platforms/pocketoption/stream.rs` | Subscription stream for UniFFI. |
-| `platforms/pocketoption/raw_handler.rs` | RawHandler for UniFFI. |
+| File                                    | Description                                                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `lib.rs`                                | Scaffolding. Re-exports `PocketOption`, `RawHandler`, `Action`, `Asset`, `Candle`, `Deal`, `Validator`. |
+| `platforms/pocketoption/client.rs`      | PocketOption UniFFI client (subset of full API).                                                        |
+| `platforms/pocketoption/types.rs`       | UniFFI-compatible types.                                                                                |
+| `platforms/pocketoption/validator.rs`   | Validator for UniFFI.                                                                                   |
+| `platforms/pocketoption/stream.rs`      | Subscription stream for UniFFI.                                                                         |
+| `platforms/pocketoption/raw_handler.rs` | RawHandler for UniFFI.                                                                                  |
 
 ---
 
 ## Data Flow
 
 ### Trading
+
 ```
 Python PocketOption/PocketOptionAsync
 → PyO3 RawPocketOption (pyo3_async_runtimes::future_into_py)
@@ -116,6 +117,7 @@ Python PocketOption/PocketOptionAsync
 ```
 
 ### Subscription (Real-Time)
+
 ```
 Python subscribe_symbol() → Rust subscribe()
 → SubscriptionsApiModule (manages 4-sub limit)
@@ -124,6 +126,7 @@ Python subscribe_symbol() → Rust subscribe()
 ```
 
 ### Raw WebSocket
+
 ```
 Python create_raw_handler(validator) → RawHandler
 → RawApiModule → RawHandle/RawHandler
@@ -132,6 +135,7 @@ Python create_raw_handler(validator) → RawHandler
 ```
 
 ### Trading Bot
+
 ```
 Python PyStrategy subclass
 → Rust StrategyWrapper → binary_options_tools::framework::Bot
@@ -152,31 +156,32 @@ Python PyStrategy subclass
 
 ### Module Architecture
 
-| Pattern | Usage | Examples |
-|---------|-------|---------|
-| `ApiModule<S>` | Full module with Command/CommandResponse/Handle | trades, deals, subscriptions, get_candles, historical_data, pending_trades, raw |
-| `LightweightModule` | Simple background task without command-response | server_time, keep_alive |
-| `Rule` | Message routing predicate | Each module registers a Rule + AsyncSender pair on the Router |
+| Pattern             | Usage                                           | Examples                                                                        |
+| ------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------- |
+| `ApiModule<S>`      | Full module with Command/CommandResponse/Handle | trades, deals, subscriptions, get_candles, historical_data, pending_trades, raw |
+| `LightweightModule` | Simple background task without command-response | server_time, keep_alive                                                         |
+| `Rule`              | Message routing predicate                       | Each module registers a Rule + AsyncSender pair on the Router                   |
 
 ### Validator System
 
-| Type | Description |
-|------|-------------|
+| Type                       | Description                                                              |
+| -------------------------- | ------------------------------------------------------------------------ |
 | `RawValidator` (Rust/PyO3) | Enum: None, Regex, StartsWith, EndsWith, Contains, All, Any, Not, Custom |
-| `Validator` (Python) | High-level wrapper with static factory methods |
-| `CrateValidator` | Rust-native validator enum implementing `ValidatorTrait` |
-| `PyCustomValidator` | Bridges Python callable into Rust `ValidatorTrait` via `Arc<Py<PyAny>>` |
+| `Validator` (Python)       | High-level wrapper with static factory methods                           |
+| `CrateValidator`           | Rust-native validator enum implementing `ValidatorTrait`                 |
+| `PyCustomValidator`        | Bridges Python callable into Rust `ValidatorTrait` via `Arc<Py<PyAny>>`  |
 
 ### Subscription Types
 
-| Type | Behavior |
-|------|----------|
-| Direct/none | Yields raw candles as they arrive from server |
-| Chunk(n) | Aggregates n raw ticks/candles into one; yields aggregated candle |
-| Time(duration) | Yields candle every `duration` seconds (sliding window) |
+| Type                  | Behavior                                                                     |
+| --------------------- | ---------------------------------------------------------------------------- |
+| Direct/none           | Yields raw candles as they arrive from server                                |
+| Chunk(n)              | Aggregates n raw ticks/candles into one; yields aggregated candle            |
+| Time(duration)        | Yields candle every `duration` seconds (sliding window)                      |
 | TimeAligned(duration) | Yields candles aligned to time boundaries (e.g., every minute on the minute) |
 
 ### Error Propagation
+
 ```
 PocketError → BinaryErrorPy (PyO3) → Python PyValueError
 ```
@@ -186,11 +191,13 @@ PocketError → BinaryErrorPy (PyO3) → Python PyValueError
 ## Protocol Details
 
 ### WebSocket Framing
+
 - **Transport:** Socket.IO 4.x (Engine.IO v4) over WebSocket
 - **Connection URL:** `wss://{host}/socket.io/?EIO=4&transport=websocket`
 - **Message Format:** `{packet_type}{event_id}-[{event_name},{payload}]` or `42[{event_name},{payload}]`
 
 ### SSID Format
+
 - **Raw:** `42["auth",{...}]`
 - **Regex:** `^42\["auth",\{.*\}\]$`
 - **Payload (demo):** `{session, isDemo:1, uid, platform, currentUrl?, isFastHistory?, isOptimized?}`
@@ -199,26 +206,27 @@ PocketError → BinaryErrorPy (PyO3) → Python PyValueError
 
 ### Key Message IDs
 
-| ID | Meaning |
-|----|---------|
-| 42 | Standard Socket.IO event message |
+| ID  | Meaning                                 |
+| --- | --------------------------------------- |
+| 42  | Standard Socket.IO event message        |
 | 430 | Socket.IO event with binary attachments |
-| 451 | Alternative event format |
-| 3 | Ping from server (respond with 2) |
+| 451 | Alternative event format                |
+| 3   | Ping from server (respond with 2)       |
 
 ### Two-Step Messages
+
 Some server events split into two WebSocket messages: (1) text header with `"_placeholder":true`, (2) binary payload with actual data. `TwoStepRule` (AtomicBool-based) and `MultiPatternRule` handle this.
 
 ---
 
 ## Testing
 
-| Type | Location | Tool |
-|------|----------|------|
-| Python tests | `tests/python/` | `pytest` (conftest.py, subdirs: pocketoption, core, tracing, experimental) |
-| Rust tests | `tests/rust/` | `cargo test` |
-| Crate-level tests | `crates/binary_options_tools/tests/`, `crates/core/tests/` | `cargo test` |
-| Mock framework | Core crate `TestingWrapper` | Mocks WebSocket streams without server connection |
+| Type              | Location                                                   | Tool                                                                       |
+| ----------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Python tests      | `tests/python/`                                            | `pytest` (conftest.py, subdirs: pocketoption, core, tracing, experimental) |
+| Rust tests        | `tests/rust/`                                              | `cargo test`                                                               |
+| Crate-level tests | `crates/binary_options_tools/tests/`, `crates/core/tests/` | `cargo test`                                                               |
+| Mock framework    | Core crate `TestingWrapper`                                | Mocks WebSocket streams without server connection                          |
 
 ---
 
