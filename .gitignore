@@ -76,6 +76,11 @@ pyvenv.cfg
 
 # debug (i have my websocket history in here and don't want to accidentally commit it if i forget to rm it)
 debug/
+.pytest_cache/
+
+# Python
+__pycache__/
+*.py[cod]
 .agents
 
 # omg n stuff

@@ -34,3 +34,6 @@ coverage.xml
 /target/release
 /target
 .rustc_info.json
+
+# Generated JSON docs (chipadocs - regenerate if needed)
+/docs.json

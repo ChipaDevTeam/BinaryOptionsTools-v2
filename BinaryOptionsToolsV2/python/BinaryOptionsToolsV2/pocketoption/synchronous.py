@@ -212,16 +212,24 @@ class PocketOption:
         return self._run(self._client.compile_candles(asset, custom_period, lookback_period))
 
     def subscribe_symbol(self, asset: str) -> SyncSubscription:
-        return SyncSubscription(self._run(self._client.client.subscribe_symbol(asset)))
+        async def _sub():
+            return await self._client.client.subscribe_symbol(asset)
+        return SyncSubscription(self._run(_sub()))
 
     def subscribe_symbol_chunked(self, asset: str, chunk_size: int) -> SyncSubscription:
-        return SyncSubscription(self._run(self._client.client.subscribe_symbol_chunked(asset, chunk_size)))
+        async def _sub():
+            return await self._client.client.subscribe_symbol_chunked(asset, chunk_size)
+        return SyncSubscription(self._run(_sub()))
 
     def subscribe_symbol_timed(self, asset: str, time: timedelta) -> SyncSubscription:
-        return SyncSubscription(self._run(self._client.client.subscribe_symbol_timed(asset, time)))
+        async def _sub():
+            return await self._client.client.subscribe_symbol_timed(asset, time)
+        return SyncSubscription(self._run(_sub()))
 
     def subscribe_symbol_time_aligned(self, asset: str, time: timedelta) -> SyncSubscription:
-        return SyncSubscription(self._run(self._client.client.subscribe_symbol_time_aligned(asset, time)))
+        async def _sub():
+            return await self._client.client.subscribe_symbol_time_aligned(asset, time)
+        return SyncSubscription(self._run(_sub()))
 
     def get_server_time(self) -> int:
         return self._run(self._client.get_server_time())
