@@ -137,7 +137,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --out dist -m ../crates/bindings_pyo3/Cargo.toml
+          args: --out dist
           working-directory: python
       - name: Upload sdist
         uses: actions/upload-artifact@v4
