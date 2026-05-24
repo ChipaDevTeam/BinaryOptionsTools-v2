@@ -250,7 +250,13 @@ impl ApiModule<State> for TradesApiModule {
                       }
                   };
                   let response_result = match msg.as_ref() {
-                      Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data),
+                      Message::Binary(data) => match serde_json::from_slice::<ServerResponse>(data) {
+                          Ok(res) => Ok(res),
+                          Err(e) => {
+                              warn!(target: "TradesApiModule", "Failed to parse binary ServerResponse: {}", e);
+                              Err(e.into())
+                          }
+                      },
                       Message::Text(text) => {
                           if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
                               Ok(res)
@@ -269,7 +275,7 @@ impl ApiModule<State> for TradesApiModule {
                           }
                       },
                       _ => {
-                          // Ignore other message types
+                          warn!(target: "TradesApiModule", "Received unexpected message type: {:?}", msg);
                           continue;
                       }
                   };

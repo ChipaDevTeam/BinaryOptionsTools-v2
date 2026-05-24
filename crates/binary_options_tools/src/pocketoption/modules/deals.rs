@@ -259,7 +259,8 @@ impl ApiModule<State> for DealsApiModule {
                             match msg.as_ref() {
                                 Message::Text(text) => {
                                     if let Some(frame) = SocketIoFrame::parse(text) {
-                                        if let Some((event, payload)) = frame.extract_event() {
+                                        let event_payload: Option<(String, serde_json::Value)> = frame.extract_event();
+                                        if let Some((event, payload)) = event_payload {
                                             let current_expected = if event == "updateOpenedDeals" {
                                                 ExpectedMessage::UpdateOpenedDeals
                                             } else if event == "updateClosedDeals" {
@@ -272,7 +273,7 @@ impl ApiModule<State> for DealsApiModule {
 
                                             if current_expected != ExpectedMessage::None {
                                                 // Check for binary placeholder
-                                                let has_placeholder = payload.as_object().is_some_and(|obj| obj.contains_key("_placeholder"));
+                                                let has_placeholder = payload.as_object().is_some_and(|obj: &serde_json::Map<String, serde_json::Value>| obj.contains_key("_placeholder"));
 
                                                 if has_placeholder {
                                                     tracing::debug!(target: "DealsApiModule", "Detected binary placeholder, waiting for binary payload for {:?}", current_expected);
@@ -373,7 +374,9 @@ impl ApiModule<State> for DealsApiModule {
                                     }
                                     expected = ExpectedMessage::None;
                                 },
-                                _ => {}
+                                _ => {
+                                    warn!(target: "DealsApiModule", "Received unexpected message type: {:?}", msg);
+                                }
                             }
                         }
                         Err(_) => {

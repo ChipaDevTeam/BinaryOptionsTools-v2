@@ -87,7 +87,9 @@ impl LightweightModule<State> for BalanceModule {
                         }
                     }
                 }
-                _ => {}
+                _ => {
+                    tracing::warn!(target: "BalanceModule", "Received unexpected message type: {:?}", msg);
+                }
             }
         }
         Err(CoreError::LightweightModuleLoop("BalanceModule".into()))

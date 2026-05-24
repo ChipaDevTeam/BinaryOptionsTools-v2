@@ -435,7 +435,8 @@ impl ApiModule<State> for GetCandlesApiModule {
                                             warn!(target: "GetCandlesApiModule", "Error processing text result: {}", e);
                                         }
                                     } else if let Some(frame) = SocketIoFrame::parse(text) {
-                                        if let Some((event_name, payload)) = frame.extract_event() {
+                                        let event_payload: Option<(String, serde_json::Value)> = frame.extract_event();
+                                        if let Some((event_name, payload)) = event_payload {
                                             if event_name == "loadHistoryPeriod" || event_name == "loadHistoryPeriodFast" {
                                                 match serde_json::from_value::<LoadHistoryPeriodResult>(payload) {
                                                     Ok(result) => {
@@ -453,7 +454,9 @@ impl ApiModule<State> for GetCandlesApiModule {
                                         self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
                                     }
                                 }
-                                _ => {}
+                                _ => {
+                                    warn!(target: "GetCandlesApiModule", "Received unexpected message type: {:?}", msg);
+                                }
                             }
                         }
                         Err(_) => {

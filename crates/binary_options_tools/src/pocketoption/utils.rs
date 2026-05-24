@@ -384,7 +384,13 @@ impl SocketIoFrame {
     /// 3. Multi-event: ["eventName", {payload}, "anotherEvent", ...] (returns first)
     pub fn extract_event(&self) -> Option<(String, serde_json::Value)> {
         let data = self.data.as_ref()?;
-        let value: serde_json::Value = serde_json::from_str(data).ok()?;
+        let value: serde_json::Value = match serde_json::from_str(data) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!(target: "SocketIoFrame", "Failed to parse Socket.IO data payload as JSON: {}. Payload: {}", e, data);
+                return None;
+            }
+        };
 
         if let Some(arr) = value.as_array() {
             if arr.is_empty() {

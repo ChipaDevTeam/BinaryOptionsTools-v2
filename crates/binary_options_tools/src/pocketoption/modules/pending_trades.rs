@@ -416,7 +416,8 @@ impl ApiModule<State> for PendingTradesApiModule {
                             match msg.as_ref() {
                                 Message::Text(text) => {
                                     if let Some(frame) = SocketIoFrame::parse(text) {
-                                        if let Some((event, payload)) = frame.extract_event() {
+                                        let event_payload: Option<(String, serde_json::Value)> = frame.extract_event();
+                                        if let Some((event, payload)) = event_payload {
                                             match event.as_str() {
                                                 "successopenPendingOrder" | "failopenPendingOrder" => {
                                                     if let Ok(response) = serde_json::from_value::<ServerResponse>(payload) {
@@ -457,23 +458,30 @@ impl ApiModule<State> for PendingTradesApiModule {
                                     }
                                 }
                                 Message::Binary(data) => {
-                                    if let Ok(response) = serde_json::from_slice::<ServerResponse>(data) {
-                                        if let ServerResponse::Success(ref pending_order) = response {
-                                            self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
-                                        }
-                                        if let Some(req_id) = self.pending_requests.pop_front() {
-                                            match response {
-                                                ServerResponse::Success(pending_order) => {
-                                                    let _ = self.command_responder.send(CommandResponse::Success { req_id, pending_order }).await;
-                                                }
-                                                ServerResponse::Fail(fail) => {
-                                                    let _ = self.command_responder.send(CommandResponse::Error(fail)).await;
+                                    match serde_json::from_slice::<ServerResponse>(data) {
+                                        Ok(response) => {
+                                            if let ServerResponse::Success(ref pending_order) = response {
+                                                self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
+                                            }
+                                            if let Some(req_id) = self.pending_requests.pop_front() {
+                                                match response {
+                                                    ServerResponse::Success(pending_order) => {
+                                                        let _ = self.command_responder.send(CommandResponse::Success { req_id, pending_order }).await;
+                                                    }
+                                                    ServerResponse::Fail(fail) => {
+                                                        let _ = self.command_responder.send(CommandResponse::Error(fail)).await;
+                                                    }
                                                 }
                                             }
                                         }
+                                        Err(e) => {
+                                            warn!(target: "PendingTradesApiModule", "Failed to parse binary ServerResponse: {}", e);
+                                        }
                                     }
                                 }
-                                _ => {}
+                                _ => {
+                                    warn!(target: "PendingTradesApiModule", "Received unexpected message type: {:?}", msg);
+                                }
                             }
                         }
                         Err(_) => {

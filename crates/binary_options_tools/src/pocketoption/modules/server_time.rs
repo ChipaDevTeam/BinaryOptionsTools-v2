@@ -67,7 +67,9 @@ impl LightweightModule<State> for ServerTimeModule {
                         );
                     }
                 },
-                _ => {}
+                _ => {
+                    tracing::warn!(target: "ServerTimeModule", "Received unexpected message type: {:?}", msg);
+                }
             }
         }
         Err(CoreError::LightweightModuleLoop(

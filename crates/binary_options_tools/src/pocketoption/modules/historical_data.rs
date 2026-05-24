@@ -324,30 +324,50 @@ impl ApiModule<State> for HistoricalDataApiModule {
                         Ok(msg) => {
                             let mut is_binary_placeholder = false;
                             let response = match &*msg {
-                                Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data).ok(),
+                                Message::Binary(data) => match serde_json::from_slice::<ServerResponse>(data) {
+                                    Ok(res) => Some(res),
+                                    Err(e) => {
+                                        warn!(target: "HistoricalDataApiModule", "Failed to parse binary ServerResponse: {}", e);
+                                        None
+                                    }
+                                },
                                 Message::Text(text) => {
                                     if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
                                         Some(res)
                                     } else if let Some(start) = text.find('[') {
-                                        if let Ok(serde_json::Value::Array(arr)) = serde_json::from_str::<serde_json::Value>(&text[start..]) {
-                                            if arr.len() >= 2 && arr[0].as_str().map(|s| s.starts_with("updateHistory")).unwrap_or(false) {
-                                                if arr[1].as_object().is_some_and(|obj| obj.contains_key("_placeholder")) {
-                                                    is_binary_placeholder = true;
-                                                    None
+                                        match serde_json::from_str::<serde_json::Value>(&text[start..]) {
+                                            Ok(serde_json::Value::Array(arr)) => {
+                                                if arr.len() >= 2 && arr[0].as_str().map(|s| s.starts_with("updateHistory")).unwrap_or(false) {
+                                                    if arr[1].as_object().is_some_and(|obj| obj.contains_key("_placeholder")) {
+                                                        is_binary_placeholder = true;
+                                                        None
+                                                    } else {
+                                                        match serde_json::from_value::<ServerResponse>(arr[1].clone()) {
+                                                            Ok(res) => Some(res),
+                                                            Err(e) => {
+                                                                warn!(target: "HistoricalDataApiModule", "Failed to parse updateHistory payload: {}", e);
+                                                                None
+                                                            }
+                                                        }
+                                                    }
                                                 } else {
-                                                    serde_json::from_value::<ServerResponse>(arr[1].clone()).ok()
+                                                    None
                                                 }
-                                            } else {
+                                            }
+                                            Ok(_) => None,
+                                            Err(e) => {
+                                                warn!(target: "HistoricalDataApiModule", "Failed to parse JSON array from text: {}", e);
                                                 None
                                             }
-                                        } else {
-                                            None
                                         }
                                     } else {
                                         None
                                     }
                                 },
-                                _ => None,
+                                _ => {
+                                    warn!(target: "HistoricalDataApiModule", "Received unexpected message type: {:?}", msg);
+                                    None
+                                },
                             };
 
                             if is_binary_placeholder { continue; }

@@ -624,15 +624,28 @@ impl ApiModule<State> for SubscriptionsApiModule {
                     };
                     
                     let response = match msg.as_ref() {
-                        Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data).ok(),
+                        Message::Binary(data) => match serde_json::from_slice::<ServerResponse>(data) {
+                            Ok(res) => Some(res),
+                            Err(e) => {
+                                warn!(target: "SubscriptionsApiModule", "Failed to parse binary ServerResponse: {}", e);
+                                None
+                            }
+                        },
                         Message::Text(text) => {
                             if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
                                 Some(res)
                             } else if let Some(frame) = SocketIoFrame::parse(text) {
-                                if let Some((event, payload)) = frame.extract_event() {
+                                let event_payload: Option<(String, serde_json::Value)> = frame.extract_event();
+                                if let Some((event, payload)) = event_payload {
                                     match event.as_str() {
                                         "updateStream" | "updateHistory" | "updateHistoryNewFast" | "updateHistoryNew" | "history" | "loadHistoryPeriod" => {
-                                            serde_json::from_value::<ServerResponse>(payload).ok()
+                                            match serde_json::from_value::<ServerResponse>(payload) {
+                                                Ok(res) => Some(res),
+                                                Err(e) => {
+                                                    warn!(target: "SubscriptionsApiModule", "Failed to parse event {} payload: {}", event, e);
+                                                    None
+                                                }
+                                            }
                                         }
                                         _ => None
                                     }
