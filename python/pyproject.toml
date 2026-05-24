@@ -50,9 +50,9 @@ Discord = "https://discord.com/invite/chipa-1261483112991555665"
 [tool.maturin]
 features = ["pyo3/extension-module", "pyo3/generate-import-lib"]
 module-name = "BinaryOptionsToolsV2"
-python-source = "python"
+python-source = "."
 include = ["**/*.pyi"]
-manifest-path = "rust/Cargo.toml"
+manifest-path = "../crates/bindings_pyo3/Cargo.toml"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -21,7 +21,7 @@ use super::{
 
 #[uniffi_doc(
     name = "PocketOption",
-    path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+    path = "crates/bindings_uniffi/docs_json/pocket_option.json"
 )]
 #[derive(uniffi::Object)]
 pub struct PocketOption {
@@ -54,7 +54,7 @@ impl PocketOption {
 
     #[uniffi_doc(
         name = "new_with_url",
-        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+        path = "crates/bindings_uniffi/docs_json/pocket_option.json"
     )]
     #[uniffi::constructor]
     pub async fn new_with_url(ssid: String, url: String) -> Result<Arc<Self>, UniError> {
@@ -78,7 +78,7 @@ impl PocketOption {
 
     #[uniffi_doc(
         name = "trade",
-        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+        path = "crates/bindings_uniffi/docs_json/pocket_option.json"
     )]
     #[uniffi::method]
     pub async fn trade(
@@ -131,7 +131,7 @@ impl PocketOption {
 
     #[uniffi_doc(
         name = "result",
-        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+        path = "crates/bindings_uniffi/docs_json/pocket_option.json"
     )]
     #[uniffi::method]
     pub async fn result(&self, id: String) -> Result<Deal, UniError> {
@@ -147,7 +147,7 @@ impl PocketOption {
 
     #[uniffi_doc(
         name = "result",
-        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+        path = "crates/bindings_uniffi/docs_json/pocket_option.json"
     )]
     #[uniffi::method]
     pub async fn result_with_timeout(
@@ -189,7 +189,7 @@ impl PocketOption {
 
     #[uniffi_doc(
         name = "open_pending_order",
-        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+        path = "crates/bindings_uniffi/docs_json/pocket_option.json"
     )]
     #[allow(clippy::too_many_arguments)]
     pub async fn open_pending_order(
@@ -243,7 +243,7 @@ impl PocketOption {
 
     #[uniffi_doc(
         name = "subscribe",
-        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+        path = "crates/bindings_uniffi/docs_json/pocket_option.json"
     )]
     #[uniffi::method]
     pub async fn subscribe(
@@ -272,7 +272,7 @@ impl PocketOption {
 
     #[uniffi_doc(
         name = "candles",
-        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+        path = "crates/bindings_uniffi/docs_json/pocket_option.json"
     )]
     #[uniffi::method]
     pub async fn get_candles_advanced(
@@ -295,7 +295,7 @@ impl PocketOption {
 
     #[uniffi_doc(
         name = "candles",
-        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+        path = "crates/bindings_uniffi/docs_json/pocket_option.json"
     )]
     #[uniffi::method]
     pub async fn get_candles(
@@ -317,7 +317,7 @@ impl PocketOption {
 
     #[uniffi_doc(
         name = "candles",
-        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+        path = "crates/bindings_uniffi/docs_json/pocket_option.json"
     )]
     #[uniffi::method]
     pub async fn history(&self, asset: String, period: u32) -> Result<Vec<Candle>, UniError> {
@@ -354,7 +354,7 @@ impl PocketOption {
 
     #[uniffi_doc(
         name = "create_raw_handler",
-        path = "BinaryOptionsToolsUni/docs_json/pocket_option.json"
+        path = "crates/bindings_uniffi/docs_json/pocket_option.json"
     )]
     #[uniffi::method]
     pub async fn create_raw_handler(
@@ -403,3 +403,4 @@ impl PocketOption {
             .map(|d| d.close_timestamp.timestamp())
     }
 }
+

@@ -5,11 +5,34 @@ members = [
     "crates/core", "crates/core/macros/",
     "crates/macros",
     "crates/binary_options_tools",
-    "BinaryOptionsToolsV2/rust",
-    "BinaryOptionsToolsUni",
-    "BinaryOptionsToolsUni/bo2_macros",
+    "crates/bindings_pyo3",
+    "crates/bindings_uniffi",
+    "crates/bindings_uniffi/bo2_macros",
     "tests/rust",
 ]
+
+[workspace.dependencies]
+anyhow = "1.0.102"
+async-trait = "0.1.89"
+chrono = { version = "0.4.44", features = ["serde"] }
+darling = { version = "0.21.3", features = ["serde"] }
+futures-util = "0.3.32"
+kanal = "0.1.1"
+rand = "0.10.1"
+regex = "1.12.3"
+rust_decimal = { version = "1.41.0", features = ["serde", "macros", "serde-with-float"] }
+rust_decimal_macros = "1.40.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+thiserror = "2.0.18"
+tokio = "1.50.0"
+tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["rustls-tls-webpki-roots", "connect", "handshake"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+uniffi = { version = "0.31.0", features = ["cli"] }
+url = { version = "2.5.8", features = ["serde"] }
+uuid = { version = "1.23.0", features = ["v4", "fast-rng", "serde"] }
+zyn = "0.5.4"
 
 [profile.release]
 opt-level = 3

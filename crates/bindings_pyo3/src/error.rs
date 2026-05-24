@@ -26,9 +26,22 @@ pub enum BinaryErrorPy {
     InvalidParameter(String),
 }
 
+pyo3::create_exception!(BinaryOptionsToolsV2, PocketOptionError, pyo3::exceptions::PyException);
+pyo3::create_exception!(BinaryOptionsToolsV2, TradeNotFoundError, pyo3::exceptions::PyException);
+pyo3::create_exception!(BinaryOptionsToolsV2, UninitializedError, pyo3::exceptions::PyException);
+pyo3::create_exception!(BinaryOptionsToolsV2, NotAllowedError, pyo3::exceptions::PyException);
+pyo3::create_exception!(BinaryOptionsToolsV2, InvalidParameterError, pyo3::exceptions::PyException);
+
 impl From<BinaryErrorPy> for PyErr {
     fn from(value: BinaryErrorPy) -> Self {
-        PyValueError::new_err(value.to_string())
+        match value {
+            BinaryErrorPy::PocketOptionError(..) => PocketOptionError::new_err(value.to_string()),
+            BinaryErrorPy::TradeNotFound(..) => TradeNotFoundError::new_err(value.to_string()),
+            BinaryErrorPy::Uninitialized(..) => UninitializedError::new_err(value.to_string()),
+            BinaryErrorPy::NotAllowed(..) => NotAllowedError::new_err(value.to_string()),
+            BinaryErrorPy::InvalidParameter(..) => InvalidParameterError::new_err(value.to_string()),
+            _ => PyValueError::new_err(value.to_string()),
+        }
     }
 }
 

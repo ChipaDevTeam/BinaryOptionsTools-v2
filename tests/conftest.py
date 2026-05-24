@@ -46,7 +46,7 @@ except ImportError:
     )
     # Add source directory to sys.path as a fallback
     source_path = os.path.join(
-        os.path.dirname(__file__), "../BinaryOptionsToolsV2/python"
+        os.path.dirname(__file__), "../python"
     )
     if source_path not in sys.path:
         sys.path.insert(0, source_path)

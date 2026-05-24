@@ -9,7 +9,7 @@ use binary_options_tools::pocketoption::{
 use bo2_macros::uniffi_doc;
 use rust_decimal::prelude::ToPrimitive;
 
-#[uniffi_doc(name = "Action", path = "BinaryOptionsToolsUni/docs_json/types.json")]
+#[uniffi_doc(name = "Action", path = "crates/bindings_uniffi/docs_json/types.json")]
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum Action {
     Call,
@@ -27,7 +27,7 @@ impl From<OriginalAction> for Action {
 
 #[uniffi_doc(
     name = "AssetType",
-    path = "BinaryOptionsToolsUni/docs_json/types.json"
+    path = "crates/bindings_uniffi/docs_json/types.json"
 )]
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum AssetType {
@@ -52,7 +52,7 @@ impl From<OriginalAssetType> for AssetType {
 
 #[uniffi_doc(
     name = "CandleLength",
-    path = "BinaryOptionsToolsUni/docs_json/types.json"
+    path = "crates/bindings_uniffi/docs_json/types.json"
 )]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct CandleLength {
@@ -67,7 +67,7 @@ impl From<OriginalCandleLength> for CandleLength {
     }
 }
 
-#[uniffi_doc(name = "Asset", path = "BinaryOptionsToolsUni/docs_json/types.json")]
+#[uniffi_doc(name = "Asset", path = "crates/bindings_uniffi/docs_json/types.json")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct Asset {
     pub id: i32,
@@ -99,7 +99,7 @@ impl From<OriginalAsset> for Asset {
     }
 }
 
-#[uniffi_doc(name = "Deal", path = "BinaryOptionsToolsUni/docs_json/types.json")]
+#[uniffi_doc(name = "Deal", path = "crates/bindings_uniffi/docs_json/types.json")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct Deal {
     pub id: String,
@@ -165,7 +165,7 @@ impl From<OriginalDeal> for Deal {
 
 #[uniffi_doc(
     name = "PendingOrder",
-    path = "BinaryOptionsToolsUni/docs_json/types.json"
+    path = "crates/bindings_uniffi/docs_json/types.json"
 )]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct PendingOrder {
@@ -200,7 +200,7 @@ impl From<OriginalPendingOrder> for PendingOrder {
     }
 }
 
-#[uniffi_doc(name = "Candle", path = "BinaryOptionsToolsUni/docs_json/types.json")]
+#[uniffi_doc(name = "Candle", path = "crates/bindings_uniffi/docs_json/types.json")]
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct Candle {
     pub symbol: String,
@@ -225,3 +225,4 @@ impl From<OriginalCandle> for Candle {
         }
     }
 }
+

@@ -8,7 +8,7 @@ use crate::error::UniError;
 
 #[uniffi_doc(
     name = "Validator",
-    path = "BinaryOptionsToolsUni/docs_json/validator.json"
+    path = "crates/bindings_uniffi/docs_json/validator.json"
 )]
 #[derive(uniffi::Object, Clone)]
 pub struct Validator {
@@ -18,7 +18,7 @@ pub struct Validator {
 #[uniffi::export]
 impl Validator {
     /// Creates a default validator that accepts all messages.
-    #[uniffi_doc(name = "new", path = "BinaryOptionsToolsUni/docs_json/validator.json")]
+    #[uniffi_doc(name = "new", path = "crates/bindings_uniffi/docs_json/validator.json")]
     #[uniffi::constructor]
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
@@ -28,7 +28,7 @@ impl Validator {
 
     #[uniffi_doc(
         name = "regex",
-        path = "BinaryOptionsToolsUni/docs_json/validator.json"
+        path = "crates/bindings_uniffi/docs_json/validator.json"
     )]
     #[uniffi::constructor]
     pub fn regex(pattern: String) -> Result<Arc<Self>, UniError> {
@@ -41,7 +41,7 @@ impl Validator {
 
     #[uniffi_doc(
         name = "starts_with",
-        path = "BinaryOptionsToolsUni/docs_json/validator.json"
+        path = "crates/bindings_uniffi/docs_json/validator.json"
     )]
     #[uniffi::constructor]
     pub fn starts_with(prefix: String) -> Arc<Self> {
@@ -52,7 +52,7 @@ impl Validator {
 
     #[uniffi_doc(
         name = "ends_with",
-        path = "BinaryOptionsToolsUni/docs_json/validator.json"
+        path = "crates/bindings_uniffi/docs_json/validator.json"
     )]
     #[uniffi::constructor]
     pub fn ends_with(suffix: String) -> Arc<Self> {
@@ -63,7 +63,7 @@ impl Validator {
 
     #[uniffi_doc(
         name = "contains",
-        path = "BinaryOptionsToolsUni/docs_json/validator.json"
+        path = "crates/bindings_uniffi/docs_json/validator.json"
     )]
     #[uniffi::constructor]
     pub fn contains(substring: String) -> Arc<Self> {
@@ -72,7 +72,7 @@ impl Validator {
         })
     }
 
-    #[uniffi_doc(name = "ne", path = "BinaryOptionsToolsUni/docs_json/validator.json")]
+    #[uniffi_doc(name = "ne", path = "crates/bindings_uniffi/docs_json/validator.json")]
     #[uniffi::constructor]
     pub fn ne(validator: Arc<Validator>) -> Arc<Self> {
         Arc::new(Self {
@@ -80,7 +80,7 @@ impl Validator {
         })
     }
 
-    #[uniffi_doc(name = "all", path = "BinaryOptionsToolsUni/docs_json/validator.json")]
+    #[uniffi_doc(name = "all", path = "crates/bindings_uniffi/docs_json/validator.json")]
     #[uniffi::constructor]
     pub fn all(validators: Vec<Arc<Validator>>) -> Arc<Self> {
         let inner_validators = validators.iter().map(|v| v.inner.clone()).collect();
@@ -89,7 +89,7 @@ impl Validator {
         })
     }
 
-    #[uniffi_doc(name = "any", path = "BinaryOptionsToolsUni/docs_json/validator.json")]
+    #[uniffi_doc(name = "any", path = "crates/bindings_uniffi/docs_json/validator.json")]
     #[uniffi::constructor]
     pub fn any(validators: Vec<Arc<Validator>>) -> Arc<Self> {
         let inner_validators = validators.iter().map(|v| v.inner.clone()).collect();
@@ -100,7 +100,7 @@ impl Validator {
 
     #[uniffi_doc(
         name = "check",
-        path = "BinaryOptionsToolsUni/docs_json/validator.json"
+        path = "crates/bindings_uniffi/docs_json/validator.json"
     )]
     #[uniffi::method]
     pub fn check(&self, message: String) -> bool {
@@ -127,3 +127,4 @@ impl Default for Validator {
         }
     }
 }
+

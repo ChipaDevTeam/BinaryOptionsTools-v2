@@ -11,7 +11,7 @@ use binary_options_tools::{
 
 #[uniffi_doc(
     name = "RawHandler",
-    path = "BinaryOptionsToolsUni/docs_json/raw_handler.json"
+    path = "crates/bindings_uniffi/docs_json/raw_handler.json"
 )]
 #[derive(uniffi::Object)]
 pub struct RawHandler {
@@ -22,7 +22,7 @@ pub struct RawHandler {
 impl RawHandler {
     #[uniffi_doc(
         name = "send_text",
-        path = "BinaryOptionsToolsUni/docs_json/raw_handler.json"
+        path = "crates/bindings_uniffi/docs_json/raw_handler.json"
     )]
     #[uniffi::method]
     pub async fn send_text(&self, message: String) -> Result<(), UniError> {
@@ -34,7 +34,7 @@ impl RawHandler {
 
     #[uniffi_doc(
         name = "send_binary",
-        path = "BinaryOptionsToolsUni/docs_json/raw_handler.json"
+        path = "crates/bindings_uniffi/docs_json/raw_handler.json"
     )]
     #[uniffi::method]
     pub async fn send_binary(&self, data: Vec<u8>) -> Result<(), UniError> {
@@ -46,7 +46,7 @@ impl RawHandler {
 
     #[uniffi_doc(
         name = "send_and_wait",
-        path = "BinaryOptionsToolsUni/docs_json/raw_handler.json"
+        path = "crates/bindings_uniffi/docs_json/raw_handler.json"
     )]
     #[uniffi::method]
     pub async fn send_and_wait(&self, message: String) -> Result<String, UniError> {
@@ -61,7 +61,7 @@ impl RawHandler {
 
     #[uniffi_doc(
         name = "wait_next",
-        path = "BinaryOptionsToolsUni/docs_json/raw_handler.json"
+        path = "crates/bindings_uniffi/docs_json/raw_handler.json"
     )]
     #[uniffi::method]
     pub async fn wait_next(&self) -> Result<String, UniError> {
@@ -88,3 +88,4 @@ fn message_to_string(msg: &Message) -> String {
         _ => String::new(),
     }
 }
+

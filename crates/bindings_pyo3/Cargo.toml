@@ -16,29 +16,30 @@ categories = ["api-bindings"]
 [lib]
 name = "BinaryOptionsToolsV2"
 crate-type = ["cdylib"]
+test = false
 
 [dependencies]
 pyo3 = { version = "0.28.2", features = ["abi3-py39"] }
 pyo3-async-runtimes = { version = "0.28.0", features = ["tokio-runtime"] }
 
-binary_options_tools = { path = "../../crates/binary_options_tools", version = "0.2.1" }
+binary_options_tools = { path = "../binary_options_tools", version = "0.2.1" }
 
-thiserror = "2.0.18"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
-uuid = "1.23.0"
-tracing = "0.1.44"
-tokio = { version = "1.50.0", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
-futures-util = "0.3.32"
-tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-chrono = "0.4.44"
-url = "2.5.8"
-regex = "1.12.3"
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+futures-util = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+url = { workspace = true }
+regex = { workspace = true }
 async-stream = "0.3.6"
-async-trait = "0.1.89"
+async-trait = { workspace = true }
 tungstenite = { version = "0.28.0", default-features = false, features = ["rustls-tls-webpki-roots", "handshake"] }
-rust_decimal = "1.41.0"
-rust_decimal_macros = "1.40.0"
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
 pyo3-stub-gen = { version = "0.7.0", optional = true }
 
 [features]

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::sync::Arc;
 
 use pyo3::{
@@ -102,30 +100,7 @@ impl Default for RawValidator {
     }
 }
 
-impl ArrayValidator {
-    // TODO: Restore validation methods when the new API supports it
-    // fn validate_all(&self, message: &RawWebsocketMessage) -> bool {
-    //     self.0.iter().all(|d| d.validate(message))
-    // }
-
-    // fn validate_any(&self, message: &RawWebsocketMessage) -> bool {
-    //     self.0.iter().any(|d| d.validate(message))
-    // }
-}
-
-// TODO: Restore BoxedValidator implementation when the new API supports it
-// impl ValidatorTrait<RawWebsocketMessage> for BoxedValidator {
-//     fn validate(&self, message: &RawWebsocketMessage) -> bool {
-//         self.0.validate(message)
-//     }
-// }
-
-// TODO: Restore RegexValidator implementation when the new API supports it
-// impl ValidatorTrait<RawWebsocketMessage> for RegexValidator {
-//     fn validate(&self, message: &RawWebsocketMessage) -> bool {
-//         self.regex.is_match(&message.to_string())
-//     }
-// }
+impl ArrayValidator {}
 
 #[pymethods]
 impl RawValidator {

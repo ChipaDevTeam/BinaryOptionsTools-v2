@@ -10,7 +10,7 @@ use super::types::Candle;
 
 #[uniffi_doc(
     name = "SubscriptionStream",
-    path = "BinaryOptionsToolsUni/docs_json/stream.json"
+    path = "crates/bindings_uniffi/docs_json/stream.json"
 )]
 #[derive(uniffi::Object)]
 pub struct SubscriptionStream {
@@ -27,7 +27,7 @@ impl SubscriptionStream {
 
 #[uniffi::export]
 impl SubscriptionStream {
-    #[uniffi_doc(name = "next", path = "BinaryOptionsToolsUni/docs_json/stream.json")]
+    #[uniffi_doc(name = "next", path = "crates/bindings_uniffi/docs_json/stream.json")]
     pub async fn next(&self) -> Result<Candle, UniError> {
         let mut stream = self.inner.lock().await;
         match stream.receive().await {
@@ -38,3 +38,4 @@ impl SubscriptionStream {
         }
     }
 }
+

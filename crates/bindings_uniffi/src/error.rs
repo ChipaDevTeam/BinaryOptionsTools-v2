@@ -3,7 +3,7 @@ use binary_options_tools::pocketoption::error::PocketError;
 use bo2_macros::uniffi_doc;
 use thiserror::Error;
 
-#[uniffi_doc(name = "UniError", path = "BinaryOptionsToolsUni/docs_json/error.json")]
+#[uniffi_doc(name = "UniError", path = "crates/bindings_uniffi/docs_json/error.json")]
 #[derive(Error, Debug, uniffi::Error)]
 pub enum UniError {
     #[error("An error occurred in the underlying binary_options_tools crate: {0}")]
@@ -34,3 +34,4 @@ impl From<PocketError> for UniError {
         UniError::PocketOption(e.to_string())
     }
 }
+

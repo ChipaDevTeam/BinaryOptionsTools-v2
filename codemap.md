@@ -11,18 +11,18 @@
 
 | Layer                      | Path                                                | Description                                                                                                                                                                        |
 | -------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Python SDK                 | `BinaryOptionsToolsV2/python/BinaryOptionsToolsV2/` | User-facing Python API. Two entrypoints: synchronous (`PocketOption`) and asynchronous (`PocketOptionAsync`). Wraps Rust FFI via pyo3.                                             |
-| PyO3 Bindings              | `BinaryOptionsToolsV2/rust/src/`                    | Rust crate compiled as cdylib. Bridges Python ↔ Rust via pyo3 and pyo3-async-runtimes. Exposes `RawPocketOption`, `RawValidator`, `PyBot`, `PyStrategy`, `PyConfig`, `Logger` etc. |
+| Python SDK                 | `python/BinaryOptionsToolsV2/` | User-facing Python API. Two entrypoints: synchronous (`PocketOption`) and asynchronous (`PocketOptionAsync`). Wraps Rust FFI via pyo3.                                             |
+| PyO3 Bindings              | `crates/bindings_pyo3/src/`                    | Rust crate compiled as cdylib. Bridges Python ↔ Rust via pyo3 and pyo3-async-runtimes. Exposes `RawPocketOption`, `RawValidator`, `PyBot`, `PyStrategy`, `PyConfig`, `Logger` etc. |
 | Binary Options Tools Crate | `crates/binary_options_tools/`                      | High-level Rust library. Platform client implementations (PocketOption, ExpertOption), config, validator, framework (Bot/Strategy/Market), all platform-specific modules.          |
 | Core Crate                 | `crates/core/`                                      | Low-level WebSocket client framework. Connection lifecycle (`ClientRunner`), message routing (`Router`), middleware stack, signals, testing utilities, stream utilities.           |
 | Macros Crate               | `crates/macros/`                                    | Proc macros for serialization (`serialize!`/`deserialize!`), timeout, action, config, region, lightweight_module generation.                                                       |
-| UniFFI Bindings            | `BinaryOptionsToolsUni/`                            | Experimental UniFFI bindings for multi-language support (Kotlin, Swift, Go, Python, C#, Ruby, JS). Shares `binary_options_tools` as dependency.                                    |
+| UniFFI Bindings            | `crates/bindings_uniffi/`                            | Experimental UniFFI bindings for multi-language support (Kotlin, Swift, Go, Python, C#, Ruby, JS). Shares `binary_options_tools` as dependency.                                    |
 
 ---
 
 ## Source Tree
 
-### Python SDK — `BinaryOptionsToolsV2/python/BinaryOptionsToolsV2/`
+### Python SDK — `python/BinaryOptionsToolsV2/`
 
 | File                           | Description                                                                                                                                                                                                                                               |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -34,7 +34,7 @@
 | `pocketoption/asynchronous.py` | `PocketOptionAsync` class. Async context manager. Full API surface including `buy`/`sell`, `subscribe_symbol*` (4 variants), `create_raw_handler`, `create_raw_order*` (3 variants).                                                                      |
 | `pocketoption/synchronous.py`  | `PocketOption` class. Creates new event loop, wraps all `PocketOptionAsync` methods via `run_until_complete`. Thread-safe with `RLock`.                                                                                                                   |
 
-### PyO3 Bindings — `BinaryOptionsToolsV2/rust/src/`
+### PyO3 Bindings — `crates/bindings_pyo3/src/`
 
 | File              | Description                                                                              |
 | ----------------- | ---------------------------------------------------------------------------------------- |
@@ -90,7 +90,7 @@
 | `deserialize.rs` | `deserialize!` proc macro — wraps `serde_json::from_str`.                                               |
 | `timeout.rs`     | `timeout!` attribute macro for async functions with optional `#[tracing::instrument]`.                  |
 
-### UniFFI Bindings — `BinaryOptionsToolsUni/src/`
+### UniFFI Bindings — `crates/bindings_uniffi/src/`
 
 | File                                    | Description                                                                                             |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
@@ -239,11 +239,12 @@ Some server events split into two WebSocket messages: (1) text header with `"_pl
 
 ## Quick Reference for Agents
 
-- **Most edited file:** `BinaryOptionsToolsV2/rust/src/pocketoption.rs` (1123 lines) — make changes here for new Python API methods
-- **Adding a feature:** (1) Rust logic in `crates/binary_options_tools/src/pocketoption/`, (2) Expose via PyO3 in `BinaryOptionsToolsV2/rust/src/pocketoption.rs`, (3) Python wrapper in `asynchronous.py`, (4) Sync wrapper in `synchronous.py`, (5) Update `__init__.py` if new class, (6) Examples + tests
+- **Most edited file:** `crates/bindings_pyo3/src/pocketoption.rs` (1123 lines) — make changes here for new Python API methods
+- **Adding a feature:** (1) Rust logic in `crates/binary_options_tools/src/pocketoption/`, (2) Expose via PyO3 in `crates/bindings_pyo3/src/pocketoption.rs`, (3) Python wrapper in `asynchronous.py`, (4) Sync wrapper in `synchronous.py`, (5) Update `__init__.py` if new class, (6) Examples + tests
 - **Changing connection:** Core lifecycle in `crates/core/src/client.rs` (`ClientRunner`)
 - **Changing subscriptions:** `SubscriptionsApiModule` at `crates/binary_options_tools/src/pocketoption/modules/subscriptions.rs`
 - **Adding a module:** Implement `ApiModule<S>` trait in `modules/`, register in `pocket_client.rs` router setup
 - **Lint commands:** Python = `ruff check && ruff format`. Rust = `cargo clippy && cargo fmt`
 - **Tests:** `pytest tests/python/` and `cargo test`
 - **Docs:** MkDocs at `mkdocs.yml`. Serve: `python -m mkdocs serve`
+

@@ -10,6 +10,10 @@ mod stream;
 mod validator;
 
 use config::PyConfig;
+use error::{
+    InvalidParameterError, NotAllowedError, PocketOptionError, TradeNotFoundError,
+    UninitializedError,
+};
 use framework::{PyBot, PyContext, PyStrategy, PyVirtualMarket};
 use logs::{start_tracing, LogBuilder, Logger, StreamLogsIterator, StreamLogsLayer};
 use pocketoption::{RawHandle, RawHandler, RawPocketOption, RawStreamIterator, StreamIterator};
@@ -38,5 +42,13 @@ fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyVirtualMarket>()?;
 
     m.add_function(wrap_pyfunction!(start_tracing, m)?)?;
+
+    // Register custom exceptions
+    m.add("PocketOptionError", m.py().get_type::<PocketOptionError>())?;
+    m.add("TradeNotFoundError", m.py().get_type::<TradeNotFoundError>())?;
+    m.add("UninitializedError", m.py().get_type::<UninitializedError>())?;
+    m.add("NotAllowedError", m.py().get_type::<NotAllowedError>())?;
+    m.add("InvalidParameterError", m.py().get_type::<InvalidParameterError>())?;
+
     Ok(())
 }

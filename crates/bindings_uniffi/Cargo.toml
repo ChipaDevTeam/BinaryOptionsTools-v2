@@ -9,7 +9,7 @@ documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
 description = "UniFFI bindings for binary-options-tools. Enables multi-language support (Kotlin, Swift, Python) for cross-platform binary options trading automation."
 keywords = ["binary-options", "uniffi", "cross-platform", "trading"]
 categories = ["api-bindings"]
-license-file = "../LICENSE"
+license-file = "../../LICENSE"
 
 [features]
 default = ["python", "swift", "go"]
@@ -32,15 +32,15 @@ name = "binary_options_tools_uni"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-uniffi = { version = "0.31.0", features = ["cli"] }
-binary_options_tools = { path = "../crates/binary_options_tools", version = "0.2.1" }
-tokio = { version = "1.50.0", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
-thiserror = "2.0.18"
-rust_decimal = "1.41.0"
-futures-util = "0.3.32"
-uuid = { version = "1.23.0", features = ["v4", "serde", "fast-rng"] }
-regex = "1.12.3"
+uniffi = { workspace = true }
+binary_options_tools = { path = "../binary_options_tools", version = "0.2.1" }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+rust_decimal = { workspace = true }
+futures-util = { workspace = true }
+uuid = { workspace = true }
+regex = { workspace = true }
 bo2_macros = { version = "0.1.0", path = "bo2_macros" }
 
 [build-dependencies]
-uniffi = { version = "0.31.0", features = ["build"] }
+uniffi = { workspace = true, features = ["build"] }
