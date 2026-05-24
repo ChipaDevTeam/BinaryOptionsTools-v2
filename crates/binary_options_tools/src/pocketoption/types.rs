@@ -542,6 +542,22 @@ pub struct FailOpenOrder {
     pub asset: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum RequestId {
+    Uuid(Uuid),
+    Number(u64),
+}
+
+impl fmt::Display for RequestId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RequestId::Uuid(id) => write!(f, "{id}"),
+            RequestId::Number(id) => write!(f, "{id}"),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenOrder {
@@ -568,7 +584,8 @@ pub struct Deal {
     pub refund_time: Option<Value>,
     pub refund_timestamp: Option<Value>,
     pub uid: u64,
-    pub request_id: Option<Uuid>,
+    #[serde(default)]
+    pub request_id: Option<RequestId>,
     pub amount: Decimal,
     pub profit: Decimal,
     pub percent_profit: i32,
