@@ -20,6 +20,7 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
     types::{Action, Deal, FailOpenOrder, MultiPatternRule, OpenOrder, RequestId},
+    utils::SocketIoFrame,
 };
 
 /// Command enum for the `TradesApiModule`.
@@ -280,26 +281,26 @@ impl ApiModule<State> for TradesApiModule {
                               info!(target: "TradesApiModule", "Trade opened: {}", deal.id);
 
                               let req_id = match deal.request_id.as_ref() {
-                                  Some(RequestId::Uuid(id)) => *id,
-                                  Some(RequestId::Number(_)) | None => Uuid::nil(),
+                                  Some(RequestId::Uuid(id)) => Some(*id),
+                                  Some(RequestId::Number(_)) | None => None,
                               };
 
                               // Clean up pending_market_orders in state and notify responder
-                              if let Some(req_id) = req_id {
-                                  self.state.trade_state.pending_market_orders.write().await.remove(&req_id);
+                              if let Some(id) = req_id {
+                                  self.state.trade_state.pending_market_orders.write().await.remove(&id);
 
-                                  if let Some(tracker) = self.pending_orders.remove(&req_id) {
+                                  if let Some(tracker) = self.pending_orders.remove(&id) {
                                       let _ = tracker.responder.send(Ok(*deal.clone()));
 
                                       let key = (tracker.asset, tracker.amount);
                                       if let Some(queue) = self.failure_matching.get_mut(&key) {
-                                          queue.retain(|&id| id != req_id);
+                                          queue.retain(|&pending_id| pending_id != id);
                                           if queue.is_empty() {
                                               self.failure_matching.remove(&key);
                                           }
                                       }
                                   } else {
-                                      warn!(target: "TradesApiModule", "Received success for unknown request ID: {}", req_id);
+                                      warn!(target: "TradesApiModule", "Received success for unknown request ID: {}", id);
                                   }
                               } else {
                                   warn!(target: "TradesApiModule", "Could not correlate successopenOrder for {} {}", deal.asset, deal.amount);
