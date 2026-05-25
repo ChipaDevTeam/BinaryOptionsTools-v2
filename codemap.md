@@ -9,14 +9,14 @@
 
 ## Architecture Overview
 
-| Layer                      | Path                                                | Description                                                                                                                                                                        |
-| -------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Layer                      | Path                           | Description                                                                                                                                                                        |
+| -------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Python SDK                 | `python/BinaryOptionsToolsV2/` | User-facing Python API. Two entrypoints: synchronous (`PocketOption`) and asynchronous (`PocketOptionAsync`). Wraps Rust FFI via pyo3.                                             |
-| PyO3 Bindings              | `crates/bindings_pyo3/src/`                    | Rust crate compiled as cdylib. Bridges Python ↔ Rust via pyo3 and pyo3-async-runtimes. Exposes `RawPocketOption`, `RawValidator`, `PyBot`, `PyStrategy`, `PyConfig`, `Logger` etc. |
-| Binary Options Tools Crate | `crates/binary_options_tools/`                      | High-level Rust library. Platform client implementations (PocketOption, ExpertOption), config, validator, framework (Bot/Strategy/Market), all platform-specific modules.          |
-| Core Crate                 | `crates/core/`                                      | Low-level WebSocket client framework. Connection lifecycle (`ClientRunner`), message routing (`Router`), middleware stack, signals, testing utilities, stream utilities.           |
-| Macros Crate               | `crates/macros/`                                    | Proc macros for serialization (`serialize!`/`deserialize!`), timeout, action, config, region, lightweight_module generation.                                                       |
-| UniFFI Bindings            | `crates/bindings_uniffi/`                            | Experimental UniFFI bindings for multi-language support (Kotlin, Swift, Go, Python, C#, Ruby, JS). Shares `binary_options_tools` as dependency.                                    |
+| PyO3 Bindings              | `crates/bindings_pyo3/src/`    | Rust crate compiled as cdylib. Bridges Python ↔ Rust via pyo3 and pyo3-async-runtimes. Exposes `RawPocketOption`, `RawValidator`, `PyBot`, `PyStrategy`, `PyConfig`, `Logger` etc. |
+| Binary Options Tools Crate | `crates/binary_options_tools/` | High-level Rust library. Platform client implementations (PocketOption, ExpertOption), config, validator, framework (Bot/Strategy/Market), all platform-specific modules.          |
+| Core Crate                 | `crates/core/`                 | Low-level WebSocket client framework. Connection lifecycle (`ClientRunner`), message routing (`Router`), middleware stack, signals, testing utilities, stream utilities.           |
+| Macros Crate               | `crates/macros/`               | Proc macros for serialization (`serialize!`/`deserialize!`), timeout, action, config, region, lightweight_module generation.                                                       |
+| UniFFI Bindings            | `crates/bindings_uniffi/`      | Experimental UniFFI bindings for multi-language support (Kotlin, Swift, Go, Python, C#, Ruby, JS). Shares `binary_options_tools` as dependency.                                    |
 
 ---
 
@@ -247,4 +247,3 @@ Some server events split into two WebSocket messages: (1) text header with `"_pl
 - **Lint commands:** Python = `ruff check && ruff format`. Rust = `cargo clippy && cargo fmt`
 - **Tests:** `pytest tests/python/` and `cargo test`
 - **Docs:** MkDocs at `mkdocs.yml`. Serve: `python -m mkdocs serve`
-

@@ -36,7 +36,7 @@ async def main(ssid: str):
                 current_price = float(candles[-1]['close'])
                 print(f"Current estimated price for {asset}: {current_price}")
             except (ValueError, KeyError, TypeError):
-                print(f"Error parsing candle price. Using fallback.")
+                print("Error parsing candle price. Using fallback.")
                 current_price = 1.0850
         else:
             print(f"Could not get candles for {asset}. Using a dummy price for testing.")

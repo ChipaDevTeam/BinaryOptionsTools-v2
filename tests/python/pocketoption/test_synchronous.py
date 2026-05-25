@@ -128,7 +128,6 @@ def test_sync_del_cleanup():
     ssid = os.getenv("POCKET_OPTION_SSID")
     if not ssid:
         pytest.skip("POCKET_OPTION_SSID not set")
-    import threading
 
     api = PocketOption(ssid)
     loop_thread = api._loop_thread

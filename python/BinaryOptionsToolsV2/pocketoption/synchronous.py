@@ -1,7 +1,6 @@
 import asyncio
 import json
 import threading
-import warnings
 from datetime import timedelta
 from typing import Dict, List, Optional, Tuple, Union
 

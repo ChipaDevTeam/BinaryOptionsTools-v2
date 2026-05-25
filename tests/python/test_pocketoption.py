@@ -1,5 +1,4 @@
 import pytest
-import asyncio
 import os
 from BinaryOptionsToolsV2 import PocketOption, PocketOptionAsync, Config
 

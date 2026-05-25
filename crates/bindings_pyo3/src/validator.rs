@@ -173,28 +173,6 @@ impl RawValidator {
     }
 }
 
-impl RawValidator {
-    fn call(&self, data: &str) -> bool {
-        match self {
-            RawValidator::None() => true,
-            RawValidator::Regex(validator) => validator.regex.is_match(data),
-            RawValidator::StartsWith(prefix) => data.starts_with(prefix),
-            RawValidator::EndsWith(suffix) => data.ends_with(suffix),
-            RawValidator::Contains(substring) => data.contains(substring),
-            RawValidator::All(validators) => validators.0.iter().all(|v| v.call(data)),
-            RawValidator::Any(validators) => validators.0.iter().any(|v| v.call(data)),
-            RawValidator::Not(validator) => !validator.0.call(data),
-            RawValidator::Custom(py_custom) => Python::attach(|py| {
-                let func = py_custom.custom.as_ref();
-                match func.call1(py, (data,)) {
-                    Ok(result) => result.extract::<bool>(py).unwrap_or_default(),
-                    Err(_) => false, // If the function call fails, return false
-                }
-            }),
-        }
-    }
-}
-
 impl From<RawValidator> for CrateValidator {
     fn from(validator: RawValidator) -> Self {
         match validator {

@@ -8,7 +8,6 @@ import os
 import pytest
 
 from BinaryOptionsToolsV2 import PocketOption, PocketOptionAsync
-from BinaryOptionsToolsV2.validator import Validator
 
 
 @pytest.mark.asyncio

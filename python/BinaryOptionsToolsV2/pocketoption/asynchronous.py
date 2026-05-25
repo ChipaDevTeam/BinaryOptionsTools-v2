@@ -9,7 +9,7 @@ from ..config import Config
 from ..validator import Validator
 
 if TYPE_CHECKING:
-    from ..BinaryOptionsToolsV2 import RawPocketOption
+    from ..BinaryOptionsToolsV2 import Logger, RawPocketOption
 
 if sys.version_info < (3, 10):
 

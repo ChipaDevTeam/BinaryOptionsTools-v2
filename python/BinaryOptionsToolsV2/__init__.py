@@ -1,6 +1,10 @@
 import importlib
 import os
 import sys
+from .config import Config as Config
+from . import tracing as tracing
+from . import validator as validator
+from .pocketoption import PocketOptionAsync, PocketOption, __all__ as __pocket_all__  # noqa: F401
 
 # Import the Rust module and re-export its attributes
 _rust_module = None
@@ -19,11 +23,6 @@ if _rust_module is not None:
 elif os.environ.get("PYTEST_CURRENT_TEST"):
     print(f"[ERROR] Rust extension module not found (__package__={__package__})")
 
-from .config import Config as Config
-from . import tracing as tracing
-from . import validator as validator
-from .pocketoption import PocketOptionAsync, PocketOption, __all__ as __pocket_all__
-
 # Names expected from the Rust cdylib; only those actually loaded will be available
 _rust_exported_names = [
     "RawPocketOption", "RawValidator", "RawHandler", "RawHandle",
@@ -34,4 +33,4 @@ _rust_exported_names = [
 ]
 __rust_all__ = [n for n in _rust_exported_names if n in globals()]
 
-__all__ = list(set(__pocket_all__ + ["tracing", "validator"] + __rust_all__))
+__all__ = list(set(__pocket_all__ + ["tracing", "validator", "PocketOptionAsync", "PocketOption"] + __rust_all__))

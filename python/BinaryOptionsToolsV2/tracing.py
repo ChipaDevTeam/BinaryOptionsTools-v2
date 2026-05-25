@@ -2,7 +2,6 @@ import json
 import os
 import sys
 import warnings
-from datetime import timedelta
 from typing import Optional
 
 
