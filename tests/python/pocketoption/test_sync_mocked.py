@@ -63,6 +63,10 @@ class MockPocketOptionAsync:
                 self.config.urls = []
             self.config.urls.insert(0, url)
 
+    @property
+    def client(self):
+        return self
+
     async def buy(self, asset, amount, time, check_win=False):
         trade_id, trade = (
             "trade_123",
@@ -83,7 +87,7 @@ class MockPocketOptionAsync:
             trade["profit"] = 1.5
         return trade_id, trade
 
-    async def check_win(self, trade_id):
+    async def check_win(self, trade_id, timeout_seconds=None):
         if trade_id == "not_found":
             raise Exception("Failed to find deal with ID: not_found")
         return {"id": trade_id, "profit": 1.5, "result": "win"}
@@ -133,7 +137,7 @@ class MockPocketOptionAsync:
         return {"ticket": ticket, "status": "cancelled"}
 
     async def cancel_pending_orders(self, tickets):
-        return [{"ticket": ticket, "status": "cancelled"} for ticket in tickets]
+        return {"cancelled": tickets}
 
     async def closed_deals(self):
         return [
@@ -180,7 +184,7 @@ class MockPocketOptionAsync:
 
         return subscription()
 
-    async def subscribe_symbol_chuncked(self, asset, chunk_size):
+    async def subscribe_symbol_chunked(self, asset, chunk_size):
         async def subscription():
             yield {"chunk": 1, "open": 1.1, "close": 1.2}
 
@@ -201,8 +205,8 @@ class MockPocketOptionAsync:
     async def _subscribe_symbol_inner(self, asset: str):
         return await self.subscribe_symbol(asset)
 
-    async def _subscribe_symbol_chuncked_inner(self, asset: str, chunk_size: int):
-        return await self.subscribe_symbol_chuncked(asset, chunk_size)
+    async def _subscribe_symbol_chunked_inner(self, asset: str, chunk_size: int):
+        return await self.subscribe_symbol_chunked(asset, chunk_size)
 
     async def _subscribe_symbol_timed_inner(self, asset: str, time):
         return await self.subscribe_symbol_timed(asset, time)
@@ -703,23 +707,63 @@ class TestOpenPendingOrder:
 
 
 class TestCancelPendingOrder:
-    """Tests for pending order cancellation methods."""
+    """Tests for cancel_pending_order method."""
 
     def test_cancel_pending_order_success(self, sync_client):
-        result = sync_client.cancel_pending_order(
-            "11111111-1111-1111-1111-111111111111"
-        )
+        """Test successful pending order cancellation."""
+        result = sync_client.cancel_pending_order("12345")
+        assert isinstance(result, dict)
+        assert result["ticket"] == "12345"
         assert result["status"] == "cancelled"
 
-    def test_cancel_pending_orders_success(self, sync_client):
-        results = sync_client.cancel_pending_orders(
-            [
-                "11111111-1111-1111-1111-111111111111",
-                "22222222-2222-2222-2222-222222222222",
-            ]
+    def test_cancel_pending_order_with_uuid(self, sync_client):
+        """Test cancellation with UUID ticket."""
+        ticket = "550e8400-e29b-41d4-a716-446655440000"
+        result = sync_client.cancel_pending_order(ticket)
+        assert isinstance(result, dict)
+        assert result["ticket"] == ticket
+
+    def test_cancel_pending_order_error(self, sync_client, mock_pocketoption_async):
+        """Test cancel_pending_order when cancellation fails."""
+        mock_pocketoption_async.cancel_pending_order = AsyncMock(
+            side_effect=Exception("Deal not found")
         )
-        assert len(results) == 2
-        assert all(result["status"] == "cancelled" for result in results)
+        with pytest.raises(Exception, match="Deal not found"):
+            sync_client.cancel_pending_order("99999")
+
+
+class TestCancelPendingOrders:
+    """Tests for cancel_pending_orders (multi-order) method."""
+
+    def test_cancel_pending_orders_success(self, sync_client):
+        """Test successful batch pending order cancellation."""
+        tickets = ["12345", "12346", "12347"]
+        result = sync_client.cancel_pending_orders(tickets)
+        assert isinstance(result, dict)
+        assert "cancelled" in result
+        assert len(result["cancelled"]) == 3
+
+    def test_cancel_pending_orders_partial(self, sync_client):
+        """Test batch cancellation with partial success."""
+        tickets = ["12345", "12346"]
+        result = sync_client.cancel_pending_orders(tickets)
+        assert isinstance(result, dict)
+        assert "cancelled" in result
+
+    def test_cancel_pending_orders_empty(self, sync_client):
+        """Test batch cancellation with empty list."""
+        result = sync_client.cancel_pending_orders([])
+        assert isinstance(result, dict)
+        assert "cancelled" in result
+        assert len(result["cancelled"]) == 0
+
+    def test_cancel_pending_orders_error(self, sync_client, mock_pocketoption_async):
+        """Test cancel_pending_orders when batch cancellation fails."""
+        mock_pocketoption_async.cancel_pending_orders = AsyncMock(
+            side_effect=Exception("Batch cancellation failed")
+        )
+        with pytest.raises(Exception, match="Batch cancellation failed"):
+            sync_client.cancel_pending_orders(["12345", "12346"])
 
 
 class TestClosedDeals:
@@ -832,15 +876,15 @@ class TestSubscriptions:
         assert sub is not None
         assert hasattr(sub, "__aiter__")
 
-    def test_subscribe_symbol_chuncked_success(self, sync_client):
-        """Test subscribe_symbol_chuncked with valid chunk size."""
-        sub = sync_client.subscribe_symbol_chuncked("EURUSD_otc", 10)
+    def test_subscribe_symbol_chunked_success(self, sync_client):
+        """Test subscribe_symbol_chunked with valid chunk size."""
+        sub = sync_client.subscribe_symbol_chunked("EURUSD_otc", 10)
         assert sub is not None
         assert hasattr(sub, "__aiter__")
 
-    def test_subscribe_symbol_chuncked_invalid_chunk(self, sync_client):
-        """Test subscribe_symbol_chuncked with invalid chunk size."""
-        sub = sync_client.subscribe_symbol_chuncked("EURUSD_otc", 0)
+    def test_subscribe_symbol_chunked_invalid_chunk(self, sync_client):
+        """Test subscribe_symbol_chunked with invalid chunk size."""
+        sub = sync_client.subscribe_symbol_chunked("EURUSD_otc", 0)
         assert sub is not None
 
     def test_subscribe_symbol_timed_success(self, sync_client):

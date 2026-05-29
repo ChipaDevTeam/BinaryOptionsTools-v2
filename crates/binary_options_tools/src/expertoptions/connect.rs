@@ -38,10 +38,10 @@ impl ConnectorTrait<State> for ExpertConnect {
         while let Some(result) = futures.next().await {
             match result {
                 Ok(stream) => {
-                    debug!(target: "PocketConnect", "Successfully connected to ExpertOptions");
+                    debug!(target: "ExpertConnect", "Successfully connected to ExpertOptions");
                     return Ok(stream);
                 }
-                Err((e, u)) => warn!(target: "PocketConnect", "Failed to connect to {}: {}", u, e),
+                Err((e, u)) => warn!(target: "ExpertConnect", "Failed to connect to {}: {}", u, e),
             }
         }
         Err(ConnectorError::Custom(

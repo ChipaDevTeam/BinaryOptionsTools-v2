@@ -14,23 +14,22 @@ pub enum MessageType {
     Pong,
 }
 
-
 impl MessageType {
     fn matches(&self, msg: &Message) -> bool {
-        match (self, msg) {
-            (MessageType::Text, Message::Text(_)) => true,
-            (MessageType::Binary, Message::Binary(_)) => true,
-            (MessageType::Close, Message::Close(_)) => true,
-            (MessageType::Ping, Message::Ping(_)) => true,
-            (MessageType::Pong, Message::Pong(_)) => true,
-            _ => false,
-        }
+        matches!(
+            (self, msg),
+            (MessageType::Text, Message::Text(_))
+                | (MessageType::Binary, Message::Binary(_))
+                | (MessageType::Close, Message::Close(_))
+                | (MessageType::Ping, Message::Ping(_))
+                | (MessageType::Pong, Message::Pong(_))
+        )
     }
 }
 
 impl TryFrom<String> for MessageType {
     type Error = CoreError;
-    
+
     fn try_from(value: String) -> CoreResult<MessageType> {
         match value.as_str() {
             "Text" => Ok(MessageType::Text),
@@ -50,7 +49,7 @@ pub enum TextMatcher {
     EndsWith(SmolStr),
     Contains(SmolStr),
     Exact(SmolStr),
-    Regex(String),
+    Regex(regex::Regex),
 }
 
 impl TextMatcher {
@@ -60,9 +59,7 @@ impl TextMatcher {
             TextMatcher::EndsWith(s) => text.ends_with(s.as_str()),
             TextMatcher::Contains(s) => text.contains(s.as_str()),
             TextMatcher::Exact(s) => text == s.as_str(),
-            TextMatcher::Regex(pattern) => regex::Regex::new(pattern)
-                .map(|re| re.is_match(text))
-                .unwrap_or(false),
+            TextMatcher::Regex(re) => re.is_match(text),
         }
     }
 }
@@ -184,6 +181,8 @@ impl Condition {
     }
 }
 
+type MessageTransform = Arc<dyn Fn(&Message) -> Option<Message> + Send + Sync>;
+
 /// Modifiers that transform the message before passing to inner rules.
 #[derive(Clone)]
 pub enum Modifier {
@@ -191,7 +190,7 @@ pub enum Modifier {
     RstripThen { suffix: SmolStr, inner: Box<Rule> },
     LstripUntil { target: SmolStr, inner: Box<Rule> },
     RstripUntil { target: SmolStr, inner: Box<Rule> },
-    Custom(Arc<dyn Fn(&Message) -> Option<Message> + Send + Sync>),
+    Custom(MessageTransform),
 }
 
 impl Modifier {
@@ -428,10 +427,12 @@ impl RuleBuilder {
         }
     }
 
-    pub fn text_regex(pattern: impl Into<String>) -> Self {
+    pub fn text_regex(pattern: impl AsRef<str>) -> Self {
         Self {
             inner: Rule::Matcher {
-                matcher: Matcher::Text(TextMatcher::Regex(pattern.into())),
+                matcher: Matcher::Text(TextMatcher::Regex(
+                    regex::Regex::new(pattern.as_ref()).expect("Invalid regex in RuleBuilder"),
+                )),
                 conditions: vec![],
             },
         }
@@ -635,20 +636,25 @@ impl RuleBuilder {
         }
     }
 
-    pub fn not(self) -> Self {
+    pub fn build(self) -> Rule {
+        self.inner
+    }
+}
+
+impl std::ops::Not for RuleBuilder {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
         Self {
             inner: Rule::Combinator(Combinator::Not(Box::new(self.inner))),
         }
-    }
-
-    pub fn build(self) -> Rule {
-        self.inner
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ops::Not;
 
     #[test]
     fn test_text_starts_with() {

@@ -134,6 +134,42 @@ impl fmt::Debug for Ssid {
     }
 }
 
+use regex::Regex;
+use std::sync::OnceLock;
+
+static KEY_REGEX: OnceLock<Regex> = OnceLock::new();
+static VAL_REGEX: OnceLock<Regex> = OnceLock::new();
+
+fn recover_json(input: &str) -> String {
+    let key_re =
+        KEY_REGEX.get_or_init(|| Regex::new(r"([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:").unwrap());
+    let val_re = VAL_REGEX.get_or_init(|| Regex::new(r"(:)\s*([a-zA-Z0-9._-]+)(\s*[,}])").unwrap());
+
+    // 1. Quote unquoted keys
+    let intermediate = key_re.replace_all(input, "$1\"$2\":");
+
+    // 2. Quote unquoted alphanumeric values (excluding true/false/null/numbers)
+    val_re
+        .replace_all(&intermediate, |caps: &regex::Captures| {
+            let prefix = &caps[1];
+            let val = &caps[2];
+            let suffix = &caps[3];
+
+            let val_lower = val.to_lowercase();
+            if val_lower == "true"
+                || val_lower == "false"
+                || val_lower == "null"
+                || (val.contains('.') && val.parse::<f64>().is_ok())
+                || val.parse::<i64>().is_ok()
+            {
+                format!("{}{}{}", prefix, val, suffix)
+            } else {
+                format!("{}\"{}\"{}", prefix, val, suffix)
+            }
+        })
+        .to_string()
+}
+
 impl Ssid {
     /// Parses a raw SSID string from PocketOption
     ///
@@ -155,23 +191,62 @@ impl Ssid {
         let prefix = "42[\"auth\",";
 
         let parsed = if let Some(stripped) = trimmed.strip_prefix(prefix) {
-            stripped.strip_suffix("]").ok_or_else(|| {
+            let inner = stripped.strip_suffix("]").ok_or_else(|| {
                 CoreError::SsidParsing("Error parsing ssid: missing closing bracket".into())
-            })?
+            })?;
+            // Detect double-encoding: payload is a quoted string literal (JSON-in-JSON)
+            if inner.starts_with('"') && inner.ends_with('"') {
+                return Err(CoreError::SsidParsing(
+                    "Invalid SSID format: double-encoding detected".into(),
+                ));
+            }
+            inner
         } else {
             trimmed
         };
 
-        let mut ssid: Demo = serde_json::from_str(parsed)
-            .map_err(|e| CoreError::SsidParsing(format!("JSON parsing error: {e}")))?;
+        // Track whether recovery was used and what the recovered string is
+        let mut used_recovery = false;
+        let mut recovered_parsed = String::new();
 
-        // Ensure raw is always in the full 42["auth",...] format for sending over WS
-        ssid.raw = if trimmed.starts_with("42[\"auth\",") {
-            trimmed.to_string()
-        } else {
-            format!("42[\"auth\",{}]", trimmed)
+        let mut ssid: Demo = match serde_json::from_str(parsed) {
+            Ok(s) => s,
+            Err(e) => {
+                // Try recovery: quote unquoted keys and alphanumeric values
+                let recovered = recover_json(parsed);
+                match serde_json::from_str(&recovered) {
+                    Ok(s) => {
+                        tracing::debug!(target: "Ssid", "JSON recovery succeeded for malformed SSID");
+                        used_recovery = true;
+                        recovered_parsed = recovered;
+                        s
+                    }
+                    Err(re) => {
+                        tracing::debug!(target: "Ssid", "Recovery failed. Original error: {:?}, Recovery error: {:?}", e, re);
+                        return Err(CoreError::SsidParsing(format!(
+                            "JSON parsing error: {e} (Recovery also failed: {re})"
+                        )));
+                    }
+                }
+            }
         };
-        ssid.json_raw = parsed.to_string();
+
+        // Normalize raw to well-formed JSON. When recovery was used, re-serialize
+        // the parsed Demo struct so ssid.raw always contains canonical JSON rather
+        // than the original malformed input that triggered recovery.
+        if used_recovery {
+            let canonical =
+                serde_json::to_string(&ssid).unwrap_or_else(|_| recovered_parsed.clone());
+            ssid.raw = format!("42[\"auth\",{}]", canonical);
+            ssid.json_raw = canonical;
+        } else {
+            ssid.raw = if trimmed.starts_with("42[\"auth\",") {
+                trimmed.to_string()
+            } else {
+                format!("42[\"auth\",{}]", parsed)
+            };
+            ssid.json_raw = parsed.to_string();
+        }
 
         let is_demo_url = ssid
             .current_url
@@ -389,5 +464,132 @@ mod tests {
         assert!(err
             .to_string()
             .contains("Invalid SSID format: double-encoding detected"));
+    }
+
+    #[test]
+    fn test_parse_ssid_recovery() -> Result<(), Box<dyn Error>> {
+        // SSID with unquoted keys and unquoted alphanumeric values (simulating shell stripping)
+        let stripped_ssid = r#"42["auth", {session: swag, isDemo: 1, uid: 12345678, platform: 2, isFastHistory: true, isOptimized: true}]"#;
+
+        let parsed = Ssid::parse(stripped_ssid)?;
+        assert_eq!(parsed.session_id(), "swag");
+        assert_eq!(parsed.demo(), true);
+
+        // Round-trip: to_string() should produce valid JSON that re-parses identically
+        let emitted = parsed.to_string();
+        let reparsed = Ssid::parse(&emitted)?;
+        assert_eq!(reparsed.session_id(), parsed.session_id());
+        assert_eq!(reparsed.demo(), parsed.demo());
+        assert!(emitted.starts_with("42[\"auth\","));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_provided_auth_message() -> Result<(), Box<dyn std::error::Error>> {
+        let auth_msg = r#"42["auth",{"session":"dummy_session_id","isDemo":1,"uid":12345678,"platform":2,"isFastHistory":true,"isOptimized":true}]"#;
+        let parsed = Ssid::parse(auth_msg)?;
+        
+        match parsed {
+            Ssid::Demo(ref demo) => {
+                assert_eq!(demo.session, "dummy_session_id");
+                assert_eq!(demo.uid, 12345678);
+                assert_eq!(demo.is_demo, 1);
+                assert_eq!(demo.platform, 2);
+                assert_eq!(demo.is_fast_history, Some(true));
+                assert_eq!(demo.is_optimized, Some(true));
+            },
+            Ssid::Real(_) => panic!("Expected Demo SSID, got Real"),
+        }
+        
+        let reconstructed = parsed.to_string();
+        assert!(reconstructed.starts_with("42[\"auth\","));
+        assert!(reconstructed.contains("\"isFastHistory\":true"));
+        assert!(reconstructed.contains("\"isOptimized\":true"));
+        
+        Ok(())
+    }
+
+    /// Read a demo SSID from the `POCKET_OPTION_SSID` environment variable.
+    /// Returns `None` if unset so tests can skip gracefully.
+    fn demo_ssid_from_env() -> Option<String> {
+        std::env::var("POCKET_OPTION_SSID").ok()
+    }
+
+    #[test]
+    fn test_demo_ssid_from_env_exact() -> Result<(), Box<dyn std::error::Error>> {
+        let raw = match demo_ssid_from_env() {
+            Some(v) => v,
+            None => return Ok(()),
+        };
+        let parsed = Ssid::parse(&raw)?;
+        assert!(parsed.demo(), "Provided SSID must be a demo account");
+        assert!(parsed.session_id().len() > 4);
+
+        let reconstructed = parsed.to_string();
+        assert!(reconstructed.starts_with("42[\"auth\","));
+        assert!(reconstructed.contains(&format!("\"session\":\"{}\"", parsed.session_id())));
+        assert!(reconstructed.contains("\"isFastHistory\":true") || reconstructed.contains("\"isFastHistory\":false"));
+        assert!(reconstructed.contains("\"isOptimized\":true") || reconstructed.contains("\"isOptimized\":false"));
+
+        let re_parsed = Ssid::parse(&reconstructed)?;
+        assert_eq!(re_parsed.session_id(), parsed.session_id());
+        assert_eq!(re_parsed.demo(), parsed.demo());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_demo_ssid_from_env_json_only() -> Result<(), Box<dyn std::error::Error>> {
+        let raw = match demo_ssid_from_env() {
+            Some(v) => v,
+            None => return Ok(()),
+        };
+        let parsed = Ssid::parse(&raw)?;
+        let session_id = parsed.session_id();
+
+        // Strip the 42["auth",...] wrapper to test JSON-only parsing
+        let json_only = if let Some(stripped) = raw.strip_prefix("42[\"auth\",") {
+            stripped.strip_suffix("]").unwrap_or(&raw)
+        } else {
+            &raw
+        };
+
+        let parsed_json = Ssid::parse(json_only)?;
+        assert_eq!(parsed_json.session_id(), session_id);
+        assert_eq!(parsed_json.demo(), true);
+
+        let reconstructed = parsed_json.to_string();
+        assert!(reconstructed.starts_with("42[\"auth\","));
+        let re_parsed = Ssid::parse(&reconstructed)?;
+        assert_eq!(re_parsed.session_id(), session_id);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_demo_ssid_current_url_demo() -> Result<(), Box<dyn std::error::Error>> {
+        let raw = r#"42["auth",{"session":"demo_session","isDemo":0,"uid":1111,"platform":2,"currentUrl":"wss://wsdemo.pocketoption.com"}]"#;
+        let parsed = Ssid::parse(raw)?;
+        assert!(parsed.demo(), "Should detect demo via currentUrl containing 'demo'");
+        assert_eq!(parsed.current_url(), Some("wss://wsdemo.pocketoption.com".into()));
+        Ok(())
+    }
+
+    #[test]
+    fn test_ssid_rejects_double_quoted_inner() {
+        let malicious = r#"42["auth","{\"session\":\"x\",\"isDemo\":1,\"uid\":1,\"platform\":2}"]"#;
+        let result = Ssid::parse(malicious);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("double-encoding"));
+    }
+
+    #[test]
+    fn test_ssid_rejects_single_quoted() {
+        let malicious = r#"'some_string_ssid'"#;
+        let result = Ssid::parse(malicious);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("double-encoding"));
     }
 }

@@ -69,13 +69,13 @@ jobs:
           # --zig handles the cross-compilation and linking for GLIBC/MUSL
           args: --release --strip --out dist -i python3.13 --zig
           manylinux: ${{ matrix.libc }}
-          working-directory: BinaryOptionsToolsV2
+          working-directory: python
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-linux-${{ matrix.target }}
-          path: BinaryOptionsToolsV2/dist
+          path: python/dist
 
   # --- 2. WINDOWS BUILD ---
   windows:
@@ -97,12 +97,12 @@ jobs:
         with:
           target: ${{ matrix.target }}
           args: --release --strip --out dist -i python3.13
-          working-directory: BinaryOptionsToolsV2
+          working-directory: python
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-${{ matrix.target }}
-          path: BinaryOptionsToolsV2/dist
+          path: python/dist
 
   # --- 3. MACOS BUILD ---
   macos:
@@ -119,12 +119,12 @@ jobs:
         with:
           target: universal2-apple-darwin
           args: --release --strip --out dist -i python3.13
-          working-directory: BinaryOptionsToolsV2
+          working-directory: python
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-macos
-          path: BinaryOptionsToolsV2/dist
+          path: python/dist
 
   # --- 4. SOURCE DISTRIBUTION ---
   sdist:
@@ -137,13 +137,13 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --out dist -m rust/Cargo.toml
-          working-directory: BinaryOptionsToolsV2
+          args: --out dist
+          working-directory: python
       - name: Upload sdist
         uses: actions/upload-artifact@v4
         with:
           name: wheels-sdist
-          path: BinaryOptionsToolsV2/dist
+          path: python/dist
 
   # --- 5. AUTOMATED RELEASE ---
   release:
@@ -168,10 +168,10 @@ jobs:
 
       - name: Get Version from Cargo.toml
         id: get_version
-        working-directory: BinaryOptionsToolsV2
+        working-directory: python
         run: |
           # The runner has python3 installed; tomllib is built-in since 3.11
-          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('rust/Cargo.toml', 'rb'))['package']['version'])")
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('../crates/bindings_pyo3/Cargo.toml', 'rb'))['package']['version'])")
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "TAG=v$VERSION" >> $GITHUB_OUTPUT
 

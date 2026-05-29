@@ -6,7 +6,7 @@ use crate::signals::Signals;
 use crate::traits::{ApiModule, AppState, ReconnectCallback, Rule, RunnerCommand};
 use futures_util::{stream::StreamExt, SinkExt};
 use kanal::{AsyncReceiver, AsyncSender};
-use rand::Rng;
+use rand::RngExt;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::future::Future;
@@ -210,6 +210,25 @@ impl<S: AppState> Client<S> {
             .await?)
     }
 
+    /// Commands the runner to disconnect and stay disconnected until explicitly commanded to reconnect.
+    ///
+    /// Unlike `disconnect()`, this prevents automatic reconnection.
+    /// Use `connect()` to resume the connection.
+    pub async fn disconnect_and_hold(&self) -> CoreResult<()> {
+        Ok(self
+            .runner_command_tx
+            .send(RunnerCommand::DisconnectAndHold)
+            .await?)
+    }
+
+    /// Commands the runner to establish a new connection after a hold-disconnect.
+    ///
+    /// This command is only effective after `disconnect_and_hold()` has been called.
+    /// In other states, it may be ignored or treated as a no-op.
+    pub async fn connect(&self) -> CoreResult<()> {
+        Ok(self.runner_command_tx.send(RunnerCommand::Connect).await?)
+    }
+
     /// Commands the runner to disconnect, and perform a "soft" reconnect.
     pub async fn reconnect(&self) -> CoreResult<()> {
         Ok(self
@@ -220,26 +239,30 @@ impl<S: AppState> Client<S> {
 
     /// Commands the runner to shutdown, this action is final as the runner and client will stop working and will be dropped.
     pub async fn shutdown(self) -> CoreResult<()> {
-        self.runner_command_tx
-            .send(RunnerCommand::Shutdown)
-            .await
-            .inspect_err(|e| {
-                error!(target: "Client", "Failed to send shutdown command: {e}");
-            })?;
+        match self.runner_command_tx.send(RunnerCommand::Shutdown).await {
+            Ok(_) => {
+                info!(target: "Client", "Runner shutdown command sent.");
+            }
+            Err(e) => {
+                // Channel may already be closed if connection dropped
+                warn!(target: "Client", "Failed to send shutdown command (channel may be closed): {e}");
+            }
+        }
         drop(self);
-        info!(target: "Client", "Runner shutdown command sent.");
         Ok(())
     }
 
     /// Commands the runner to shutdown without consuming the client.
     pub async fn shutdown_ref(&self) -> CoreResult<()> {
-        self.runner_command_tx
-            .send(RunnerCommand::Shutdown)
-            .await
-            .inspect_err(|e| {
-                error!(target: "Client", "Failed to send shutdown command: {e}");
-            })?;
-        info!(target: "Client", "Runner shutdown command sent (via ref).");
+        match self.runner_command_tx.send(RunnerCommand::Shutdown).await {
+            Ok(_) => {
+                info!(target: "Client", "Runner shutdown command sent (via ref).");
+            }
+            Err(e) => {
+                // Channel may already be closed if connection dropped
+                warn!(target: "Client", "Failed to send shutdown command (channel may be closed): {e}");
+            }
+        }
         Ok(())
     }
 
@@ -262,25 +285,26 @@ impl<S: AppState> Client<S> {
     }
 }
 
-// --- The Background Worker ---
+const CONNECTION_STABLE_RESET_SECS: u64 = 10;
+const BACKOFF_BASE_SECS: u64 = 5;
+const BACKOFF_MAX_SECS: u64 = 3600;
+const BACKOFF_EXPONENT_CAP: u32 = 10;
+
 /// Implementation of the `ClientRunner` for managing WebSocket client connections and session lifecycle.
 pub struct ClientRunner<S: AppState> {
-    /// Notify the client of connection status changes.
     pub(crate) signal: Signals,
     pub(crate) connector: Arc<dyn Connector<S>>,
     pub(crate) router: Arc<Router<S>>,
     pub(crate) state: Arc<S>,
-    // Flag to determine if the next connection is a fresh one.
     pub(crate) is_hard_disconnect: bool,
-    // Flag to terminate the main run loop.
     pub(crate) shutdown_requested: bool,
+    pub(crate) is_hold_disconnect: bool,
 
     pub(crate) connection_callback: ConnectionCallback<S>,
     pub(crate) to_ws_sender: AsyncSender<Message>,
     pub(crate) to_ws_receiver: AsyncReceiver<Message>,
     pub(crate) runner_command_rx: AsyncReceiver<RunnerCommand>,
 
-    // Track reconnection attempts for exponential backoff
     pub(crate) reconnect_attempts: u32,
 
     pub(crate) max_allowed_loops: u32,
@@ -288,23 +312,88 @@ pub struct ClientRunner<S: AppState> {
 }
 
 impl<S: AppState> ClientRunner<S> {
-    /// Main client runner loop that manages WebSocket connections and message processing.
+    /// Tear down the current session: run middleware, disconnect connector, abort tasks.
+    async fn teardown_session(
+        &mut self,
+        writer_task: &mut Option<tokio::task::JoinHandle<()>>,
+        reader_task: &mut Option<tokio::task::JoinHandle<()>>,
+        hold: bool,
+    ) {
+        let ctx = MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
+        self.router.middleware_stack.on_disconnect(&ctx).await;
+
+        if let Err(e) = self.connector.disconnect().await {
+            warn!(target: "Runner", "Connector disconnect failed: {e}");
+        }
+
+        self.state.clear_temporal_data().await;
+        self.is_hard_disconnect = true;
+        self.is_hold_disconnect = hold;
+
+        if let Some(t) = writer_task.take() { t.abort(); }
+        if let Some(t) = reader_task.take() { t.abort(); }
+
+        self.signal.set_disconnected();
+    }
+
+    async fn handle_command(
+        &mut self,
+        cmd: RunnerCommand,
+        writer_task: &mut Option<tokio::task::JoinHandle<()>>,
+        reader_task: &mut Option<tokio::task::JoinHandle<()>>,
+    ) -> bool {
+        match cmd {
+            RunnerCommand::Disconnect => {
+                debug!(target: "Runner", "Disconnect command received (will reconnect).");
+                self.teardown_session(writer_task, reader_task, false).await;
+                false
+            }
+            RunnerCommand::DisconnectAndHold => {
+                debug!(target: "Runner", "DisconnectAndHold command received (will NOT reconnect).");
+                self.teardown_session(writer_task, reader_task, true).await;
+                false
+            }
+            RunnerCommand::Shutdown => {
+                debug!(target: "Runner", "Shutdown command received.");
+                self.teardown_session(writer_task, reader_task, false).await;
+                self.shutdown_requested = true;
+                false
+            }
+            _ => true,
+        }
+    }
+
     pub async fn run(&mut self) {
-        // TODO: Add a way to disconnect and keep the connection closed intill specified otherwhise
-        // The outermost loop runs until a shutdown is commanded.
         while !self.shutdown_requested {
-            // Execute middleware on_connect hook
+            if self.is_hold_disconnect {
+                debug!(target: "Runner", "In hold-disconnect mode, waiting for Connect command...");
+                match self.runner_command_rx.recv().await {
+                    Ok(RunnerCommand::Connect) | Ok(RunnerCommand::Reconnect) => {
+                        debug!(target: "Runner", "Connect command received, exiting hold mode.");
+                        self.is_hold_disconnect = false;
+                        self.is_hard_disconnect = true;
+                        continue;
+                    }
+                    Ok(RunnerCommand::Shutdown) => {
+                        debug!(target: "Runner", "Shutdown command received while in hold mode.");
+                        self.shutdown_requested = true;
+                        break;
+                    }
+                    Ok(_) => continue,
+                    Err(_) => {
+                        error!(target: "Runner", "Runner command channel closed while in hold mode.");
+                        self.shutdown_requested = true;
+                        break;
+                    }
+                }
+            }
+
             let middleware_context =
                 MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
             debug!(target: "Runner", "Starting connection cycle...");
 
-            // Call middleware to record connection attempt
-            self.router
-                .middleware_stack
-                .record_connection_attempt(&middleware_context)
-                .await;
+            self.router.middleware_stack.record_connection_attempt(&middleware_context).await;
 
-            // Use the correct connection method based on the flag.
             let stream_result = if self.is_hard_disconnect {
                 self.connector.connect(self.state.clone()).await
             } else {
@@ -316,27 +405,21 @@ impl<S: AppState> ClientRunner<S> {
                 Err(e) => {
                     self.reconnect_attempts += 1;
 
-                    if self.max_allowed_loops > 0
-                        && self.reconnect_attempts >= self.max_allowed_loops
-                    {
+                    if self.max_allowed_loops > 0 && self.reconnect_attempts >= self.max_allowed_loops {
                         error!(target: "Runner", "Maximum reconnection attempts ({}) reached. Shutting down.", self.max_allowed_loops);
                         self.shutdown_requested = true;
                         break;
                     }
 
-                    // Use configured reconnect_delay with exponential backoff if it's > 0, else use a default
                     let base_delay = if self.reconnect_delay.as_secs() > 0 {
                         self.reconnect_delay.as_secs()
                     } else {
-                        5
+                        BACKOFF_BASE_SECS
                     };
 
-                    let delay_secs = std::cmp::min(
-                        base_delay
-                            .saturating_mul(2u64.saturating_pow(self.reconnect_attempts.min(10))),
-                        300,
-                    );
-                    // Add jitter
+                    let exponent = self.reconnect_attempts.min(BACKOFF_EXPONENT_CAP);
+                    let multiplier = 2u64.saturating_pow(exponent);
+                    let delay_secs = base_delay.saturating_mul(multiplier).min(BACKOFF_MAX_SECS);
                     let jitter = rand::rng().random_range(0.8..1.2);
                     let delay = std::time::Duration::from_secs_f64(delay_secs as f64 * jitter);
 
@@ -345,58 +428,33 @@ impl<S: AppState> ClientRunner<S> {
                         if self.max_allowed_loops > 0 { self.max_allowed_loops.to_string() } else { "∞".to_string() },
                         delay);
                     tokio::time::sleep(delay).await;
-                    // On failure, the next attempt is a reconnect, not a hard connect.
                     self.is_hard_disconnect = false;
-                    continue; // Restart the connection cycle.
+                    continue;
                 }
             };
 
-            // 🎯 MIDDLEWARE HOOK: on_connect - called after successful connection
-            // Location: After WebSocket connection is established
             debug!(target: "Runner", "Connection successful.");
             self.signal.set_connected();
 
-            // Track connection start time to reset attempts only if stable
             let connection_start = std::time::Instant::now();
             let mut attempts_reset = false;
-            self.router
-                .middleware_stack
-                .on_connect(&middleware_context)
-                .await;
+            self.router.middleware_stack.on_connect(&middleware_context).await;
 
-            // Execute the correct callback.
             if self.is_hard_disconnect {
                 debug!(target: "Runner", "Executing on_connect callback.");
-                // Handle any error from on_connect
-                if let Err(err) =
-                    (self.connection_callback.on_connect)(self.state.clone(), &self.to_ws_sender)
-                        .await
-                {
-                    warn!(
-                        target: "Runner",
-                        "on_connect callback failed: {err:#?}"
-                    );
+                if let Err(err) = (self.connection_callback.on_connect)(self.state.clone(), &self.to_ws_sender).await {
+                    warn!(target: "Runner", "on_connect callback failed: {err:#?}");
                 }
             } else {
                 debug!(target: "Runner", "Executing on_reconnect callback.");
-                // Handle any error from on_reconnect
-                if let Err(err) = self
-                    .connection_callback
-                    .on_reconnect
-                    .call(self.state.clone(), &self.to_ws_sender)
-                    .await
-                {
-                    warn!(
-                        target: "Runner",
-                        "on_reconnect callback failed: {err:#?}"
-                    );
+                if let Err(err) = self.connection_callback.on_reconnect.call(self.state.clone(), &self.to_ws_sender).await {
+                    warn!(target: "Runner", "on_reconnect callback failed: {err:#?}");
                 }
-            } // A successful connection means the next one is a "reconnect" unless told otherwise.
+            }
             self.is_hard_disconnect = false;
 
             let (mut ws_writer, mut ws_reader) = ws_stream.split();
 
-            // 🎯 MIDDLEWARE HOOK: on_send - called in writer task for outgoing messages
             let writer_task = tokio::spawn({
                 let to_ws_rx = self.to_ws_receiver.clone();
                 let router = Arc::clone(&self.router);
@@ -405,11 +463,7 @@ impl<S: AppState> ClientRunner<S> {
                 async move {
                     let middleware_context = MiddlewareContext::new(state, to_ws_sender);
                     while let Ok(msg) = to_ws_rx.recv().await {
-                        // Execute middleware on_send hook
-                        router
-                            .middleware_stack
-                            .on_send(&msg, &middleware_context)
-                            .await;
+                        router.middleware_stack.on_send(&msg, &middleware_context).await;
                         if ws_writer.send(msg).await.is_err() {
                             error!(target: "Runner", "WebSocket writer task failed to send message.");
                             break;
@@ -420,7 +474,7 @@ impl<S: AppState> ClientRunner<S> {
 
             let reader_task = tokio::spawn({
                 let to_ws_sender = self.to_ws_sender.clone();
-                let router = Arc::clone(&self.router); // Use Arc for sharing
+                let router = Arc::clone(&self.router);
                 async move {
                     while let Some(Ok(msg)) = ws_reader.next().await {
                         if let Err(e) = router.route(Arc::new(msg), &to_ws_sender).await {
@@ -430,20 +484,12 @@ impl<S: AppState> ClientRunner<S> {
                 }
             });
 
-            // --- Active Session Loop ---
-            // This loop runs as long as the connection is stable or no commands are received.
             let mut writer_task_opt = Some(writer_task);
             let mut reader_task_opt: Option<tokio::task::JoinHandle<()>> = Some(reader_task);
-
             let mut session_active = true;
 
-            // Temporal timer so we i can check the duration of a connection
-            // let temporal_timer = std::time::Instant::now();
             while session_active {
-                // Reset reconnect attempts if connection has been stable for > 10s
-                if !attempts_reset
-                    && connection_start.elapsed() > std::time::Duration::from_secs(10)
-                {
+                if !attempts_reset && connection_start.elapsed() > std::time::Duration::from_secs(CONNECTION_STABLE_RESET_SECS) {
                     self.reconnect_attempts = 0;
                     attempts_reset = true;
                     debug!(target: "Runner", "Connection stable, resetting reconnect attempts.");
@@ -453,58 +499,8 @@ impl<S: AppState> ClientRunner<S> {
                     biased;
 
                     Ok(cmd) = self.runner_command_rx.recv() => {
-                        match cmd {
-                            RunnerCommand::Disconnect => {
-                                // 🎯 MIDDLEWARE HOOK: on_disconnect - manual disconnect
-
-                                debug!(target: "Runner", "Disconnect command received.");
-
-                                // Execute middleware on_disconnect hook
-                                let middleware_context = MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
-                                self.router.middleware_stack.on_disconnect(&middleware_context).await;
-
-                                // Call connector's disconnect method to properly close the connection
-                                if let Err(e) = self.connector.disconnect().await {
-                                    warn!(target: "Runner", "Connector disconnect failed: {e}");
-                                }
-
-
-                                self.state.clear_temporal_data().await;
-                                self.is_hard_disconnect = true;
-                                if let Some(writer_task) = writer_task_opt.take() {
-                                    writer_task.abort();
-                                }
-                                if let Some(reader_task) = reader_task_opt.take() {
-                                    reader_task.abort();
-                                }
-                                self.signal.set_disconnected();
-                                session_active = false;
-                            },
-                            RunnerCommand::Shutdown => {
-                                // 🎯 MIDDLEWARE HOOK: on_disconnect - shutdown
-
-                                debug!(target: "Runner", "Shutdown command received.");
-
-                                // Execute middleware on_disconnect hook
-                                let middleware_context = MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
-                                self.router.middleware_stack.on_disconnect(&middleware_context).await;
-
-                                // Call connector's disconnect method to properly close the connection
-                                if let Err(e) = self.connector.disconnect().await {
-                                    warn!(target: "Runner", "Connector disconnect failed: {e}");
-                                }
-
-                                self.shutdown_requested = true;
-                                if let Some(writer_task) = writer_task_opt.take() {
-                                    writer_task.abort();
-                                }
-                                if let Some(reader_task) = reader_task_opt.take() {
-                                    reader_task.abort();
-                                }
-                                self.signal.set_disconnected();
-                                session_active = false;
-                            }
-                            _ => {}
+                        if !self.handle_command(cmd, &mut writer_task_opt, &mut reader_task_opt).await {
+                            session_active = false;
                         }
                     },
                     _ = async {
@@ -512,28 +508,17 @@ impl<S: AppState> ClientRunner<S> {
                             let _ = reader_task.await;
                         }
                     } => {
-                        // 🎯 MIDDLEWARE HOOK: on_disconnect - unexpected connection loss
                         warn!(target: "Runner", "Connection lost unexpectedly.");
-
-                        // Execute middleware on_disconnect hook
-                        let middleware_context = MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
-                        self.router.middleware_stack.on_disconnect(&middleware_context).await;
-
-                        if let Some(writer_task) = writer_task_opt.take() {
-                            writer_task.abort();
-                        }
-                        if let Some(reader_task) = reader_task_opt.take() {
-                            // Already finished, but abort for completeness
-                            reader_task.abort();
-                        }
+                        let ctx = MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
+                        self.router.middleware_stack.on_disconnect(&ctx).await;
+                        if let Some(t) = writer_task_opt.take() { t.abort(); }
+                        if let Some(t) = reader_task_opt.take() { t.abort(); }
                         self.signal.set_disconnected();
                         session_active = false;
-                        // panic!("Connection lost unexpectedly, exiting session loop. Duration: {:?}", temporal_timer.elapsed());
                     }
                 }
             }
         }
-
         debug!(target: "Runner", "Shutdown complete.");
     }
 }

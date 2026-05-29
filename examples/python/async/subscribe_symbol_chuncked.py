@@ -7,7 +7,7 @@ from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 async def main(ssid: str):
     # The api automatically detects if the 'ssid' is for real or demo account
     api = PocketOptionAsync(ssid)
-    stream = await api.subscribe_symbol_chuncked(
+    stream = await api.subscribe_symbol_chunked(
         "EURUSD_otc", 15
     )  # Returns a candle obtained from combining 15 (chunk_size) candles
 

@@ -5,6 +5,34 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.10] - 2026-03-22
+
+### Added
+
+- Rule macro system with DSL support for ergonomic rule definitions (`#[rule({ starts_with("42") & !contains("error") })]`)
+- Per-language documentation macro for BinaryOptionsToolsUni crate
+- Demo test example for verifying library functionality (connection, subscriptions, candle fetching)
+- Trade state regression test
+- Documentation JSON files for API modules (error, pocket_option, raw_handler, stream, types, validator)
+- Max subscriptions configuration in State builder (default: 4)
+- Memory pruning for closed deals (limit to 1000) to prevent memory growth
+
+### Changed
+
+- **Major core crate refactoring**: Removed `core-pre` crate and consolidated into `core` crate
+- Improved SSID parsing with double-encoding detection and regex recovery for malformed JSON
+- Enhanced deals module with better Socket.IO frame handling and message pattern matching
+- Refactored historical data module for improved reliability
+- Updated README with new Python bot framework examples and corrected version support
+- Updated Python version support (dropped 3.8, 3.13, 3.14, 3.15)
+- Dependency updates across multiple directories
+
+### Fixed
+
+- Fixed check win functionality
+- Fixed documentation errors in Rust source
+- Fixed source distribution (sdist) build
+
 ## [0.2.9] - 2026-03-09
 
 ### Added
@@ -214,6 +242,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [PyPI Package](https://pypi.org/project/binaryoptionstoolsv2/)
 - [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/)
 
+[0.2.10]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.10
+[0.2.9]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.9
+[0.2.8]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.8
 [0.2.6]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.6
 [0.2.5]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.5
 [0.2.4]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.4

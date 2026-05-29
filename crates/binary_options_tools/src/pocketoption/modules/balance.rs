@@ -54,25 +54,42 @@ impl LightweightModule<State> for BalanceModule {
                         self.state.set_balance(balance_msg.balance).await;
                     } else if let Some(start) = text.find('[') {
                         // Try to parse as a 1-step Socket.IO message: 42["successupdateBalance", {...}]
-                        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text[start..])
-                        {
-                            if let Some(arr) = value.as_array() {
-                                if arr.len() >= 2 && arr[0] == "successupdateBalance" {
-                                    if let Ok(balance_msg) =
-                                        serde_json::from_value::<BalanceMessage>(arr[1].clone())
-                                    {
-                                        debug!(
-                                            "Received balance message (text 1-step): {:?}",
-                                            balance_msg
-                                        );
-                                        self.state.set_balance(balance_msg.balance).await;
+                        match serde_json::from_str::<serde_json::Value>(&text[start..]) {
+                            Ok(value) => {
+                                if let Some(arr) = value.as_array() {
+                                    if arr.len() >= 2 && arr[0] == "successupdateBalance" {
+                                        match serde_json::from_value::<BalanceMessage>(
+                                            arr[1].clone(),
+                                        ) {
+                                            Ok(balance_msg) => {
+                                                debug!(
+                                                    "Received balance message (text 1-step): {:?}",
+                                                    balance_msg
+                                                );
+                                                self.state.set_balance(balance_msg.balance).await;
+                                            }
+                                            Err(e) => {
+                                                warn!(
+                                                    "Failed to deserialize BalanceMessage from Socket.IO payload (arr[1]): {}. Raw text slice: {}",
+                                                    e, &text[start..]
+                                                );
+                                            }
+                                        }
                                     }
                                 }
+                            }
+                            Err(e) => {
+                                warn!(
+                                    "Failed to parse Socket.IO JSON envelope for balance: {}. Raw text slice: {}",
+                                    e, &text[start..]
+                                );
                             }
                         }
                     }
                 }
-                _ => {}
+                _ => {
+                    tracing::warn!(target: "BalanceModule", "Received unexpected message type: {:?}", msg);
+                }
             }
         }
         Err(CoreError::LightweightModuleLoop("BalanceModule".into()))

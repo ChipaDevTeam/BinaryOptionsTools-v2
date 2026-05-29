@@ -14,33 +14,33 @@ categories = ["api-bindings", "asynchronous"]
 include = ["src/**/*", "data/**/*", "Cargo.toml", "Readme.md", "LICENSE"]
 
 [dependencies]
-anyhow = "1.0.98"
-async-trait = "0.1.89"
-chrono = { version = "0.4.35", features = ["serde"] }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
 # binary-options-tools-core = { path = "../core", version = "0.2.0" }
 # trading-macros = { path = "../macros" }
-futures-util = "0.3.30"
-reqwest = { version = "0.12.1", default-features = false, features = ["rustls-tls", "json"] }
-serde = { version = "1.0.197", features = ["derive"] }
-serde_json = "1.0.115"
-tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
-tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["rustls-tls-webpki-roots", "connect", "handshake"] }
-url = "2.5.0"
-uuid = { version = "1.7.0", features = ["v4", "fast-rng", "serde"] }
+futures-util = { workspace = true }
+reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls", "json"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
 binary-options-tools-core = { path = "../core", version = "0.2.0" }
 binary-options-tools-macros = { path = "../macros", version = "0.2.0" }
-rand = "0.9.2"
-tracing = "0.1.40"
-rust_decimal = { version = "1.35.0", features = ["serde", "macros", "serde-with-float"] }
-rust_decimal_macros = "1.35.0"
+rand = { workspace = true }
+tracing = { workspace = true }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
 ryu = "1.0"
-thiserror = "2.0.18"
-regex = "1.10.5"
-rustls = { version = "0.23.10", default-features = false, features = ["ring"] }
-rustls-native-certs = "0.8.0"
+thiserror = { workspace = true }
+regex = { workspace = true }
+rustls = { version = "0.23.40", default-features = false, features = ["ring"] }
+rustls-native-certs = "0.8.3"
 php_serde = "0.6.0"
 
 [dev-dependencies]
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-kanal = "0.1.0"
+tracing-subscriber = { workspace = true }
+kanal = { workspace = true }
 

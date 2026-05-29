@@ -46,7 +46,7 @@ except ImportError:
     )
     # Add source directory to sys.path as a fallback
     source_path = os.path.join(
-        os.path.dirname(__file__), "../BinaryOptionsToolsV2/python"
+        os.path.dirname(__file__), "../python"
     )
     if source_path not in sys.path:
         sys.path.insert(0, source_path)
@@ -74,7 +74,7 @@ async def api():
 
     config = {
         "connection_initialization_timeout_secs": 30,  # Reduced from 60
-        "max_allowed_loops": 10,
+        "max_allowed_loops": 0,  # Unlimited reconnection attempts
         "timeout_secs": 60,
         "terminal_logging": False,
         "log_level": "WARN",
@@ -96,7 +96,7 @@ def api_sync():
 
     config = {
         "connection_initialization_timeout_secs": 30,
-        "max_allowed_loops": 10,
+        "max_allowed_loops": 0,  # Unlimited reconnection attempts
         "timeout_secs": 60,
         "terminal_logging": False,
         "log_level": "WARN",

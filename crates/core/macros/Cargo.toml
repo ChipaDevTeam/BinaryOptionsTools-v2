@@ -2,8 +2,13 @@
 name = "binary-options-tools-core-macros"
 version = "0.1.0"
 edition = "2024"
+authors = ["ChipaDevTeam"]
+repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+description = "Proc-macro utilities for binary-options-tools-core"
+license-file = "../LICENSE"
+
 [lib]
 proc-macro = true
 
 [dependencies]
-zyn = { version = "0.5.3", features = ["diagnostics", "ext"] }
+zyn = { workspace = true, features = ["diagnostics", "ext"] }

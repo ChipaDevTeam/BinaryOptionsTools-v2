@@ -55,6 +55,9 @@ pub mod trades;
 // };
 
 #[cfg(test)]
+mod deals_tests;
+
+#[cfg(test)]
 mod pending_trades_tests;
 
 #[cfg(test)]

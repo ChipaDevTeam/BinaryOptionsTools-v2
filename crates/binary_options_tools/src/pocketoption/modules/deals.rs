@@ -23,11 +23,15 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
     types::Deal,
+    utils::SocketIoFrame,
 };
 
 const UPDATE_OPENED_DEALS: &str = r#"451-["updateOpenedDeals","#;
 const UPDATE_CLOSED_DEALS: &str = r#"451-["updateClosedDeals","#;
 const SUCCESS_CLOSE_ORDER: &str = r#"451-["successcloseOrder","#;
+const UPDATE_OPENED_DEALS_42: &str = r#"42["updateOpenedDeals","#;
+const UPDATE_CLOSED_DEALS_42: &str = r#"42["updateClosedDeals","#;
+const SUCCESS_CLOSE_ORDER_42: &str = r#"42["successcloseOrder","#;
 
 #[derive(Debug)]
 pub enum Command {
@@ -62,6 +66,8 @@ pub struct DealsHandle {
 }
 
 impl DealsHandle {
+    /// Checks the result of a specific trade by its ID.
+    /// This will wait until the trade is closed and the result is available.
     pub async fn check_result(&self, trade_id: Uuid) -> PocketResult<Deal> {
         let (tx, rx) = oneshot::channel();
         self.sender
@@ -75,6 +81,7 @@ impl DealsHandle {
         }
     }
 
+    /// Checks the result of a specific trade with a timeout.
     pub async fn check_result_with_timeout(
         &self,
         trade_id: Uuid,
@@ -98,8 +105,13 @@ impl DealsHandle {
     }
 }
 
-/// An API module responsible for listening to deal updates,
-/// maintaining the shared `TradeState`, and checking trade results.
+/// An API module responsible for listening to deal updates (opened and closed),
+/// maintaining the shared `TradeState`, and notifying waiters when a trade closes.
+///
+/// It handles Socket.IO events:
+/// - `updateOpenedDeals`: Updates the list of currently open trades.
+/// - `updateClosedDeals`: Updates the list of closed trades and moves them from the open list.
+/// - `successcloseOrder`: Confirms that a trade has been successfully closed.
 pub struct DealsApiModule {
     state: Arc<State>,
     ws_receiver: AsyncReceiver<Arc<Message>>,
@@ -110,6 +122,7 @@ pub struct DealsApiModule {
 }
 
 impl DealsApiModule {
+    /// Processes text-based deal update messages from the WebSocket.
     async fn process_text_data(&mut self, text: &str, expected: ExpectedMessage) {
         match expected {
             ExpectedMessage::UpdateOpenedDeals => match serde_json::from_str::<Vec<Deal>>(text) {
@@ -120,11 +133,7 @@ impl DealsApiModule {
             },
             ExpectedMessage::UpdateClosedDeals => match serde_json::from_str::<Vec<Deal>>(text) {
                 Ok(deals) => {
-                    self.state
-                        .trade_state
-                        .update_closed_deals(deals.clone())
-                        .await;
-                    for deal in deals {
+                    for deal in &deals {
                         if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
                             info!("Trade closed: {:?}", deal);
                             for tx in waiters {
@@ -132,18 +141,18 @@ impl DealsApiModule {
                             }
                         }
                     }
+                    self.state.trade_state.update_closed_deals(deals).await;
+                    // Periodically prune closed deals to prevent memory growth (limit to 1000)
+                    self.state.trade_state.prune_closed_deals(1000).await;
                 }
                 Err(e) => warn!("Failed to parse UpdateClosedDeals (text): {:?}", e),
             },
             ExpectedMessage::SuccessCloseOrder => {
                 // Try parsing as CloseOrder struct first
                 match serde_json::from_str::<CloseOrder>(text) {
-                    Ok(close_order) => {
-                        self.state
-                            .trade_state
-                            .update_closed_deals(close_order.deals.clone())
-                            .await;
-                        for deal in close_order.deals {
+                    Ok(mut close_order) => {
+                        let deals = std::mem::take(&mut close_order.deals);
+                        for deal in &deals {
                             if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
                                 info!("Trade closed: {:?}", deal);
                                 for tx in waiters {
@@ -151,16 +160,15 @@ impl DealsApiModule {
                                 }
                             }
                         }
+                        self.state.trade_state.update_closed_deals(deals).await;
+                        // Prune closed deals
+                        self.state.trade_state.prune_closed_deals(1000).await;
                     }
                     Err(_) => {
                         // Fallback: Try parsing as Vec<Deal> (sometimes API sends just the list)
                         match serde_json::from_str::<Vec<Deal>>(text) {
                             Ok(deals) => {
-                                self.state
-                                    .trade_state
-                                    .update_closed_deals(deals.clone())
-                                    .await;
-                                for deal in deals {
+                                for deal in &deals {
                                     if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
                                         info!("Trade closed (fallback): {:?}", deal);
                                         for tx in waiters {
@@ -168,6 +176,9 @@ impl DealsApiModule {
                                         }
                                     }
                                 }
+                                self.state.trade_state.update_closed_deals(deals).await;
+                                // Prune closed deals
+                                self.state.trade_state.prune_closed_deals(1000).await;
                             }
                             Err(e) => warn!("Failed to parse SuccessCloseOrder (text): {:?}", e),
                         }
@@ -176,6 +187,30 @@ impl DealsApiModule {
             }
             ExpectedMessage::None => {}
         }
+    }
+
+    /// Notifies all pending waiters that the module has stopped.
+    /// This prevents "responder dropped" errors by properly cleaning up pending requests.
+    fn notify_waiters_module_stopped(&mut self) {
+        let waiters = std::mem::take(&mut self.waiting_requests);
+        if !waiters.is_empty() {
+            tracing::info!("DealsApiModule: Notifying {} pending waiters that module has stopped", waiters.len());
+        }
+        for (trade_id, responders) in waiters {
+            for responder in responders {
+                let error = PocketError::ModuleStopped {
+                    module_name: "DealsApiModule".to_string(),
+                    context: format!("Trade ID: {}", trade_id),
+                };
+                let _ = responder.send(Err(error));
+            }
+        }
+    }
+}
+
+impl Drop for DealsApiModule {
+    fn drop(&mut self) {
+        self.notify_waiters_module_stopped();
     }
 }
 
@@ -223,39 +258,36 @@ impl ApiModule<State> for DealsApiModule {
                             tracing::debug!("Received message: {:?}", msg);
                             match msg.as_ref() {
                                 Message::Text(text) => {
-                                    let mut data_text = None;
-                                    let mut current_expected = ExpectedMessage::None;
-                                    if text.starts_with(UPDATE_OPENED_DEALS) {
-                                        current_expected = ExpectedMessage::UpdateOpenedDeals;
-                                        data_text = text.strip_prefix(UPDATE_OPENED_DEALS);
-                                    } else if text.starts_with(UPDATE_CLOSED_DEALS) {
-                                        current_expected = ExpectedMessage::UpdateClosedDeals;
-                                        data_text = text.strip_prefix(UPDATE_CLOSED_DEALS);
-                                    } else if text.starts_with(SUCCESS_CLOSE_ORDER) {
-                                        current_expected = ExpectedMessage::SuccessCloseOrder;
-                                        data_text = text.strip_prefix(SUCCESS_CLOSE_ORDER);
-                                    }
+                                    if let Some(frame) = SocketIoFrame::parse(text) {
+                                        let event_payload: Option<(String, serde_json::Value)> = frame.extract_event();
+                                        if let Some((event, payload)) = event_payload {
+                                            let current_expected = if event == "updateOpenedDeals" {
+                                                ExpectedMessage::UpdateOpenedDeals
+                                            } else if event == "updateClosedDeals" {
+                                                ExpectedMessage::UpdateClosedDeals
+                                            } else if event == "successcloseOrder" {
+                                                ExpectedMessage::SuccessCloseOrder
+                                            } else {
+                                                ExpectedMessage::None
+                                            };
 
-                                    if let Some(data) = data_text {
-                                        let trimmed = data.trim();
+                                            if current_expected != ExpectedMessage::None {
+                                                // Check for binary placeholder
+                                                let has_placeholder = payload.as_object().is_some_and(|obj: &serde_json::Map<String, serde_json::Value>| obj.contains_key("_placeholder"));
 
-                                        // Socket.IO 4.x binary placeholder check
-                                        if trimmed.contains(r#""_placeholder":true"#) {
-                                            tracing::debug!(target: "DealsApiModule", "Detected binary placeholder, waiting for binary payload for {:?}", current_expected);
-                                            expected = current_expected;
-                                            continue;
-                                        }
-
-                                        if !trimmed.is_empty() && trimmed != "]" && trimmed != ",]" {
-                                            // It's a 1-step message, process the data now
-                                            let json_data = trimmed.strip_suffix(']').unwrap_or(trimmed);
-                                            self.process_text_data(json_data, current_expected).await;
-                                            expected = ExpectedMessage::None;
-                                            continue;
-                                        } else {
-                                            // Header-only, wait for data
-                                            expected = current_expected;
-                                            continue;
+                                                if has_placeholder {
+                                                    tracing::debug!(target: "DealsApiModule", "Detected binary placeholder, waiting for binary payload for {:?}", current_expected);
+                                                    expected = current_expected;
+                                                    continue;
+                                                } else {
+                                                    // 1-step message
+                                                    if let Ok(data) = serde_json::to_string(&payload) {
+                                                        self.process_text_data(&data, current_expected).await;
+                                                        expected = ExpectedMessage::None;
+                                                        continue;
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
 
@@ -279,8 +311,7 @@ impl ApiModule<State> for DealsApiModule {
                                         ExpectedMessage::UpdateClosedDeals => {
                                             match serde_json::from_slice::<Vec<Deal>>(data) {
                                                 Ok(deals) => {
-                                                    self.state.trade_state.update_closed_deals(deals.clone()).await;
-                                                    for deal in deals {
+                                                    for deal in &deals {
                                                         if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
                                                             info!("Trade closed: {:?}", deal);
                                                             for tx in waiters {
@@ -288,15 +319,18 @@ impl ApiModule<State> for DealsApiModule {
                                                             }
                                                         }
                                                     }
+                                                    self.state.trade_state.update_closed_deals(deals).await;
+                                                    // Prune closed deals
+                                                    self.state.trade_state.prune_closed_deals(1000).await;
                                                 },
                                                 Err(e) => warn!("Failed to parse UpdateClosedDeals (binary): {:?}", e),
                                             }
                                         }
                                         ExpectedMessage::SuccessCloseOrder => {
                                             match serde_json::from_slice::<CloseOrder>(data) {
-                                                Ok(close_order) => {
-                                                    self.state.trade_state.update_closed_deals(close_order.deals.clone()).await;
-                                                    for deal in close_order.deals {
+                                                Ok(mut close_order) => {
+                                                    let deals = std::mem::take(&mut close_order.deals);
+                                                    for deal in &deals {
                                                         if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
                                                             info!("Trade closed: {:?}", deal);
                                                             for tx in waiters {
@@ -304,13 +338,15 @@ impl ApiModule<State> for DealsApiModule {
                                                             }
                                                         }
                                                     }
+                                                    self.state.trade_state.update_closed_deals(deals).await;
+                                                    // Prune closed deals
+                                                    self.state.trade_state.prune_closed_deals(1000).await;
                                                 },
                                                 Err(_) => {
                                                      // Fallback: Try parsing as Vec<Deal>
                                                      match serde_json::from_slice::<Vec<Deal>>(data) {
                                                         Ok(deals) => {
-                                                            self.state.trade_state.update_closed_deals(deals.clone()).await;
-                                                            for deal in deals {
+                                                            for deal in &deals {
                                                                 if let Some(waiters) = self.waiting_requests.remove(&deal.id) {
                                                                     info!("Trade closed (fallback): {:?}", deal);
                                                                     for tx in waiters {
@@ -318,6 +354,9 @@ impl ApiModule<State> for DealsApiModule {
                                                                     }
                                                                 }
                                                             }
+                                                            self.state.trade_state.update_closed_deals(deals).await;
+                                                            // Prune closed deals
+                                                            self.state.trade_state.prune_closed_deals(1000).await;
                                                         }
                                                         Err(e) => warn!("Failed to parse SuccessCloseOrder (binary): {:?}", e),
                                                     }
@@ -335,10 +374,16 @@ impl ApiModule<State> for DealsApiModule {
                                     }
                                     expected = ExpectedMessage::None;
                                 },
-                                _ => {}
+                                _ => {
+                                    warn!(target: "DealsApiModule", "Received unexpected message type: {:?}", msg);
+                                }
                             }
                         }
-                        Err(_) => break,
+                        Err(_) => {
+                            tracing::info!("DealsApiModule: WebSocket receiver closed, shutting down...");
+                            self.notify_waiters_module_stopped();
+                            break;
+                        }
                     }
                 }
                 cmd_res = self.command_receiver.recv() => {
@@ -359,11 +404,16 @@ impl ApiModule<State> for DealsApiModule {
                                 }
                             }
                         }
-                        Err(_) => break,
+                        Err(_) => {
+                            tracing::info!("DealsApiModule: Command receiver closed, shutting down...");
+                            self.notify_waiters_module_stopped();
+                            break;
+                        }
                     }
                 }
             }
         }
+        tracing::info!("DealsApiModule: Run loop exited.");
         Ok(())
     }
 
@@ -377,6 +427,9 @@ impl ApiModule<State> for DealsApiModule {
             UPDATE_CLOSED_DEALS,
             UPDATE_OPENED_DEALS,
             SUCCESS_CLOSE_ORDER,
+            UPDATE_CLOSED_DEALS_42,
+            UPDATE_OPENED_DEALS_42,
+            SUCCESS_CLOSE_ORDER_42,
         ]))
     }
 }

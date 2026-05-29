@@ -81,4 +81,4 @@ def test_validator_custom_exception_safety():
 
     v = Validator.custom(crashing_func)
     # This should return False instead of crashing the process
-    assert v.check("any message") == False
+    assert not v.check("any message")

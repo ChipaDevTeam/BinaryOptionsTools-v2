@@ -73,7 +73,9 @@ impl LightweightModule<State> for AssetsModule {
                         }
                     }
                 }
-                _ => {}
+                _ => {
+                    tracing::warn!(target: "AssetsModule", "Received unexpected message type: {:?}", msg);
+                }
             }
         }
         Err(CoreError::LightweightModuleLoop("AssetsModule".into()))

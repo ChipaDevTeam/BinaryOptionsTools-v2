@@ -1,7 +1,7 @@
 # BinaryOptionsTools V2
 
 [![Discord](https://img.shields.io/discord/1261483112991555665?label=Discord&logo=discord&color=7289da)](https://discord.com/invite/p7YyFqSmAz)
-[![Python Version](https://img.shields.io/badge/python-3.8%20|%203.9%20|%203.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14%20|%203.15-blue)](https://www.python.org/)
+[![Python Version](https://img.shields.io/badge/python-3.9%20|%203.10%20|%203.11%20|%203.12-blue)](https://www.python.org/)
 [![Rust](https://img.shields.io/badge/built%20with-Rust-orange)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-Personal-green)](LICENSE)
 
@@ -17,7 +17,7 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 | Support Channel          | Link                                                                           |
 | :----------------------- | :----------------------------------------------------------------------------- |
 | **PayPal**               | [Support ChipaDevTeam](https://www.paypal.me/ChipaCL)                          |
-| **PocketOption (Six)**   | [Join via Six's Affiliate Link](https://poaffiliate.onelink.me/t5P7/9y34jkp3)  |
+| **PocketOption (Six)**   | [Join via Six's Affiliate Link](https://u3.shortink.io/smart/IqeAmBtFTrEWbh)   |
 | **PocketOption (Chipa)** | [Join via Chipa's Affiliate Link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) |
 
 ---
@@ -30,9 +30,10 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
   - [Async API](#async-api-recommended)
-  - [Sync API](#sync-api)
+  - [Bot Framework](#bot-framework--strategy-high-level)
   - [Data Streaming](#real-time-data-streaming)
 - [Advanced Usage](#advanced-usage)
+- [Examples](#examples)
 - [Roadmap](#roadmap)
 - [Legal & Disclaimer](#legal-and-disclaimer)
 
@@ -76,7 +77,7 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 
 ### Bot Framework (New)
 
-- **Event-Driven**: Hooks for `on_candle`, `on_tick`, `on_deal_closed`, etc.
+- **Event-Driven**: Hooks for `on_start` and `on_candle` with JSON candle data.
 - **Contextual API**: Write once, run on any platform (PocketOption, ExpertOption, or Virtual).
 - **Strategy Trait**: Easily implement and swap trading algorithms.
 - **Virtual Market**: Built-in simulator for backtesting strategies without financial risk.
@@ -115,7 +116,7 @@ graph TD
 
 #### Option A: Prebuilt Wheels (Recommended)
 
-Install directly from our GitHub releases. Supports **Python 3.8 - 3.15**.
+Install directly from our GitHub releases. Supports **Python 3.9 - 3.12**.
 
 **Windows**
 
@@ -151,7 +152,7 @@ maturin develop --release
 Requires `rustc`, `cargo`, and `maturin`.
 
 ```bash
-pip install git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git#subdirectory=BinaryOptionsToolsV2
+pip install git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git#subdirectory=python
 ```
 
 ### Rust
@@ -179,7 +180,7 @@ async def main():
     async with PocketOptionAsync(ssid=ssid) as client:
         balance = await client.balance()
         print(f"Balance: ${balance}")
-        
+
         trade_id, deal = await client.buy("EURUSD_otc", 1.0, 60)
         print(f"Outcome: {await client.check_win(trade_id)}")
 
@@ -192,17 +193,35 @@ if __name__ == "__main__":
 Implement the `Strategy` trait (Rust) or inherit from `PyStrategy` (Python) for structured bot development.
 
 ```python
-from BinaryOptionsToolsV2 import PyBot, PyStrategy, PyContext, PyVirtualMarket
+import asyncio
+import json
+import os
+
+from BinaryOptionsToolsV2 import PyBot, PyStrategy, RawPocketOption
+
 
 class MyStrategy(PyStrategy):
-    async def on_candle(self, ctx: PyContext, asset: str, candle):
-        if candle['close'] > candle['open']:
-            await ctx.buy(asset, 1.0, 60)
+    def on_start(self, ctx):
+        print("Strategy started!")
 
-# Run on Virtual Market (Backtesting)
-market = PyVirtualMarket()
-bot = PyBot(PyContext(market), MyStrategy())
-# bot.run() ...
+    def on_candle(self, ctx, asset, candle_json):
+        candle = json.loads(candle_json)
+        if candle["close"] > candle["open"]:
+            asyncio.create_task(ctx.buy(asset, 1.0, 60))
+
+
+async def main():
+    ssid = os.getenv("POCKET_OPTION_SSID")
+    client = await RawPocketOption.create(ssid)
+
+    strategy = MyStrategy()
+    bot = PyBot(client, strategy)
+    bot.add_asset("EURUSD_otc", 60)  # Monitor 60s candles
+
+    await bot.run()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### Real-time Data Streaming
@@ -220,6 +239,8 @@ async with PocketOptionAsync(ssid="...") as client:
 For complex implementations, you can access the **Raw Handler API**. This allows you to construct custom WebSocket messages and filter responses.
 
 ```python
+from BinaryOptionsToolsV2.validator import Validator
+
 # Create a validator to filter messages containing "balance"
 validator = Validator.contains("balance")
 handler = await client.create_raw_handler(validator)
@@ -232,7 +253,35 @@ async for message in await handler.subscribe():
     print(f"Raw Update: {message}")
 ```
 
-> **Note on Authentication**: Authentication is handled via the `SSID` cookie. See our [Tutorials Directory](tutorials/) for instructions on how to extract this from your browser.
+> **Note on Authentication**: Authentication is handled via the `SSID` cookie. See our [Tutorials Directory](docs/tutorials/) for instructions on how to extract this from your browser.
+
+---
+
+## Examples
+
+The [`examples/`](examples/) directory contains ready-to-run scripts for both async and sync APIs.
+
+### Python Async
+
+| Example                                                                | Description                     |
+| ---------------------------------------------------------------------- | ------------------------------- |
+| [`trade.py`](examples/python/async/trade.py)                           | Basic buy/sell with `check_win` |
+| [`get_balance.py`](examples/python/async/get_balance.py)               | Account balance retrieval       |
+| [`get_candles.py`](examples/python/async/get_candles.py)               | Historical candle data          |
+| [`subscribe_symbol.py`](examples/python/async/subscribe_symbol.py)     | Real-time candle subscription   |
+| [`strategy_example.py`](examples/python/async/strategy_example.py)     | PyBot/PyStrategy framework      |
+| [`comprehensive_demo.py`](examples/python/async/comprehensive_demo.py) | Full API walkthrough            |
+| [`raw_send.py`](examples/python/async/raw_send.py)                     | Raw WebSocket messages          |
+| [`create_raw_order.py`](examples/python/async/create_raw_order.py)     | Raw order with validator        |
+| [`validator.py`](examples/python/async/validator.py)                   | Validator usage examples        |
+
+### Python Sync
+
+A parallel set of examples using the synchronous `PocketOption` client is available in [`examples/python/sync/`](examples/python/sync/).
+
+### Other Languages
+
+UniFFI-generated examples for Go, Kotlin, Swift, Ruby, C#, and Rust are available in their respective subdirectories under [`examples/`](examples/).
 
 ---
 

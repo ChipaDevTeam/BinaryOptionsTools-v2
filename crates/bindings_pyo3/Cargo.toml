@@ -1,0 +1,47 @@
+[package]
+name = "BinaryOptionsToolsV2"
+version = "0.2.11"
+edition = "2021"
+authors = ["ChipaDevTeam"]
+description = "Python bindings for binary-options-tools. High-performance library for PocketOption trading automation with async/sync support, real-time data streaming, and WebSocket API access."
+license-file = "LICENSE"
+homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html"
+readme = "Readme.md"
+keywords = ["binary-options", "pocketoption", "trading", "python", "pyo3"]
+categories = ["api-bindings"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "BinaryOptionsToolsV2"
+crate-type = ["cdylib"]
+test = false
+
+[dependencies]
+pyo3 = { version = "0.28.3", features = ["abi3-py39"] }
+pyo3-async-runtimes = { version = "0.28.0", features = ["tokio-runtime"] }
+
+binary_options_tools = { path = "../binary_options_tools", version = "0.2.1" }
+
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+futures-util = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+url = { workspace = true }
+regex = { workspace = true }
+async-stream = "0.3.6"
+async-trait = { workspace = true }
+tungstenite = { version = "0.29.0", default-features = false, features = ["rustls-tls-webpki-roots", "handshake"] }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+pyo3-stub-gen = { version = "0.7.0", optional = true }
+
+[features]
+default = []
+stubgen = ["pyo3-stub-gen"]

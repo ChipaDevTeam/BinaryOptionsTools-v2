@@ -1,3 +1,4 @@
+use crate::expertoptions::error::ExpertOptionsError;
 use crate::pocketoption::error::PocketError;
 use binary_options_tools_core::error::CoreError;
 use rust_decimal::Decimal;
@@ -10,6 +11,9 @@ pub enum BinaryOptionsError {
 
     #[error("Pocket Options Error: {0}")]
     PocketOptions(#[from] PocketError),
+
+    #[error("Expert Options Error: {0}")]
+    ExpertOptions(#[from] ExpertOptionsError),
 
     /// Couldn't parse f64 to Decimal
     #[error("Couldn't parse f64 to Decimal: {0}")]

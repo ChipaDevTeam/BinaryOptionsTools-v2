@@ -71,7 +71,9 @@ impl LightweightModule<State> for InitModule {
                                 let _ = self.runner_command_tx.send(RunnerCommand::Shutdown).await;
                             }
                         }
-                        _ => {}
+                        _ => {
+                            warn!(target: "InitModule", "Received unexpected message type: {:?}", msg);
+                        }
                     }
 
                     if let Some(text) = process_text {

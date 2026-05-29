@@ -108,10 +108,9 @@ mod tests {
         msg_tx.send(Arc::new(msg_deal_42)).await.unwrap();
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-        let opened = state.trade_state.opened_deals.read().await;
         let deal_id = uuid::Uuid::parse_str("2f561661-334c-4de3-920f-f095c7b1193f").unwrap();
         assert!(
-            opened.contains_key(&deal_id),
+            state.trade_state.contains_opened_deal(deal_id).await,
             "Deal should be correctly parsed and added to state"
         );
     }

@@ -20,6 +20,7 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
     types::{Action, Deal, FailOpenOrder, MultiPatternRule, OpenOrder, RequestId},
+    utils::SocketIoFrame,
 };
 
 /// Command enum for the `TradesApiModule`.
@@ -146,6 +147,28 @@ pub struct TradesApiModule {
     failure_matching: HashMap<(String, Decimal), VecDeque<Uuid>>,
 }
 
+impl TradesApiModule {
+    fn notify_waiters_module_stopped(&mut self) {
+        let pending = std::mem::take(&mut self.pending_orders);
+        if !pending.is_empty() {
+            tracing::info!("TradesApiModule: Notifying {} pending waiters that module has stopped", pending.len());
+        }
+        for (req_id, tracker) in pending {
+            let error = PocketError::ModuleStopped {
+                module_name: "TradesApiModule".to_string(),
+                context: format!("Request ID: {}", req_id),
+            };
+            let _ = tracker.responder.send(Err(error));
+        }
+    }
+}
+
+impl Drop for TradesApiModule {
+    fn drop(&mut self) {
+        self.notify_waiters_module_stopped();
+    }
+}
+
 #[async_trait]
 impl ApiModule<State> for TradesApiModule {
     type Command = Command;
@@ -212,38 +235,47 @@ impl ApiModule<State> for TradesApiModule {
                               }
                           }
                       }
-                      Err(_) => return Ok(()), // Channel closed
+                      Err(_) => {
+                          self.notify_waiters_module_stopped();
+                          return Ok(());
+                      }
                   }
               },
               msg_res = self.message_receiver.recv() => {
                   let msg = match msg_res {
                       Ok(msg) => msg,
-                      Err(_) => return Ok(()), // Channel closed
+                      Err(_) => {
+                          self.notify_waiters_module_stopped();
+                          return Ok(());
+                      }
                   };
                   let response_result = match msg.as_ref() {
-                      Message::Binary(data) => serde_json::from_slice::<ServerResponse>(data),
+                      Message::Binary(data) => match serde_json::from_slice::<ServerResponse>(data) {
+                          Ok(res) => Ok(res),
+                          Err(e) => {
+                              warn!(target: "TradesApiModule", "Failed to parse binary ServerResponse: {}", e);
+                              Err(e.into())
+                          }
+                      },
                       Message::Text(text) => {
                           if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
                               Ok(res)
-                          } else if let Some(start) = text.find('[') {
-                              // Resilient Socket.IO parsing: extract the JSON array content
-                              // Handles prefixes like "42", "451-", etc.
-                              match serde_json::from_str::<serde_json::Value>(&text[start..]) {
-                                  Ok(serde_json::Value::Array(arr)) => {
-                                      if arr.len() >= 2 && (arr[0] == "successopenOrder" || arr[0] == "failopenOrder") {
-                                          serde_json::from_value::<ServerResponse>(arr[1].clone())
-                                      } else {
-                                          serde_json::from_str::<ServerResponse>(text)
-                                      }
+                          } else if let Some(frame) = SocketIoFrame::parse(text) {
+                              if let Some((event, payload)) = frame.extract_event() {
+                                  if event == "successopenOrder" || event == "failopenOrder" {
+                                      serde_json::from_value::<ServerResponse>(payload)
+                                  } else {
+                                      serde_json::from_str::<ServerResponse>(text)
                                   }
-                                  _ => serde_json::from_str::<ServerResponse>(text),
+                              } else {
+                                  serde_json::from_str::<ServerResponse>(text)
                               }
                           } else {
                               serde_json::from_str::<ServerResponse>(text)
                           }
                       },
                       _ => {
-                          // Ignore other message types
+                          warn!(target: "TradesApiModule", "Received unexpected message type: {:?}", msg);
                           continue;
                       }
                   };
@@ -255,26 +287,26 @@ impl ApiModule<State> for TradesApiModule {
                               info!(target: "TradesApiModule", "Trade opened: {}", deal.id);
 
                               let req_id = match deal.request_id.as_ref() {
-                                  Some(RequestId::Uuid(id)) => *id,
-                                  Some(RequestId::Number(_)) | None => Uuid::nil(),
+                                  Some(RequestId::Uuid(id)) => Some(*id),
+                                  Some(RequestId::Number(_)) | None => None,
                               };
 
                               // Clean up pending_market_orders in state and notify responder
-                              if let Some(req_id) = req_id {
-                                  self.state.trade_state.pending_market_orders.write().await.remove(&req_id);
+                              if let Some(id) = req_id {
+                                  self.state.trade_state.pending_market_orders.write().await.remove(&id);
 
-                                  if let Some(tracker) = self.pending_orders.remove(&req_id) {
+                                  if let Some(tracker) = self.pending_orders.remove(&id) {
                                       let _ = tracker.responder.send(Ok(*deal.clone()));
 
                                       let key = (tracker.asset, tracker.amount);
                                       if let Some(queue) = self.failure_matching.get_mut(&key) {
-                                          queue.retain(|&id| id != req_id);
+                                          queue.retain(|&pending_id| pending_id != id);
                                           if queue.is_empty() {
                                               self.failure_matching.remove(&key);
                                           }
                                       }
                                   } else {
-                                      warn!(target: "TradesApiModule", "Received success for unknown request ID: {}", req_id);
+                                      warn!(target: "TradesApiModule", "Received success for unknown request ID: {}", id);
                                   }
                               } else {
                                   warn!(target: "TradesApiModule", "Could not correlate successopenOrder for {} {}", deal.asset, deal.amount);
@@ -322,7 +354,7 @@ impl ApiModule<State> for TradesApiModule {
         // This rule will match messages like:
         // 451-["successopenOrder",...]
         // 451-["failopenOrder",...]
-        
+
         Box::new(MultiPatternRule::new(vec![
             "successopenOrder",
             "failopenOrder",

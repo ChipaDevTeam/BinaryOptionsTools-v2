@@ -772,15 +772,10 @@ impl<T> TrackedSender<T> {
 
         // We'll track all sends for now, regardless of type
         if result.is_ok() {
-            // Use tokio::spawn for async operation
-            let stats = self.stats.clone();
-            tokio::spawn(async move {
-                // For now, we'll just track the count without message details
-                // In a real implementation, you might want to have a trait for message sizing
-                stats
-                    .messages_sent
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            });
+            // Increment the counter directly (atomic and fast)
+            self.stats
+                .messages_sent
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         }
 
         result
@@ -806,15 +801,10 @@ impl<T> TrackedReceiver<T> {
 
         // We'll track all receives for now, regardless of type
         if result.is_ok() {
-            // Use tokio::spawn for async operation
-            let stats = self.stats.clone();
-            tokio::spawn(async move {
-                // For now, we'll just track the count without message details
-                // In a real implementation, you might want to have a trait for message sizing
-                stats
-                    .messages_received
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            });
+            // Increment the counter directly (atomic and fast)
+            self.stats
+                .messages_received
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         }
 
         result

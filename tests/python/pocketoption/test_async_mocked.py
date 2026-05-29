@@ -85,7 +85,7 @@ class MockRawClient:
         return json.dumps({"ticket": ticket, "status": "cancelled"})
 
     async def cancel_pending_orders(self, tickets):
-        return json.dumps([{"ticket": ticket, "status": "cancelled"} for ticket in tickets])
+        return json.dumps({"cancelled": tickets})
 
     async def closed_deals(self):
         return json.dumps(
@@ -133,7 +133,7 @@ class MockRawClient:
 
         return subscription()
 
-    async def subscribe_symbol_chuncked(self, asset, chunk_size):
+    async def subscribe_symbol_chunked(self, asset, chunk_size):
         async def subscription():
             yield json.dumps({"chunk": 1, "open": 1.1, "close": 1.2})
 
@@ -253,6 +253,11 @@ class MockRawValidator:
         self.condition = condition
 
     def __call__(self, message):
+        if hasattr(self, "_custom_func") and self._custom_func is not None:
+            try:
+                return self._custom_func(message)
+            except Exception:
+                return False
         return True
 
     def __repr__(self):
@@ -275,10 +280,13 @@ class MockRawValidator:
 
     @classmethod
     def custom(cls, func):
-        """Mock custom validator factory."""
+        """Mock custom validator factory - mirrors Rust RawValidator.custom() behavior."""
         if not callable(func):
             raise TypeError("func must be callable")
-        return cls(condition=f"custom:{func}")
+        instance = cls(condition=f"custom:{func}")
+        # Store the callable for check() delegation
+        instance._custom_func = func
+        return instance
 
 
 class MockLogger:
@@ -376,44 +384,49 @@ async def async_client(mock_raw_pocketoption):
 class TestPocketOptionAsyncInit:
     """Tests for PocketOptionAsync initialization."""
 
-    def test_init_with_ssid_only(self, mock_raw_pocketoption):
+    @pytest.mark.asyncio
+    async def test_init_with_ssid_only(self, mock_raw_pocketoption):
         """Test initialization with just SSID."""
         client = PocketOptionAsync("test_ssid")
         assert client.client is mock_raw_pocketoption
-        asyncio.get_event_loop().run_until_complete(client.shutdown())
+        await client.shutdown()
 
-    def test_init_with_config_dict(self, mock_raw_pocketoption):
+    @pytest.mark.asyncio
+    async def test_init_with_config_dict(self, mock_raw_pocketoption):
         """Test initialization with config dict."""
         config = {"terminal_logging": False, "log_level": "INFO"}
         client = PocketOptionAsync("test_ssid", config=config)
         assert client.config.terminal_logging is False
-        asyncio.get_event_loop().run_until_complete(client.shutdown())
+        await client.shutdown()
 
-    def test_init_with_config_json(self, mock_raw_pocketoption):
+    @pytest.mark.asyncio
+    async def test_init_with_config_json(self, mock_raw_pocketoption):
         """Test initialization with config JSON string."""
         config_json = '{"terminal_logging": false, "log_level": "DEBUG"}'
         client = PocketOptionAsync("test_ssid", config=config_json)
         assert client.config.terminal_logging is False
-        asyncio.get_event_loop().run_until_complete(client.shutdown())
+        await client.shutdown()
 
-    def test_init_with_config_object(self, mock_raw_pocketoption):
+    @pytest.mark.asyncio
+    async def test_init_with_config_object(self, mock_raw_pocketoption):
         """Test initialization with Config object."""
         cfg = Config()
         cfg.terminal_logging = False
         client = PocketOptionAsync("test_ssid", config=cfg)
         assert client.config.terminal_logging is False
-        asyncio.get_event_loop().run_until_complete(client.shutdown())
+        await client.shutdown()
 
-    def test_init_with_invalid_config_type(self):
+    def test_init_with_invalid_config_type(self, mock_raw_pocketoption):
         """Test initialization with invalid config type raises ValueError."""
         with pytest.raises(ValueError, match="Config type mismatch"):
             PocketOptionAsync("test_ssid", config=123)
 
-    def test_init_with_custom_url(self, mock_raw_pocketoption):
+    @pytest.mark.asyncio
+    async def test_init_with_custom_url(self, mock_raw_pocketoption):
         """Test that custom URL is added to config."""
         client = PocketOptionAsync("test_ssid", url="wss://custom.com")
         assert "wss://custom.com" in client.config.urls
-        asyncio.get_event_loop().run_until_complete(client.shutdown())
+        await client.shutdown()
 
 
 class TestBuyAndSell:
@@ -629,25 +642,74 @@ class TestOpenPendingOrder:
 
 
 class TestCancelPendingOrder:
-    """Tests for pending order cancellation methods."""
+    """Tests for cancel_pending_order method."""
 
     @pytest.mark.asyncio
     async def test_cancel_pending_order_success(self, async_client):
-        result = await async_client.cancel_pending_order(
-            "11111111-1111-1111-1111-111111111111"
-        )
+        """Test successful pending order cancellation."""
+        result = await async_client.cancel_pending_order("12345")
+        assert isinstance(result, dict)
+        assert result["ticket"] == "12345"
         assert result["status"] == "cancelled"
 
     @pytest.mark.asyncio
-    async def test_cancel_pending_orders_success(self, async_client):
-        results = await async_client.cancel_pending_orders(
-            [
-                "11111111-1111-1111-1111-111111111111",
-                "22222222-2222-2222-2222-222222222222",
-            ]
+    async def test_cancel_pending_order_with_uuid(self, async_client):
+        """Test cancellation with UUID ticket."""
+        ticket = "550e8400-e29b-41d4-a716-446655440000"
+        result = await async_client.cancel_pending_order(ticket)
+        assert isinstance(result, dict)
+        assert result["ticket"] == ticket
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_order_error(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Test cancel_pending_order when cancellation fails."""
+        mock_raw_pocketoption.cancel_pending_order = AsyncMock(
+            side_effect=Exception("Deal not found")
         )
-        assert len(results) == 2
-        assert all(result["status"] == "cancelled" for result in results)
+        with pytest.raises(Exception, match="Deal not found"):
+            await async_client.cancel_pending_order("99999")
+
+
+class TestCancelPendingOrders:
+    """Tests for cancel_pending_orders (multi-order) method."""
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_orders_success(self, async_client):
+        """Test successful batch pending order cancellation."""
+        tickets = ["12345", "12346", "12347"]
+        result = await async_client.cancel_pending_orders(tickets)
+        assert isinstance(result, dict)
+        assert "cancelled" in result
+        assert len(result["cancelled"]) == 3
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_orders_partial(self, async_client):
+        """Test batch cancellation with partial success."""
+        tickets = ["12345", "12346"]
+        result = await async_client.cancel_pending_orders(tickets)
+        assert isinstance(result, dict)
+        assert "cancelled" in result
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_orders_empty(self, async_client):
+        """Test batch cancellation with empty list."""
+        result = await async_client.cancel_pending_orders([])
+        assert isinstance(result, dict)
+        assert "cancelled" in result
+        assert len(result["cancelled"]) == 0
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_orders_error(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Test cancel_pending_orders when batch cancellation fails."""
+        mock_raw_pocketoption.cancel_pending_orders = AsyncMock(
+            side_effect=Exception("Batch cancellation failed")
+        )
+        with pytest.raises(Exception, match="Batch cancellation failed"):
+            await async_client.cancel_pending_orders(["12345", "12346"])
 
 
 class TestClosedDeals:
@@ -775,16 +837,16 @@ class TestSubscriptions:
         assert hasattr(sub, "__aiter__")
 
     @pytest.mark.asyncio
-    async def test_subscribe_symbol_chuncked_success(self, async_client):
-        """Test subscribe_symbol_chuncked with valid chunk size."""
-        sub = await async_client.subscribe_symbol_chuncked("EURUSD_otc", 10)
+    async def test_subscribe_symbol_chunked_success(self, async_client):
+        """Test subscribe_symbol_chunked with valid chunk size."""
+        sub = await async_client.subscribe_symbol_chunked("EURUSD_otc", 10)
         assert sub is not None
         assert hasattr(sub, "__aiter__")
 
     @pytest.mark.asyncio
-    async def test_subscribe_symbol_chuncked_invalid_chunk(self, async_client):
-        """Test subscribe_symbol_chuncked with invalid chunk size."""
-        sub = await async_client.subscribe_symbol_chuncked("EURUSD_otc", 0)
+    async def test_subscribe_symbol_chunked_invalid_chunk(self, async_client):
+        """Test subscribe_symbol_chunked with invalid chunk size."""
+        sub = await async_client.subscribe_symbol_chunked("EURUSD_otc", 0)
         assert sub is not None
 
     @pytest.mark.asyncio
@@ -1033,7 +1095,7 @@ class TestContextManager:
     """Tests for async context manager."""
 
     @pytest.mark.asyncio
-    async def test_async_context_manager(self):
+    async def test_async_context_manager(self, mock_raw_pocketoption):
         """Test async context manager enter and exit."""
         async with PocketOptionAsync("test_ssid") as client:
             assert client.client is not None
@@ -1073,3 +1135,160 @@ class TestConcurrentOperations:
         assert isinstance(balance, float)
         assert isinstance(assets, list)
         assert isinstance(candles, list)
+
+
+class TestGetTradeResultEdgeCases:
+    """Tests for internal _get_trade_result edge cases."""
+
+    @pytest.mark.asyncio
+    async def test_get_trade_result_invalid_profit_type(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Test _get_trade_result when profit is not a number."""
+        mock_raw_pocketoption.check_win = AsyncMock(
+            return_value=json.dumps({"id": "trade_123", "profit": "not_a_number"})
+        )
+        with pytest.raises(Exception, match="Invalid trade result response"):
+            await async_client._get_trade_result("trade_123")
+
+    @pytest.mark.asyncio
+    async def test_get_trade_result_missing_profit_key(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Test _get_trade_result when profit key is missing."""
+        mock_raw_pocketoption.check_win = AsyncMock(
+            return_value=json.dumps({"id": "trade_123"})
+        )
+        with pytest.raises(Exception, match="Invalid trade result response"):
+            await async_client._get_trade_result("trade_123")
+
+    @pytest.mark.asyncio
+    async def test_get_trade_result_non_dict_response(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Test _get_trade_result when response is not a dict."""
+        mock_raw_pocketoption.check_win = AsyncMock(
+            return_value=json.dumps(["not", "a", "dict"])
+        )
+        with pytest.raises(Exception, match="Invalid trade result response"):
+            await async_client._get_trade_result("trade_123")
+
+    @pytest.mark.asyncio
+    async def test_get_trade_result_draw(self, async_client, mock_raw_pocketoption):
+        """Test _get_trade_result correctly classifies draw (profit == 0)."""
+        mock_raw_pocketoption.check_win = AsyncMock(
+            return_value=json.dumps({"id": "trade_123", "profit": 0})
+        )
+        result = await async_client._get_trade_result("trade_123")
+        assert result["result"] == "draw"
+
+    @pytest.mark.asyncio
+    async def test_get_trade_result_loss(self, async_client, mock_raw_pocketoption):
+        """Test _get_trade_result correctly classifies loss (profit < 0)."""
+        mock_raw_pocketoption.check_win = AsyncMock(
+            return_value=json.dumps({"id": "trade_123", "profit": -1.5})
+        )
+        result = await async_client._get_trade_result("trade_123")
+        assert result["result"] == "loss"
+        assert result["profit"] == -1.5
+
+
+class TestSsidValidation:
+    """Tests for SSID semantic validation in _sanitize_and_validate_ssid."""
+
+    def test_valid_ssid_passes(self):
+        """A well-formed SSID with all required fields passes validation."""
+        ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":1,"platform":2}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_valid_ssid_with_optional_fields(self):
+        """SSID with optional fields like isFastHistory and isOptimized passes."""
+        ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":1,"platform":2,"isFastHistory":true,"isOptimized":true}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_missing_session_raises(self):
+        """SSID missing the 'session' field raises ValueError."""
+        ssid = '42["auth",{"uid":69982301,"isDemo":1}]'
+        with pytest.raises(ValueError, match="missing required field 'session'"):
+            PocketOptionAsync(ssid, config={"terminal_logging": False})
+
+    def test_missing_uid_raises(self):
+        """SSID missing the 'uid' field raises ValueError."""
+        ssid = '42["auth",{"session":"abc123def456","isDemo":1}]'
+        with pytest.raises(ValueError, match="missing required field 'uid'"):
+            PocketOptionAsync(ssid, config={"terminal_logging": False})
+
+    def test_missing_both_required_raises(self):
+        """SSID missing both session and uid raises ValueError."""
+        ssid = '42["auth",{"isDemo":1}]'
+        with pytest.raises(ValueError, match="Invalid SSID"):
+            PocketOptionAsync(ssid, config={"terminal_logging": False})
+
+    def test_invalid_session_format_warns_but_proceeds(self):
+        """A session token with unexpected format emits a warning but does not raise."""
+        ssid = '42["auth",{"session":"!!!","uid":69982301}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        # Should not raise, just warn
+        assert client.is_ssid_valid() is True
+
+    def test_negative_uid_warns_but_proceeds(self):
+        """A negative uid emits a warning but does not raise."""
+        ssid = '42["auth",{"session":"abc123def456","uid":-1}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_non_integer_uid_warns_but_proceeds(self):
+        """A non-integer uid emits a warning but does not raise."""
+        ssid = '42["auth",{"session":"abc123def456","uid":"not_a_number"}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_invalid_is_demo_warns_but_proceeds(self):
+        """An isDemo value that is not 0 or 1 emits a warning but does not raise."""
+        ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":5}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_invalid_platform_warns_but_proceeds(self):
+        """A platform value that is not 1 or 2 emits a warning but does not raise."""
+        ssid = '42["auth",{"session":"abc123def456","uid":69982301,"platform":99}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_non_42_prefix_returns_unchanged(self):
+        """An SSID not starting with 42[ is returned as-is with validation skipped."""
+        ssid = "not_a_valid_ssid"
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is False
+
+    def test_invalid_json_returns_unchanged(self):
+        """An SSID with invalid JSON after 42[ is returned as-is with validation skipped."""
+        ssid = "42[not valid json"
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is False
+
+    def test_ssid_with_single_quotes_normalized(self):
+        """An SSID using single quotes around 'auth' is normalized to double quotes."""
+        ssid = '42[\'auth\',{"session":"abc123def456","uid":69982301,"isDemo":1}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_shell_stripped_auth_normalized(self):
+        """An SSID where auth lost its quotes due to shell expansion is normalized."""
+        ssid = '42[auth,{"session":"abc123def456","uid":69982301,"isDemo":1}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_payload_not_array_warns(self):
+        """A payload that is not a [event, data] array is handled gracefully."""
+        ssid = '42[{"session":"abc123def456","uid":69982301}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        # Payload is a dict, not an array — warns but proceeds
+        assert client.is_ssid_valid() is False
+
+    def test_none_ssid_skips_validation(self):
+        """A None SSID skips validation and marks as invalid."""
+        client = PocketOptionAsync(None, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is False

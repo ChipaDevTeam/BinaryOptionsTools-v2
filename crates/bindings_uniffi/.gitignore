@@ -1,0 +1,12 @@
+/target
+
+# Build artifacts - generated UniFFI bindings
+/out/
+
+# Binary / compiled files
+*.dll
+*.dylib
+*.so
+
+# Generated JSON docs (regenerate with docs:build)
+/docs_json/

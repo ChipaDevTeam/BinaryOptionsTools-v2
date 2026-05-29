@@ -37,7 +37,7 @@ use crate::{
         },
         ssid::Ssid,
         state::{State, StateBuilder},
-        types::{Action, Assets, CancelPendingOrderResult, Deal, PendingOrder},
+        types::{Action, Assets, Deal, PendingOrder},
     },
     utils::print_handler,
 };
@@ -177,27 +177,10 @@ impl PocketOption {
     }
 
     /// Creates a new PocketOption client with a custom WebSocket URL.
-    ///
-    /// This method allows you to specify a custom WebSocket URL for connecting to the PocketOption platform,
-    /// which can be useful for testing or connecting to alternative endpoints.
-    ///
-    /// # Arguments
-    /// * `ssid` - The session ID (SSID cookie value) for authenticating with PocketOption.
-    /// * `url` - The custom WebSocket URL to connect to.
-    ///
-    /// # Returns
-    /// A `PocketResult` containing the initialized `PocketOption` client.
     pub async fn new_with_url(ssid: impl ToString, url: String) -> PocketResult<Self> {
-        let mut config = Config::default();
-        if let Ok(parsed_url) = url::Url::parse(&url) {
-            config.urls.push(parsed_url);
-        }
-
-        // We still use the state builder for the initial connection URL
-        // because ClientRunner uses the state's URL.
-        // The config.urls are fallbacks or for future use.
+        let parsed_ssid = Ssid::parse(ssid)?;
         let state = StateBuilder::default()
-            .ssid(Ssid::parse(ssid)?)
+            .ssid(parsed_ssid)
             .default_connection_url(url)
             .build()?;
 
@@ -209,7 +192,7 @@ impl PocketOption {
         Ok(Self {
             client,
             _runner: Arc::new(_runner),
-            config,
+            config: Config::default(),
             pending_trades_lock: Arc::new(tokio::sync::Mutex::new(())),
         })
     }
@@ -229,7 +212,9 @@ impl PocketOption {
         }
 
         // Pass all URLs as fallbacks
-        builder = builder.urls(config.urls.iter().map(|u| u.to_string()).collect());
+        builder = builder
+            .urls(config.urls.iter().map(|u| u.to_string()).collect())
+            .max_subscriptions(config.max_subscriptions);
 
         let state = builder.build()?;
         let client_builder =
@@ -318,6 +303,22 @@ impl PocketOption {
         state.ssid.demo()
     }
 
+    /// Checks if the client is currently connected to the WebSocket server.
+    ///
+    /// Use this before performing operations to avoid "channel closed" errors
+    /// when the connection has dropped.
+    ///
+    /// # Returns
+    /// `true` if connected, `false` otherwise.
+    pub fn is_connected(&self) -> bool {
+        self.client.is_connected()
+    }
+
+    /// Returns the configured maximum number of concurrent subscriptions.
+    pub fn max_subscriptions(&self) -> usize {
+        self.client.state.max_subscriptions
+    }
+
     /// Subscribes to an asset's stream and prepends historical data.
     ///
     /// This is a QoL helper for bot developers who need to "warm up" their indicators.
@@ -363,26 +364,19 @@ impl PocketOption {
         }
     }
 
-    /// Executes a trade on the specified asset with built-in duplicate prevention and validation.
-    ///
-    /// This method performs the following steps:
-    /// 1. Validates the trade amount and asset availability.
-    /// 2. Employs a 2-second debounce window using trade fingerprints to prevent accidental double-trades.
-    /// 3. Registers the trade in `pending_market_orders` to allow for reconciliation if the connection drops.
-    /// 4. Dispatches the trade request to the `TradesApiModule`.
-    ///
-    /// # Arguments
-    /// * `asset` - The symbol to trade (e.g., "EURUSD_otc").
-    /// * `action` - Call (Buy) or Put (Sell).
-    /// * `time` - Expiration duration in seconds. Must be a divisor of 86400.
-    /// * `amount` - Trade amount. Must be between 1.0 and 20000.0.
-    ///
-    /// # Returns
-    /// A `PocketResult` containing the trade UUID and the resulting `Deal`.
-    ///
-    /// # Errors
-    /// * `PocketError::InvalidAsset` - If the asset is inactive or the timeframe is invalid.
-    /// * `PocketError::General` - If the amount is out of bounds or a duplicate is detected.
+    async fn register_pending_trade(&self, asset: &str, action: Action, time: u32, amount: Decimal) -> Uuid {
+        use crate::pocketoption::types::OpenOrder;
+        let request_id = Uuid::new_v4();
+        let order = OpenOrder::new(amount, asset.to_string(), action, time, self.is_demo() as u32, request_id);
+        self.client.state.trade_state.pending_market_orders.write().await.insert(request_id, (order, std::time::Instant::now()));
+        request_id
+    }
+
+    async fn cleanup_trade(&self, fingerprint: &(String, Action, u32, Decimal), request_id: Uuid) {
+        self.client.state.trade_state.recent_trades.write().await.remove(fingerprint);
+        self.client.state.trade_state.pending_market_orders.write().await.remove(&request_id);
+    }
+
     pub async fn trade(
         &self,
         asset: impl ToString,
@@ -408,114 +402,24 @@ impl PocketOption {
                 "Amount must be at most {MAXIMUM_TRADE_AMOUNT}"
             )));
         }
-
-        // Fix #4: Duplicate Trade Prevention
         let fingerprint = (asset_str.clone(), action, time, amount);
-        let request_id = Uuid::new_v4();
+        let request_id = self.register_pending_trade(&asset_str, action, time, amount).await;
 
-        {
-            let mut recent = self.client.state.trade_state.recent_trades.write().await;
-            if let Some((existing_id, created_at)) = recent.get(&fingerprint) {
-                if created_at.elapsed() < Duration::from_secs(2) {
-                    let id_str = if existing_id.is_nil() {
-                        "pending".to_string()
-                    } else {
-                        existing_id.to_string()
-                    };
-                    return Err(PocketError::General(format!(
-                        "Duplicate trade blocked (original ID: {})",
-                        id_str
-                    )));
-                }
-            }
-            // Insert a placeholder to prevent concurrent duplicate calls while we await the handle
-            recent.insert(
-                fingerprint.clone(),
-                (Uuid::nil(), std::time::Instant::now()),
-            );
-            // Cleanup old entries (>5 seconds)
-            recent.retain(|_, (_, t)| t.elapsed() < Duration::from_secs(5));
-        }
-
-        // Populate pending_market_orders for reconciliation
-        {
-            use crate::pocketoption::types::OpenOrder;
-            let order = OpenOrder::new(
-                amount,
-                asset_str.clone(),
-                action,
-                time,
-                self.is_demo() as u32,
-                request_id,
-            );
-            self.client
-                .state
-                .trade_state
-                .pending_market_orders
-                .write()
-                .await
-                .insert(request_id, (order, std::time::Instant::now()));
-        }
-
-        let handle_result = self
-            .require_handle::<TradesApiModule>("TradesApiModule")
-            .await;
-
-        let handle = match handle_result {
+        let handle = match self.require_handle::<TradesApiModule>("TradesApiModule").await {
             Ok(h) => h,
             Err(e) => {
-                // Remove the placeholder if handle retrieval fails
-                self.client
-                    .state
-                    .trade_state
-                    .recent_trades
-                    .write()
-                    .await
-                    .remove(&fingerprint);
-                self.client
-                    .state
-                    .trade_state
-                    .pending_market_orders
-                    .write()
-                    .await
-                    .remove(&request_id);
+                self.cleanup_trade(&fingerprint, request_id).await;
                 return Err(e);
             }
         };
 
-        let deal_result = handle
-            .trade_with_id(asset_str.clone(), action, amount, time, request_id)
-            .await;
-
-        match deal_result {
+        match handle.trade_with_id(asset_str, action, amount, time, request_id).await {
             Ok(deal) => {
-                // Update with the actual deal ID
-                self.client
-                    .state
-                    .trade_state
-                    .recent_trades
-                    .write()
-                    .await
-                    .insert(fingerprint, (deal.id, std::time::Instant::now()));
-                // Note: We keep it in pending_market_orders until it's confirmed by the DealsApiModule or TradesApiModule
+                self.client.state.trade_state.recent_trades.write().await.insert(fingerprint, (deal.id, std::time::Instant::now()));
                 Ok((deal.id, deal))
             }
             Err(e) => {
-                // Remove the placeholder if trade fails
-                self.client
-                    .state
-                    .trade_state
-                    .recent_trades
-                    .write()
-                    .await
-                    .remove(&fingerprint);
-                self.client
-                    .state
-                    .trade_state
-                    .pending_market_orders
-                    .write()
-                    .await
-                    .remove(&request_id);
+                self.cleanup_trade(&fingerprint, request_id).await;
                 Err(e)
             }
         }
@@ -684,7 +588,7 @@ impl PocketOption {
         open_type: u32,
         amount: Decimal,
         asset: String,
-        open_time: u32,
+        open_time: String,
         open_price: Decimal,
         timeframe: u32,
         min_payout: u32,
@@ -692,31 +596,10 @@ impl PocketOption {
     ) -> PocketResult<PendingOrder> {
         self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
             .await?
+            .with_lock(self.pending_trades_lock.clone())
             .open_pending_order(
                 open_type, amount, asset, open_time, open_price, timeframe, min_payout, command,
             )
-            .await
-    }
-
-    /// Cancels a pending order by ticket.
-    pub async fn cancel_pending_order(
-        &self,
-        ticket: Uuid,
-    ) -> PocketResult<CancelPendingOrderResult> {
-        self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
-            .await?
-            .cancel_pending_order(ticket)
-            .await
-    }
-
-    /// Cancels multiple pending orders by ticket.
-    pub async fn cancel_pending_orders(
-        &self,
-        tickets: Vec<Uuid>,
-    ) -> PocketResult<Vec<CancelPendingOrderResult>> {
-        self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
-            .await?
-            .cancel_pending_orders(tickets)
             .await
     }
 
@@ -740,12 +623,47 @@ impl PocketOption {
             .await
     }
 
+    /// Cancels a pending order by its ticket identifier.
+    ///
+    /// # Arguments
+    /// * `ticket` - The unique ticket string identifying the pending order to cancel.
+    ///
+    /// # Returns
+    /// * `Ok(String)` - The ticket of the successfully cancelled order.
+    pub async fn cancel_pending_order(&self, ticket: String) -> PocketResult<String> {
+        self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
+            .await?
+            .with_lock(self.pending_trades_lock.clone())
+            .cancel_pending_order(ticket)
+            .await
+    }
+
+    /// Cancels multiple pending orders in a single batch operation.
+    ///
+    /// # Arguments
+    /// * `tickets` - A vector of ticket strings identifying the pending orders to cancel.
+    ///
+    /// # Returns
+    /// * `Ok(Vec<String>)` - A vector of tickets that were successfully cancelled.
+    pub async fn cancel_pending_orders(&self, tickets: Vec<String>) -> PocketResult<Vec<String>> {
+        self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
+            .await?
+            .with_lock(self.pending_trades_lock.clone())
+            .cancel_pending_orders(tickets)
+            .await
+    }
+
     /// Subscribes to a specific asset's updates.
     pub async fn subscribe(
         &self,
         asset: impl ToString,
         sub_type: SubscriptionType,
     ) -> PocketResult<SubscriptionStream> {
+        if !self.is_connected() {
+            return Err(PocketError::General(
+                "Not connected to server. The connection may have dropped; wait for reconnection or create a new client.".into(),
+            ));
+        }
         let handle = self
             .require_handle::<SubscriptionsApiModule>("SubscriptionsApiModule")
             .await?;
@@ -855,22 +773,44 @@ impl PocketOption {
     }
 
     /// Gets historical tick data (timestamp, price) for a specific asset and period.
+    ///
+    /// This method uses `loadHistoryPeriod` with pagination to fetch tick data going back
+    /// as far as needed, overcoming the limited window returned by `changeSymbol`.
+    ///
     /// # Arguments
     /// * `asset` - The asset to get historical data for.
-    /// * `period` - The time period for each tick in seconds.
+    /// * `lookback_seconds` - How many seconds of tick history to fetch.
+    ///
     /// # Returns
     /// A `PocketResult` containing a vector of `(timestamp, price)` if successful, or an error if the request fails.
-    pub async fn ticks(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<(i64, f64)>> {
-        let handle = self
-            .require_handle::<HistoricalDataApiModule>("HistoricalDataApiModule")
-            .await?;
+    pub async fn ticks(
+        &self,
+        asset: impl ToString,
+        lookback_seconds: u32,
+    ) -> PocketResult<Vec<(i64, f64)>> {
+        let asset_str = asset.to_string();
+
+        if !self.is_connected() {
+            return Err(PocketError::General(
+                "Not connected to server. The connection may have dropped; wait for reconnection or create a new client.".into(),
+            ));
+        }
 
         if let Some(assets) = self.assets().await {
-            if assets.get(&asset.to_string()).is_none() {
-                return Err(PocketError::InvalidAsset(asset.to_string()));
+            if assets.get(&asset_str).is_none() {
+                return Err(PocketError::InvalidAsset(asset_str.clone()));
             }
         }
-        handle.ticks(asset.to_string(), period).await
+
+        // Use GetCandlesApiModule with loadHistoryPeriod for paginated tick fetching
+        let handle = self
+            .require_handle::<GetCandlesApiModule>("GetCandlesApiModule")
+            .await?;
+
+        // Use a 1-second period context for the server
+        handle
+            .get_ticks(asset_str, 1, lookback_seconds as i64)
+            .await
     }
 
     /// Gets historical candle data for a specific asset and period.
@@ -880,6 +820,11 @@ impl PocketOption {
     /// # Returns
     /// A `PocketResult` containing a vector of `Candle` if successful, or an error if the request fails.
     pub async fn candles(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<Candle>> {
+        if !self.is_connected() {
+            return Err(PocketError::General(
+                "Not connected to server. The connection may have dropped; wait for reconnection or create a new client.".into(),
+            ));
+        }
         let handle = self
             .require_handle::<HistoricalDataApiModule>("HistoricalDataApiModule")
             .await?;

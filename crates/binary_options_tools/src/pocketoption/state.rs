@@ -70,6 +70,8 @@ pub struct State {
     pub raw_keep_alive: Arc<RwLock<HashMap<Uuid, Outgoing>>>,
     /// List of fallback WebSocket URLs
     pub urls: Vec<String>,
+    /// Maximum number of concurrent asset subscriptions allowed
+    pub max_subscriptions: usize,
 }
 
 /// Builder pattern for creating State instances
@@ -82,6 +84,7 @@ pub struct StateBuilder {
     default_connection_url: Option<String>,
     default_symbol: Option<String>,
     urls: Vec<String>,
+    max_subscriptions: Option<usize>,
 }
 
 impl StateBuilder {
@@ -118,11 +121,22 @@ impl StateBuilder {
         self
     }
 
-    /// Build the final State instance
+    /// Set the maximum number of concurrent asset subscriptions
     ///
-    /// # Returns
-    /// Result containing the State or an error if required fields are missing
+    /// # Arguments
+    /// * `max` - Maximum subscriptions allowed (default: 4)
+    pub fn max_subscriptions(mut self, max: usize) -> Self {
+        self.max_subscriptions = Some(max);
+        self
+    }
+
+    /// Build the final State instance
     pub fn build(self) -> PocketResult<State> {
+        self.build_with_trade_state(Arc::new(TradeState::default()))
+    }
+
+    /// Build the final State instance with a custom TradeState
+    pub fn build_with_trade_state(self, trade_state: Arc<TradeState>) -> PocketResult<State> {
         Ok(State {
             ssid: self
                 .ssid
@@ -136,13 +150,14 @@ impl StateBuilder {
             server_time: ServerTimeState::default(),
             assets: RwLock::new(None),
             assets_updated: Arc::new(tokio::sync::Notify::new()),
-            trade_state: Arc::new(TradeState::default()),
+            trade_state,
             raw_validators: SyncRwLock::new(HashMap::new()),
             active_subscriptions: RwLock::new(HashMap::new()),
             histories: RwLock::new(Vec::new()),
             raw_sinks: RwLock::new(HashMap::new()),
             raw_keep_alive: Arc::new(RwLock::new(HashMap::new())),
             urls: self.urls,
+            max_subscriptions: self.max_subscriptions.unwrap_or(4),
         })
     }
 }
@@ -302,15 +317,15 @@ type RecentTradeKey = (String, Action, u32, Decimal);
 #[derive(Debug, Default)]
 pub struct TradeState {
     /// A map of currently opened deals, keyed by their UUID.
-    pub opened_deals: RwLock<HashMap<Uuid, Deal>>,
+    opened_deals: RwLock<HashMap<Uuid, Deal>>,
     /// A map of recently closed deals, keyed by their UUID.
-    pub closed_deals: RwLock<HashMap<Uuid, Deal>>,
+    closed_deals: RwLock<HashMap<Uuid, Deal>>,
     /// A map of pending deals, keyed by their UUID.
     pub pending_deals: RwLock<HashMap<Uuid, PendingOrder>>,
     /// A map of market orders sent but not yet confirmed by the server.
     /// Key: Request UUID. Value: (OpenOrder, Timestamp sent)
     pub pending_market_orders: RwLock<HashMap<Uuid, (OpenOrder, Instant)>>,
-    /// Cache of recent trades to prevent duplicates.
+    /// Cache of recent trades
     /// Key: (Asset, Action, Time, Amount). Value: (Trade ID, Timestamp)
     pub recent_trades: RwLock<HashMap<RecentTradeKey, (Uuid, Instant)>>,
 }
@@ -336,24 +351,32 @@ impl TradeState {
 
     /// Moves deals from opened to closed and adds new closed deals.
     pub async fn update_closed_deals(&self, deals: Vec<Deal>) {
-        let ids: Vec<_> = deals.iter().map(|deal| deal.id).collect();
+        let mut opened = self.opened_deals.write().await;
+        let mut closed = self.closed_deals.write().await;
 
-        // Remove these deals from opened_deals
-        self.opened_deals
-            .write()
-            .await
-            .retain(|id, _| !ids.contains(id));
-
-        // Add them to closed_deals
-        self.closed_deals
-            .write()
-            .await
-            .extend(deals.into_iter().map(|deal| (deal.id, deal)));
+        for deal in deals {
+            opened.remove(&deal.id);
+            closed.insert(deal.id, deal);
+        }
     }
 
     /// Removes all deals from the closed_deals map.
     pub async fn clear_closed_deals(&self) {
         self.closed_deals.write().await.clear();
+    }
+
+    /// Prunes the closed_deals map to keep only the most recent N deals.
+    pub async fn prune_closed_deals(&self, max_deals: usize) {
+        let mut closed = self.closed_deals.write().await;
+        if closed.len() > max_deals {
+            let mut deals: Vec<_> = closed.values().collect();
+            // Sort by close timestamp (descending)
+            deals.sort_by(|a, b| b.close_timestamp.cmp(&a.close_timestamp));
+
+            let to_keep: std::collections::HashSet<_> =
+                deals.iter().take(max_deals).map(|d| d.id).collect();
+            closed.retain(|id, _| to_keep.contains(id));
+        }
     }
 
     /// Clears all opened deals.
