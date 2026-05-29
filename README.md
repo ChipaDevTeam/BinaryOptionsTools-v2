@@ -152,7 +152,7 @@ maturin develop --release
 Requires `rustc`, `cargo`, and `maturin`.
 
 ```bash
-pip install git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git#subdirectory=BinaryOptionsToolsV2
+pip install git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git#subdirectory=python
 ```
 
 ### Rust
