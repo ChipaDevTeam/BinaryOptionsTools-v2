@@ -4,7 +4,13 @@ import sys
 from .config import Config as Config
 from . import tracing as tracing
 from . import validator as validator
-from .pocketoption import PocketOptionAsync, PocketOption, __all__ as __pocket_all__  # noqa: F401
+from .pocketoption import (
+    PocketOptionAsync,
+    PocketOption,
+    RawHandler,
+    Validator,
+    __all__ as __pocket_all__,
+)  # noqa: F401
 
 # Import the Rust module and re-export its attributes
 _rust_module = None
@@ -33,4 +39,10 @@ _rust_exported_names = [
 ]
 __rust_all__ = [n for n in _rust_exported_names if n in globals()]
 
-__all__ = list(set(__pocket_all__ + ["tracing", "validator", "PocketOptionAsync", "PocketOption"] + __rust_all__))
+__all__ = list(
+    set(
+        __pocket_all__
+        + ["tracing", "validator", "PocketOptionAsync", "PocketOption", "RawHandler", "Validator"]
+        + __rust_all__
+    )
+)

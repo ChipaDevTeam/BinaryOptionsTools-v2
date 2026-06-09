@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from ..config import Config
 from ..validator import Validator
-from .asynchronous import PocketOptionAsync
+from .asynchronous import PocketOptionAsync, RawHandler, Validator
 
 
 class SyncSubscription:

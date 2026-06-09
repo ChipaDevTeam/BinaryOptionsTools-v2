@@ -12,8 +12,9 @@ __all__ = [
     "PocketOption",
     "RawHandler",
     "RawHandlerSync",
+    "Validator",
 ]
 
 from . import asynchronous, synchronous
-from .asynchronous import PocketOptionAsync, RawHandler
+from .asynchronous import PocketOptionAsync, RawHandler, Validator
 from .synchronous import PocketOption, RawHandlerSync

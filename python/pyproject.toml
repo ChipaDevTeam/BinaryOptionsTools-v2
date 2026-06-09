@@ -3,7 +3,7 @@ requires = ["maturin>=1.7,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "binaryoptionstoolsv2"
+name = "BinaryOptionsToolsV2"
 description = "Python bindings for binary-options-tools. High-performance library for PocketOption trading automation with async/sync support, real-time data streaming, and WebSocket API access."
 authors = [
     {name = "ChipaDevTeam"},
