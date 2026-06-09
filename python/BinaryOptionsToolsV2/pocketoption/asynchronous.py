@@ -462,8 +462,8 @@ class PocketOptionAsync:
 
         Args:
             asset (str): Trading asset (e.g., "EURUSD_otc")
-            timeframe (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
             period (int): Historical period in seconds to fetch
+            offset (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
 
         Returns:
             List[Dict]: List of candles, each containing:
@@ -486,8 +486,8 @@ class PocketOptionAsync:
 
         Args:
             asset (str): Trading asset (e.g., "EURUSD_otc")
-            timeframe (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
             period (int): Historical period in seconds to fetch
+            offset (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
             time (int): Time to fetch candles from
 
         Returns:
