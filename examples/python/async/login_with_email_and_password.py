@@ -15,6 +15,11 @@ Usage:
 
 import asyncio
 import os
+import sys
+from pathlib import Path
+
+# Allow running directly from the repo without installing the package
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "python"))
 
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 from BinaryOptionsToolsV2.pocketoption.tools.login import LoginError, login_async
