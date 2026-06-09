@@ -1,46 +1,16 @@
-"""Probe which HTTP method can reach pocketoption.com/en/login/"""
-import sys
+"""Test connectivity to both PO domains and attempt login via po.trade"""
+import re
+import requests
 
-def try_curl_cffi():
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+
+for url in ["https://po.trade/en/login/", "https://pocketoption.com/en/login/"]:
     try:
-        from curl_cffi import requests as cr
-        r = cr.get("https://pocketoption.com/en/login/", impersonate="chrome", timeout=20)
-        print(f"[curl_cffi chrome] status={r.status_code} len={len(r.text)}")
-        return r.status_code == 200
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=15)
+        print(f"GET {url} -> {r.status_code}, len={len(r.text)}")
+        # print input fields
+        for m in re.finditer(r'<input[^>]{0,200}>', r.text, re.IGNORECASE):
+            print(" ", m.group()[:100])
     except Exception as e:
-        print(f"[curl_cffi] failed: {e}")
-        return False
-
-def try_playwright_firefox():
-    try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as pw:
-            browser = pw.firefox.launch(headless=True)
-            page = browser.new_page()
-            page.goto("https://pocketoption.com/en/login/", wait_until="domcontentloaded", timeout=20000)
-            print(f"[playwright firefox] url={page.url} title={page.title()}")
-            browser.close()
-            return True
-    except Exception as e:
-        print(f"[playwright firefox] failed: {e}")
-        return False
-
-def try_playwright_chrome_channel():
-    try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True, channel="chrome")
-            page = browser.new_page()
-            page.goto("https://pocketoption.com/en/login/", wait_until="domcontentloaded", timeout=20000)
-            print(f"[playwright chrome channel] url={page.url}")
-            browser.close()
-            return True
-    except Exception as e:
-        print(f"[playwright chrome channel] failed: {e}")
-        return False
-
-print("Testing connectivity methods...")
-ok1 = try_curl_cffi()
-ok2 = try_playwright_firefox()
-ok3 = try_playwright_chrome_channel()
-print(f"\nResults: curl_cffi={ok1}  playwright_firefox={ok2}  playwright_chrome={ok3}")
+        print(f"GET {url} -> FAILED: {e}")
+    print()
