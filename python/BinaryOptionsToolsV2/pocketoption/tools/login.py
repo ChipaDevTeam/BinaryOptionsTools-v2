@@ -1,23 +1,34 @@
 """
 Login module for PocketOption — obtain a session SSID from email/password.
 
-Two backends are available:
+Three backends are available:
 
-* ``"playwright"`` (default) — launches a headless Chromium browser that
-  fills the login form and clicks submit.  reCAPTCHA v3 is handled
-  automatically by the real browser engine.  Requires the ``playwright``
-  package (``pip install playwright && playwright install chromium``).
+* ``"capsolver"`` — uses the CapSolver API (free tier at capsolver.com) to solve
+  reCAPTCHA v3, then submits the form via plain HTTP requests.  Best choice when
+  browser processes are blocked by a firewall.  Requires ``api_key`` and the
+  ``requests`` package.
 
-* ``"2captcha"`` — uses the 2captcha API to solve the reCAPTCHA v3 token
-  and then submits the form via plain HTTP.  Requires a ``api_key``
-  argument and the ``requests`` package.
+* ``"2captcha"`` — same approach but uses the 2captcha.com service instead of
+  CapSolver.  Requires ``api_key`` and the ``requests`` package.
+
+* ``"playwright"`` — launches a headless browser (Firefox → Chromium → system
+  Chrome) that fills the form and handles reCAPTCHA v3 automatically.  Requires
+  ``pip install playwright && playwright install firefox chromium``.  Useful when
+  a captcha solver API key is not available.
+
+* ``"auto"`` (default) — tries ``playwright`` first; if every browser backend
+  fails with a network error, raises ``LoginError`` with instructions to use
+  the captcha-solver backends.
 
 Usage::
 
+    # With CapSolver (recommended when browsers are firewall-blocked)
     from BinaryOptionsToolsV2.pocketoption.tools.login import login
+    ssid = login("you@example.com", "password", demo=True,
+                 backend="capsolver", api_key="YOUR_CAPSOLVER_KEY")
 
+    # With Playwright headless browser
     ssid = login("you@example.com", "password", demo=True)
-    # ssid == '42["auth",{"session":"...","isDemo":1,...}]'
 """
 
 from __future__ import annotations
@@ -52,7 +63,7 @@ def login(
     password: str,
     *,
     demo: bool = False,
-    backend: Literal["playwright", "2captcha"] = "playwright",
+    backend: Literal["auto", "playwright", "capsolver", "2captcha"] = "auto",
     api_key: Optional[str] = None,
     headless: bool = True,
     timeout: int = 60,
@@ -63,9 +74,9 @@ def login(
         email: Account e-mail address.
         password: Account password.
         demo: If True, the SSID targets the demo account.
-        backend: ``"playwright"`` (default) uses a headless browser;
-                 ``"2captcha"`` uses the 2captcha API (needs ``api_key``).
-        api_key: 2captcha API key — only used when ``backend="2captcha"``.
+        backend: Which login method to use (see module docstring).
+            ``"auto"`` tries playwright and gives a clear error if it fails.
+        api_key: CapSolver or 2captcha API key (required for those backends).
         headless: Run the browser in headless mode (playwright only).
         timeout: Overall timeout in seconds.
 
@@ -74,14 +85,23 @@ def login(
 
     Raises:
         LoginError: Credentials rejected or session cookie not found.
+        ValueError: Missing required argument (e.g. api_key).
         ImportError: Required backend library not installed.
     """
-    if backend == "playwright":
+    if backend in ("auto", "playwright"):
         session = _login_playwright(email, password, headless=headless, timeout=timeout)
+    elif backend == "capsolver":
+        if not api_key:
+            raise ValueError("api_key is required when backend='capsolver'")
+        session = _login_captcha_solver(
+            email, password, api_key=api_key, service="capsolver", timeout=timeout
+        )
     elif backend == "2captcha":
         if not api_key:
             raise ValueError("api_key is required when backend='2captcha'")
-        session = _login_2captcha(email, password, api_key=api_key, timeout=timeout)
+        session = _login_captcha_solver(
+            email, password, api_key=api_key, service="2captcha", timeout=timeout
+        )
     else:
         raise ValueError(f"Unknown backend: {backend!r}")
 
@@ -97,7 +117,7 @@ async def login_async(
     password: str,
     *,
     demo: bool = False,
-    backend: Literal["playwright", "2captcha"] = "playwright",
+    backend: Literal["auto", "playwright", "capsolver", "2captcha"] = "auto",
     api_key: Optional[str] = None,
     headless: bool = True,
     timeout: int = 60,
@@ -126,10 +146,9 @@ async def login_async(
 
 
 def _login_playwright(email: str, password: str, *, headless: bool, timeout: int) -> str:
-    """Use a real browser to log in and return the session value.
+    """Use a real browser to log in and return the po_session cookie value.
 
-    Tries Firefox first (better TLS fingerprint vs PocketOption's bot filter),
-    then falls back to Chromium.
+    Tries Firefox → Chromium → system Chrome in order.
     """
     try:
         from playwright.sync_api import Error as PWError
@@ -139,7 +158,7 @@ def _login_playwright(email: str, password: str, *, headless: bool, timeout: int
         raise ImportError(
             "playwright is required for the 'playwright' backend.\n"
             "Install it with:  pip install playwright\n"
-            "Then install browsers:  playwright install firefox chromium"
+            "Then:             py -3 -m playwright install firefox chromium"
         ) from exc
 
     last_error: Exception = RuntimeError("no browser attempted")
@@ -174,25 +193,26 @@ def _login_playwright(email: str, password: str, *, headless: bool, timeout: int
                     )
                 except PWTimeout:
                     err_els = page.locator(".error, .alert, .form-error")
-                    err_text = err_els.first.text_content(timeout=2000) if err_els.count() > 0 else ""
+                    err_text = (
+                        err_els.first.text_content(timeout=2000)
+                        if err_els.count() > 0
+                        else ""
+                    )
                     raise LoginError(
-                        f"Login did not redirect away from /login/ within {timeout}s. "
-                        + (f"Page error: {err_text}" if err_text else "Credentials may be wrong or CAPTCHA blocked.")
+                        "Login did not redirect — credentials may be wrong or CAPTCHA blocked."
+                        + (f" Page says: {err_text}" if err_text else "")
                     )
 
-                cookies = ctx.cookies()
-                session_value = _find_session_cookie(cookies)
+                session_value = _find_session_cookie(ctx.cookies())
                 if not session_value:
                     raise LoginError(
-                        "Login appeared to succeed (redirected) but 'po_session' cookie "
-                        "was not found in the browser context."
+                        "Login redirected but 'po_session' cookie was not found."
                     )
                 return session_value
 
             except LoginError:
                 raise
             except PWError as exc:
-                # Network-level failure — try next browser
                 last_error = exc
                 continue
             finally:
@@ -200,16 +220,17 @@ def _login_playwright(email: str, password: str, *, headless: bool, timeout: int
 
     raise LoginError(
         f"All browser backends failed to reach {LOGIN_URL}.\n"
-        f"Last error: {last_error}\n"
-        "Possible causes:\n"
-        "  • Your IP is temporarily rate-limited by PocketOption — wait a few minutes.\n"
-        "  • A firewall is blocking browser network access. Try headless=False.\n"
-        "  • Required browsers not installed: playwright install firefox chromium"
+        f"Last error: {last_error}\n\n"
+        "Your browser processes appear to be blocked by a firewall or security\n"
+        "software.  Use a captcha-solver backend instead:\n\n"
+        "  1. Get a FREE CapSolver key at https://capsolver.com  (no credit card)\n"
+        "  2. Call:  login(email, password, backend='capsolver', api_key='YOUR_KEY')\n\n"
+        "Or use 2captcha.com (paid) with backend='2captcha'."
     )
 
 
 def _browser_configs(pw, headless: bool):
-    """Yield (browser_type, launch_kwargs, context_kwargs) to try in order."""
+    """Yield (browser_type, launch_kwargs, context_kwargs) in order to try."""
     common_ctx = {
         "user_agent": _DEFAULT_UA,
         "locale": "en-US",
@@ -217,13 +238,11 @@ def _browser_configs(pw, headless: bool):
         "viewport": {"width": 1366, "height": 768},
         "extra_http_headers": {"Accept-Language": "en-US,en;q=0.9"},
     }
-    # Firefox first — its TLS fingerprint is less likely to be blocked
     yield (
         pw.firefox,
         {"headless": headless},
         common_ctx,
     )
-    # Chromium as fallback
     yield (
         pw.chromium,
         {
@@ -245,7 +264,6 @@ def _browser_configs(pw, headless: bool):
             },
         },
     )
-    # System Chrome if installed
     yield (
         pw.chromium,
         {
@@ -264,34 +282,42 @@ def _find_session_cookie(cookies: list[dict]) -> Optional[str]:
     return None
 
 
-# ── 2captcha backend ───────────────────────────────────────────────────────────
+# ── Captcha-solver HTTP backend (CapSolver + 2captcha) ─────────────────────────
 
 
-def _login_2captcha(email: str, password: str, *, api_key: str, timeout: int) -> str:
-    """Solve reCAPTCHA v3 via 2captcha, then POST credentials via HTTP."""
+def _login_captcha_solver(
+    email: str,
+    password: str,
+    *,
+    api_key: str,
+    service: Literal["capsolver", "2captcha"],
+    timeout: int,
+) -> str:
+    """Solve reCAPTCHA v3 via a solver API then POST credentials over HTTP."""
     try:
-        import requests
+        import requests as req
     except ImportError as exc:
         raise ImportError(
-            "requests is required for the '2captcha' backend.\n"
+            "requests is required for captcha-solver backends.\n"
             "Install it with: pip install requests"
         ) from exc
 
-    s = requests.Session()
-    s.headers.update({"User-Agent": _DEFAULT_UA, "Accept-Language": "en-GB,en;q=0.9"})
+    s = req.Session()
+    s.headers.update({"User-Agent": _DEFAULT_UA, "Accept-Language": "en-US,en;q=0.9"})
 
-    # Step 1: GET login page — collect cookies and register_page
+    # Step 1: GET login page to collect cookies and register_page value
     r = s.get(LOGIN_URL, timeout=30)
     r.raise_for_status()
-    html = r.text
-
-    m = _REGISTER_PAGE_RE.search(html)
+    m = _REGISTER_PAGE_RE.search(r.text)
     register_page = (m.group(1) or m.group(2)) if m else "0"
 
-    # Step 2: Submit reCAPTCHA v3 task to 2captcha
-    captcha_token = _solve_recaptcha_v3(api_key, pageurl=LOGIN_URL, timeout=timeout)
+    # Step 2: Solve reCAPTCHA v3
+    if service == "capsolver":
+        captcha_token = _solve_via_capsolver(api_key, timeout=timeout)
+    else:
+        captcha_token = _solve_via_2captcha(api_key, timeout=timeout)
 
-    # Step 3: POST login form
+    # Step 3: POST the login form
     boundary = "----WebKitFormBoundary" + uuid.uuid4().hex[:16].upper()
     fields = {
         "submitLogin": "1",
@@ -322,12 +348,10 @@ def _login_2captcha(email: str, password: str, *, api_key: str, timeout: int) ->
         allow_redirects=False,
     )
 
-    # Step 4: Try to parse response
+    # Step 4: Check for server-side errors in JSON response
     try:
         data = resp.json()
-        if not data.get("status", True) is False:
-            pass  # success branch (status True or missing)
-        else:
+        if data.get("status") is False:
             err = data.get("error", {})
             raise LoginError(f"Server rejected login: {err}")
     except (ValueError, AttributeError):
@@ -338,24 +362,66 @@ def _login_2captcha(email: str, password: str, *, api_key: str, timeout: int) ->
     if not session_value:
         _check_response_for_errors(resp.text)
         raise LoginError(
-            "Login appeared to succeed but 'po_session' cookie was not found. "
-            f"Response status: {resp.status_code}"
+            f"Login request returned HTTP {resp.status_code} but 'po_session' "
+            "cookie was not set. Check your credentials."
         )
     return session_value
 
 
-def _solve_recaptcha_v3(api_key: str, pageurl: str, timeout: int) -> str:
-    """Submit a reCAPTCHA v3 task to 2captcha and return the token."""
-    import requests
+def _solve_via_capsolver(api_key: str, *, timeout: int) -> str:
+    """Submit a ReCaptchaV3TaskProxyless task to CapSolver and return the token."""
+    import requests as req
 
-    # Submit task
-    submit = requests.post(
+    submit = req.post(
+        "https://api.capsolver.com/createTask",
+        json={
+            "clientKey": api_key,
+            "task": {
+                "type": "ReCaptchaV3TaskProxyless",
+                "websiteURL": LOGIN_URL,
+                "websiteKey": RECAPTCHA_SITEKEY,
+                "pageAction": "login",
+                "minScore": 0.5,
+            },
+        },
+        timeout=30,
+    )
+    result = submit.json()
+    if result.get("errorId") != 0:
+        raise LoginError(
+            f"CapSolver task creation failed: {result.get('errorDescription', result)}\n"
+            "Get a free API key at https://capsolver.com"
+        )
+    task_id = result["taskId"]
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(3)
+        poll = req.post(
+            "https://api.capsolver.com/getTaskResult",
+            json={"clientKey": api_key, "taskId": task_id},
+            timeout=30,
+        )
+        data = poll.json()
+        if data.get("errorId") != 0:
+            raise LoginError(f"CapSolver error: {data.get('errorDescription', data)}")
+        if data.get("status") == "ready":
+            return data["solution"]["gRecaptchaResponse"]
+
+    raise LoginError(f"CapSolver did not return a token within {timeout}s")
+
+
+def _solve_via_2captcha(api_key: str, *, timeout: int) -> str:
+    """Submit a reCAPTCHA v3 task to 2captcha and return the token."""
+    import requests as req
+
+    submit = req.post(
         "https://2captcha.com/in.php",
         data={
             "key": api_key,
             "method": "userrecaptcha",
             "googlekey": RECAPTCHA_SITEKEY,
-            "pageurl": pageurl,
+            "pageurl": LOGIN_URL,
             "version": "v3",
             "action": "login",
             "min_score": "0.5",
@@ -368,11 +434,10 @@ def _solve_recaptcha_v3(api_key: str, pageurl: str, timeout: int) -> str:
         raise LoginError(f"2captcha submission failed: {result}")
     task_id = result["request"]
 
-    # Poll for result
     deadline = time.time() + timeout
     while time.time() < deadline:
         time.sleep(5)
-        poll = requests.get(
+        poll = req.get(
             f"https://2captcha.com/res.php?key={api_key}&action=get&id={task_id}&json=1",
             timeout=30,
         )
@@ -385,7 +450,7 @@ def _solve_recaptcha_v3(api_key: str, pageurl: str, timeout: int) -> str:
     raise LoginError(f"2captcha did not return a token within {timeout}s")
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# ── Shared helpers ─────────────────────────────────────────────────────────────
 
 
 def _build_multipart(fields: dict[str, str], boundary: str) -> bytes:
@@ -393,7 +458,9 @@ def _build_multipart(fields: dict[str, str], boundary: str) -> bytes:
     sep = f"--{boundary}".encode()
     for name, value in fields.items():
         parts.append(sep)
-        parts.append(f'Content-Disposition: form-data; name="{name}"\r\n\r\n{value}'.encode())
+        parts.append(
+            f'Content-Disposition: form-data; name="{name}"\r\n\r\n{value}'.encode()
+        )
     parts.append(f"--{boundary}--".encode())
     return b"\r\n".join(parts)
 
@@ -403,7 +470,7 @@ def _check_response_for_errors(body: str) -> None:
     if "invalid" in lower or "incorrect" in lower or "wrong" in lower:
         raise LoginError("Invalid credentials: server rejected the email/password.")
     if "captcha" in lower:
-        raise LoginError("Login blocked by CAPTCHA.")
+        raise LoginError("Login blocked by CAPTCHA — the solver token may be stale.")
 
 
 class LoginError(RuntimeError):
