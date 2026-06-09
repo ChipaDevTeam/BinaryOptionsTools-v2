@@ -126,83 +126,135 @@ async def login_async(
 
 
 def _login_playwright(email: str, password: str, *, headless: bool, timeout: int) -> str:
-    """Use a real Chromium browser to log in and return the session value."""
+    """Use a real browser to log in and return the session value.
+
+    Tries Firefox first (better TLS fingerprint vs PocketOption's bot filter),
+    then falls back to Chromium.
+    """
     try:
-        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+        from playwright.sync_api import Error as PWError
+        from playwright.sync_api import TimeoutError as PWTimeout
+        from playwright.sync_api import sync_playwright
     except ImportError as exc:
         raise ImportError(
             "playwright is required for the 'playwright' backend.\n"
-            "Install it with: pip install playwright && playwright install chromium"
+            "Install it with:  pip install playwright\n"
+            "Then install browsers:  playwright install firefox chromium"
         ) from exc
 
+    last_error: Exception = RuntimeError("no browser attempted")
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(
-            headless=headless,
-            args=[
+        for browser_type, launch_kwargs, ctx_kwargs in _browser_configs(pw, headless):
+            try:
+                browser = browser_type.launch(**launch_kwargs)
+            except Exception as exc:
+                last_error = exc
+                continue
+
+            ctx = browser.new_context(**ctx_kwargs)
+            ctx.add_init_script(
+                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+            )
+            page = ctx.new_page()
+            try:
+                page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=timeout * 1000)
+                page.fill('input[name="email"]', email)
+                page.fill('input[name="password"]', password)
+                try:
+                    page.check('input[name="remember"]', timeout=2000)
+                except Exception:
+                    pass
+
+                page.click('button[type="submit"], input[type="submit"]')
+
+                try:
+                    page.wait_for_url(
+                        lambda url: "/login/" not in url,
+                        timeout=timeout * 1000,
+                    )
+                except PWTimeout:
+                    err_els = page.locator(".error, .alert, .form-error")
+                    err_text = err_els.first.text_content(timeout=2000) if err_els.count() > 0 else ""
+                    raise LoginError(
+                        f"Login did not redirect away from /login/ within {timeout}s. "
+                        + (f"Page error: {err_text}" if err_text else "Credentials may be wrong or CAPTCHA blocked.")
+                    )
+
+                cookies = ctx.cookies()
+                session_value = _find_session_cookie(cookies)
+                if not session_value:
+                    raise LoginError(
+                        "Login appeared to succeed (redirected) but 'po_session' cookie "
+                        "was not found in the browser context."
+                    )
+                return session_value
+
+            except LoginError:
+                raise
+            except PWError as exc:
+                # Network-level failure — try next browser
+                last_error = exc
+                continue
+            finally:
+                browser.close()
+
+    raise LoginError(
+        f"All browser backends failed to reach {LOGIN_URL}.\n"
+        f"Last error: {last_error}\n"
+        "Possible causes:\n"
+        "  • Your IP is temporarily rate-limited by PocketOption — wait a few minutes.\n"
+        "  • A firewall is blocking browser network access. Try headless=False.\n"
+        "  • Required browsers not installed: playwright install firefox chromium"
+    )
+
+
+def _browser_configs(pw, headless: bool):
+    """Yield (browser_type, launch_kwargs, context_kwargs) to try in order."""
+    common_ctx = {
+        "user_agent": _DEFAULT_UA,
+        "locale": "en-US",
+        "timezone_id": "America/New_York",
+        "viewport": {"width": 1366, "height": 768},
+        "extra_http_headers": {"Accept-Language": "en-US,en;q=0.9"},
+    }
+    # Firefox first — its TLS fingerprint is less likely to be blocked
+    yield (
+        pw.firefox,
+        {"headless": headless},
+        common_ctx,
+    )
+    # Chromium as fallback
+    yield (
+        pw.chromium,
+        {
+            "headless": headless,
+            "args": [
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
-                "--disable-web-security",
-                "--disable-features=IsolateOrigins,site-per-process",
                 "--lang=en-US,en",
             ],
-        )
-        ctx = browser.new_context(
-            user_agent=_DEFAULT_UA,
-            locale="en-US",
-            timezone_id="America/New_York",
-            viewport={"width": 1366, "height": 768},
-            extra_http_headers={
-                "Accept-Language": "en-US,en;q=0.9",
+        },
+        {
+            **common_ctx,
+            "extra_http_headers": {
+                **common_ctx["extra_http_headers"],
                 "sec-ch-ua": '"Not-A.Brand";v="24", "Chromium";v="146"',
                 "sec-ch-ua-mobile": "?0",
                 "sec-ch-ua-platform": '"Windows"',
             },
-        )
-        # Mask navigator.webdriver
-        ctx.add_init_script(
-            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-        )
-        page = ctx.new_page()
-
-        try:
-            page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=timeout * 1000)
-            page.fill('input[name="email"]', email)
-            page.fill('input[name="password"]', password)
-            # Check the remember-me checkbox if present
-            try:
-                page.check('input[name="remember"]', timeout=2000)
-            except Exception:
-                pass
-
-            page.click('button[type="submit"], input[type="submit"]')
-
-            # Wait for either a redirect away from /login/ or an error message
-            try:
-                page.wait_for_url(
-                    lambda url: "/login/" not in url,
-                    timeout=timeout * 1000,
-                )
-            except PWTimeout:
-                # Check for an error message on the page
-                err_text = page.locator(".error, .alert, .form-error").first.text_content(timeout=2000) if page.locator(".error, .alert, .form-error").count() > 0 else ""
-                raise LoginError(
-                    f"Login did not redirect away from /login/ within {timeout}s. "
-                    + (f"Page error: {err_text}" if err_text else "Credentials may be wrong or CAPTCHA blocked.")
-                )
-
-            # Grab po_session cookie
-            cookies = ctx.cookies()
-            session_value = _find_session_cookie(cookies)
-            if not session_value:
-                raise LoginError(
-                    "Login appeared to succeed (redirected) but 'po_session' cookie "
-                    "was not found in the browser context."
-                )
-            return session_value
-
-        finally:
-            browser.close()
+        },
+    )
+    # System Chrome if installed
+    yield (
+        pw.chromium,
+        {
+            "headless": headless,
+            "channel": "chrome",
+            "args": ["--disable-blink-features=AutomationControlled"],
+        },
+        common_ctx,
+    )
 
 
 def _find_session_cookie(cookies: list[dict]) -> Optional[str]:
