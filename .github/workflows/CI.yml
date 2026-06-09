@@ -32,6 +32,8 @@ jobs:
       - name: Install dependencies with uv
         run: uv pip install --system mkdocs-material "mkdocstrings[python]"
       - run: mkdocs gh-deploy --force
+        env:
+          PYTHONPATH: python
 
   # --- 1. LINUX BUILD ---
   linux:

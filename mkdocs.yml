@@ -8,7 +8,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [BinaryOptionsToolsV2/python]
+          paths: [python]
 
 theme:
   name: material
