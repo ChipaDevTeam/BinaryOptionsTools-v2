@@ -136,11 +136,32 @@ def _login_playwright(email: str, password: str, *, headless: bool, timeout: int
         ) from exc
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=headless)
+        browser = pw.chromium.launch(
+            headless=headless,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-web-security",
+                "--disable-features=IsolateOrigins,site-per-process",
+                "--lang=en-US,en",
+            ],
+        )
         ctx = browser.new_context(
             user_agent=_DEFAULT_UA,
-            locale="en-GB",
-            extra_http_headers={"Accept-Language": "en-GB,en;q=0.9"},
+            locale="en-US",
+            timezone_id="America/New_York",
+            viewport={"width": 1366, "height": 768},
+            extra_http_headers={
+                "Accept-Language": "en-US,en;q=0.9",
+                "sec-ch-ua": '"Not-A.Brand";v="24", "Chromium";v="146"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"Windows"',
+            },
+        )
+        # Mask navigator.webdriver
+        ctx.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
         page = ctx.new_page()
 

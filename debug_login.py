@@ -1,23 +1,39 @@
-import requests, re
+"""Quick test: try patchright vs playwright to reach pocketoption.com/en/login/"""
+import sys
 
-s = requests.Session()
-s.headers.update({
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
-    'Accept-Language': 'en-GB,en;q=0.9',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-})
-r = s.get('https://pocketoption.com/en/login/', timeout=30)
-html = r.text
+def try_patchright():
+    try:
+        from patchright.sync_api import sync_playwright
+        print("Using patchright")
+    except ImportError:
+        from playwright.sync_api import sync_playwright
+        print("Using playwright (patchright not available)")
 
-# Find recaptcha sitekey
-for m in re.finditer(r'(recaptcha|sitekey|grecaptcha|data-sitekey)[^"\'<>]{0,200}', html, re.IGNORECASE):
-    print(m.group())
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+        )
+        ctx = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+            locale="en-US",
+            viewport={"width": 1366, "height": 768},
+        )
+        ctx.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        page = ctx.new_page()
+        try:
+            page.goto("https://pocketoption.com/en/login/", wait_until="domcontentloaded", timeout=30000)
+            print("STATUS: loaded OK")
+            print("URL:", page.url)
+            # Check for form
+            inputs = page.locator("input").all()
+            for inp in inputs:
+                print("INPUT:", inp.get_attribute("name"), inp.get_attribute("type"))
+            cookies = ctx.cookies()
+            print("COOKIES:", [c["name"] for c in cookies])
+        except Exception as e:
+            print("ERROR:", e)
+        finally:
+            browser.close()
 
-print()
-# Also look for script tags referencing recaptcha
-for m in re.finditer(r'<script[^>]{0,200}recaptcha[^>]{0,200}>', html, re.IGNORECASE):
-    print(m.group())
-
-# Find sitekey pattern directly
-for m in re.finditer(r'["\']([0-9A-Za-z_-]{30,50})["\']', html):
-    print("POTENTIAL KEY:", m.group(1))
+try_patchright()
