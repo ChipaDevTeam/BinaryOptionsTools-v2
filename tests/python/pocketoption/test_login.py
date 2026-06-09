@@ -155,25 +155,19 @@ class TestLoginPlaywrightUnit:
 
 
 class TestLoginPlaywrightBrowserMock:
-    """Mock the playwright browser directly to test _login_playwright logic."""
+    """Verify _login_playwright wiring via module-level patching."""
 
-    def test_session_cookie_extracted(self):
-        import BinaryOptionsToolsV2.pocketoption.tools.login as mod
+    @patch("BinaryOptionsToolsV2.pocketoption.tools.login._login_playwright",
+           return_value=FAKE_SESSION)
+    def test_session_cookie_extracted(self, _):
+        result = login("u@e.com", "p", backend="playwright")
+        assert FAKE_SESSION in result
 
-        sp_mock = _make_playwright_mock(session=FAKE_SESSION)
-        # sync_playwright is imported inside the function; patch it in its source module
-        with patch("playwright.sync_api.sync_playwright", sp_mock, create=True):
-            with patch("BinaryOptionsToolsV2.pocketoption.tools.login._login_playwright",
-                       return_value=FAKE_SESSION) as m:
-                result = mod._login_playwright.__wrapped__("u@e.com", "p", headless=True, timeout=30) if hasattr(mod._login_playwright, "__wrapped__") else FAKE_SESSION
-        assert result == FAKE_SESSION
-
-    def test_missing_session_cookie_raises(self):
-        import BinaryOptionsToolsV2.pocketoption.tools.login as mod
-
-        with patch.object(mod, "_login_playwright", side_effect=LoginError("po_session not found")):
-            with pytest.raises(LoginError, match="po_session"):
-                login("u@e.com", "p", backend="playwright")
+    @patch("BinaryOptionsToolsV2.pocketoption.tools.login._login_playwright",
+           side_effect=LoginError("po_session cookie was not found"))
+    def test_missing_session_cookie_raises(self, _):
+        with pytest.raises(LoginError, match="po_session"):
+            login("u@e.com", "p", backend="playwright")
 
 
 # ── Async wrapper ─────────────────────────────────────────────────────────────
