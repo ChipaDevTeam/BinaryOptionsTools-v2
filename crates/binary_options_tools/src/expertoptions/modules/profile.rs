@@ -327,8 +327,10 @@ impl ProfileModule {
         let token = self.state.token.clone();
         let timezone = self.state.timezone.read().await;
         // Ensure demo context if currently demo
-        if dbg!(self.state.is_demo().await) {
-            dbg!("Sent demo message");
+        let is_demo = self.state.is_demo().await;
+        debug!("Current demo state: {}", is_demo);
+        if is_demo {
+            debug!("Sending demo context startup message");
             let demo = Demo::new(true);
             let msg = demo
                 .action(token.clone())

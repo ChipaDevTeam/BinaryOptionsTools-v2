@@ -254,7 +254,7 @@ impl ApiModule<State> for TradesApiModule {
                           Ok(res) => Ok(res),
                           Err(e) => {
                               warn!(target: "TradesApiModule", "Failed to parse binary ServerResponse: {}", e);
-                              Err(e.into())
+                              Err(e)
                           }
                       },
                       Message::Text(text) => {

@@ -119,6 +119,7 @@ impl PendingTradesHandle {
     }
 
     /// Creates a new pending order on the PocketOption platform.
+    #[allow(clippy::too_many_arguments)]
     pub async fn open_pending_order(
         &self,
         open_type: u32,

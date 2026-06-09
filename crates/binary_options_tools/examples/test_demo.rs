@@ -112,8 +112,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\n=== Test 4: Custom max_subscriptions ===");
-    let mut config = Config::default();
-    config.max_subscriptions = 8;
+    let config = Config {
+        max_subscriptions: 8,
+        ..Default::default()
+    };
     let client2 = PocketOption::new_with_config(&ssid, config).await?;
     tokio::time::sleep(Duration::from_secs(3)).await;
 

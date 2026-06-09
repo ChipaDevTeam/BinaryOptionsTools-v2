@@ -73,8 +73,7 @@ struct BinaryContainsRule;
 // ============================================================================
 // METHOD CHAIN TESTS
 // ============================================================================
-// TODO: Fix chained method parsing - currently has issues with argument parsing
-/*
+
 #[Rule]
 #[rule({starts_with("prefix").wait(1)})]
 struct ChainedWait;
@@ -98,7 +97,6 @@ struct ChainedLstripUntil;
 #[Rule]
 #[rule({contains("test").rstrip_until(";")})]
 struct ChainedRstripUntil;
-*/
 
 // ============================================================================
 // AND OPERATOR TESTS
@@ -428,6 +426,36 @@ mod tests {
     use tokio_tungstenite::tungstenite::Message;
 
     #[test]
+    fn test_chained_wait_compiles() {
+        let _rule = ChainedWait::new();
+    }
+
+    #[test]
+    fn test_chained_multiple_methods_compiles() {
+        let _rule = ChainedMultipleMethods::new();
+    }
+
+    #[test]
+    fn test_chained_lstrip_then_compiles() {
+        let _rule = ChainedLstripThen::new();
+    }
+
+    #[test]
+    fn test_chained_rstrip_then_compiles() {
+        let _rule = ChainedRstripThen::new();
+    }
+
+    #[test]
+    fn test_chained_lstrip_until_compiles() {
+        let _rule = ChainedLstripUntil::new();
+    }
+
+    #[test]
+    fn test_chained_rstrip_until_compiles() {
+        let _rule = ChainedRstripUntil::new();
+    }
+
+    #[test]
     fn test_simple_any_compiles() {
         let _rule = SimpleAny::new();
     }
@@ -651,25 +679,22 @@ mod tests {
         // Step 1: Text header with placeholder (should NOT pass)
         let header =
             Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
-        assert_eq!(
-            rule.call(&header),
-            false,
+        assert!(
+            !rule.call(&header),
             "Header message should NOT pass (returns false, waits for binary)"
         );
 
         // Step 2: Binary body (should pass because flag was set)
         let body = Message::binary(b"anything".to_vec());
-        assert_eq!(
+        assert!(
             rule.call(&body),
-            true,
             "Binary message should pass after header"
         );
 
         // Step 3: Another binary without header (should NOT pass)
         let orphan_binary = Message::binary(vec![0x04, 0x05]);
-        assert_eq!(
-            rule.call(&orphan_binary),
-            false,
+        assert!(
+            !rule.call(&orphan_binary),
             "Binary message without preceding header should NOT pass"
         );
     }
@@ -681,11 +706,11 @@ mod tests {
         // Step 1: Text header with placeholder
         let header =
             Message::text(r#"451-["failopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
-        assert_eq!(rule.call(&header), false, "Header should not pass");
+        assert!(!rule.call(&header), "Header should not pass");
 
         // Step 2: Binary body
         let body = Message::binary(vec![0xFF, 0xEE]);
-        assert_eq!(rule.call(&body), true, "Binary should pass after header");
+        assert!(rule.call(&body), "Binary should pass after header");
     }
 
     #[test]
@@ -695,18 +720,18 @@ mod tests {
         // Test successopenOrder
         let success_header =
             Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
-        assert_eq!(rule.call(&success_header), false);
+        assert!(!rule.call(&success_header));
 
         let success_body = Message::binary(b"success_data".to_vec());
-        assert_eq!(rule.call(&success_body), true);
+        assert!(rule.call(&success_body));
 
         // Test failopenOrder
         let fail_header =
             Message::text(r#"451-["failopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
-        assert_eq!(rule.call(&fail_header), false);
+        assert!(!rule.call(&fail_header));
 
         let fail_body = Message::binary(b"fail_data".to_vec());
-        assert_eq!(rule.call(&fail_body), true);
+        assert!(rule.call(&fail_body));
     }
 
     #[test]
@@ -718,8 +743,8 @@ mod tests {
         );
         let body = Message::binary(br#"{"balance":1500.50,"demo":false}"#.to_vec());
 
-        assert_eq!(rule.call(&header), false, "Balance header should not pass");
-        assert_eq!(rule.call(&body), true, "Balance binary should pass");
+        assert!(!rule.call(&header), "Balance header should not pass");
+        assert!(rule.call(&body), "Balance binary should pass");
     }
 
     #[test]
@@ -730,8 +755,8 @@ mod tests {
             Message::text(r#"451-["updateStream",{"_placeholder":true,"num":0}]"#.to_string());
         let body = Message::binary(br#"[["AUDCHF_otc",1773834518.929,0.55218]]"#.to_vec());
 
-        assert_eq!(rule.call(&header), false);
-        assert_eq!(rule.call(&body), true);
+        assert!(!rule.call(&header));
+        assert!(rule.call(&body));
     }
 
     #[test]
@@ -742,30 +767,30 @@ mod tests {
         let stream_header =
             Message::text(r#"451-["updateHistory",{"_placeholder":true,"num":0}]"#.to_string());
         let stream_body = Message::binary(b"stream_data".to_vec());
-        assert_eq!(rule.call(&stream_header), false);
-        assert_eq!(rule.call(&stream_body), true);
+        assert!(!rule.call(&stream_header));
+        assert!(rule.call(&stream_body));
 
         // Test updateHistory
         let history_header =
             Message::text(r#"451-["updateHistory",{"_placeholder":true,"num":0}]"#.to_string());
         let history_body = Message::binary(b"history_data".to_vec());
-        assert_eq!(rule.call(&history_header), false);
-        assert_eq!(rule.call(&history_body), true);
+        assert!(!rule.call(&history_header));
+        assert!(rule.call(&history_body));
 
         // Test updateHistoryNewFast
         let fast_header = Message::text(
             r#"451-["updateHistoryNewFast",{"_placeholder":true,"num":0}]"#.to_string(),
         );
         let fast_body = Message::binary(b"fast_data".to_vec());
-        assert_eq!(rule.call(&fast_header), false);
-        assert_eq!(rule.call(&fast_body), true);
+        assert!(!rule.call(&fast_header));
+        assert!(rule.call(&fast_body));
 
         // Test updateHistoryNew
         let new_header =
             Message::text(r#"451-["updateHistoryNew",{"_placeholder":true,"num":0}]"#.to_string());
         let new_body = Message::binary(b"new_data".to_vec());
-        assert_eq!(rule.call(&new_header), false);
-        assert_eq!(rule.call(&new_body), true);
+        assert!(!rule.call(&new_header));
+        assert!(rule.call(&new_body));
     }
 
     #[test]
@@ -775,17 +800,15 @@ mod tests {
         // Different event name should not match
         let wrong_header =
             Message::text(r#"451-["wrongEventName",{"_placeholder":true,"num":0}]"#.to_string());
-        assert_eq!(
-            rule.call(&wrong_header),
-            false,
+        assert!(
+            !rule.call(&wrong_header),
             "Wrong event name should not match"
         );
 
         // Binary should also not pass since header didn't match
         let body = Message::binary(vec![0x01, 0x02]);
-        assert_eq!(
-            rule.call(&body),
-            false,
+        assert!(
+            !rule.call(&body),
             "Binary should not pass without matching header"
         );
     }
@@ -797,11 +820,11 @@ mod tests {
         // successopenOrder header
         let success_header =
             Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
-        assert_eq!(rule.call(&success_header), false);
+        assert!(!rule.call(&success_header));
 
         // Some unrelated text message (should not pass, but should not affect state)
         let unrelated = Message::text("some other message".to_string());
-        assert_eq!(rule.call(&unrelated), false);
+        assert!(!rule.call(&unrelated));
 
         // The binary body should still pass (if implementation keeps state correctly)
         // Note: This tests state persistence through non-matching messages
@@ -818,16 +841,15 @@ mod tests {
         // Set up the two-step sequence
         let header =
             Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
-        assert_eq!(rule.call(&header), false);
+        assert!(!rule.call(&header));
 
         // Reset the rule
         rule.reset();
 
         // After reset, binary should not pass
         let body = Message::binary(vec![0x01, 0x02]);
-        assert_eq!(
-            rule.call(&body),
-            false,
+        assert!(
+            !rule.call(&body),
             "Binary should not pass after reset"
         );
     }
@@ -840,21 +862,21 @@ mod tests {
         let header1 =
             Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         let body1 = Message::binary(b"data1".to_vec());
-        assert_eq!(rule.call(&header1), false);
-        assert_eq!(rule.call(&body1), true);
+        assert!(!rule.call(&header1));
+        assert!(rule.call(&body1));
 
         // Second pair: failopenOrder
         let header2 =
             Message::text(r#"451-["failopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         let body2 = Message::binary(b"data2".to_vec());
-        assert_eq!(rule.call(&header2), false);
-        assert_eq!(rule.call(&body2), true);
+        assert!(!rule.call(&header2));
+        assert!(rule.call(&body2));
 
         // Third pair: successopenOrder again
         let header3 =
             Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         let body3 = Message::binary(b"data3".to_vec());
-        assert_eq!(rule.call(&header3), false);
-        assert_eq!(rule.call(&body3), true);
+        assert!(!rule.call(&header3));
+        assert!(rule.call(&body3));
     }
 }
