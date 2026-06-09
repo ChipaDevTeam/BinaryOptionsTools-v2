@@ -186,13 +186,25 @@ class TestLoginAsync:
 
 
 class TestLogin2CaptchaMock:
-    @patch("BinaryOptionsToolsV2.pocketoption.tools.login._login_2captcha",
+    @patch("BinaryOptionsToolsV2.pocketoption.tools.login._login_captcha_solver",
            return_value=FAKE_SESSION)
-    def test_2captcha_backend_used(self, mock_2c):
+    def test_2captcha_backend_used(self, mock_solver):
         result = login("u@e.com", "p", backend="2captcha", api_key="testkey", demo=True)
-        mock_2c.assert_called_once_with("u@e.com", "p", api_key="testkey", timeout=60)
+        mock_solver.assert_called_once_with(
+            "u@e.com", "p", api_key="testkey", service="2captcha", timeout=60
+        )
         assert FAKE_SESSION in result
         assert '"isDemo":1' in result
+
+    @patch("BinaryOptionsToolsV2.pocketoption.tools.login._login_captcha_solver",
+           return_value=FAKE_SESSION)
+    def test_capsolver_backend_used(self, mock_solver):
+        result = login("u@e.com", "p", backend="capsolver", api_key="cs_key", demo=False)
+        mock_solver.assert_called_once_with(
+            "u@e.com", "p", api_key="cs_key", service="capsolver", timeout=60
+        )
+        assert FAKE_SESSION in result
+        assert '"isDemo":0' in result
 
 
 # ── Integration tests ─────────────────────────────────────────────────────────
