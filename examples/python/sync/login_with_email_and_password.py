@@ -1,5 +1,5 @@
 """
-Login to PocketOption using email and password (no SSID needed).
+Login to PocketOption using email and password (no SSID needed) — sync version.
 
 Two backends are supported — pick the one that works in your environment:
 
@@ -17,7 +17,6 @@ Usage:
     python login_with_email_and_password.py
 """
 
-import asyncio
 import os
 import sys
 from pathlib import Path
@@ -25,8 +24,8 @@ from pathlib import Path
 # Allow running directly from the repo without installing the package
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "python"))
 
-from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
-from BinaryOptionsToolsV2.pocketoption.tools.login import LoginError, login_async
+from BinaryOptionsToolsV2.pocketoption import PocketOption
+from BinaryOptionsToolsV2.pocketoption.tools.login import LoginError, login
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 
@@ -41,7 +40,7 @@ CAPSOLVER_API_KEY = os.getenv("CAPSOLVER_API_KEY", "")
 
 # ── Login ──────────────────────────────────────────────────────────────────────
 
-async def main() -> None:
+def main() -> None:
     if CAPSOLVER_API_KEY:
         print("Logging in via CapSolver (HTTP backend) …")
         backend_kwargs = {"backend": "capsolver", "api_key": CAPSOLVER_API_KEY}
@@ -51,7 +50,7 @@ async def main() -> None:
         backend_kwargs = {"backend": "auto"}
 
     try:
-        ssid = await login_async(EMAIL, PASSWORD, demo=DEMO, **backend_kwargs)
+        ssid = login(EMAIL, PASSWORD, demo=DEMO, **backend_kwargs)
     except LoginError as exc:
         print(f"\nLogin failed:\n{exc}")
         return
@@ -61,11 +60,11 @@ async def main() -> None:
 
     print(f"\nGot SSID (first 60 chars): {ssid[:60]}…")
 
-    async with PocketOptionAsync(ssid) as api:
-        balance = await api.balance()
+    with PocketOption(ssid) as api:
+        balance = api.balance()
         account = "DEMO" if DEMO else "REAL"
         print(f"[{account}] Balance: {balance}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
