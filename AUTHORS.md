@@ -16,7 +16,7 @@
 
 ### Vigo Walker
 
-- **GitHub**: [@Rick-29](https://github.com/theshadow76)
+- **GitHub**: [@theshadow76](https://github.com/theshadow76)
 - **Role**: developer
 - **Contributions**: Python bindings, API design, testing infrastructure
 
