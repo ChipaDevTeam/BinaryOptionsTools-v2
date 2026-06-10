@@ -14,6 +14,12 @@
 - **Role**: Core developer
 - **Contributions**: Python bindings, API design, testing infrastructure
 
+### Vigo Walker
+
+- **GitHub**: [@Rick-29](https://github.com/theshadow76)
+- **Role**: developer
+- **Contributions**: Python bindings, API design, testing infrastructure
+
 ## Contributors
 
 We welcome contributions from the community! This project wouldn't be possible without the help of many contributors.
