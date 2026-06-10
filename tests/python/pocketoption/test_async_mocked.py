@@ -4,6 +4,7 @@ import sys
 import types
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
+from urllib.parse import urlparse
 
 import pytest
 
@@ -425,7 +426,10 @@ class TestPocketOptionAsyncInit:
     async def test_init_with_custom_url(self, mock_raw_pocketoption):
         """Test that custom URL is added to config."""
         client = PocketOptionAsync("test_ssid", url="wss://custom.com")
-        assert "wss://custom.com" in client.config.urls
+        assert any(
+            parsed.scheme == "wss" and parsed.hostname == "custom.com"
+            for parsed in (urlparse(url) for url in client.config.urls)
+        )
         await client.shutdown()
 
 
