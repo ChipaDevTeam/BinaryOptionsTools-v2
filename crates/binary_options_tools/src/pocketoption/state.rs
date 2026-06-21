@@ -72,7 +72,13 @@ pub struct State {
     pub urls: Vec<String>,
     /// Maximum number of concurrent asset subscriptions allowed
     pub max_subscriptions: usize,
+    /// Shared tick cache written by SubscriptionsApiModule, read by historical modules.
+    /// Keyed by symbol. Capped at SHARED_TICK_CACHE_MAX ticks per symbol.
+    pub shared_tick_cache: Arc<RwLock<HashMap<String, Vec<(i64, f64)>>>>,
 }
+
+/// Maximum ticks stored per symbol in the shared tick cache (~28 h at 1 tick/s).
+pub const SHARED_TICK_CACHE_MAX: usize = 100_000;
 
 /// Builder pattern for creating State instances
 ///
@@ -158,6 +164,7 @@ impl StateBuilder {
             raw_keep_alive: Arc::new(RwLock::new(HashMap::new())),
             urls: self.urls,
             max_subscriptions: self.max_subscriptions.unwrap_or(4),
+            shared_tick_cache: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 }
@@ -184,6 +191,18 @@ impl AppState for State {
 }
 
 impl State {
+    /// Push a (timestamp, price) tick into the shared cache for `symbol`.
+    /// Evicts the oldest half when the per-symbol cap is exceeded.
+    pub async fn push_shared_tick(&self, symbol: &str, timestamp: i64, price: f64) {
+        let mut cache = self.shared_tick_cache.write().await;
+        let ticks = cache.entry(symbol.to_string()).or_default();
+        ticks.push((timestamp, price));
+        if ticks.len() > SHARED_TICK_CACHE_MAX {
+            let keep_from = ticks.len() / 2;
+            ticks.drain(..keep_from);
+        }
+    }
+
     /// Sets the current balance.
     /// This method updates the balance in a thread-safe manner.
     ///

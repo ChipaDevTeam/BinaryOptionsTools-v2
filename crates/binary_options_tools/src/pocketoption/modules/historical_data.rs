@@ -231,7 +231,7 @@ impl HistoricalDataHandle {
 }
 
 pub struct HistoricalDataApiModule {
-    _state: Arc<State>,
+    state: Arc<State>,
     command_receiver: AsyncReceiver<Command>,
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
@@ -255,7 +255,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
         _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self {
-            _state: shared_state,
+            state: shared_state,
             command_receiver,
             command_responder,
             message_receiver,
@@ -287,7 +287,6 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                     if self.pending_request.is_some() {
                                         warn!(target: "HistoricalDataApiModule", "Overwriting a pending request. Concurrent calls are not supported.");
                                     }
-                                    self.latest_ticks.remove(&asset);
                                     self.pending_request = Some((req_id, asset.clone(), period, RequestType::Ticks));
                                     let payload = serde_json::json!(["changeSymbol", { "asset": asset, "period": period }]);
                                     let msg = format!("42{}", serde_json::to_string(&payload)?);
@@ -301,7 +300,6 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                     if self.pending_request.is_some() {
                                         warn!(target: "HistoricalDataApiModule", "Overwriting a pending request. Concurrent calls are not supported.");
                                     }
-                                    self.latest_ticks.remove(&asset);
                                     self.pending_request = Some((req_id, asset.clone(), period, RequestType::Candles));
                                     let payload = serde_json::json!(["changeSymbol", { "asset": asset, "period": period }]);
                                     let msg = format!("42{}", serde_json::to_string(&payload)?);
@@ -409,17 +407,27 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                             let symbol = history_response.asset;
                                             let mut ticks = history_response.history.as_ref().map(|h| h.iter().map(|item| item.to_tick()).collect()).unwrap_or_else(Vec::new);
 
+                                            // Collect supplemental ticks: local buffer + shared cache (deduped by ts)
+                                            let extra_ticks: Vec<(i64, f64)> = {
+                                                let mut combined: Vec<(i64, f64)> = self.latest_ticks.get(&symbol).cloned().unwrap_or_default();
+                                                let shared = self.state.shared_tick_cache.read().await;
+                                                if let Some(cached) = shared.get(&symbol) {
+                                                    combined.extend_from_slice(cached);
+                                                }
+                                                combined.sort_by_key(|(ts, _)| *ts);
+                                                combined.dedup_by_key(|(ts, _)| *ts);
+                                                combined
+                                            };
+
                                             if req_type == RequestType::Ticks {
                                                 if ticks.is_empty() {
                                                     if let Some(c_items) = history_response.candles {
                                                         ticks = c_items.iter().map(|i| (i.timestamp, i.close)).collect();
                                                     }
                                                 }
-                                                if let Some(stream_ticks) = self.latest_ticks.get(&symbol) {
-                                                    let last_ts = ticks.last().map(|(t, _)| *t).unwrap_or(0);
-                                                    for &(ts, price) in stream_ticks {
-                                                        if ts > last_ts { ticks.push((ts, price)); }
-                                                    }
+                                                let last_ts = ticks.last().map(|(t, _)| *t).unwrap_or(0);
+                                                for (ts, price) in extra_ticks {
+                                                    if ts > last_ts { ticks.push((ts, price)); }
                                                 }
                                                 let _ = self.command_responder.send(CommandResponse::Ticks { req_id, ticks }).await;
                                             } else {
@@ -431,10 +439,8 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                                     }
                                                 }
                                                 let mut h_items = history_response.history.unwrap_or_default();
-                                                if let Some(s_ticks) = self.latest_ticks.get(&symbol) {
-                                                    for &(ts, price) in s_ticks {
-                                                        h_items.push(HistoryItem::Tick([serde_json::Value::from(ts as f64), serde_json::Value::from(price)]));
-                                                    }
+                                                for (ts, price) in extra_ticks {
+                                                    h_items.push(HistoryItem::Tick([serde_json::Value::from(ts as f64), serde_json::Value::from(price)]));
                                                 }
                                                 if !h_items.is_empty() {
                                                     let compiled = compile_candles_from_ticks(&h_items, history_response.period, &symbol);

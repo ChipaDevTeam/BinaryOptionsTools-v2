@@ -840,6 +840,13 @@ impl SubscriptionsApiModule {
         price: Decimal,
         timestamp: i64,
     ) -> CoreResult<()> {
+        use rust_decimal::prelude::ToPrimitive;
+
+        // Always write to shared cache so historical modules benefit even without a caller.
+        if let Some(price_f64) = price.to_f64() {
+            self.state.push_shared_tick(asset, timestamp, price_f64).await;
+        }
+
         let senders: Vec<AsyncSender<SubscriptionEvent>> = {
             let subscriptions = self.state.active_subscriptions.read().await;
             if let Some(vec) = subscriptions.get(asset) {
