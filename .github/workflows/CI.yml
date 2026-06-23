@@ -90,6 +90,9 @@ jobs:
             arch: x64
           - target: i686-pc-windows-msvc
             arch: x86
+    env:
+      RUSTC_WRAPPER: ""  # Disable sccache for Windows
+      SCCACHE_GHA_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
       # Disable sccache for windows due to potential cross-compilation issues
