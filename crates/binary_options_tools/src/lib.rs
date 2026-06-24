@@ -31,7 +31,6 @@ pub mod error;
 pub mod expertoptions;
 pub mod framework;
 pub mod pocketoption;
-pub mod reimports;
 pub mod traits;
 pub mod utils;
 pub mod validator;
@@ -49,7 +48,7 @@ mod tests {
     use tokio::time::sleep;
     use tracing::debug;
 
-    use binary_options_tools_macros::{deserialize, serialize, timeout};
+    use binary_options_tools_macros::timeout;
     #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
     struct Test {
         name: String,
@@ -60,8 +59,8 @@ mod tests {
         let test = Test {
             name: "Test".to_string(),
         };
-        let test_str = serialize!(&test).unwrap();
-        let test2 = deserialize!(Test, &test_str).unwrap();
+        let test_str = serde_json::to_string(&test).unwrap();
+        let test2 = serde_json::from_str::<Test>(&test_str).unwrap();
         assert_eq!(test, test2)
     }
 
