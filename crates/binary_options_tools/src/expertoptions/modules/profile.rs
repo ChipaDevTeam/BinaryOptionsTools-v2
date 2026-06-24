@@ -304,8 +304,8 @@ impl ApiModule<State> for ProfileModule {
             ) -> CoreResult<()> {
                 // On reconnect, re-send multipleAction and ensure context if demo
                 let token = state.token.clone();
-                let timezone = state.timezone.read().await;
-                let multi = multiple_action_action(token.clone(), *timezone)?.to_message()?;
+                let timezone = *state.timezone.read().await;
+                let multi = multiple_action_action(token.clone(), timezone)?.to_message()?;
                 ws_sender.send(multi).await?;
                 if state.is_demo().await {
                     let demo = Demo::new(true);
@@ -325,7 +325,7 @@ impl ApiModule<State> for ProfileModule {
 impl ProfileModule {
     async fn send_startup_messages(&self) -> CoreResult<()> {
         let token = self.state.token.clone();
-        let timezone = self.state.timezone.read().await;
+        let timezone = *self.state.timezone.read().await;
         // Ensure demo context if currently demo
         let is_demo = self.state.is_demo().await;
         debug!("Current demo state: {}", is_demo);
@@ -339,7 +339,7 @@ impl ProfileModule {
             self.ws_sender.send(msg).await?;
         }
         // Send multipleAction with basic actions placeholder (can be extended)
-        let multi = multiple_action_action(token, *timezone)?.to_message()?;
+        let multi = multiple_action_action(token, timezone)?.to_message()?;
         self.ws_sender.send(multi).await?;
         Ok(())
     }

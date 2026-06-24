@@ -119,17 +119,9 @@ impl PendingTradesHandle {
     }
 
     /// Creates a new pending order on the PocketOption platform.
-    #[allow(clippy::too_many_arguments)]
     pub async fn open_pending_order(
         &self,
-        open_type: u32,
-        amount: Decimal,
-        asset: String,
-        open_time: String,
-        open_price: Decimal,
-        timeframe: u32,
-        min_payout: u32,
-        command: u32,
+        order: OpenPendingOrder,
     ) -> PocketResult<PendingOrder> {
         let _lock = self.call_lock.lock().await;
 
@@ -139,16 +131,17 @@ impl PendingTradesHandle {
         }
 
         let id = Uuid::new_v4();
+        let asset = order.asset.clone();
         self.sender
             .send(Command::OpenPendingOrder {
-                open_type,
-                amount,
-                asset: asset.clone(),
-                open_time,
-                open_price,
-                timeframe,
-                min_payout,
-                command,
+                open_type: order.open_type,
+                amount: order.amount,
+                asset: order.asset,
+                open_time: order.open_time,
+                open_price: order.open_price,
+                timeframe: order.timeframe,
+                min_payout: order.min_payout,
+                command: order.command,
                 req_id: id,
             })
             .await

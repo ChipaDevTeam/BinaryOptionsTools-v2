@@ -64,7 +64,7 @@ fn test_exponential_backoff_calculation() {
 
     // Attempt 15 (exponent capped at 10): same as attempt 10
     let delay15 = base_delay
-        .saturating_mul(2u64.saturating_pow(10))
+        .saturating_mul(2u64.saturating_pow(15u32.min(10)))
         .min(300);
     assert_eq!(delay15, 300);
 }
@@ -82,7 +82,7 @@ fn test_exponential_backoff_with_large_base_delay() {
 
     // Attempt 20 (exponent capped): same result
     let delay_capped = base_delay
-        .saturating_mul(2u64.saturating_pow(10))
+        .saturating_mul(2u64.saturating_pow(20u32.min(10)))
         .min(300);
     assert_eq!(delay_capped, 300);
 }
