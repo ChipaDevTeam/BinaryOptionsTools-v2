@@ -131,18 +131,27 @@ impl PendingTradesHandle {
         }
 
         let id = Uuid::new_v4();
-        let asset = order.asset.clone();
-        let open_type = order.open_type;
+        let OpenPendingOrder {
+            open_type,
+            amount,
+            asset: order_asset,
+            open_time,
+            open_price,
+            timeframe,
+            min_payout,
+            command,
+        } = order;
+        let asset = order_asset.clone();
         self.sender
             .send(Command::OpenPendingOrder {
-                open_type: order.open_type,
-                amount: order.amount,
-                asset: order.asset,
-                open_time: order.open_time,
-                open_price: order.open_price,
-                timeframe: order.timeframe,
-                min_payout: order.min_payout,
-                command: order.command,
+                open_type,
+                amount,
+                asset: order_asset,
+                open_time,
+                open_price,
+                timeframe,
+                min_payout,
+                command,
                 req_id: id,
             })
             .await

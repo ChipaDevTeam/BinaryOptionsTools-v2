@@ -150,6 +150,19 @@ class MockPocketOptionAsync:
             }
         ]
 
+    async def get_opened_deal(self, trade_id):
+        if trade_id == "not_found":
+            return None
+        return {"id": trade_id, "status": "open"}
+
+    async def get_closed_deal(self, trade_id):
+        if trade_id == "not_found":
+            return None
+        return {"id": trade_id, "status": "closed", "result": "win"}
+
+    async def compile_candles(self, asset, custom_period, lookback_period):
+        return [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
+
     async def clear_closed_deals(self):
         pass
 
@@ -223,6 +236,12 @@ class MockPocketOptionAsync:
     def is_demo(self):
         return True
 
+    def is_connected(self):
+        return self._connected
+
+    def max_subscriptions(self):
+        return 4
+
     async def disconnect(self):
         self._connected = False
 
@@ -243,9 +262,13 @@ class MockPocketOptionAsync:
         mock_handler.id.return_value = "handler_123"
         mock_handler.send_text = AsyncMock()
         mock_handler.send_binary = AsyncMock()
-        mock_handler.send_and_wait = AsyncMock(return_value='42["response"]')
-        mock_handler.wait_next = AsyncMock(return_value='42["message"]')
-        mock_handler.subscribe = AsyncMock(return_value=AsyncMock())
+        mock_handler.send_and_wait = AsyncMock(return_value="response")
+        mock_handler.wait_next = AsyncMock(return_value="message")
+        # subscribe mock
+        async_iter = MagicMock()
+        async_iter.__anext__ = AsyncMock(return_value="message")
+        async_iter.__next__ = MagicMock(return_value="message")
+        mock_handler.subscribe = AsyncMock(return_value=async_iter)
         mock_handler.close = AsyncMock()
         return mock_handler
 
@@ -979,6 +1002,13 @@ class TestShutdown:
         sync_client.shutdown()
         assert sync_client.client._closed is True
 
+    def test_shutdown_exception_safety(self, mock_pocketoption_async):
+        from unittest.mock import AsyncMock
+        mock_pocketoption_async.shutdown = AsyncMock(side_effect=[None, Exception("mock shutdown failure")])
+        from BinaryOptionsToolsV2.pocketoption.synchronous import PocketOption
+        client = PocketOption("test_ssid", config={"terminal_logging": False})
+        client.shutdown()
+
 
 class TestCreateRawHandler:
     """Tests for create_raw_handler method."""
@@ -1106,3 +1136,43 @@ class TestContextManager:
         """Test sync context manager enter and exit."""
         with PocketOption("test_ssid") as client:
             assert client.client is not None
+
+
+class TestSynchronousCoverage:
+    """Extra tests to ensure 100% coverage of synchronous.py methods and wrappers."""
+
+    def test_sync_extra_wrappers(self, sync_client):
+        # 1. get_opened_deal
+        deal = sync_client.get_opened_deal("deal_123")
+        assert deal is not None
+        assert deal["id"] == "deal_123"
+        assert sync_client.get_opened_deal("not_found") is None
+
+        # 2. get_closed_deal
+        closed = sync_client.get_closed_deal("deal_456")
+        assert closed is not None
+        assert closed["id"] == "deal_456"
+        assert sync_client.get_closed_deal("not_found") is None
+
+        # 3. compile_candles
+        candles = sync_client.compile_candles("EURUSD_otc", 5, 100)
+        assert len(candles) == 1
+        assert candles[0]["open"] == 1.1
+
+        # 4. is_connected
+        assert sync_client.is_connected() is True
+
+        # 5. max_subscriptions
+        assert sync_client.max_subscriptions() == 4
+
+    def test_sync_subscription_magic_methods(self, sync_client):
+        sub = sync_client.subscribe_symbol("EURUSD_otc")
+        assert sub.__aiter__() is sub.subscription
+
+        validator = Validator.starts_with('42["test"')
+        handler = sync_client.create_raw_handler(validator)
+        raw_sub = handler.subscribe()
+        assert raw_sub.__iter__() is raw_sub
+        assert raw_sub.__aiter__() is raw_sub.subscription
+        assert next(raw_sub) == "message"
+
