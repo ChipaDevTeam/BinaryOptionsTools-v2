@@ -46,4 +46,4 @@ pyo3-stub-gen = { version = "0.23.0", optional = true }
 
 [features]
 default = []
-stubgen = ["dep:pyo3-stub-gen", "build-dependencies/pyo3-stub-gen"]
+stubgen = ["dep:pyo3-stub-gen"]

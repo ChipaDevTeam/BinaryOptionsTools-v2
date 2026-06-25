@@ -20,7 +20,7 @@ chrono = { workspace = true }
 # binary-options-tools-core = { path = "../core", version = "0.2.0" }
 # trading-macros = { path = "../macros" }
 futures-util = { workspace = true }
-reqwest = { version = "0.13.4", default-features = false, features = ["rustls-tls-no-provider", "json"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls-no-provider", "json"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
