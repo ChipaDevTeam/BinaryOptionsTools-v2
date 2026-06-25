@@ -94,19 +94,19 @@ jobs:
       RUSTC_WRAPPER: ""  # Disable sccache for Windows
       SCCACHE_GHA_ENABLED: "false"
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v4
         with:
           persist-credentials: false
       # Disable sccache for windows due to potential cross-compilation issues
       # - name: Run sccache-cache
       #   uses: mozilla/sccache-action@v0.0.6
-      - uses: actions/setup-python@3632701262eb0626be2880e68e37c735255fa4ec # v5.3.0
+      - uses: actions/setup-python@v5
         id: setup-python
         with:
           python-version: "3.13.12"
           architecture: ${{ matrix.arch }}
       - name: Build wheels
-        uses: PyO3/maturin-action@13be7ec20a3250b86551b73e52e46b5d92e59e19 # v1.40.0
+        uses: PyO3/maturin-action@v1
         env:
           PYO3_PYTHON: ${{ steps.setup-python.outputs.python-path }}
         with:
@@ -114,7 +114,7 @@ jobs:
           args: --release --strip --out dist -i "${{ steps.setup-python.outputs.python-path }}"
           working-directory: python
       - name: Upload wheels
-        uses: actions/upload-artifact@65c83002ed51bbe98e32706be26097d5e4bca1c6 # v4.6.0
+        uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-${{ matrix.arch }}
           path: python/dist
