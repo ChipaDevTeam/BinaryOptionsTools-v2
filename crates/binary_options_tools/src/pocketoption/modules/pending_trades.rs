@@ -132,6 +132,7 @@ impl PendingTradesHandle {
 
         let id = Uuid::new_v4();
         let asset = order.asset.clone();
+        let open_type = order.open_type;
         self.sender
             .send(Command::OpenPendingOrder {
                 open_type: order.open_type,
