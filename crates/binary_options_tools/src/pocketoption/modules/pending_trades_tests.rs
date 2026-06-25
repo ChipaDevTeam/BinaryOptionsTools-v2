@@ -381,15 +381,16 @@ async fn test_open_pending_order_channel_error_sender_closed() {
     let _ = module_task.await;
 
     let result = client_handle
-        .open_pending_order(
-            1,
-            Decimal::from_f64_retain(100.0).unwrap(),
-            "EURUSD_otc".to_string(),
-            "2026-04-07 22:50:00".to_string(),
-                            Decimal::from_f64_retain(1.1950).unwrap(),
-                            60,            85,
-            0,
-        )
+        .open_pending_order(OpenPendingOrder {
+            open_type: 1,
+            amount: Decimal::from_f64_retain(100.0).unwrap(),
+            asset: "EURUSD_otc".to_string(),
+            open_time: "2026-04-07 22:50:00".to_string(),
+            open_price: Decimal::from_f64_retain(1.1950).unwrap(),
+            timeframe: 60,
+            min_payout: 85,
+            command: 0,
+        })
         .await;
 
     assert!(result.is_err());

@@ -121,14 +121,7 @@ impl PendingTradesHandle {
     /// Creates a new pending order on the PocketOption platform.
     pub async fn open_pending_order(
         &self,
-        open_type: u32,
-        amount: Decimal,
-        asset: String,
-        open_time: String,
-        open_price: Decimal,
-        timeframe: u32,
-        min_payout: u32,
-        command: u32,
+        order: OpenPendingOrder,
     ) -> PocketResult<PendingOrder> {
         let _lock = self.call_lock.lock().await;
 
@@ -138,11 +131,22 @@ impl PendingTradesHandle {
         }
 
         let id = Uuid::new_v4();
+        let OpenPendingOrder {
+            open_type,
+            amount,
+            asset: order_asset,
+            open_time,
+            open_price,
+            timeframe,
+            min_payout,
+            command,
+        } = order;
+        let asset = order_asset.clone();
         self.sender
             .send(Command::OpenPendingOrder {
                 open_type,
                 amount,
-                asset: asset.clone(),
+                asset: order_asset,
                 open_time,
                 open_price,
                 timeframe,

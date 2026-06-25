@@ -39,21 +39,21 @@ mod tests {
         println!("Sending header: {:?}", header);
         let result = rule.call(&header);
         println!("Header result: {} (expected: false)", result);
-        assert_eq!(result, false, "Header should return false and set state");
+        assert!(!result, "Header should return false and set state");
 
         // Step 2: Binary body
         let body = Message::binary(vec![0x01, 0x02, 0x03]);
         println!("Sending binary body: {:?}", body);
         let result = rule.call(&body);
         println!("Binary result: {} (expected: true)", result);
-        assert_eq!(result, true, "Binary should return true after header");
+        assert!(result, "Binary should return true after header");
 
         // Step 3: Orphan binary (no preceding header)
         let orphan = Message::binary(vec![0x04, 0x05]);
         println!("Sending orphan binary: {:?}", orphan);
         let result = rule.call(&orphan);
         println!("Orphan result: {} (expected: false)", result);
-        assert_eq!(result, false, "Orphan binary should return false");
+        assert!(!result, "Orphan binary should return false");
 
         println!("✓ Test passed!\n");
     }
@@ -66,11 +66,11 @@ mod tests {
         let header =
             Message::text(r#"451-["failopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         println!("Sending fail header: {:?}", header);
-        assert_eq!(rule.call(&header), false, "Fail header should return false");
+        assert!(!rule.call(&header), "Fail header should return false");
 
         let body = Message::binary(vec![0xFF, 0xEE]);
         println!("Sending fail body: {:?}", body);
-        assert_eq!(rule.call(&body), true, "Fail binary should return true");
+        assert!(rule.call(&body), "Fail binary should return true");
 
         println!("✓ Test passed!\n");
     }
@@ -84,19 +84,19 @@ mod tests {
         println!("Testing successopenOrder...");
         let success_header =
             Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
-        assert_eq!(rule.call(&success_header), false);
+        assert!(!rule.call(&success_header));
 
         let success_body = Message::binary(b"success_data".to_vec());
-        assert_eq!(rule.call(&success_body), true);
+        assert!(rule.call(&success_body));
 
         // Test failopenOrder
         println!("Testing failopenOrder...");
         let fail_header =
             Message::text(r#"451-["failopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
-        assert_eq!(rule.call(&fail_header), false);
+        assert!(!rule.call(&fail_header));
 
         let fail_body = Message::binary(b"fail_data".to_vec());
-        assert_eq!(rule.call(&fail_body), true);
+        assert!(rule.call(&fail_body));
 
         println!("✓ Test passed!\n");
     }
@@ -109,17 +109,15 @@ mod tests {
         let wrong_header =
             Message::text(r#"451-["wrongEventName",{"_placeholder":true,"num":0}]"#.to_string());
         println!("Sending wrong event: {:?}", wrong_header);
-        assert_eq!(
-            rule.call(&wrong_header),
-            false,
+        assert!(
+            !rule.call(&wrong_header),
             "Wrong event should not match"
         );
 
         let body = Message::binary(vec![0x01, 0x02]);
         println!("Sending binary after wrong event: {:?}", body);
-        assert_eq!(
-            rule.call(&body),
-            false,
+        assert!(
+            !rule.call(&body),
             "Binary should not pass without matching header"
         );
 
@@ -135,7 +133,7 @@ mod tests {
         let header =
             Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         println!("Sending header: {:?}", header);
-        assert_eq!(rule.call(&header), false);
+        assert!(!rule.call(&header));
 
         // Reset should clear state
         println!("Calling reset()...");
@@ -146,7 +144,7 @@ mod tests {
         println!("Sending binary after reset: {:?}", body);
         let result = rule.call(&body);
         println!("Binary after reset result: {} (expected: false)", result);
-        assert_eq!(result, false, "Binary should not pass after reset");
+        assert!(!result, "Binary should not pass after reset");
 
         println!("✓ Test passed!\n");
     }
@@ -161,24 +159,24 @@ mod tests {
         let h1 =
             Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         let b1 = Message::binary(b"data1".to_vec());
-        assert_eq!(rule.call(&h1), false);
-        assert_eq!(rule.call(&b1), true);
+        assert!(!rule.call(&h1));
+        assert!(rule.call(&b1));
 
         // Pair 2
         println!("Pair 2: failopenOrder");
         let h2 =
             Message::text(r#"451-["failopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         let b2 = Message::binary(b"data2".to_vec());
-        assert_eq!(rule.call(&h2), false);
-        assert_eq!(rule.call(&b2), true);
+        assert!(!rule.call(&h2));
+        assert!(rule.call(&b2));
 
         // Pair 3
         println!("Pair 3: successopenOrder again");
         let h3 =
             Message::text(r#"451-["successopenOrder",{"_placeholder":true,"num":0}]"#.to_string());
         let b3 = Message::binary(b"data3".to_vec());
-        assert_eq!(rule.call(&h3), false);
-        assert_eq!(rule.call(&b3), true);
+        assert!(!rule.call(&h3));
+        assert!(rule.call(&b3));
 
         println!("✓ Test passed!\n");
     }

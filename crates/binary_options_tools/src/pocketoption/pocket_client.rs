@@ -37,7 +37,7 @@ use crate::{
         },
         ssid::Ssid,
         state::{State, StateBuilder},
-        types::{Action, Assets, Deal, PendingOrder},
+        types::{Action, Assets, Deal, PendingOrder, OpenPendingOrder},
     },
     utils::print_handler,
 };
@@ -597,9 +597,16 @@ impl PocketOption {
         self.require_handle::<PendingTradesApiModule>("PendingTradesApiModule")
             .await?
             .with_lock(self.pending_trades_lock.clone())
-            .open_pending_order(
-                open_type, amount, asset, open_time, open_price, timeframe, min_payout, command,
-            )
+            .open_pending_order(OpenPendingOrder {
+                open_type,
+                amount,
+                asset,
+                open_time,
+                open_price,
+                timeframe,
+                min_payout,
+                command,
+            })
             .await
     }
 

@@ -90,6 +90,7 @@ pub fn get_index() -> PocketResult<u64> {
 }
 
 pub async fn get_user_location(ip_address: &str) -> PocketResult<(f64, f64)> {
+    init_crypto_provider();
     let client = reqwest::Client::builder()
         .timeout(StdDuration::from_secs(2))
         .build()
@@ -138,6 +139,7 @@ pub fn calculate_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 }
 
 pub async fn get_public_ip() -> PocketResult<String> {
+    init_crypto_provider();
     let client = reqwest::Client::builder()
         .timeout(StdDuration::from_secs(2))
         .build()
