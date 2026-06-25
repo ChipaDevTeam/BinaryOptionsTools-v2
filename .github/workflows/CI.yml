@@ -85,25 +85,38 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [x64, x86]
+        include:
+          - target: x86_64-pc-windows-msvc
+            arch: x64
+          - target: i686-pc-windows-msvc
+            arch: x86
+    env:
+      RUSTC_WRAPPER: ""  # Disable sccache for Windows
+      SCCACHE_GHA_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
-      - name: Run sccache-cache
-        uses: mozilla/sccache-action@v0.0.6
+        with:
+          persist-credentials: false
+      # Disable sccache for windows due to potential cross-compilation issues
+      # - name: Run sccache-cache
+      #   uses: mozilla/sccache-action@v0.0.6
       - uses: actions/setup-python@v5
+        id: setup-python
         with:
           python-version: "3.13.12"
-          architecture: ${{ matrix.target }}
+          architecture: ${{ matrix.arch }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
+        env:
+          PYO3_PYTHON: ${{ steps.setup-python.outputs.python-path }}
         with:
           target: ${{ matrix.target }}
-          args: --release --strip --out dist -i python3.13
+          args: --release --strip --out dist -i "${{ steps.setup-python.outputs.python-path }}"
           working-directory: python
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-windows-${{ matrix.target }}
+          name: wheels-windows-${{ matrix.arch }}
           path: python/dist
 
   # --- 3. MACOS BUILD ---

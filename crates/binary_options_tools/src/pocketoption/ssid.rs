@@ -473,7 +473,7 @@ mod tests {
 
         let parsed = Ssid::parse(stripped_ssid)?;
         assert_eq!(parsed.session_id(), "swag");
-        assert_eq!(parsed.demo(), true);
+        assert!(parsed.demo());
 
         // Round-trip: to_string() should produce valid JSON that re-parses identically
         let emitted = parsed.to_string();
@@ -557,7 +557,7 @@ mod tests {
 
         let parsed_json = Ssid::parse(json_only)?;
         assert_eq!(parsed_json.session_id(), session_id);
-        assert_eq!(parsed_json.demo(), true);
+        assert!(parsed_json.demo());
 
         let reconstructed = parsed_json.to_string();
         assert!(reconstructed.starts_with("42[\"auth\","));

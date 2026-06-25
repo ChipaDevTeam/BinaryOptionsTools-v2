@@ -2,6 +2,7 @@ use binary_options_tools_core::traits::AppState;
 use chrono::Local;
 use rust_decimal::{dec, Decimal};
 use tokio::sync::RwLock;
+use tracing::info;
 
 use crate::expertoptions::{modules::profile::Demo, types::Assets};
 
@@ -57,7 +58,7 @@ impl AppState for State {
 impl State {
     pub fn new(token: String, demo: bool) -> Self {
         let timezone = Local::now().offset().local_minus_utc().div_euclid(60);
-        dbg!(timezone);
+        info!("Timezone offset: {}", timezone);
         State {
             token,
             balance: RwLock::new(None),

@@ -52,3 +52,35 @@ def test_config_update():
     cfg.update({"timeout_secs": 45, "log_level": "ERROR"})
     assert cfg.timeout_secs == 45
     assert cfg.log_level == "ERROR"
+
+
+def test_config_validation_errors():
+    with pytest.raises(ValueError, match="max_allowed_loops"):
+        Config(max_allowed_loops=-1)._validate()
+    with pytest.raises(ValueError, match="sleep_interval"):
+        Config(sleep_interval=-1)._validate()
+    with pytest.raises(ValueError, match="reconnect_time"):
+        Config(reconnect_time=0)._validate()
+    with pytest.raises(ValueError, match="connection_initialization_timeout_secs"):
+        Config(connection_initialization_timeout_secs=0)._validate()
+    with pytest.raises(ValueError, match="timeout_secs"):
+        Config(timeout_secs=0)._validate()
+    with pytest.raises(ValueError, match="max_subscriptions"):
+        Config(max_subscriptions=0)._validate()
+
+
+def test_config_get_pyconfig_fallback():
+    from unittest.mock import patch
+    from BinaryOptionsToolsV2.config import _get_pyconfig
+    with patch("sys.modules") as mock_modules:
+        mock_modules.get.return_value = None
+        pycfg_class = _get_pyconfig()
+        assert pycfg_class is not None
+
+
+def test_sync_pyconfig_none():
+    cfg = Config()
+    assert cfg._pyconfig is None
+    cfg._sync_pyconfig()
+    assert cfg._pyconfig is not None
+
