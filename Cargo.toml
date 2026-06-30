@@ -12,15 +12,15 @@ members = [
 ]
 
 [workspace.dependencies]
-anyhow = "1.0.102"
+anyhow = "1.0.103"
 async-trait = "0.1.89"
-chrono = { version = "0.4.44", features = ["serde"] }
+chrono = { version = "0.4.45", features = ["serde"] }
 darling = { version = "0.23.0", features = ["serde"] }
 futures-util = "0.3.32"
 kanal = "0.1.1"
 rand = "0.10.1"
-regex = "1.12.3"
-rust_decimal = { version = "1.42.0", features = ["serde", "macros", "serde-with-float"] }
+regex = "1.12.4"
+rust_decimal = { version = "1.42.1", features = ["serde", "macros", "serde-with-float"] }
 rust_decimal_macros = "1.40.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
@@ -29,9 +29,9 @@ tokio = "1.52.3"
 tokio-tungstenite = { version = "0.29.0", default-features = false, features = ["rustls-tls-webpki-roots", "connect", "handshake"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-uniffi = { version = "0.31.1", features = ["cli"] }
+uniffi = { version = "0.32.0", features = ["cli"] }
 url = { version = "2.5.8", features = ["serde"] }
-uuid = { version = "1.23.1", features = ["v4", "fast-rng", "serde"] }
+uuid = { version = "1.23.4", features = ["v4", "fast-rng", "serde"] }
 zyn = "0.5.4"
 
 [profile.release]

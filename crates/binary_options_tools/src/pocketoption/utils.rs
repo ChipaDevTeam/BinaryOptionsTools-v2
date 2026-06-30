@@ -225,9 +225,10 @@ pub mod optional_uuid {
     {
         let value = serde_json::Value::deserialize(deserializer)?;
         match value {
-            serde_json::Value::String(s) => {
-                s.parse::<Uuid>().map(Some).map_err(serde::de::Error::custom)
-            }
+            serde_json::Value::String(s) => s
+                .parse::<Uuid>()
+                .map(Some)
+                .map_err(serde::de::Error::custom),
             _ => Ok(None),
         }
     }
@@ -439,7 +440,8 @@ mod tests {
         assert_eq!(payload, json!({"val":2}));
 
         // Multi-event format (should return first)
-        let frame = SocketIoFrame::parse("42[\"firstEvent\",{\"a\":1},\"secondEvent\",{\"b\":2}]").unwrap();
+        let frame =
+            SocketIoFrame::parse("42[\"firstEvent\",{\"a\":1},\"secondEvent\",{\"b\":2}]").unwrap();
         let (event, payload) = frame.extract_event().unwrap();
         assert_eq!(event, "firstEvent");
         assert_eq!(payload, json!({"a":1}));

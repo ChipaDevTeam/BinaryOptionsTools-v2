@@ -71,7 +71,7 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 ### Market Data & Backtesting
 
 - **Live Stream**: Subscribe to real-time candles and price ticks.
-- **Historical**: Fetch OHLC data for analysis.
+- **Historical / UTC Candles**: Fetch and compile custom or standard candles directly from 1-second ticks aligned strictly to UTC boundaries, ensuring no server-side gaps or overlaps (merges).
 - **Virtual Market**: Built-in simulator for backtesting strategies without financial risk.
 - **Server Sync**: Precision timing via NTP-like synchronization.
 
@@ -121,19 +121,19 @@ Install directly from our GitHub releases. Supports **Python 3.9 - 3.12**.
 **Windows**
 
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.11/binaryoptionstoolsv2-0.2.11-cp39-abi3-win_amd64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.12/binaryoptionstoolsv2-0.2.12-cp39-abi3-win_amd64.whl"
 ```
 
 **Linux**
 
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.11/binaryoptionstoolsv2-0.2.11-cp39-abi3-manylinux_2_28_x86_64.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.12/binaryoptionstoolsv2-0.2.12-cp39-abi3-manylinux_2_28_x86_64.whl"
 ```
 
 **macOS (Apple Silicon)**
 
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.11/binaryoptionstoolsv2-0.2.11-cp39-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
+pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.12/binaryoptionstoolsv2-0.2.12-cp39-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
 ```
 
 #### Option B: Build from Source
@@ -142,7 +142,7 @@ Requires `rustc`, `cargo`, and `maturin`.
 
 ```bash
 git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git
-cd BinaryOptionsTools-v2/BinaryOptionsToolsV2
+cd BinaryOptionsTools-v2/python
 pip install maturin
 maturin develop --release
 ```

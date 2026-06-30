@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use binary_options_tools_core::{
@@ -37,7 +39,7 @@ use crate::{
         },
         ssid::Ssid,
         state::{State, StateBuilder},
-        types::{Action, Assets, Deal, PendingOrder, OpenPendingOrder},
+        types::{Action, Assets, Deal, OpenPendingOrder, PendingOrder},
     },
     utils::print_handler,
 };
@@ -98,9 +100,7 @@ impl Market for PocketOption {
 /// A high-level client for interacting with PocketOption.
 /// It provides methods for executing trades, retrieving balance, subscribing to
 /// asset updates, and managing the connection to the PocketOption platform.
-
 #[derive(Clone)]
-
 pub struct PocketOption {
     client: Client<State>,
     _runner: Arc<tokio::task::JoinHandle<()>>,
@@ -183,11 +183,19 @@ impl PocketOption {
             .ssid(parsed_ssid)
             .default_connection_url(url)
             .build()?;
-
         let builder = Self::configure_common_modules(ClientBuilder::new(PocketConnect, state));
         let (client, mut runner) = builder.build().await?;
 
         let _runner = tokio::spawn(async move { runner.run().await });
+
+        match tokio::time::timeout(Duration::from_secs(30), client.wait_connected()).await {
+            Ok(_) => {}
+            Err(_) => {
+                return Err(PocketError::General(
+                    "Connection initialization timed out".into(),
+                ));
+            }
+        }
 
         Ok(Self {
             client,
@@ -364,17 +372,48 @@ impl PocketOption {
         }
     }
 
-    async fn register_pending_trade(&self, asset: &str, action: Action, time: u32, amount: Decimal) -> Uuid {
+    async fn register_pending_trade(
+        &self,
+        asset: &str,
+        action: Action,
+        time: u32,
+        amount: Decimal,
+    ) -> Uuid {
         use crate::pocketoption::types::OpenOrder;
         let request_id = Uuid::new_v4();
-        let order = OpenOrder::new(amount, asset.to_string(), action, time, self.is_demo() as u32, request_id);
-        self.client.state.trade_state.pending_market_orders.write().await.insert(request_id, (order, std::time::Instant::now()));
+        let order = OpenOrder::new(
+            amount,
+            asset.to_string(),
+            action,
+            time,
+            self.is_demo() as u32,
+            request_id,
+        );
+        self.client
+            .state
+            .trade_state
+            .pending_market_orders
+            .write()
+            .await
+            .insert(request_id, (order, std::time::Instant::now()));
         request_id
     }
 
     async fn cleanup_trade(&self, fingerprint: &(String, Action, u32, Decimal), request_id: Uuid) {
-        self.client.state.trade_state.recent_trades.write().await.remove(fingerprint);
-        self.client.state.trade_state.pending_market_orders.write().await.remove(&request_id);
+        self.client
+            .state
+            .trade_state
+            .recent_trades
+            .write()
+            .await
+            .remove(fingerprint);
+        self.client
+            .state
+            .trade_state
+            .pending_market_orders
+            .write()
+            .await
+            .remove(&request_id);
     }
 
     pub async fn trade(
@@ -403,9 +442,14 @@ impl PocketOption {
             )));
         }
         let fingerprint = (asset_str.clone(), action, time, amount);
-        let request_id = self.register_pending_trade(&asset_str, action, time, amount).await;
+        let request_id = self
+            .register_pending_trade(&asset_str, action, time, amount)
+            .await;
 
-        let handle = match self.require_handle::<TradesApiModule>("TradesApiModule").await {
+        let handle = match self
+            .require_handle::<TradesApiModule>("TradesApiModule")
+            .await
+        {
             Ok(h) => h,
             Err(e) => {
                 self.cleanup_trade(&fingerprint, request_id).await;
@@ -413,9 +457,18 @@ impl PocketOption {
             }
         };
 
-        match handle.trade_with_id(asset_str, action, amount, time, request_id).await {
+        match handle
+            .trade_with_id(asset_str, action, amount, time, request_id)
+            .await
+        {
             Ok(deal) => {
-                self.client.state.trade_state.recent_trades.write().await.insert(fingerprint, (deal.id, std::time::Instant::now()));
+                self.client
+                    .state
+                    .trade_state
+                    .recent_trades
+                    .write()
+                    .await
+                    .insert(fingerprint, (deal.id, std::time::Instant::now()));
                 Ok((deal.id, deal))
             }
             Err(e) => {
@@ -821,31 +874,21 @@ impl PocketOption {
     }
 
     /// Gets historical candle data for a specific asset and period.
+    ///
+    /// This method fetches raw 1-second tick data for the asset (covering the last 1000 periods)
+    /// and compiles them into candles aligned to UTC boundaries, avoiding server-side candle mismatches.
+    ///
     /// # Arguments
     /// * `asset` - The asset to get historical data for.
     /// * `period` - The time period for each candle in seconds.
     /// # Returns
     /// A `PocketResult` containing a vector of `Candle` if successful, or an error if the request fails.
     pub async fn candles(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<Candle>> {
-        if !self.is_connected() {
-            return Err(PocketError::General(
-                "Not connected to server. The connection may have dropped; wait for reconnection or create a new client.".into(),
-            ));
-        }
-        let handle = self
-            .require_handle::<HistoricalDataApiModule>("HistoricalDataApiModule")
-            .await?;
-
-        if let Some(assets) = self.assets().await {
-            if assets.get(&asset.to_string()).is_none() {
-                return Err(PocketError::InvalidAsset(asset.to_string()));
-            }
-        }
-        handle.candles(asset.to_string(), period).await
+        self.compile_candles(asset, period, 1000 * period).await
     }
 
     /// Gets historical candle data for a specific asset and period.
-    /// Deprecated: use `candles()` instead.
+    #[deprecated(since = "0.2.0", note = "use candles() instead")]
     pub async fn history(&self, asset: impl ToString, period: u32) -> PocketResult<Vec<Candle>> {
         self.candles(asset, period).await
     }
@@ -854,8 +897,12 @@ impl PocketOption {
     ///
     /// This method fetches raw tick data for the asset over the specified
     /// `lookback_period` and then aggregates those ticks into custom-sized
-    /// candlesticks of `custom_period` seconds. This allows for non-standard
-    /// timeframes like 20s, 40s, 90s, etc.
+    /// candlesticks of `custom_period` seconds.
+    /// All candles are manually compiled from 1-second ticks and aligned
+    /// strictly to UTC boundaries to prevent time-alignment mismatches, overlaps,
+    /// or gaps ("merges") common with server-side candle retrieval.
+    ///
+    /// This allows for non-standard timeframes like 20s, 40s, 90s, etc.
     ///
     /// # Arguments
     /// * `asset` - Trading symbol (e.g., "EURUSD_otc")
@@ -939,6 +986,7 @@ impl PocketOption {
 
     /// Shuts down the client and stops the runner.
     pub async fn shutdown_owned(self) -> PocketResult<()> {
+        self._runner.abort();
         self.client.shutdown().await.map_err(PocketError::from)
     }
 

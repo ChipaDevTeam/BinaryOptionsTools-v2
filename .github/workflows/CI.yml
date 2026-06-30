@@ -19,22 +19,27 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Configure Git Credentials
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v6
         with:
-          python-version: 3.x
-      - name: Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      - name: Install dependencies with uv
-        run: uv pip install --system mkdocs-material "mkdocstrings[python]"
-      - run: mkdocs gh-deploy --force
-        env:
-          PYTHONPATH: python
-
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build
+          publish_branch: gh-pages
   # --- 1. LINUX BUILD ---
   linux:
     runs-on: ubuntu-24.04
@@ -54,13 +59,15 @@ jobs:
           - target: armv7-unknown-linux-gnueabihf
             libc: manylinux_2_28
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Run sccache-cache
-        uses: mozilla/sccache-action@v0.0.6
+        uses: mozilla/sccache-action@v0.0.10
 
       - name: Install Zig
-        uses: mlugg/setup-zig@v1
+        uses: mlugg/setup-zig@v2
         with:
           version: 0.13.0 # Explicitly use stable to avoid 404s
 
@@ -74,7 +81,7 @@ jobs:
           working-directory: python
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: wheels-linux-${{ matrix.target }}
           path: python/dist
@@ -91,16 +98,16 @@ jobs:
           - target: i686-pc-windows-msvc
             arch: x86
     env:
-      RUSTC_WRAPPER: ""  # Disable sccache for Windows
+      RUSTC_WRAPPER: "" # Disable sccache for Windows
       SCCACHE_GHA_ENABLED: "false"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       # Disable sccache for windows due to potential cross-compilation issues
       # - name: Run sccache-cache
-      #   uses: mozilla/sccache-action@v0.0.6
-      - uses: actions/setup-python@v5
+      #   uses: mozilla/sccache-action@v0.0.10
+      - uses: actions/setup-python@v6
         id: setup-python
         with:
           python-version: "3.13.12"
@@ -114,7 +121,7 @@ jobs:
           args: --release --strip --out dist -i "${{ steps.setup-python.outputs.python-path }}"
           working-directory: python
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: wheels-windows-${{ matrix.arch }}
           path: python/dist
@@ -123,10 +130,12 @@ jobs:
   macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Run sccache-cache
-        uses: mozilla/sccache-action@v0.0.6
-      - uses: actions/setup-python@v5
+        uses: mozilla/sccache-action@v0.0.10
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13.12"
       - name: Build wheels
@@ -136,7 +145,7 @@ jobs:
           args: --release --strip --out dist -i python3.13
           working-directory: python
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: wheels-macos
           path: python/dist
@@ -145,9 +154,11 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Run sccache-cache
-        uses: mozilla/sccache-action@v0.0.6
+        uses: mozilla/sccache-action@v0.0.10
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
@@ -155,7 +166,7 @@ jobs:
           args: --out dist
           working-directory: python
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: wheels-sdist
           path: python/dist
@@ -164,13 +175,15 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [linux, windows, macos, sdist]
+    needs: [linux, windows, macos, sdist, docs]
     permissions:
       contents: write
     outputs:
       has_pypi_token: ${{ steps.check_token.outputs.has_token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Check for PyPI token
         id: check_token
@@ -191,7 +204,7 @@ jobs:
           echo "TAG=v$VERSION" >> $GITHUB_OUTPUT
 
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: wheels
           pattern: wheels-*
@@ -226,12 +239,12 @@ jobs:
   pypi-publish:
     name: PyPI Publish
     runs-on: ubuntu-latest
-    needs: [release, linux, windows, macos, sdist]
+    needs: [release, linux, windows, macos, sdist, docs]
     # Skip if secrets.PYPI_API_TOKEN is not set or if not on a main/master branch push
     if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) && needs.release.outputs.has_pypi_token == 'true'
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           pattern: wheels-*

@@ -72,6 +72,7 @@ def test_config_validation_errors():
 def test_config_get_pyconfig_fallback():
     from unittest.mock import patch
     from BinaryOptionsToolsV2.config import _get_pyconfig
+
     with patch("sys.modules") as mock_modules:
         mock_modules.get.return_value = None
         pycfg_class = _get_pyconfig()
@@ -83,4 +84,3 @@ def test_sync_pyconfig_none():
     assert cfg._pyconfig is None
     cfg._sync_pyconfig()
     assert cfg._pyconfig is not None
-

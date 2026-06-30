@@ -1,0 +1,152 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * infers the import path from the `@site` alias, which resolves to the
+ * website directory, i.e. the directory containing docusaurus.config.js.
+ * To import a CSS file from a different location, use the `@site` alias.
+ */
+
+/* You can add global styles to this file, and also import other style files */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --ifm-color-primary: #4f46e5;
+  --ifm-color-primary-dark: #4338ca;
+  --ifm-color-primary-darker: #3730a3;
+  --ifm-color-primary-darkest: #312e81;
+  --ifm-color-primary-light: #6366f1;
+  --ifm-color-primary-lighter: #818cf8;
+  --ifm-color-primary-lightest: #a5b4fc;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  --ifm-font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif;
+  --ifm-font-family-monospace: 'JetBrains Mono', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+[data-theme="dark"] {
+  --ifm-color-primary: #818cf8;
+  --ifm-color-primary-dark: #6366f1;
+  --ifm-color-primary-darker: #4f46e5;
+  --ifm-color-primary-darkest: #4338ca;
+  --ifm-color-primary-light: #a5b4fc;
+  --ifm-color-primary-lighter: #c7d2fe;
+  --ifm-color-primary-lightest: #e0e7ff;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.15);
+}
+
+/* Custom styling for code blocks */
+.code-block {
+  border-radius: 8px;
+}
+
+.code-block pre {
+  border-radius: 8px;
+}
+
+/* Custom styling for tabs */
+.tabs-container {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tabs-container .tab-item {
+  border-radius: 8px 8px 0 0;
+}
+
+/* Hero section customization */
+.hero {
+  padding: 4rem 0;
+  text-align: center;
+}
+
+.hero__title {
+  font-size: 3.5rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+}
+
+.hero__subtitle {
+  font-size: 1.5rem;
+  font-weight: 400;
+  margin-bottom: 2rem;
+  opacity: 0.9;
+}
+
+/* Feature cards */
+.feature-card {
+  padding: 2rem;
+  border-radius: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Navigation tabs */
+.navbar {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .navbar {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Footer */
+.footer {
+  background-color: var(--ifm-background-surface-color);
+}
+
+[data-theme="dark"] .footer {
+  background-color: var(--ifm-background-color);
+}
+
+/* Custom admonition styles */
+:root {
+  --ifm-alert-background-color: var(--ifm-color-primary-lightest);
+  --ifm-alert-border-color: var(--ifm-color-primary-light);
+  --ifm-alert-color: var(--ifm-color-primary-darkest);
+  --ifm-alert-title-color: var(--ifm-color-primary-darkest);
+}
+
+[data-theme="dark"] {
+  --ifm-alert-background-color: rgba(79, 70, 229, 0.15);
+  --ifm-alert-border-color: var(--ifm-color-primary);
+  --ifm-alert-color: var(--ifm-color-primary-lightest);
+  --ifm-alert-title-color: var(--ifm-color-primary-lightest);
+}
+
+/* Table of contents */
+.table-of-contents {
+  border-left: 2px solid var(--ifm-color-primary);
+  padding-left: 1rem;
+}
+
+/* Language tabs */
+.docusaurus-tabs {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.docusaurus-tabs .tab-item {
+  border-radius: 8px 8px 0 0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--ifm-background-surface-color);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ifm-color-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ifm-color-primary-dark);
+}

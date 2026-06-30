@@ -1,6 +1,6 @@
-# Binary Options Tools - Core Pre - Testing Framework
+# Binary Options Tools - Core - Testing Framework
 
-A comprehensive WebSocket testing and monitoring framework for the `binary-options-tools-core-pre` crate.
+A comprehensive WebSocket testing and monitoring framework for the `binary-options-tools-core` crate.
 
 ## Overview
 
@@ -249,4 +249,4 @@ When adding new features:
 
 ## License
 
-This framework is part of the `binary-options-tools-core-pre` crate and follows the same license.
+This framework is part of the `binary-options-tools-core` crate and follows the same license.

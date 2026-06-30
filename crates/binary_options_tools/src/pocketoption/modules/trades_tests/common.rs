@@ -1,5 +1,4 @@
-#![allow(warnings)]
-#![allow(unused_imports)]
+#![allow(unused_imports, dead_code, unused_variables)]
 use binary_options_tools_core::{
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, RunnerCommand},

@@ -130,6 +130,7 @@ async def test_raw_handler_extended(api):
     """Test raw handler extended functionality."""
     pytest.skip("Raw handler extended test - handler may not receive matching messages")
 
+
 @pytest.mark.asyncio
 async def test_extra_api_methods(api):
     # Test reconnect (Line 717)

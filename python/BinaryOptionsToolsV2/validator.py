@@ -48,15 +48,11 @@ class Validator:
 
     @staticmethod
     def all(validators: List["Validator"]) -> "Validator":
-        return Validator(
-            _get_raw_validator().all([item._validator for item in validators])
-        )
+        return Validator(_get_raw_validator().all([item._validator for item in validators]))
 
     @staticmethod
     def any(validators: List["Validator"]) -> "Validator":
-        return Validator(
-            _get_raw_validator().any([item._validator for item in validators])
-        )
+        return Validator(_get_raw_validator().any([item._validator for item in validators]))
 
     @staticmethod
     def custom(func: Callable[[str], bool]) -> "Validator":

@@ -1,6 +1,11 @@
+---
+sidebar_position: 2
+slug: /overview
+---
+
 # Documentation Overview
 
-BinaryOptionsTools v2 features a modern, comprehensive documentation system built with MkDocs and the Material theme. This system replaces the legacy static HTML files with a dynamic, searchable, and maintainable documentation site.
+BinaryOptionsTools v2 features a modern, comprehensive documentation system built with Docusaurus. This system provides a dynamic, searchable, and maintainable documentation site.
 
 ## Documentation Structure
 
@@ -10,6 +15,8 @@ The documentation is organized into logical sections for easier navigation:
 - **Guides**: Practical tutorials for trading strategies, raw handlers, and platform specifics.
 - **Architecture**: Deep dives into the internal data flow and project structure.
 - **Project Info**: Deployment guides, roadmaps, and documentation summaries.
+- **Examples**: Code examples in all supported languages.
+- **Tutorials**: Step-by-step guides for getting started.
 
 ## Key Features
 
@@ -37,15 +44,15 @@ Integrated with GitHub Actions to automatically build and deploy the latest docu
 
 ### For Developers
 
-1. Read the [Introduction](INDEX.md) and [Overview](OVERVIEW.md).
-2. Explore the [API Reference](api/reference.md) for your preferred language.
-3. Check out the [Trading Guide](guides/trading.md) for implementation patterns.
+1. Read the [Introduction](/intro) and [Overview](/overview).
+2. Explore the [API Reference](/api/reference) for your preferred language.
+3. Check out the [Trading Guide](/guides/trading) for implementation patterns.
 
 ### For Contributors
 
 1. Documentation source is located in the `docs/` directory.
-2. Configuration is handled via `mkdocs.yml` in the root.
-3. Preview changes locally using `bun run docs:serve`.
+2. Configuration is handled via `docusaurus.config.js` in the root.
+3. Preview changes locally using `npm run start`.
 
 ## Quality and Coverage
 
@@ -53,3 +60,13 @@ Integrated with GitHub Actions to automatically build and deploy the latest docu
 - **20+ API Methods** documented with parameters and return types.
 - **100+ Code Snippets** ready for copy-pasting.
 - **Interactive Guides** for complex features like Raw Handlers.
+
+## Migration from MkDocs
+
+This documentation was migrated from MkDocs Material to Docusaurus v3. Key improvements include:
+
+- Better React-based theming and customization
+- Improved MDX support for interactive components
+- Faster build times with modern tooling
+- Better TypeScript integration
+- Enhanced Algolia DocSearch integration

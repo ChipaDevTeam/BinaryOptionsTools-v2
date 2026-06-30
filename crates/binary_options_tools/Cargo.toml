@@ -1,6 +1,6 @@
 [package]
 name = "binary_options_tools"
-version = "0.2.1"
+version = "0.2.12"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 description = "High-level library for binary options trading automation. Supports PocketOption and ExpertOption with real-time data streaming, WebSocket API access, and automated trading strategies."
@@ -27,8 +27,8 @@ tokio = { workspace = true }
 tokio-tungstenite = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
-binary-options-tools-core = { path = "../core", version = "0.2.0" }
-binary-options-tools-macros = { path = "../macros", version = "0.2.0" }
+binary-options-tools-core = { path = "../core", version = "0.2.12" }
+binary-options-tools-macros = { path = "../macros", version = "0.2.12" }
 rand = { workspace = true }
 tracing = { workspace = true }
 rust_decimal = { workspace = true }
@@ -36,8 +36,8 @@ rust_decimal_macros = { workspace = true }
 ryu = "1.0"
 thiserror = { workspace = true }
 regex = { workspace = true }
-rustls = { version = "0.23.40", default-features = false, features = ["ring"] }
-rustls-native-certs = "0.8.3"
+rustls = { version = "0.23.41", default-features = false, features = ["ring"] }
+rustls-native-certs = "0.8.4"
 php_serde = "0.6.0"
 
 [dev-dependencies]

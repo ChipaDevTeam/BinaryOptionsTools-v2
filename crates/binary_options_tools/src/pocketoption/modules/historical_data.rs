@@ -18,7 +18,7 @@ use crate::pocketoption::candle::{
 };
 use crate::pocketoption::error::{PocketError, PocketResult};
 use crate::pocketoption::state::State;
-use crate::pocketoption::types::{MultiPatternRule};
+use crate::pocketoption::types::MultiPatternRule;
 use crate::pocketoption::utils::normalize_timestamp;
 
 const HISTORICAL_DATA_TIMEOUT: Duration = Duration::from_secs(30);
@@ -466,7 +466,12 @@ impl ApiModule<State> for HistoricalDataApiModule {
     }
 
     fn rule(_: Arc<State>) -> Box<dyn Rule + Send + Sync> {
-        Box::new(MultiPatternRule::new(vec!["updateHistory", "updateHistoryNewFast", "updateHistoryNew", "updateStream"]))
+        Box::new(MultiPatternRule::new(vec![
+            "updateHistory",
+            "updateHistoryNewFast",
+            "updateHistoryNew",
+            "updateStream",
+        ]))
     }
 }
 
@@ -476,11 +481,21 @@ impl HistoricalDataApiModule {
         let arr: serde_json::Value = serde_json::from_str(&text[start..]).ok()?;
         let outer = arr.as_array()?;
         let data = if let Some(first) = outer.first() {
-            if first.is_string() && outer.len() >= 2 { outer.get(1)?.as_array()? } else { outer }
-        } else { return None; };
+            if first.is_string() && outer.len() >= 2 {
+                outer.get(1)?.as_array()?
+            } else {
+                outer
+            }
+        } else {
+            return None;
+        };
         if let Some(inner) = data.first().and_then(|v| v.as_array()) {
             if inner.len() >= 3 {
-                return Some((inner[0].as_str()?.to_string(), normalize_timestamp(inner[1].as_f64()?), inner[2].as_f64()?));
+                return Some((
+                    inner[0].as_str()?.to_string(),
+                    normalize_timestamp(inner[1].as_f64()?),
+                    inner[2].as_f64()?,
+                ));
             }
         }
         None
@@ -488,13 +503,21 @@ impl HistoricalDataApiModule {
 
     async fn notify_waiters_module_stopped(&mut self) {
         if let Some((req_id, _, _, _)) = self.pending_request.take() {
-            let _ = self.command_responder.send(CommandResponse::Shutdown { req_id }).await;
+            let _ = self
+                .command_responder
+                .send(CommandResponse::Shutdown { req_id })
+                .await;
         }
     }
 }
 
 impl Drop for HistoricalDataApiModule {
     fn drop(&mut self) {
-        tracing::debug!(target: "HistoricalDataApiModule", "HistoricalDataApiModule dropped");
+        if let Some((req_id, _, _, _)) = self.pending_request.take() {
+            let _ = self
+                .command_responder
+                .as_sync()
+                .try_send(CommandResponse::Shutdown { req_id });
+        }
     }
 }

@@ -45,10 +45,36 @@ fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Register custom exceptions
     m.add("PocketOptionError", m.py().get_type::<PocketOptionError>())?;
-    m.add("TradeNotFoundError", m.py().get_type::<TradeNotFoundError>())?;
-    m.add("UninitializedError", m.py().get_type::<UninitializedError>())?;
+    m.add(
+        "TradeNotFoundError",
+        m.py().get_type::<TradeNotFoundError>(),
+    )?;
+    m.add(
+        "UninitializedError",
+        m.py().get_type::<UninitializedError>(),
+    )?;
     m.add("NotAllowedError", m.py().get_type::<NotAllowedError>())?;
-    m.add("InvalidParameterError", m.py().get_type::<InvalidParameterError>())?;
+    m.add(
+        "InvalidParameterError",
+        m.py().get_type::<InvalidParameterError>(),
+    )?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_action_enum_variants() {
+        assert_eq!(format!("{:?}", Action::Call), "Call");
+        assert_eq!(format!("{:?}", Action::Put), "Put");
+    }
+
+    #[test]
+    fn test_py_config_defaults() {
+        let config = PyConfig::default();
+        assert_eq!(config.inner.max_allowed_loops, 0);
+    }
 }

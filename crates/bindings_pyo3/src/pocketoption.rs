@@ -7,17 +7,13 @@ use binary_options_tools::pocketoption::candle::{Candle, SubscriptionType};
 use binary_options_tools::pocketoption::error::PocketResult;
 use binary_options_tools::pocketoption::pocket_client::PocketOption;
 use binary_options_tools::utils::f64_to_decimal;
-use rust_decimal::prelude::ToPrimitive;
-// use binary_options_tools::pocketoption::types::base::RawWebsocketMessage;
-// use binary_options_tools::pocketoption::types::update::DataCandle;
-// use binary_options_tools::pocketoption::ws::stream::StreamAsset;
-// use binary_options_tools::reimports::FilteredRecieverStream;
 use binary_options_tools::validator::Validator as CrateValidator;
 use binary_options_tools::validator::Validator;
 use futures_util::stream::{BoxStream, Fuse};
 use futures_util::StreamExt;
 use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python};
 use pyo3_async_runtimes::tokio::future_into_py;
+use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
 
 use crate::config::PyConfig;
@@ -458,7 +454,11 @@ impl RawPocketOption {
         })
     }
 
-    pub fn get_closed_deal<'py>(&self, py: Python<'py>, trade_id: String) -> PyResult<Bound<'py, PyAny>> {
+    pub fn get_closed_deal<'py>(
+        &self,
+        py: Python<'py>,
+        trade_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
             let uuid = Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?;
@@ -488,7 +488,11 @@ impl RawPocketOption {
         })
     }
 
-    pub fn get_opened_deal<'py>(&self, py: Python<'py>, trade_id: String) -> PyResult<Bound<'py, PyAny>> {
+    pub fn get_opened_deal<'py>(
+        &self,
+        py: Python<'py>,
+        trade_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
             let uuid = Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?;
@@ -504,7 +508,6 @@ impl RawPocketOption {
     pub fn payout<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
-            // Work in progress - this feature is not yet implemented in the new API
             match client.assets().await {
                 Some(assets) => {
                     let payouts: HashMap<&String, i32> = assets
@@ -549,11 +552,10 @@ impl RawPocketOption {
         asset: String,
         period: u32,
     ) -> PyResult<Bound<'py, PyAny>> {
-        // Work in progress - this feature is not yet implemented in the new API
         let client = self.client.clone();
         future_into_py(py, async move {
             let res = client
-                .history(asset, period)
+                .candles(asset, period)
                 .await
                 .map_err(BinaryErrorPy::from)?;
             Python::attach(|py| {

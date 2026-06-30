@@ -1316,8 +1316,12 @@ class TestAsynchronousExtraCoverage:
     @pytest.mark.asyncio
     async def test_terminal_logging_exception_safety(self):
         from unittest.mock import patch
+
         # terminal_logging is True and LogBuilder raises Exception
-        with patch("BinaryOptionsToolsV2.tracing.LogBuilder.terminal", side_effect=Exception("mock")):
+        with patch(
+            "BinaryOptionsToolsV2.tracing.LogBuilder.terminal",
+            side_effect=Exception("mock"),
+        ):
             client = PocketOptionAsync("test_ssid", config={"terminal_logging": True})
             assert client is not None
 
@@ -1330,16 +1334,21 @@ class TestAsynchronousExtraCoverage:
     @pytest.mark.asyncio
     async def test_asynchronous_relative_import_fallback(self):
         from unittest.mock import patch
-        with patch.dict("sys.modules", {"BinaryOptionsToolsV2.BinaryOptionsToolsV2": None}):
+
+        with patch.dict(
+            "sys.modules", {"BinaryOptionsToolsV2.BinaryOptionsToolsV2": None}
+        ):
             client = PocketOptionAsync("test_ssid", config={"terminal_logging": False})
             assert client is not None
 
     @pytest.mark.asyncio
     async def test_check_win_timeout(self):
         client = PocketOptionAsync("test_ssid")
+
         async def slow_get_trade(id):
             await asyncio.sleep(2)
             return {"id": id}
+
         client._get_trade_result = slow_get_trade
         with pytest.raises(TimeoutError, match="Timeout waiting for trade result"):
             await client.check_win("deal_1", timeout_seconds=0.1)
@@ -1348,7 +1357,9 @@ class TestAsynchronousExtraCoverage:
     async def test_get_opened_deal_coverage(self, mock_raw_pocketoption):
         client = PocketOptionAsync("test_ssid")
         # 1. Normal
-        mock_raw_pocketoption.get_opened_deal = AsyncMock(return_value='{"id": "deal_123", "status": "open"}')
+        mock_raw_pocketoption.get_opened_deal = AsyncMock(
+            return_value='{"id": "deal_123", "status": "open"}'
+        )
         deal = await client.get_opened_deal("deal_123")
         assert deal is not None
         assert deal["id"] == "deal_123"
@@ -1361,7 +1372,9 @@ class TestAsynchronousExtraCoverage:
     async def test_get_closed_deal_coverage(self, mock_raw_pocketoption):
         client = PocketOptionAsync("test_ssid")
         # 1. Normal
-        mock_raw_pocketoption.get_closed_deal = AsyncMock(return_value='{"id": "deal_456", "status": "closed"}')
+        mock_raw_pocketoption.get_closed_deal = AsyncMock(
+            return_value='{"id": "deal_456", "status": "closed"}'
+        )
         deal = await client.get_closed_deal("deal_456")
         assert deal is not None
         assert deal["id"] == "deal_456"
@@ -1373,9 +1386,10 @@ class TestAsynchronousExtraCoverage:
     @pytest.mark.asyncio
     async def test_open_pending_order_type_error_fallbacks(self, mock_raw_pocketoption):
         client = PocketOptionAsync("test_ssid")
-        
+
         # We want open_pending_order to raise TypeError on the first call, then succeed
         call_count = 0
+
         async def mock_open(ot, amt, asset, optime, opprice, tf, minp, cmd):
             nonlocal call_count
             call_count += 1
@@ -1392,22 +1406,29 @@ class TestAsynchronousExtraCoverage:
 
         # Test numeric string
         call_count = 0
-        res = await client.open_pending_order(1, 10.0, "EURUSD", "12345678", 1.1, 60, 80, 0)
+        res = await client.open_pending_order(
+            1, 10.0, "EURUSD", "12345678", 1.1, 60, 80, 0
+        )
         assert res["optime"] == 12345678
 
         # Test date string YYYY-MM-DD HH:MM:SS
         call_count = 0
-        res = await client.open_pending_order(1, 10.0, "EURUSD", "2026-06-25 12:00:00", 1.1, 60, 80, 0)
+        res = await client.open_pending_order(
+            1, 10.0, "EURUSD", "2026-06-25 12:00:00", 1.1, 60, 80, 0
+        )
         assert res["optime"] > 0
 
         # Test invalid date string
         call_count = 0
-        res = await client.open_pending_order(1, 10.0, "EURUSD", "invalid_date", 1.1, 60, 80, 0)
+        res = await client.open_pending_order(
+            1, 10.0, "EURUSD", "invalid_date", 1.1, 60, 80, 0
+        )
         assert res["optime"] == 0
 
         # Test other TypeError is re-raised
         async def mock_other_type_error(*args):
             raise TypeError("some other error")
+
         mock_raw_pocketoption.open_pending_order = mock_other_type_error
         with pytest.raises(TypeError, match="some other error"):
             await client.open_pending_order(1, 10.0, "EURUSD", "0", 1.1, 60, 80, 0)
@@ -1415,31 +1436,36 @@ class TestAsynchronousExtraCoverage:
     def test_anext_polyfill_coverage(self):
         import sys
         import importlib
+
         original_version = sys.version_info
         sys.version_info = (3, 9, 0)
         try:
             import BinaryOptionsToolsV2.pocketoption.asynchronous as async_mod
+
             importlib.reload(async_mod)
             assert hasattr(async_mod, "anext")
-            
+
             class MockIter:
                 async def __anext__(self):
                     return 42
-            
+
             import anyio
+
             async def run_test():
                 assert await async_mod.anext(MockIter()) == 42
+
             anyio.run(run_test)
         finally:
             sys.version_info = original_version
             import BinaryOptionsToolsV2.pocketoption.asynchronous as async_mod
+
             importlib.reload(async_mod)
 
     def test_raw_pocket_option_import_fallback(self):
         from unittest.mock import patch
+
         # Force fallback import of RawPocketOption
         with patch("sys.modules") as mock_modules:
             mock_modules.get.return_value = None
             client = PocketOptionAsync("test_ssid", config={"terminal_logging": False})
             assert client is not None
-

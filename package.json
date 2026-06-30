@@ -6,8 +6,12 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepare": "husky",
-    "docs:serve": "python -m mkdocs serve",
-    "docs:build": "python -m mkdocs build"
+    "start": "docusaurus start",
+    "build": "docusaurus build",
+    "serve": "docusaurus serve",
+    "clear": "docusaurus clear",
+    "docs:serve": "npm run start",
+    "docs:build": "npm run build"
   },
   "keywords": [],
   "author": "",
@@ -15,7 +19,7 @@
   "packageManager": "bun@1.3.10",
   "devDependencies": {
     "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
+    "lint-staged": "^17.0.8",
     "markdownlint-cli2": "^0.22.1"
   },
   "lint-staged": {
@@ -28,6 +32,13 @@
     ]
   },
   "dependencies": {
-    "BinaryOptionsTools-v2": "."
+    "@docusaurus/core": "^3.10.1",
+    "@docusaurus/preset-classic": "^3.10.1",
+    "@mdx-js/react": "^3.1.1",
+    "BinaryOptionsTools-v2": ".",
+    "clsx": "^2.1.1",
+    "prism-react-renderer": "^2.4.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }

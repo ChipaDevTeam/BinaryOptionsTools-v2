@@ -92,9 +92,9 @@ Key Features of PocketOptionAsync
   - `sell()`: Places a sell trade asynchronously.
   - `check_win()`: Checks the outcome of a trade ('win', 'draw', or 'loss').
 - **Market Data**:
-  - `get_candles()`: Fetches historical candle data.
-  - `history()`: Retrieves recent data for a specific asset.
-  - `compile_candles()`: Compiles custom-period candlesticks from base candle data.
+  - `candles()` / `get_candles()`: Fetches and manually compiles historical candle data from 1-second ticks strictly on UTC boundaries to avoid server-side gaps/overlaps.
+  - `history()`: Retrieves recent data for a specific asset (delegates to `candles()`).
+  - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
 - **Account Management**:
   - `balance()`: Returns the current account balance.
   - `opened_deals()`: Lists all open trades.
@@ -104,13 +104,23 @@ Key Features of PocketOptionAsync
   - `subscribe_symbol()`: Provides an asynchronous iterator for real-time candle updates.
   - `subscribe_symbol_timed()`: Provides an asynchronous iterator for timed real-time candle updates.
   - `subscribe_symbol_chunked()`: Provides an asynchronous iterator for chunked real-time candle updates.
+- **Pending Orders**:
+  - `open_pending_order()`: Places a pending limit order.
+  - `cancel_pending_order()`: Cancels a specific pending order by ticket ID.
+  - `cancel_pending_orders()`: Cancels multiple pending orders in a batch.
+  - `get_pending_deals()`: Lists all active pending orders.
+  - `get_pending_deal()`: Retrieves details of a specific pending order.
 - **Server Information**:
   - `server_time()`: Gets the current server time.
 - **Connection Management**:
   - `reconnect()`: Manually reconnect to the server.
   - `shutdown()`: Properly close the connection.
-
-Helper Class - `AsyncSubscription`
+- **Advanced / Utilities**:
+  - `wait_for_assets()`: Awaits until the assets list is fully loaded from the server.
+  - `is_demo()`: Returns whether the current session is a demo account.
+  - `is_connected()`: Returns connection status.
+  - `create_raw_handler()`: Sets up direct raw WebSocket message listeners with custom validators.
+    Helper Class - `AsyncSubscription`
 
 Facilitates asynchronous iteration over live data streams, enabling non-blocking operations.
 
@@ -155,9 +165,9 @@ Key Features of PocketOption
   - `sell()`: Places a sell trade.
   - `check_win()`: Checks the trade outcome synchronously.
 - **Market Data**:
-  - `get_candles()`: Fetches historical candle data.
-  - `history()`: Retrieves recent data for a specific asset.
-  - `compile_candles()`: Compiles custom-period candlesticks from base candle data.
+  - `candles()` / `get_candles()`: Fetches and manually compiles historical candle data from 1-second ticks strictly on UTC boundaries to avoid server-side gaps/overlaps ("merges").
+  - `history()`: Retrieves recent data for a specific asset (delegates to `candles()`).
+  - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
 - **Account Management**:
   - `balance()`: Retrieves account balance.
   - `opened_deals()`: Lists all open trades.
@@ -167,13 +177,23 @@ Key Features of PocketOption
   - `subscribe_symbol()`: Provides a synchronous iterator for live data updates.
   - `subscribe_symbol_timed()`: Provides a synchronous iterator for timed real-time candle updates.
   - `subscribe_symbol_chunked()`: Provides a synchronous iterator for chunked real-time candle updates.
+- **Pending Orders**:
+  - `open_pending_order()`: Places a pending limit order.
+  - `cancel_pending_order()`: Cancels a specific pending order by ticket ID.
+  - `cancel_pending_orders()`: Cancels multiple pending orders in a batch.
+  - `get_pending_deals()`: Lists all active pending orders.
+  - `get_pending_deal()`: Retrieves details of a specific pending order.
 - **Server Information**:
   - `server_time()`: Gets the current server time.
 - **Connection Management**:
   - `reconnect()`: Manually reconnect to the server.
   - `shutdown()`: Properly close the connection.
-
-Helper Class - `SyncSubscription`
+- **Advanced / Utilities**:
+  - `wait_for_assets()`: Awaits until the assets list is fully loaded from the server.
+  - `is_demo()`: Returns whether the current session is a demo account.
+  - `is_connected()`: Returns connection status.
+  - `create_raw_handler()`: Sets up direct raw WebSocket message listeners with custom validators.
+    Helper Class - `SyncSubscription`
 
 Allows synchronous iteration over real-time data streams for compatibility with simpler scripts.
 

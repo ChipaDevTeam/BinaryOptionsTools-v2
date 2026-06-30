@@ -28,8 +28,6 @@ pub fn timeout(attr: TokenStream, item: TokenStream) -> TokenStream {
     q.into()
 }
 
-
-
 #[proc_macro_derive(RegionImpl, attributes(region))]
 pub fn region(input: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(input as DeriveInput);

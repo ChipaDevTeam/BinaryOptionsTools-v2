@@ -86,6 +86,7 @@ def test_validator_custom_exception_safety():
 
 def test_validator_non_callable():
     import pytest
+
     with pytest.raises(TypeError, match="must be callable"):
         Validator.custom(123)
 
@@ -110,8 +111,8 @@ def test_validator_repr():
 def test_validator_get_raw_validator_fallback():
     from unittest.mock import patch
     from BinaryOptionsToolsV2.validator import _get_raw_validator
+
     with patch("sys.modules") as mock_modules:
         mock_modules.get.return_value = None
         raw_val = _get_raw_validator()
         assert raw_val is not None
-

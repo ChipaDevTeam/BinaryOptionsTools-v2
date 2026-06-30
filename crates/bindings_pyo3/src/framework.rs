@@ -21,7 +21,7 @@ use tracing::info;
 use uuid::Uuid;
 
 #[pyclass(from_py_object)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Action {
     Call,
     Put,

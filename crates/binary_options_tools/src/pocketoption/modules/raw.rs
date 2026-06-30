@@ -52,9 +52,7 @@ pub enum CommandResponse {
         existed: bool,
     },
     /// The module has stopped and cannot fulfill the request.
-    Shutdown {
-        command_id: Uuid,
-    },
+    Shutdown { command_id: Uuid },
 }
 
 /// Handle used by clients to create per-validator RawHandlers
@@ -222,7 +220,7 @@ impl Rule for RawRule {
             .state
             .raw_validators
             .read()
-            .expect("Failed to acquire read lock");
+            .unwrap_or_else(|e| e.into_inner());
         for (_id, v) in validators.iter() {
             if v.call(msg_str.as_str()) {
                 return true;
@@ -322,7 +320,7 @@ impl ApiModule<State> for RawApiModule {
 
                             let mut targets = Vec::new();
                             {
-                                let validators = self.state.raw_validators.read().expect("Failed to acquire read lock");
+                                let validators = self.state.raw_validators.read().unwrap_or_else(|e| e.into_inner());
                                 for (id, validator) in validators.iter() {
                                     if validator.call(content.as_str()) {
                                         targets.push(*id);
@@ -405,6 +403,15 @@ impl RawApiModule {
 
 impl Drop for RawApiModule {
     fn drop(&mut self) {
-        // Cannot async notify here easily, but run() handles it.
+        // Synchronously clean up registered sinks and validators
+        // to prevent resource leaks
+        if let Ok(mut sinks) = self.sinks.try_write() {
+            sinks.clear();
+        }
+        if let Ok(mut keep_alive) = self.keep_alive_msgs.try_write() {
+            keep_alive.clear();
+        }
+        // Remove all raw validators from shared state
+        self.state.clear_raw_validators();
     }
 }

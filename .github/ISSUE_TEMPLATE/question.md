@@ -1,26 +1,25 @@
 ---
-name: Question
-about: Ask for technical assistance
+name: Question / Support
+about: Ask for assistance, usage guidance, or general technical support
 title: "[QUESTION] "
 labels: question
 ---
 
 ## Inquiry
 
-What is your technical question?
+State your technical question clearly and concisely.
 
-## Context
+## Attempted Solutions
 
-Provide details on what you are trying to achieve and what you have attempted.
+Describe what you are trying to achieve and what you have attempted so far. Include code samples if possible.
 
-## Environment
+## Environment Details
 
 - **OS**:
 - **Python Version**:
 - **Library Version**:
 
-## Resources Checked
+## AI Usage Disclosure
 
-- [ ] Documentation
-- [ ] Existing Examples
-- [ ] Previous Issues
+- [ ] I used AI assistance to write or understand this issue.
+      If yes, please specify which tool(s) and what parts were AI-assisted:

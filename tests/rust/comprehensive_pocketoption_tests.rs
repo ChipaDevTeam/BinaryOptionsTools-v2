@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 //! Comprehensive integration tests for all PocketOption functions
 //!
 //! This test file covers all major PocketOption API functions including:
@@ -17,13 +19,16 @@ use std::time::Duration;
 
 use binary_options_tools::pocketoption::{candle::SubscriptionType, PocketOption};
 
-/// Demo SSID for testing - provided by user
-const DEMO_SSID: &str = "swap-ssid-for-testing-1234567890abcdef";
+/// Demo SSID for testing — read from POCKET_OPTION_SSID env var
+fn demo_ssid() -> String {
+    std::env::var("POCKET_OPTION_SSID")
+        .expect("POCKET_OPTION_SSID must be set. Run: POCKET_OPTION_SSID='42[...]' cargo test")
+}
 
 /// Helper function to create and initialize a PocketOption client
 async fn create_test_client() -> Result<PocketOption, Box<dyn std::error::Error>> {
     let _ = tracing_subscriber::fmt::try_init();
-    let api = PocketOption::new(DEMO_SSID).await?;
+    let api = PocketOption::new(demo_ssid()).await?;
 
     // Wait for assets to be loaded (indicates full initialization)
     tokio::time::timeout(

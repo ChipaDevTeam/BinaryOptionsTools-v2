@@ -428,7 +428,7 @@ mod tests {
     }
 
     struct TestMiddleware {
-        #[allow(dead_code)]
+        #[allow(dead_code)] // Used in test helper new() for self-documentation
         name: String,
         send_count: AtomicU64,
         receive_count: AtomicU64,

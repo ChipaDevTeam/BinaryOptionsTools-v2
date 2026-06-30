@@ -79,20 +79,22 @@ async def test_log_subscription():
 
 def test_log_subscription_wrapper():
     from BinaryOptionsToolsV2.tracing import LogSubscription
-    
+
     # Test sync iteration
     inner_sync = iter(['{"msg": "hello"}', '{"msg": "world"}'])
     sub_sync = LogSubscription(inner_sync)
     assert sub_sync.__iter__() is sub_sync
     assert next(sub_sync) == {"msg": "hello"}
     assert next(sub_sync) == {"msg": "world"}
-    
+
     # Test async iteration
     class MockAsyncSub:
         def __init__(self, items):
             self.items = iter(items)
+
         def __aiter__(self):
             return self
+
         async def __anext__(self):
             try:
                 return next(self.items)
@@ -101,18 +103,20 @@ def test_log_subscription_wrapper():
 
     sub_async = LogSubscription(MockAsyncSub(['{"msg": "async1"}']))
     assert sub_async.__aiter__() is sub_async
-    
+
     async def run_async_test():
         assert await sub_async.__anext__() == {"msg": "async1"}
         with pytest.raises(StopAsyncIteration):
             await sub_async.__anext__()
-            
+
     import anyio
+
     anyio.run(run_async_test)
 
 
 def test_start_logs_failure():
     from unittest.mock import patch
+
     with patch("BinaryOptionsToolsV2.tracing._get_rust_attr") as mock_get_attr:
         mock_start_tracing = mock_get_attr.return_value
         mock_start_tracing.side_effect = Exception("Mock Rust Exception")
@@ -123,8 +127,8 @@ def test_start_logs_failure():
 def test_get_rust_attr_fallback():
     from unittest.mock import patch
     from BinaryOptionsToolsV2.tracing import _get_rust_attr
+
     with patch("sys.modules") as mock_modules:
         mock_modules.get.return_value = None
         attr = _get_rust_attr("Logger")
         assert attr is not None
-
