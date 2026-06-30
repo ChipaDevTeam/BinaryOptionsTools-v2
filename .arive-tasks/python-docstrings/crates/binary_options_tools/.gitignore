@@ -1,0 +1,4 @@
+/target
+.qodo
+Cargo.lock
+/src/pocketoption/modules/unworking_subs

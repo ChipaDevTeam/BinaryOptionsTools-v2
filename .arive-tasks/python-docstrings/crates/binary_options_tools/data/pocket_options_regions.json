@@ -1,0 +1,37 @@
+[
+  {
+    "url": "wss://api-msk.po.market/socket.io/?EIO=4&transport=websocket",
+    "name": "RUSSIA_MOSCOW",
+    "latitude": 55.7558,
+    "longitude": 37.6173,
+    "demo": false
+  },
+  {
+    "url": "wss://api-spb.po.market/socket.io/?EIO=4&transport=websocket",
+    "name": "RUSSIA_SPB",
+    "latitude": 59.9343,
+    "longitude": 30.3351,
+    "demo": false
+  },
+  {
+    "url": "wss://api-eu.po.market/socket.io/?EIO=4&transport=websocket",
+    "name": "EUROPE",
+    "latitude": 50.0755,
+    "longitude": 14.4378,
+    "demo": false
+  },
+  {
+    "url": "wss://api-us-south.po.market/socket.io/?EIO=4&transport=websocket",
+    "name": "US_SOUTH",
+    "latitude": 32.7767,
+    "longitude": -96.797,
+    "demo": false
+  },
+  {
+    "url": "wss://demo-api-eu.po.market/socket.io/?EIO=4&transport=websocket",
+    "name": "DEMO",
+    "latitude": 50.0755,
+    "longitude": 14.4378,
+    "demo": true
+  }
+]

@@ -1,0 +1,46 @@
+[package]
+name = "binary_options_tools"
+version = "0.2.1"
+edition = "2021"
+authors = ["ChipaDevTeam"]
+description = "High-level library for binary options trading automation. Supports PocketOption and ExpertOption with real-time data streaming, WebSocket API access, and automated trading strategies."
+license-file = "LICENSE"
+homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+readme = "Readme.md"
+keywords = ["binary-options", "pocketoption", "trading", "expertoption", "automation"]
+categories = ["api-bindings", "asynchronous"]
+include = ["src/**/*", "data/**/*", "Cargo.toml", "Readme.md", "LICENSE"]
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+# binary-options-tools-core = { path = "../core", version = "0.2.0" }
+# trading-macros = { path = "../macros" }
+futures-util = { workspace = true }
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls-no-provider", "json"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
+binary-options-tools-core = { path = "../core", version = "0.2.0" }
+binary-options-tools-macros = { path = "../macros", version = "0.2.0" }
+rand = { workspace = true }
+tracing = { workspace = true }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+ryu = "1.0"
+thiserror = { workspace = true }
+regex = { workspace = true }
+rustls = { version = "0.23.40", default-features = false, features = ["ring"] }
+rustls-native-certs = "0.8.3"
+php_serde = "0.6.0"
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
+kanal = { workspace = true }
+

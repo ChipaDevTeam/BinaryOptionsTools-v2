@@ -1,0 +1,18 @@
+pub mod error;
+pub mod platforms;
+pub mod tracing;
+pub mod utils;
+
+#[cfg(test)]
+mod test;
+
+// Re-export main types for easier access
+pub use platforms::pocketoption::{
+    client::PocketOption,
+    raw_handler::RawHandler,
+    types::{Action, Asset, Candle, Deal},
+    validator::Validator,
+};
+
+uniffi::setup_scaffolding!();
+// uniffi::include_scaffolding!("binary_options_tools_uni");

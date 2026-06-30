@@ -1,0 +1,71 @@
+use std::collections::HashMap;
+
+use crate::utils::serialize::bool2int;
+use binary_options_tools_core::traits::Rule;
+use serde::Deserialize;
+use serde_json::Value;
+
+#[derive(Deserialize)]
+pub struct Asset {
+    pub id: u32,
+    pub symbol: Option<String>,
+    pub name: String,
+    #[serde(with = "bool2int", rename = "active")]
+    pub is_active: bool,
+    #[serde(flatten)]
+    _extra: HashMap<String, Value>,
+}
+
+pub struct Assets(pub HashMap<String, Asset>);
+
+pub struct MultiRule {
+    rules: Vec<Box<dyn Rule + Send + Sync>>,
+}
+
+impl MultiRule {
+    pub fn new(rules: Vec<Box<dyn Rule + Send + Sync>>) -> Self {
+        Self { rules }
+    }
+}
+
+impl Rule for MultiRule {
+    fn call(&self, msg: &binary_options_tools_core::reimports::Message) -> bool {
+        for rule in &self.rules {
+            if rule.call(msg) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn reset(&self) {
+        for rule in &self.rules {
+            rule.reset();
+        }
+    }
+}
+
+impl Asset {
+    fn is_valid(&self) -> bool {
+        self.id > 0 && self.id != 20000 // Id of asset not supported by client
+    }
+
+    pub fn get_symbol(&self) -> String {
+        self.symbol.clone().unwrap_or_else(|| self.name.clone())
+    }
+}
+
+impl Assets {
+    pub fn new(assets: Vec<Asset>) -> Self {
+        Assets(HashMap::from_iter(
+            assets
+                .into_iter()
+                .filter(|asset| asset.is_valid())
+                .map(|a| (a.get_symbol(), a)),
+        ))
+    }
+
+    pub fn id(&self, asset: &str) -> Option<u32> {
+        self.0.get(asset).map(|a| a.id)
+    }
+}

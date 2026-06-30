@@ -15,7 +15,7 @@ use binary_options_tools::error::BinaryOptionsError;
 use super::{
     raw_handler::RawHandler,
     stream::SubscriptionStream,
-    types::{Action, Asset, Candle, Deal, PendingOrder},
+    types::{Action, Asset, Candle, Deal, PendingOrder, Tick},
     validator::Validator,
 };
 
@@ -401,6 +401,152 @@ impl PocketOption {
             .get_opened_deal(deal_id)
             .await
             .map(|d| d.close_timestamp.timestamp())
+    }
+
+    /// Cancels a specific pending order by its ticket ID.
+    #[uniffi::method]
+    pub async fn cancel_pending_order(&self, ticket: String) -> Result<String, UniError> {
+        self.inner
+            .cancel_pending_order(ticket)
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))
+    }
+
+    /// Cancels multiple pending orders in a single batch operation.
+    #[uniffi::method]
+    pub async fn cancel_pending_orders(
+        &self,
+        tickets: Vec<String>,
+    ) -> Result<Vec<String>, UniError> {
+        self.inner
+            .cancel_pending_orders(tickets)
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))
+    }
+
+    /// Returns `true` if the WebSocket connection is currently active.
+    #[uniffi::method]
+    pub fn is_connected(&self) -> bool {
+        self.inner.is_connected()
+    }
+
+    /// Re-establishes the WebSocket connection.
+    #[uniffi::method]
+    pub async fn connect(&self) -> Result<(), UniError> {
+        self.inner
+            .connect()
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))
+    }
+
+    /// Disconnects the WebSocket connection while keeping configuration intact.
+    #[uniffi::method]
+    pub async fn disconnect(&self) -> Result<(), UniError> {
+        self.inner
+            .disconnect()
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))
+    }
+
+
+    /// Retrieves a pending order by its deal ID.
+    #[uniffi::method]
+    pub async fn get_pending_deal(
+        &self,
+        deal_id: String,
+    ) -> Result<Option<PendingOrder>, UniError> {
+        let uuid = Uuid::parse_str(&deal_id)
+            .map_err(|e| UniError::Uuid(format!("Invalid UUID: {e}")))?;
+        Ok(self.inner.get_pending_deal(uuid).await.map(PendingOrder::from))
+    }
+
+    /// Returns all currently active (tradable) assets.
+    #[uniffi::method]
+    pub async fn active_assets(&self) -> Result<Vec<Asset>, UniError> {
+        Ok(self
+            .inner
+            .active_assets()
+            .await
+            .map(|assets| assets.0.into_values().map(Asset::from).collect())
+            .unwrap_or_default())
+    }
+
+    /// Gets custom-period candle data compiled from tick history.
+    #[uniffi::method]
+    pub async fn compile_candles(
+        &self,
+        asset: String,
+        custom_period: u32,
+        lookback_period: u32,
+    ) -> Result<Vec<Candle>, UniError> {
+        let candles = self
+            .inner
+            .compile_candles(asset, custom_period, lookback_period)
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?
+            .into_iter()
+            .map(Candle::from)
+            .collect();
+        Ok(candles)
+    }
+
+    /// Returns historical tick data (timestamp, price) for a specific asset and lookback period.
+    #[uniffi::method]
+    pub async fn ticks(
+        &self,
+        asset: String,
+        lookback_seconds: u32,
+    ) -> Result<Vec<Tick>, UniError> {
+        self.inner
+            .ticks(asset, lookback_seconds)
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))
+            .map(|tuples| {
+                tuples
+                    .into_iter()
+                    .map(|(ts, price)| Tick {
+                        timestamp: ts,
+                        price,
+                    })
+                    .collect()
+            })
+    }
+
+    /// Waits for the asset list to be loaded from the server.
+    #[uniffi::method]
+    pub async fn wait_for_assets(&self, timeout_secs: f64) -> Result<(), UniError> {
+        self.inner
+            .wait_for_assets(StdDuration::from_secs_f64(timeout_secs))
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))
+    }
+
+    /// Creates a new `PocketOption` client with a custom configuration.
+    #[uniffi::constructor]
+    pub async fn new_with_config(
+        ssid: String,
+        urls: Vec<String>,
+        connection_timeout_secs: u32,
+    ) -> Result<Arc<Self>, UniError> {
+        use binary_options_tools::config::Config;
+
+        let parsed_urls: Vec<url::Url> = urls
+            .into_iter()
+            .filter_map(|u| url::Url::parse(&u).ok())
+            .collect();
+
+        let config = Config {
+            urls: parsed_urls,
+            connection_initialization_timeout: StdDuration::from_secs(
+                connection_timeout_secs as u64,
+            ),
+            ..Default::default()
+        };
+
+        let inner = OriginalPocketOption::new_with_config(ssid, config)
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
+        Ok(Arc::new(Self { inner }))
     }
 }
 

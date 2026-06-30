@@ -1,0 +1,35 @@
+[package]
+name = "binary-options-tools-macros"
+version = "0.2.0"
+edition = "2021"
+authors = ["ChipaDevTeam"]
+repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+readme = "readme.md"
+description = "Procedural macros for the binary-options-tools crate. Provides code generation and compile-time utilities for trading platform integrations."
+keywords = ["binary-options", "macros", "proc-macro", "trading"]
+categories = ["development-tools::procedural-macro-helpers"]
+license-file = "LICENSE"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+# binary-options-tools-core = { path = "../core", version = "0.1.5" }
+
+anyhow = "1.0.102"
+proc-macro2 = "1.0.106"
+quote = "1.0.45"
+serde_json = "1.0.150"
+syn = "2.0.117"
+tokio = { version = "1.52.3", default-features = false, features = ["macros"] }
+tracing = "0.1.44"
+darling = { version = "0.21.3", features = ["serde"] }
+url = { version = "2.5.8", features = ["serde"] }
+serde = { version = "1.0.228", features = ["derive"] }
+
+# raw_core = { path = "../raw_core" }
+
+[dev-dependencies]
+serde = "1.0.228"

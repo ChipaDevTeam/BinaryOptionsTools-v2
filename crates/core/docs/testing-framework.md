@@ -1,6 +1,6 @@
 # WebSocket Testing Framework
 
-A comprehensive testing and monitoring framework for WebSocket connections in the `binary-options-tools-core-pre` crate.
+A comprehensive testing and monitoring framework for WebSocket connections in the `binary-options-tools-core` crate.
 
 ## Overview
 
@@ -292,7 +292,7 @@ The `docs/examples/testing_echo_client.rs` demonstrates full functionality:
 - Statistics are collected in real-time
 - Graceful shutdown works properly
 
-The TestingWrapper is now a complete, production-ready testing framework for WebSocket connections in the binary-options-tools-core-pre crate.
+The TestingWrapper is now a complete, production-ready testing framework for WebSocket connections in the binary-options-tools-core crate.
 
 ## Examples
 
@@ -310,7 +310,7 @@ When adding new features to the testing framework:
 
 ## License
 
-This testing framework is part of the `binary-options-tools-core-pre` crate and follows the same license.
+This testing framework is part of the `binary-options-tools-core` crate and follows the same license.
 
 ## Middleware System
 
