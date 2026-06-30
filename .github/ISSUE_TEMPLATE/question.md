@@ -18,3 +18,9 @@ Describe what you are trying to achieve and what you have attempted so far. Incl
 - **OS**:
 - **Python Version**:
 - **Library Version**:
+
+## AI Usage Disclosure
+
+- [ ] I used AI assistance to write or understand this issue.
+  If yes, please specify which tool(s) and what parts were AI-assisted:
+
