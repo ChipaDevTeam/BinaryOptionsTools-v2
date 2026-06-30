@@ -24,7 +24,7 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.x
       - name: Install uv
@@ -100,7 +100,7 @@ jobs:
       # Disable sccache for windows due to potential cross-compilation issues
       # - name: Run sccache-cache
       #   uses: mozilla/sccache-action@v0.0.6
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         id: setup-python
         with:
           python-version: "3.13.12"
@@ -126,7 +126,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run sccache-cache
         uses: mozilla/sccache-action@v0.0.6
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13.12"
       - name: Build wheels
