@@ -81,7 +81,7 @@ jobs:
           working-directory: python
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: wheels-linux-${{ matrix.target }}
           path: python/dist
@@ -121,7 +121,7 @@ jobs:
           args: --release --strip --out dist -i "${{ steps.setup-python.outputs.python-path }}"
           working-directory: python
       - name: Upload wheels
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: wheels-windows-${{ matrix.arch }}
           path: python/dist
@@ -145,7 +145,7 @@ jobs:
           args: --release --strip --out dist -i python3.13
           working-directory: python
       - name: Upload wheels
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: wheels-macos
           path: python/dist
@@ -166,7 +166,7 @@ jobs:
           args: --out dist
           working-directory: python
       - name: Upload sdist
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: wheels-sdist
           path: python/dist
