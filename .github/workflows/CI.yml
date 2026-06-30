@@ -60,7 +60,7 @@ jobs:
         uses: mozilla/sccache-action@v0.0.6
 
       - name: Install Zig
-        uses: mlugg/setup-zig@v1
+        uses: mlugg/setup-zig@v2
         with:
           version: 0.13.0 # Explicitly use stable to avoid 404s
 
