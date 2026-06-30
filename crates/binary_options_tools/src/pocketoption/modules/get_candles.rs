@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
@@ -14,7 +14,7 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::pocketoption::{
-    candle::{Candle, compile_candles_from_ticks, HistoryItem},
+    candle::{compile_candles_from_ticks, Candle, HistoryItem},
     error::{PocketError, PocketResult},
     state::State,
     types::MultiPatternRule,
@@ -53,7 +53,12 @@ impl LoadHistoryPeriod {
         })
     }
 
-    pub fn new_fast(asset: impl ToString, time: i64, period: i64, offset: i64) -> PocketResult<Self> {
+    pub fn new_fast(
+        asset: impl ToString,
+        time: i64,
+        period: i64,
+        offset: i64,
+    ) -> PocketResult<Self> {
         Ok(LoadHistoryPeriod {
             asset: asset.to_string(),
             period,
@@ -68,7 +73,11 @@ impl LoadHistoryPeriod {
 impl std::fmt::Display for LoadHistoryPeriod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let data = serde_json::to_string(&self).map_err(|_| std::fmt::Error)?;
-        let event = if self.is_fast { "loadHistoryPeriodFast" } else { "loadHistoryPeriod" };
+        let event = if self.is_fast {
+            "loadHistoryPeriodFast"
+        } else {
+            "loadHistoryPeriod"
+        };
         write!(f, "42[\"{event}\",{data}]")
     }
 }
@@ -244,7 +253,9 @@ impl GetCandlesHandle {
                     }
                     // Continue waiting for the correct response
                 }
-                Ok(CommandResponse::Shutdown { req_id: response_id }) => {
+                Ok(CommandResponse::Shutdown {
+                    req_id: response_id,
+                }) => {
                     if req_id == response_id {
                         return Err(PocketError::ModuleStopped {
                             module_name: "GetCandlesApiModule".to_string(),
@@ -320,7 +331,9 @@ impl GetCandlesHandle {
                             return Err(PocketError::General(error));
                         }
                     }
-                    Ok(CommandResponse::Shutdown { req_id: response_id }) => {
+                    Ok(CommandResponse::Shutdown {
+                        req_id: response_id,
+                    }) => {
                         if req_id == response_id {
                             return Err(PocketError::ModuleStopped {
                                 module_name: "GetCandlesApiModule".to_string(),
@@ -361,7 +374,7 @@ impl GetCandlesHandle {
         }
 
         // Sort by timestamp and deduplicate
-        all_ticks.sort_by(|a, b| a.0.cmp(&b.0));
+        all_ticks.sort_by_key(|a| a.0);
         all_ticks.dedup_by(|a, b| a.0 == b.0);
 
         info!(target: "GetCandlesHandle", "Collected {} ticks for {} covering {} seconds", all_ticks.len(), asset_str, lookback_seconds);
@@ -487,7 +500,7 @@ impl ApiModule<State> for GetCandlesApiModule {
                                         Ok(load_history) => {
                                             // Clear buffered ticks for this asset to ensure we get fresh ones after the historical request
                                             self.latest_ticks.remove(&asset);
-                                            
+
                                             // Store the request mapping
                                             self.pending_requests.insert(load_history.index, (req_id, asset, RequestKind::Candles, period as u32));
 
@@ -524,7 +537,7 @@ impl ApiModule<State> for GetCandlesApiModule {
                                     match load_history_res {
                                         Ok(load_history) => {
                                             self.latest_ticks.remove(&asset);
-                                            
+
                                             // Store the request mapping
                                             self.pending_requests.insert(load_history.index, (req_id, asset, RequestKind::Ticks, period as u32));
 
@@ -585,7 +598,9 @@ impl GetCandlesApiModule {
     /// Parses an updateStream message into (symbol, timestamp, price).
     fn parse_update_stream(&self, text: &str) -> Option<(String, i64, f64)> {
         // Handle Socket.IO array format: [["symbol", timestamp, price]]
-        if let Ok(serde_json::Value::Array(outer_arr)) = serde_json::from_str::<serde_json::Value>(text) {
+        if let Ok(serde_json::Value::Array(outer_arr)) =
+            serde_json::from_str::<serde_json::Value>(text)
+        {
             if let Some(inner_arr) = outer_arr.first().and_then(|v| v.as_array()) {
                 if inner_arr.len() >= 3 {
                     let symbol = inner_arr[0].as_str()?.to_string();
@@ -600,7 +615,9 @@ impl GetCandlesApiModule {
 
     async fn process_result(&mut self, result: LoadHistoryPeriodResult) -> CoreResult<()> {
         // Find the pending request by index
-        if let Some((req_id, asset, request_kind, requested_period)) = self.pending_requests.remove(&result.index) {
+        if let Some((req_id, asset, request_kind, requested_period)) =
+            self.pending_requests.remove(&result.index)
+        {
             match request_kind {
                 RequestKind::Candles => {
                     // Check if the data is already OHLC candles
@@ -653,7 +670,7 @@ impl GetCandlesApiModule {
                     // Append buffered ticks from updateStream if they are newer
                     if let Some(stream_ticks) = self.latest_ticks.remove(&asset) {
                         let last_ts = history_items.last().map(|i| i.to_tick().0).unwrap_or(0);
-                        
+
                         for (ts, price) in stream_ticks {
                             if ts > last_ts {
                                 history_items.push(HistoryItem::Tick([
@@ -664,7 +681,8 @@ impl GetCandlesApiModule {
                         }
                     }
 
-                    let candles = compile_candles_from_ticks(&history_items, requested_period, &asset);
+                    let candles =
+                        compile_candles_from_ticks(&history_items, requested_period, &asset);
 
                     if let Err(e) = self
                         .command_responder

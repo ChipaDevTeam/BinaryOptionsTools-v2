@@ -88,4 +88,3 @@ fn message_to_string(msg: &Message) -> String {
         _ => String::new(),
     }
 }
-

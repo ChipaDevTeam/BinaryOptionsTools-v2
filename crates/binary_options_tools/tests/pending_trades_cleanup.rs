@@ -1,6 +1,8 @@
-use binary_options_tools::pocketoption::modules::pending_trades::{Command, CommandResponse, PendingTradesApiModule};
-use binary_options_tools::pocketoption::state::StateBuilder;
+use binary_options_tools::pocketoption::modules::pending_trades::{
+    Command, CommandResponse, PendingTradesApiModule,
+};
 use binary_options_tools::pocketoption::ssid::Ssid;
+use binary_options_tools::pocketoption::state::StateBuilder;
 use binary_options_tools_core::reimports::bounded_async;
 use binary_options_tools_core::traits::ApiModule;
 use kanal::unbounded_async;
@@ -31,9 +33,7 @@ async fn test_pending_trades_cleanup_on_stop() {
         );
 
         // Spawn the module
-        let module_handle = tokio::spawn(async move {
-            module.run().await
-        });
+        let module_handle = tokio::spawn(async move { module.run().await });
 
         // Send cancel command directly (bypass handle to avoid call_lock hang)
         let _ = cmd_tx

@@ -330,8 +330,12 @@ impl<S: AppState> ClientRunner<S> {
         self.is_hard_disconnect = true;
         self.is_hold_disconnect = hold;
 
-        if let Some(t) = writer_task.take() { t.abort(); }
-        if let Some(t) = reader_task.take() { t.abort(); }
+        if let Some(t) = writer_task.take() {
+            t.abort();
+        }
+        if let Some(t) = reader_task.take() {
+            t.abort();
+        }
 
         self.signal.set_disconnected();
     }
@@ -392,7 +396,10 @@ impl<S: AppState> ClientRunner<S> {
                 MiddlewareContext::new(Arc::clone(&self.state), self.to_ws_sender.clone());
             debug!(target: "Runner", "Starting connection cycle...");
 
-            self.router.middleware_stack.record_connection_attempt(&middleware_context).await;
+            self.router
+                .middleware_stack
+                .record_connection_attempt(&middleware_context)
+                .await;
 
             let stream_result = if self.is_hard_disconnect {
                 self.connector.connect(self.state.clone()).await
@@ -405,7 +412,9 @@ impl<S: AppState> ClientRunner<S> {
                 Err(e) => {
                     self.reconnect_attempts += 1;
 
-                    if self.max_allowed_loops > 0 && self.reconnect_attempts >= self.max_allowed_loops {
+                    if self.max_allowed_loops > 0
+                        && self.reconnect_attempts >= self.max_allowed_loops
+                    {
                         error!(target: "Runner", "Maximum reconnection attempts ({}) reached. Shutting down.", self.max_allowed_loops);
                         self.shutdown_requested = true;
                         break;
@@ -438,15 +447,25 @@ impl<S: AppState> ClientRunner<S> {
 
             let connection_start = std::time::Instant::now();
             let mut attempts_reset = false;
-            self.router.middleware_stack.on_connect(&middleware_context).await;
+            self.router
+                .middleware_stack
+                .on_connect(&middleware_context)
+                .await;
 
             debug!(target: "Runner", "Executing on_connect callback.");
-            if let Err(err) = (self.connection_callback.on_connect)(self.state.clone(), &self.to_ws_sender).await {
+            if let Err(err) =
+                (self.connection_callback.on_connect)(self.state.clone(), &self.to_ws_sender).await
+            {
                 warn!(target: "Runner", "on_connect callback failed: {err:#?}");
             }
 
             debug!(target: "Runner", "Executing on_reconnect callback.");
-            if let Err(err) = self.connection_callback.on_reconnect.call(self.state.clone(), &self.to_ws_sender).await {
+            if let Err(err) = self
+                .connection_callback
+                .on_reconnect
+                .call(self.state.clone(), &self.to_ws_sender)
+                .await
+            {
                 warn!(target: "Runner", "on_reconnect callback failed: {err:#?}");
             }
             self.is_hard_disconnect = false;
@@ -461,7 +480,10 @@ impl<S: AppState> ClientRunner<S> {
                 async move {
                     let middleware_context = MiddlewareContext::new(state, to_ws_sender);
                     while let Ok(msg) = to_ws_rx.recv().await {
-                        router.middleware_stack.on_send(&msg, &middleware_context).await;
+                        router
+                            .middleware_stack
+                            .on_send(&msg, &middleware_context)
+                            .await;
                         if ws_writer.send(msg).await.is_err() {
                             error!(target: "Runner", "WebSocket writer task failed to send message.");
                             break;
@@ -487,7 +509,10 @@ impl<S: AppState> ClientRunner<S> {
             let mut session_active = true;
 
             while session_active {
-                if !attempts_reset && connection_start.elapsed() > std::time::Duration::from_secs(CONNECTION_STABLE_RESET_SECS) {
+                if !attempts_reset
+                    && connection_start.elapsed()
+                        > std::time::Duration::from_secs(CONNECTION_STABLE_RESET_SECS)
+                {
                     self.reconnect_attempts = 0;
                     attempts_reset = true;
                     debug!(target: "Runner", "Connection stable, resetting reconnect attempts.");

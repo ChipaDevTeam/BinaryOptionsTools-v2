@@ -45,10 +45,19 @@ fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Register custom exceptions
     m.add("PocketOptionError", m.py().get_type::<PocketOptionError>())?;
-    m.add("TradeNotFoundError", m.py().get_type::<TradeNotFoundError>())?;
-    m.add("UninitializedError", m.py().get_type::<UninitializedError>())?;
+    m.add(
+        "TradeNotFoundError",
+        m.py().get_type::<TradeNotFoundError>(),
+    )?;
+    m.add(
+        "UninitializedError",
+        m.py().get_type::<UninitializedError>(),
+    )?;
     m.add("NotAllowedError", m.py().get_type::<NotAllowedError>())?;
-    m.add("InvalidParameterError", m.py().get_type::<InvalidParameterError>())?;
+    m.add(
+        "InvalidParameterError",
+        m.py().get_type::<InvalidParameterError>(),
+    )?;
 
     Ok(())
 }

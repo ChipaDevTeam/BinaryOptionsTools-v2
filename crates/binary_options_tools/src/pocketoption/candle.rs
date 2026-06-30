@@ -460,7 +460,7 @@ pub fn compile_candles_from_ticks(ticks: &[HistoryItem], period: u32, symbol: &s
 
     // Sort ticks by timestamp just in case
     let mut sorted_ticks: Vec<(i64, f64)> = ticks.iter().map(|t| t.to_tick()).collect();
-    sorted_ticks.sort_by(|a, b| a.0.cmp(&b.0));
+    sorted_ticks.sort_by_key(|a| a.0);
 
     let mut current_candle: Option<BaseCandle> = None;
     let mut current_boundary_idx: Option<i64> = None;

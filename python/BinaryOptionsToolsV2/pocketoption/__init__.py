@@ -16,6 +16,6 @@ __all__ = [
     "Validator",
 ]
 from .tools.login import login, login_async
-from . import asynchronous, synchronous
+from . import asynchronous, synchronous as synchronous
 from .asynchronous import PocketOptionAsync, RawHandler, Validator
 from .synchronous import PocketOption, RawHandlerSync

@@ -30,7 +30,7 @@ use binary_options_tools::pocketoption::{
     error::PocketResult,
     ssid::{Demo, Ssid},
     state::{State, StateBuilder},
-    types::{PendingOrder, OpenPendingOrder},
+    types::{OpenPendingOrder, PendingOrder},
 };
 use binary_options_tools_core::reimports::Message;
 use binary_options_tools_core::traits::{ApiModule, RunnerCommand};
@@ -153,14 +153,14 @@ async fn example_basic_pending_order() -> PocketResult<()> {
 
     let result = client_handle
         .open_pending_order(OpenPendingOrder {
-            open_type: 1,                                         // open_type: 1 = typical for binary options
-            amount: Decimal::from_f64_retain(100.0).unwrap(),  // amount
-            asset: "EURUSD_otc".to_string(),                  // asset (OTC EUR/USD)
-            open_time: "2026-04-07 22:50:00".to_string(),          // open_time: specific trigger time (for openType 0) or expiration (for openType 1)
+            open_type: 1, // open_type: 1 = typical for binary options
+            amount: Decimal::from_f64_retain(100.0).unwrap(), // amount
+            asset: "EURUSD_otc".to_string(), // asset (OTC EUR/USD)
+            open_time: "2026-04-07 22:50:00".to_string(), // open_time: specific trigger time (for openType 0) or expiration (for openType 1)
             open_price: Decimal::from_f64_retain(1.1950).unwrap(), // open_price: current market price
-            timeframe: 60,                                        // timeframe: 60 seconds
+            timeframe: 60,                                         // timeframe: 60 seconds
             min_payout: 85,                                        // min_payout: 85% minimum payout
-            command: 0,                                         // command: 0 (typically for buy/call)
+            command: 0, // command: 0 (typically for buy/call)
         })
         .await;
 
@@ -523,9 +523,13 @@ async fn scenario1_mismatched_responses() -> PocketResult<()> {
     tokio::spawn(async move {
         sleep(Duration::from_millis(50)).await;
         for _ in 0..3 {
-            let server_response = ServerResponse::Success(Box::new(create_test_pending_order(Uuid::new_v4())));
+            let server_response =
+                ServerResponse::Success(Box::new(create_test_pending_order(Uuid::new_v4())));
             let response_json = serde_json::to_string(&server_response).unwrap();
-            msg_tx_clone.send(Arc::new(Message::Text(response_json.into()))).await.unwrap();
+            msg_tx_clone
+                .send(Arc::new(Message::Text(response_json.into())))
+                .await
+                .unwrap();
             sleep(Duration::from_millis(10)).await;
         }
         // Finally send the correct one (module will match by asset/amount/etc if req_id is missing or use internal tracking)
@@ -533,16 +537,18 @@ async fn scenario1_mismatched_responses() -> PocketResult<()> {
     });
 
     println!("Waiting for order (should handle mismatches)...");
-    let _ = client_handle.open_pending_order(OpenPendingOrder {
-        open_type: 1,
-        amount: dec!(100),
-        asset: "EURUSD_otc".into(),
-        open_time: "2026-04-07 22:50:00".into(),
-        open_price: dec!(1.1950),
-        timeframe: 60,
-        min_payout: 85,
-        command: 0,
-    }).await;
+    let _ = client_handle
+        .open_pending_order(OpenPendingOrder {
+            open_type: 1,
+            amount: dec!(100),
+            asset: "EURUSD_otc".into(),
+            open_time: "2026-04-07 22:50:00".into(),
+            open_price: dec!(1.1950),
+            timeframe: 60,
+            min_payout: 85,
+            command: 0,
+        })
+        .await;
 
     module_task.abort();
     Ok(())
@@ -571,16 +577,20 @@ async fn scenario3_timeout() -> PocketResult<()> {
     let module_task = tokio::spawn(async move { module.run().await.ok() });
 
     println!("Requesting order with no server response (expect timeout)...");
-    let result = timeout(Duration::from_secs(2), client_handle.open_pending_order(OpenPendingOrder {
-        open_type: 1,
-        amount: dec!(100),
-        asset: "EURUSD_otc".into(),
-        open_time: "2026-04-07 22:50:00".into(),
-        open_price: dec!(1.1950),
-        timeframe: 60,
-        min_payout: 85,
-        command: 0,
-    })).await;
+    let result = timeout(
+        Duration::from_secs(2),
+        client_handle.open_pending_order(OpenPendingOrder {
+            open_type: 1,
+            amount: dec!(100),
+            asset: "EURUSD_otc".into(),
+            open_time: "2026-04-07 22:50:00".into(),
+            open_price: dec!(1.1950),
+            timeframe: 60,
+            min_payout: 85,
+            command: 0,
+        }),
+    )
+    .await;
 
     match result {
         Err(_) => println!("✓ Correctly timed out!"),

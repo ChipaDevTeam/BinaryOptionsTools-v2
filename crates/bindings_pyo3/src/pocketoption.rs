@@ -7,13 +7,13 @@ use binary_options_tools::pocketoption::candle::{Candle, SubscriptionType};
 use binary_options_tools::pocketoption::error::PocketResult;
 use binary_options_tools::pocketoption::pocket_client::PocketOption;
 use binary_options_tools::utils::f64_to_decimal;
-use rust_decimal::prelude::ToPrimitive;
 use binary_options_tools::validator::Validator as CrateValidator;
 use binary_options_tools::validator::Validator;
 use futures_util::stream::{BoxStream, Fuse};
 use futures_util::StreamExt;
 use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python};
 use pyo3_async_runtimes::tokio::future_into_py;
+use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
 
 use crate::config::PyConfig;
@@ -454,7 +454,11 @@ impl RawPocketOption {
         })
     }
 
-    pub fn get_closed_deal<'py>(&self, py: Python<'py>, trade_id: String) -> PyResult<Bound<'py, PyAny>> {
+    pub fn get_closed_deal<'py>(
+        &self,
+        py: Python<'py>,
+        trade_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
             let uuid = Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?;
@@ -484,7 +488,11 @@ impl RawPocketOption {
         })
     }
 
-    pub fn get_opened_deal<'py>(&self, py: Python<'py>, trade_id: String) -> PyResult<Bound<'py, PyAny>> {
+    pub fn get_opened_deal<'py>(
+        &self,
+        py: Python<'py>,
+        trade_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
             let uuid = Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?;

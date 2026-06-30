@@ -450,23 +450,20 @@ mod tests {
         let ssid = Ssid::parse(
             r#"42["auth",{"sessionToken":"test","uid":0,"platform":2,"currentUrl":"demo","isFastHistory":false,"isOptimized":true}]"#
         ).unwrap();
-        let builder = StateBuilder::default()
-            .ssid(ssid);
+        let builder = StateBuilder::default().ssid(ssid);
         assert!(builder.ssid.is_some());
     }
 
     #[test]
     fn test_state_builder_urls_method() {
         let urls = vec!["wss://example.com".to_string()];
-        let builder = StateBuilder::default()
-            .urls(urls.clone());
+        let builder = StateBuilder::default().urls(urls.clone());
         assert_eq!(builder.urls, urls);
     }
 
     #[test]
     fn test_state_builder_default_symbol() {
-        let builder = StateBuilder::default()
-            .default_symbol("EURUSD_otc".to_string());
+        let builder = StateBuilder::default().default_symbol("EURUSD_otc".to_string());
         assert_eq!(builder.default_symbol, Some("EURUSD_otc".to_string()));
     }
 

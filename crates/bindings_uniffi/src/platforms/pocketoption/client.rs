@@ -30,7 +30,6 @@ pub struct PocketOption {
 
 #[uniffi::export]
 impl PocketOption {
-
     /// Creates a new `PocketOption` client, authenticating with the given session ID.
     ///
     /// This is the primary constructor.
@@ -169,7 +168,8 @@ impl PocketOption {
     /// Returns all closed deals stored in the client's state.
     #[uniffi::method]
     pub async fn get_closed_deals(&self) -> Result<Vec<Deal>, UniError> {
-        Ok(self.inner
+        Ok(self
+            .inner
             .get_closed_deals()
             .await
             .into_values()
@@ -438,16 +438,19 @@ impl PocketOption {
             .map_err(|e| UniError::from(BinaryOptionsError::from(e)))
     }
 
-
     /// Retrieves a pending order by its deal ID.
     #[uniffi::method]
     pub async fn get_pending_deal(
         &self,
         deal_id: String,
     ) -> Result<Option<PendingOrder>, UniError> {
-        let uuid = Uuid::parse_str(&deal_id)
-            .map_err(|e| UniError::Uuid(format!("Invalid UUID: {e}")))?;
-        Ok(self.inner.get_pending_deal(uuid).await.map(PendingOrder::from))
+        let uuid =
+            Uuid::parse_str(&deal_id).map_err(|e| UniError::Uuid(format!("Invalid UUID: {e}")))?;
+        Ok(self
+            .inner
+            .get_pending_deal(uuid)
+            .await
+            .map(PendingOrder::from))
     }
 
     /// Returns all currently active (tradable) assets.
@@ -482,11 +485,7 @@ impl PocketOption {
 
     /// Returns historical tick data (timestamp, price) for a specific asset and lookback period.
     #[uniffi::method]
-    pub async fn ticks(
-        &self,
-        asset: String,
-        lookback_seconds: u32,
-    ) -> Result<Vec<Tick>, UniError> {
+    pub async fn ticks(&self, asset: String, lookback_seconds: u32) -> Result<Vec<Tick>, UniError> {
         self.inner
             .ticks(asset, lookback_seconds)
             .await
@@ -539,4 +538,3 @@ impl PocketOption {
         Ok(Arc::new(Self { inner }))
     }
 }
-

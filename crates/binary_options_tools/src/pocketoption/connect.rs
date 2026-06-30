@@ -108,7 +108,10 @@ mod tests {
     fn test_fallback_urls_are_valid_urls() {
         for url in FALLBACK_URLS {
             assert!(url.starts_with("wss://"), "Expected wss:// URL, got: {url}");
-            assert!(url.contains(".market/"), "Expected .market/ in URL, got: {url}");
+            assert!(
+                url.contains(".market/"),
+                "Expected .market/ in URL, got: {url}"
+            );
         }
     }
 
@@ -135,9 +138,7 @@ mod tests {
         let ssid = Ssid::parse(
             r#"42["auth",{"sessionToken":"test","uid":0,"platform":2,"currentUrl":"demo","isFastHistory":false,"isOptimized":true}]"#
         ).unwrap();
-        let result = rt.block_on(async {
-            connector.connect_multiple(vec![], ssid).await
-        });
+        let result = rt.block_on(async { connector.connect_multiple(vec![], ssid).await });
         assert!(result.is_err());
     }
 }

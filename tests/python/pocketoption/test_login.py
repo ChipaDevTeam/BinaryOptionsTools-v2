@@ -27,7 +27,7 @@ if _source not in sys.path:
     sys.path.insert(0, _source)
 
 try:
-    import playwright
+    import playwright  # noqa: F401
 except ImportError:
     # Playwright is not installed, mock it so that standard patch and calls don't crash
     from unittest.mock import MagicMock
@@ -40,7 +40,7 @@ except ImportError:
     sys.modules["playwright"] = mock_playwright
     sys.modules["playwright.sync_api"] = mock_sync_api
 
-from BinaryOptionsToolsV2.pocketoption.tools.login import (
+from BinaryOptionsToolsV2.pocketoption.tools.login import (  # noqa: E402
     LoginError,
     _build_multipart,
     _find_session_cookie,

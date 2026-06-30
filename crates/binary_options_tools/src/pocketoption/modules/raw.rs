@@ -52,9 +52,7 @@ pub enum CommandResponse {
         existed: bool,
     },
     /// The module has stopped and cannot fulfill the request.
-    Shutdown {
-        command_id: Uuid,
-    },
+    Shutdown { command_id: Uuid },
 }
 
 /// Handle used by clients to create per-validator RawHandlers

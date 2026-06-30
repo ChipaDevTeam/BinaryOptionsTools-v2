@@ -226,7 +226,6 @@ impl From<OriginalCandle> for Candle {
     }
 }
 
-
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct Tick {
     pub timestamp: i64,

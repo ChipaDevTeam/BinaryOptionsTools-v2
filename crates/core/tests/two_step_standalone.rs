@@ -109,10 +109,7 @@ mod tests {
         let wrong_header =
             Message::text(r#"451-["wrongEventName",{"_placeholder":true,"num":0}]"#.to_string());
         println!("Sending wrong event: {:?}", wrong_header);
-        assert!(
-            !rule.call(&wrong_header),
-            "Wrong event should not match"
-        );
+        assert!(!rule.call(&wrong_header), "Wrong event should not match");
 
         let body = Message::binary(vec![0x01, 0x02]);
         println!("Sending binary after wrong event: {:?}", body);

@@ -151,7 +151,10 @@ impl TradesApiModule {
     fn notify_waiters_module_stopped(&mut self) {
         let pending = std::mem::take(&mut self.pending_orders);
         if !pending.is_empty() {
-            tracing::info!("TradesApiModule: Notifying {} pending waiters that module has stopped", pending.len());
+            tracing::info!(
+                "TradesApiModule: Notifying {} pending waiters that module has stopped",
+                pending.len()
+            );
         }
         for (req_id, tracker) in pending {
             let error = PocketError::ModuleStopped {
@@ -295,7 +298,7 @@ impl ApiModule<State> for TradesApiModule {
 
                                   if let Some(tracker) = self.pending_orders.remove(&id) {
                                       let _ = tracker.responder.send(Ok(*deal.clone()));
-                                      
+
                                       // Remove the specific failure_matching entry for this request
                                       let key = (tracker.asset, tracker.amount, id);
                                       self.failure_matching.remove(&key);
@@ -309,7 +312,7 @@ impl ApiModule<State> for TradesApiModule {
                           ServerResponse::Fail(fail) => {
                               let asset = fail.asset.clone();
                               let amount = fail.amount;
-                              
+
                               // Find any entry in failure_matching matching this (asset, amount)
                               // The triple key includes req_id as nonce for disambiguation
                               let found_req_id = {
@@ -322,7 +325,7 @@ impl ApiModule<State> for TradesApiModule {
 
                               if let Some(req_id) = found_req_id {
                                   self.failure_matching.remove(&(asset.clone(), amount, req_id));
-                                  
+
                                   // Clean up pending_market_orders in state
                                   self.state.trade_state.pending_market_orders.write().await.remove(&req_id);
 

@@ -5,8 +5,8 @@ from datetime import timedelta
 from typing import Dict, List, Optional, Tuple, Union
 
 from ..config import Config
-from ..validator import Validator
-from .asynchronous import PocketOptionAsync, RawHandler, Validator
+from ..validator import Validator as Validator
+from .asynchronous import PocketOptionAsync as PocketOptionAsync
 
 
 class SyncSubscription:

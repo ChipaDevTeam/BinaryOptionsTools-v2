@@ -1,7 +1,7 @@
-use binary_options_tools::pocketoption::modules::deals::DealsApiModule;
-use binary_options_tools::pocketoption::state::StateBuilder;
-use binary_options_tools::pocketoption::ssid::Ssid;
 use binary_options_tools::pocketoption::error::PocketError;
+use binary_options_tools::pocketoption::modules::deals::DealsApiModule;
+use binary_options_tools::pocketoption::ssid::Ssid;
+use binary_options_tools::pocketoption::state::StateBuilder;
 use binary_options_tools::pocketoption::types::Deal;
 use binary_options_tools_core::reimports::bounded_async;
 use binary_options_tools_core::traits::ApiModule;
@@ -14,7 +14,7 @@ async fn test_deals_module_cleanup_on_stop() {
         let ssid_json = r#"{"session":"mock_session_id","isDemo":1,"uid":12345,"platform":2}"#;
         let ssid = Ssid::parse(ssid_json).expect("Failed to parse mock SSID");
         let state = Arc::new(StateBuilder::default().ssid(ssid).build().unwrap());
-        
+
         let (cmd_tx, cmd_rx) = bounded_async(10);
         let (cmd_resp_tx, cmd_resp_rx) = bounded_async(10);
         let (ws_tx, ws_rx) = bounded_async(10);
@@ -33,9 +33,10 @@ async fn test_deals_module_cleanup_on_stop() {
         let handle = DealsApiModule::create_handle(cmd_tx.clone(), cmd_resp_rx);
 
         let trade_id = Uuid::new_v4();
-        
+
         // Create a mock deal and add it to opened_deals
-        let deal_json = format!(r#"{{
+        let deal_json = format!(
+            r#"{{
             "id": "{}",
             "openTime": "2023-01-01 00:00:00",
             "closeTime": "2023-01-01 00:01:00",
@@ -55,19 +56,17 @@ async fn test_deals_module_cleanup_on_stop() {
             "openMs": 123,
             "optionType": 1,
             "currency": "USD"
-        }}"#, trade_id);
+        }}"#,
+            trade_id
+        );
         let deal: Deal = serde_json::from_str(&deal_json).unwrap();
         state.trade_state.add_opened_deal(deal).await;
 
         // Spawn the module
-        let module_handle = tokio::spawn(async move {
-            module.run().await
-        });
+        let module_handle = tokio::spawn(async move { module.run().await });
 
         // Request check_result which should wait
-        let wait_handle = tokio::spawn(async move {
-            handle.check_result(trade_id).await
-        });
+        let wait_handle = tokio::spawn(async move { handle.check_result(trade_id).await });
 
         // Give it a moment to register the waiter
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -78,7 +77,7 @@ async fn test_deals_module_cleanup_on_stop() {
 
         // The module should finish and the waiter should receive an error
         let result = wait_handle.await.unwrap();
-        
+
         match result {
             Err(PocketError::ModuleStopped { module_name, .. }) => {
                 assert_eq!(module_name, "DealsApiModule");
@@ -87,7 +86,8 @@ async fn test_deals_module_cleanup_on_stop() {
         }
 
         module_handle.await.unwrap().unwrap();
-    }).await;
+    })
+    .await;
 
     assert!(result.is_ok(), "Test timed out after 5 seconds");
 }

@@ -620,7 +620,6 @@ mod tests {
         let _rule = CustomWithOr::new();
     }
 
-
     #[test]
     fn test_edge_case_any_alone_compiles() {
         let _rule = EdgeCaseAnyAlone::new();
@@ -669,10 +668,7 @@ mod tests {
 
         // Step 2: Binary body (should pass because flag was set)
         let body = Message::binary(b"anything".to_vec());
-        assert!(
-            rule.call(&body),
-            "Binary message should pass after header"
-        );
+        assert!(rule.call(&body), "Binary message should pass after header");
 
         // Step 3: Another binary without header (should NOT pass)
         let orphan_binary = Message::binary(vec![0x04, 0x05]);
@@ -831,10 +827,7 @@ mod tests {
 
         // After reset, binary should not pass
         let body = Message::binary(vec![0x01, 0x02]);
-        assert!(
-            !rule.call(&body),
-            "Binary should not pass after reset"
-        );
+        assert!(!rule.call(&body), "Binary should not pass after reset");
     }
 
     #[test]

@@ -39,7 +39,7 @@ use crate::{
         },
         ssid::Ssid,
         state::{State, StateBuilder},
-        types::{Action, Assets, Deal, PendingOrder, OpenPendingOrder},
+        types::{Action, Assets, Deal, OpenPendingOrder, PendingOrder},
     },
     utils::print_handler,
 };
@@ -96,10 +96,6 @@ impl Market for PocketOption {
         self.result(trade_id).await
     }
 }
-
-/// A high-level client for interacting with PocketOption.
-/// It provides methods for executing trades, retrieving balance, subscribing to
-/// asset updates, and managing the connection to the PocketOption platform.
 
 /// A high-level client for interacting with PocketOption.
 /// It provides methods for executing trades, retrieving balance, subscribing to
@@ -192,12 +188,7 @@ impl PocketOption {
 
         let _runner = tokio::spawn(async move { runner.run().await });
 
-        match tokio::time::timeout(
-            Duration::from_secs(30),
-            client.wait_connected(),
-        )
-        .await
-        {
+        match tokio::time::timeout(Duration::from_secs(30), client.wait_connected()).await {
             Ok(_) => {}
             Err(_) => {
                 return Err(PocketError::General(
@@ -381,17 +372,48 @@ impl PocketOption {
         }
     }
 
-    async fn register_pending_trade(&self, asset: &str, action: Action, time: u32, amount: Decimal) -> Uuid {
+    async fn register_pending_trade(
+        &self,
+        asset: &str,
+        action: Action,
+        time: u32,
+        amount: Decimal,
+    ) -> Uuid {
         use crate::pocketoption::types::OpenOrder;
         let request_id = Uuid::new_v4();
-        let order = OpenOrder::new(amount, asset.to_string(), action, time, self.is_demo() as u32, request_id);
-        self.client.state.trade_state.pending_market_orders.write().await.insert(request_id, (order, std::time::Instant::now()));
+        let order = OpenOrder::new(
+            amount,
+            asset.to_string(),
+            action,
+            time,
+            self.is_demo() as u32,
+            request_id,
+        );
+        self.client
+            .state
+            .trade_state
+            .pending_market_orders
+            .write()
+            .await
+            .insert(request_id, (order, std::time::Instant::now()));
         request_id
     }
 
     async fn cleanup_trade(&self, fingerprint: &(String, Action, u32, Decimal), request_id: Uuid) {
-        self.client.state.trade_state.recent_trades.write().await.remove(fingerprint);
-        self.client.state.trade_state.pending_market_orders.write().await.remove(&request_id);
+        self.client
+            .state
+            .trade_state
+            .recent_trades
+            .write()
+            .await
+            .remove(fingerprint);
+        self.client
+            .state
+            .trade_state
+            .pending_market_orders
+            .write()
+            .await
+            .remove(&request_id);
     }
 
     pub async fn trade(
@@ -420,9 +442,14 @@ impl PocketOption {
             )));
         }
         let fingerprint = (asset_str.clone(), action, time, amount);
-        let request_id = self.register_pending_trade(&asset_str, action, time, amount).await;
+        let request_id = self
+            .register_pending_trade(&asset_str, action, time, amount)
+            .await;
 
-        let handle = match self.require_handle::<TradesApiModule>("TradesApiModule").await {
+        let handle = match self
+            .require_handle::<TradesApiModule>("TradesApiModule")
+            .await
+        {
             Ok(h) => h,
             Err(e) => {
                 self.cleanup_trade(&fingerprint, request_id).await;
@@ -430,9 +457,18 @@ impl PocketOption {
             }
         };
 
-        match handle.trade_with_id(asset_str, action, amount, time, request_id).await {
+        match handle
+            .trade_with_id(asset_str, action, amount, time, request_id)
+            .await
+        {
             Ok(deal) => {
-                self.client.state.trade_state.recent_trades.write().await.insert(fingerprint, (deal.id, std::time::Instant::now()));
+                self.client
+                    .state
+                    .trade_state
+                    .recent_trades
+                    .write()
+                    .await
+                    .insert(fingerprint, (deal.id, std::time::Instant::now()));
                 Ok((deal.id, deal))
             }
             Err(e) => {
@@ -861,9 +897,9 @@ impl PocketOption {
     ///
     /// This method fetches raw tick data for the asset over the specified
     /// `lookback_period` and then aggregates those ticks into custom-sized
-    /// candlesticks of `custom_period` seconds. 
-    /// All candles are manually compiled from 1-second ticks and aligned 
-    /// strictly to UTC boundaries to prevent time-alignment mismatches, overlaps, 
+    /// candlesticks of `custom_period` seconds.
+    /// All candles are manually compiled from 1-second ticks and aligned
+    /// strictly to UTC boundaries to prevent time-alignment mismatches, overlaps,
     /// or gaps ("merges") common with server-side candle retrieval.
     ///
     /// This allows for non-standard timeframes like 20s, 40s, 90s, etc.

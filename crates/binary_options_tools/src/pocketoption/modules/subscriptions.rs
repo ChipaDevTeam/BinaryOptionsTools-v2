@@ -28,12 +28,12 @@ use crate::pocketoption::candle::{
 };
 use crate::pocketoption::error::PocketError;
 use crate::pocketoption::types::{MultiPatternRule, StreamData as RawCandle, SubscriptionEvent};
+use crate::pocketoption::utils::SocketIoFrame;
 use crate::pocketoption::{
     candle::Candle, // Assuming this exists in your types
     error::PocketResult,
     state::State,
 };
-use crate::pocketoption::utils::SocketIoFrame;
 
 /// Default maximum cached subscriptions, mirrors [`State`] default `max_subscriptions`.
 const DEFAULT_CACHED_MAX: usize = 4;
@@ -207,9 +207,7 @@ pub enum CommandResponse {
         error: Box<PocketError>,
     },
     /// The module has stopped and cannot fulfill the request.
-    Shutdown {
-        command_id: Uuid,
-    },
+    Shutdown { command_id: Uuid },
 }
 
 /// Represents the data sent through the subscription stream.
@@ -307,8 +305,7 @@ impl SubscriptionsHandle {
             .map_err(|_| PocketError::ModuleStopped {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "Response router channel closed".to_string(),
-            })?
-        {
+            })? {
             CommandResponse::SubscriptionSuccess {
                 command_id: _,
                 subscription_id,
@@ -362,8 +359,7 @@ impl SubscriptionsHandle {
             .map_err(|_| PocketError::ModuleStopped {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "Response router channel closed".to_string(),
-            })?
-        {
+            })? {
             CommandResponse::UnsubscriptionSuccess { .. } => Ok(()),
             CommandResponse::UnsubscriptionFailed { error, .. } => Err(*error),
             CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
@@ -399,8 +395,7 @@ impl SubscriptionsHandle {
             .map_err(|_| PocketError::ModuleStopped {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "Response router channel closed".to_string(),
-            })?
-        {
+            })? {
             CommandResponse::SubscriptionCount { count, max, .. } => {
                 self.cached_max.store(max, Ordering::Relaxed);
                 Ok(count)
@@ -459,8 +454,7 @@ impl SubscriptionsHandle {
             .map_err(|_| PocketError::ModuleStopped {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "Response router channel closed".to_string(),
-            })?
-        {
+            })? {
             CommandResponse::History { data, .. } => Ok(data),
             CommandResponse::HistoryFailed { error, .. } => Err(*error),
             CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
@@ -645,7 +639,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             return Ok(());
                         }
                     };
-                    
+
                     let response = match msg.as_ref() {
                         Message::Binary(data) => match serde_json::from_slice::<ServerResponse>(data) {
                             Ok(res) => Some(res),
@@ -773,7 +767,8 @@ impl SubscriptionsApiModule {
             if let Err(e) = self
                 .command_responder
                 .send(CommandResponse::Shutdown { command_id })
-                .await {
+                .await
+            {
                 warn!(target: "SubscriptionsApiModule", "Failed to send Shutdown response in notify_waiters: {}", e);
             }
         }
@@ -783,9 +778,12 @@ impl SubscriptionsApiModule {
         let active = std::mem::take(&mut *subscriptions_lock);
         for (_, subs) in active {
             for (sender, _, _) in subs {
-                if let Err(e) = sender.send(SubscriptionEvent::Terminated {
-                    reason: "SubscriptionsApiModule stopped".to_string(),
-                }).await {
+                if let Err(e) = sender
+                    .send(SubscriptionEvent::Terminated {
+                        reason: "SubscriptionsApiModule stopped".to_string(),
+                    })
+                    .await
+                {
                     warn!(target: "SubscriptionsApiModule", "Failed to send Terminated event to stream: {}", e);
                 }
             }
@@ -855,7 +853,8 @@ impl SubscriptionsApiModule {
                 .send(SubscriptionEvent::Terminated {
                     reason: "Unsubscribed from main module".to_string(),
                 })
-                .await {
+                .await
+            {
                 warn!(target: "SubscriptionsApiModule", "Failed to send Terminated event during remove_subscription: {}", e);
             }
         }
@@ -929,8 +928,7 @@ impl SubscriptionStream {
             .map_err(|_| PocketError::ModuleStopped {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "Response router channel closed".to_string(),
-            })?
-        {
+            })? {
             CommandResponse::UnsubscriptionSuccess { .. } => Ok(()),
             CommandResponse::UnsubscriptionFailed { error, .. } => Err(*error),
             CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
