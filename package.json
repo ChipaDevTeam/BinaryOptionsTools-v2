@@ -6,8 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepare": "husky",
-    "docs:serve": "python -m mkdocs serve",
-    "docs:build": "python -m mkdocs build"
+    "docs:serve": "npm run start --prefix docs",
+    "docs:build": "npm run build --prefix docs"
   },
   "keywords": [],
   "author": "",
@@ -28,6 +28,13 @@
     ]
   },
   "dependencies": {
-    "BinaryOptionsTools-v2": "."
+    "@docusaurus/core": "^3.10.1",
+    "@docusaurus/preset-classic": "^3.10.1",
+    "@mdx-js/react": "^3.1.1",
+    "BinaryOptionsTools-v2": ".",
+    "clsx": "^2.1.1",
+    "prism-react-renderer": "^2.4.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }

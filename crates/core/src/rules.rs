@@ -437,7 +437,7 @@ impl RuleBuilder {
         }
     }
 
-    pub fn regex(self, pattern: impl AsRef<str>) -> CoreResult<Self> {
+    pub fn regex(pattern: impl AsRef<str>) -> CoreResult<Self> {
         let re = regex::Regex::new(pattern.as_ref())
             .map_err(|e| CoreError::Other(format!("Invalid regex pattern: {e}")))?;
         Ok(Self {

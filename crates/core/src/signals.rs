@@ -30,18 +30,22 @@ impl Signals {
 
     pub async fn wait_connected(&self) {
         let mut rx = self.connected_receiver.clone();
-        if *rx.borrow() {
-            return;
+        loop {
+            if *rx.borrow() {
+                return;
+            }
+            let _ = rx.changed().await;
         }
-        let _ = rx.changed().await;
     }
 
     pub async fn wait_disconnected(&self) {
         let mut rx = self.connected_receiver.clone();
-        if !*rx.borrow() {
-            return;
+        loop {
+            if !*rx.borrow() {
+                return;
+            }
+            let _ = rx.changed().await;
         }
-        let _ = rx.changed().await;
     }
 }
 

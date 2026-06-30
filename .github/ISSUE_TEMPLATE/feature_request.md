@@ -32,5 +32,4 @@ Why is this feature important or beneficial for the project and its users?
 ## AI Usage Disclosure
 
 - [ ] I used AI assistance to write or understand this issue.
-  If yes, please specify which tool(s) and what parts were AI-assisted:
-
+      If yes, please specify which tool(s) and what parts were AI-assisted:

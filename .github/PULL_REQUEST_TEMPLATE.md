@@ -43,5 +43,4 @@ pytest tests/python/pocketoption/
 ## AI Usage Disclosure
 
 - [ ] I used AI assistance to write or understand this PR/issue.
-  If yes, please specify which tool(s) and what parts were AI-assisted:
-
+      If yes, please specify which tool(s) and what parts were AI-assisted:

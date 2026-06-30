@@ -127,8 +127,10 @@ class PocketOption:
         """
         self._lock = threading.RLock()
         self._loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._loop)
-        self._loop_thread = threading.Thread(target=self._loop.run_forever, daemon=True)
+        def _run_loop():
+            asyncio.set_event_loop(self._loop)
+            self._loop.run_forever()
+        self._loop_thread = threading.Thread(target=_run_loop, daemon=True)
         self._loop_thread.start()
         self._client = PocketOptionAsync(ssid, url=url, config=config)
         future = asyncio.run_coroutine_threadsafe(self._client.wait_for_assets(), self._loop)
@@ -573,7 +575,7 @@ class PocketOption:
 
     def shutdown(self) -> None:
         """Shut down the client and release all resources."""
-        self._run(self._client.shutdown())
+        self.close()
 
     def create_raw_handler(self, validator: Validator, keep_alive: Optional[str] = None) -> "RawHandlerSync":
         """Create a synchronous raw WebSocket message handler.

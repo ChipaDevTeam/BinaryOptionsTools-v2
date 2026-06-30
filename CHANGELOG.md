@@ -266,7 +266,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/)
 
 [0.2.12]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.12
-
+[0.2.11]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.11
 [0.2.10]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.10
 [0.2.9]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.9
 [0.2.8]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.8
