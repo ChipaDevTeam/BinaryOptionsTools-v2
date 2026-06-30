@@ -228,7 +228,7 @@ impl Candle {
             low: price,
             close: price,
             volume: None, // PocketOption doesn't provide volume
-                          // is_closed: false,
+            is_closed: false,
         })
     }
 
@@ -721,6 +721,7 @@ impl TryFrom<(BaseCandle, String)> for Candle {
             close: Decimal::from_f64(base_candle.close)
                 .ok_or(BinaryOptionsError::General("Couldn't parse close".into()))?,
             volume,
+            is_closed: false,
         })
     }
 }
