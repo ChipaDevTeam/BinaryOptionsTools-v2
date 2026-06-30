@@ -1,7 +1,7 @@
 """
 Login module for PocketOption — obtain a session SSID from email/password.
 
-Three backends are available:
+Four backends are available:
 
 * ``"capsolver"`` — uses the CapSolver API (free tier at capsolver.com) to solve
   reCAPTCHA v3, then submits the form via plain HTTP requests.  Best choice when
@@ -10,6 +10,10 @@ Three backends are available:
 
 * ``"2captcha"`` — same approach but uses the 2captcha.com service instead of
   CapSolver.  Requires ``api_key`` and the ``requests`` package.
+
+* ``"nocaptchaai"`` — uses the NoCaptchaAI API (dash.nocaptchaai.com) to solve
+  reCAPTCHA v3.  API shape mirrors CapSolver.  Requires ``api_key`` and the
+  ``requests`` package.
 
 * ``"playwright"`` — launches a headless browser (Firefox → Chromium → system
   Chrome) that fills the form and handles reCAPTCHA v3 automatically.  Requires
@@ -26,6 +30,10 @@ Usage::
     from BinaryOptionsToolsV2.pocketoption.tools.login import login
     ssid = login("you@example.com", "password", demo=True,
                  backend="capsolver", api_key="YOUR_CAPSOLVER_KEY")
+
+    # With NoCaptchaAI
+    ssid = login("you@example.com", "password", demo=True,
+                 backend="nocaptchaai", api_key="YOUR_NOCAPTCHAAI_KEY")
 
     # With Playwright headless browser
     ssid = login("you@example.com", "password", demo=True)
@@ -63,7 +71,7 @@ def login(
     password: str,
     *,
     demo: bool = False,
-    backend: Literal["auto", "playwright", "capsolver", "2captcha"] = "auto",
+    backend: Literal["auto", "playwright", "capsolver", "2captcha", "nocaptchaai"] = "auto",
     api_key: Optional[str] = None,
     headless: bool = True,
     timeout: int = 60,
@@ -76,7 +84,7 @@ def login(
         demo: If True, the SSID targets the demo account.
         backend: Which login method to use (see module docstring).
             ``"auto"`` tries playwright and gives a clear error if it fails.
-        api_key: CapSolver or 2captcha API key (required for those backends).
+        api_key: CapSolver, 2captcha, or NoCaptchaAI API key.
         headless: Run the browser in headless mode (playwright only).
         timeout: Overall timeout in seconds.
 
@@ -102,6 +110,12 @@ def login(
         session = _login_captcha_solver(
             email, password, api_key=api_key, service="2captcha", timeout=timeout
         )
+    elif backend == "nocaptchaai":
+        if not api_key:
+            raise ValueError("api_key is required when backend='nocaptchaai'")
+        session = _login_captcha_solver(
+            email, password, api_key=api_key, service="nocaptchaai", timeout=timeout
+        )
     else:
         raise ValueError(f"Unknown backend: {backend!r}")
 
@@ -110,14 +124,12 @@ def login(
         f'42["auth",{{"session":"{session}",'
         f'"isDemo":{is_demo_int},"uid":0,"platform":2}}]'
     )
-
-
 async def login_async(
     email: str,
     password: str,
     *,
     demo: bool = False,
-    backend: Literal["auto", "playwright", "capsolver", "2captcha"] = "auto",
+    backend: Literal["auto", "playwright", "capsolver", "2captcha", "nocaptchaai"] = "auto",
     api_key: Optional[str] = None,
     headless: bool = True,
     timeout: int = 60,
@@ -279,18 +291,15 @@ def _find_session_cookie(cookies: list[dict]) -> Optional[str]:
     for c in cookies:
         if c.get("name") == "po_session":
             return c.get("value")
-    return None
 
-
-# ── Captcha-solver HTTP backend (CapSolver + 2captcha) ─────────────────────────
-
+# ── Captcha-solver HTTP backend (CapSolver + 2captcha + NoCaptchaAI) ─────
 
 def _login_captcha_solver(
     email: str,
     password: str,
     *,
     api_key: str,
-    service: Literal["capsolver", "2captcha"],
+    service: Literal["capsolver", "2captcha", "nocaptchaai"],
     timeout: int,
 ) -> str:
     """Solve reCAPTCHA v3 via a solver API then POST credentials over HTTP."""
@@ -314,8 +323,10 @@ def _login_captcha_solver(
     # Step 2: Solve reCAPTCHA v3
     if service == "capsolver":
         captcha_token = _solve_via_capsolver(api_key, timeout=timeout)
-    else:
+    elif service == "2captcha":
         captcha_token = _solve_via_2captcha(api_key, timeout=timeout)
+    else:
+        captcha_token = _solve_via_nocaptchaai(api_key, timeout=timeout)
 
     # Step 3: POST the login form
     boundary = "----WebKitFormBoundary" + uuid.uuid4().hex[:16].upper()
@@ -449,6 +460,51 @@ def _solve_via_2captcha(api_key: str, *, timeout: int) -> str:
 
     raise LoginError(f"2captcha did not return a token within {timeout}s")
 
+
+
+def _solve_via_nocaptchaai(api_key: str, *, timeout: int) -> str:
+    """Submit a ReCaptchaV3TaskProxyless task to NoCaptchaAI and return the token."""
+    import requests as req
+
+    BASE = "https://api.nocaptchaai.com"
+
+    submit = req.post(
+        f"{BASE}/createTask",
+        json={
+            "clientKey": api_key,
+            "task": {
+                "type": "ReCaptchaV3TaskProxyless",
+                "websiteURL": LOGIN_URL,
+                "websiteKey": RECAPTCHA_SITEKEY,
+                "pageAction": "login",
+                "minScore": 0.5,
+            },
+        },
+        timeout=30,
+    )
+    result = submit.json()
+    if result.get("errorId") != 0:
+        raise LoginError(
+            f"NoCaptchaAI task creation failed: {result.get('errorDescription', result)}\n"
+            "Get an API key at https://dash.nocaptchaai.com"
+        )
+    task_id = result["taskId"]
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(3)
+        poll = req.post(
+            f"{BASE}/getTaskResult",
+            json={"clientKey": api_key, "taskId": task_id},
+            timeout=30,
+        )
+        data = poll.json()
+        if data.get("errorId") != 0:
+            raise LoginError(f"NoCaptchaAI error: {data.get('errorDescription', data)}")
+        if data.get("status") == "ready":
+            return data["solution"]["gRecaptchaResponse"]
+
+    raise LoginError(f"NoCaptchaAI did not return a token within {timeout}s")
 
 # ── Shared helpers ─────────────────────────────────────────────────────────────
 

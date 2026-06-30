@@ -41,6 +41,7 @@ futures-util = { workspace = true }
 uuid = { workspace = true }
 regex = { workspace = true }
 bo2_macros = { version = "0.1.0", path = "bo2_macros" }
+url = { workspace = true }
 
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"] }

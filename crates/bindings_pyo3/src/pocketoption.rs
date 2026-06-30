@@ -504,7 +504,6 @@ impl RawPocketOption {
     pub fn payout<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
-            // Work in progress - this feature is not yet implemented in the new API
             match client.assets().await {
                 Some(assets) => {
                     let payouts: HashMap<&String, i32> = assets
@@ -549,7 +548,6 @@ impl RawPocketOption {
         asset: String,
         period: u32,
     ) -> PyResult<Bound<'py, PyAny>> {
-        // Work in progress - this feature is not yet implemented in the new API
         let client = self.client.clone();
         future_into_py(py, async move {
             let res = client

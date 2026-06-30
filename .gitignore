@@ -74,17 +74,19 @@ bin/
 lib64
 pyvenv.cfg
 
-# debug (i have my uncensored websocket history in here and don't want to accidentally commit it if i forget to rm it lol)
+# debug
 debug/
 .pytest_cache/
-testing_before_push
 
 # Python
 __pycache__/
 *.py[cod]
 .agents
 
-# omg n stuff
+# arive mcp n stuff
 assets
-.omg
+.arive
 memory
+# Sensitive test data
+tests/login_test.txt
+tests/assets.txt
