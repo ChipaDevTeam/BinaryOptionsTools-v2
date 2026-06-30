@@ -43,9 +43,7 @@ except ImportError:
         "\n[TEST_ENV] BinaryOptionsToolsV2 not found in site-packages, attempting to load from source..."
     )
     # Add source directory to sys.path as a fallback
-    source_path = os.path.join(
-        os.path.dirname(__file__), "../python"
-    )
+    source_path = os.path.join(os.path.dirname(__file__), "../python")
     if source_path not in sys.path:
         sys.path.insert(0, source_path)
 

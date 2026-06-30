@@ -51,9 +51,7 @@ LOGIN_URL = BASE_URL + "/en/login/"
 RECAPTCHA_SITEKEY = "6LeJDkwpAAAAAFUuiKS66HQe6Jz-Z-uPp5Dl6q5B"
 
 _DEFAULT_UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/146.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
 )
 
 _REGISTER_PAGE_RE = re.compile(
@@ -101,29 +99,22 @@ def login(
     elif backend == "capsolver":
         if not api_key:
             raise ValueError("api_key is required when backend='capsolver'")
-        session = _login_captcha_solver(
-            email, password, api_key=api_key, service="capsolver", timeout=timeout
-        )
+        session = _login_captcha_solver(email, password, api_key=api_key, service="capsolver", timeout=timeout)
     elif backend == "2captcha":
         if not api_key:
             raise ValueError("api_key is required when backend='2captcha'")
-        session = _login_captcha_solver(
-            email, password, api_key=api_key, service="2captcha", timeout=timeout
-        )
+        session = _login_captcha_solver(email, password, api_key=api_key, service="2captcha", timeout=timeout)
     elif backend == "nocaptchaai":
         if not api_key:
             raise ValueError("api_key is required when backend='nocaptchaai'")
-        session = _login_captcha_solver(
-            email, password, api_key=api_key, service="nocaptchaai", timeout=timeout
-        )
+        session = _login_captcha_solver(email, password, api_key=api_key, service="nocaptchaai", timeout=timeout)
     else:
         raise ValueError(f"Unknown backend: {backend!r}")
 
     is_demo_int = 1 if demo else 0
-    return (
-        f'42["auth",{{"session":"{session}",'
-        f'"isDemo":{is_demo_int},"uid":0,"platform":2}}]'
-    )
+    return f'42["auth",{{"session":"{session}","isDemo":{is_demo_int},"uid":0,"platform":2}}]'
+
+
 async def login_async(
     email: str,
     password: str,
@@ -183,9 +174,7 @@ def _login_playwright(email: str, password: str, *, headless: bool, timeout: int
                 continue
 
             ctx = browser.new_context(**ctx_kwargs)
-            ctx.add_init_script(
-                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-            )
+            ctx.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             page = ctx.new_page()
             try:
                 page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=timeout * 1000)
@@ -205,11 +194,7 @@ def _login_playwright(email: str, password: str, *, headless: bool, timeout: int
                     )
                 except PWTimeout:
                     err_els = page.locator(".error, .alert, .form-error")
-                    err_text = (
-                        err_els.first.text_content(timeout=2000)
-                        if err_els.count() > 0
-                        else ""
-                    )
+                    err_text = err_els.first.text_content(timeout=2000) if err_els.count() > 0 else ""
                     raise LoginError(
                         "Login did not redirect — credentials may be wrong or CAPTCHA blocked."
                         + (f" Page says: {err_text}" if err_text else "")
@@ -217,9 +202,7 @@ def _login_playwright(email: str, password: str, *, headless: bool, timeout: int
 
                 session_value = _find_session_cookie(ctx.cookies())
                 if not session_value:
-                    raise LoginError(
-                        "Login redirected but 'po_session' cookie was not found."
-                    )
+                    raise LoginError("Login redirected but 'po_session' cookie was not found.")
                 return session_value
 
             except LoginError:
@@ -292,7 +275,9 @@ def _find_session_cookie(cookies: list[dict]) -> Optional[str]:
         if c.get("name") == "po_session":
             return c.get("value")
 
+
 # ── Captcha-solver HTTP backend (CapSolver + 2captcha + NoCaptchaAI) ─────
+
 
 def _login_captcha_solver(
     email: str,
@@ -307,8 +292,7 @@ def _login_captcha_solver(
         import requests as req
     except ImportError as exc:
         raise ImportError(
-            "requests is required for captcha-solver backends.\n"
-            "Install it with: pip install requests"
+            "requests is required for captcha-solver backends.\nInstall it with: pip install requests"
         ) from exc
 
     s = req.Session()
@@ -461,7 +445,6 @@ def _solve_via_2captcha(api_key: str, *, timeout: int) -> str:
     raise LoginError(f"2captcha did not return a token within {timeout}s")
 
 
-
 def _solve_via_nocaptchaai(api_key: str, *, timeout: int) -> str:
     """Submit a ReCaptchaV3TaskProxyless task to NoCaptchaAI and return the token."""
     import requests as req
@@ -506,6 +489,7 @@ def _solve_via_nocaptchaai(api_key: str, *, timeout: int) -> str:
 
     raise LoginError(f"NoCaptchaAI did not return a token within {timeout}s")
 
+
 # ── Shared helpers ─────────────────────────────────────────────────────────────
 
 
@@ -514,9 +498,7 @@ def _build_multipart(fields: dict[str, str], boundary: str) -> bytes:
     sep = f"--{boundary}".encode()
     for name, value in fields.items():
         parts.append(sep)
-        parts.append(
-            f'Content-Disposition: form-data; name="{name}"\r\n\r\n{value}'.encode()
-        )
+        parts.append(f'Content-Disposition: form-data; name="{name}"\r\n\r\n{value}'.encode())
     parts.append(f"--{boundary}--".encode())
     return b"\r\n".join(parts)
 

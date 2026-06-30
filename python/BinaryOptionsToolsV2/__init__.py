@@ -31,11 +31,23 @@ elif os.environ.get("PYTEST_CURRENT_TEST"):
 
 # Names expected from the Rust cdylib; only those actually loaded will be available
 _rust_exported_names = [
-    "RawPocketOption", "RawValidator", "RawHandler", "RawHandle",
-    "Logger", "LogBuilder", "PyConfig", "PyBot", "PyStrategy",
-    "PyContext", "PyVirtualMarket", "Action",
-    "StreamLogsIterator", "StreamLogsLayer", "StreamIterator",
-    "RawStreamIterator", "start_tracing",
+    "RawPocketOption",
+    "RawValidator",
+    "RawHandler",
+    "RawHandle",
+    "Logger",
+    "LogBuilder",
+    "PyConfig",
+    "PyBot",
+    "PyStrategy",
+    "PyContext",
+    "PyVirtualMarket",
+    "Action",
+    "StreamLogsIterator",
+    "StreamLogsLayer",
+    "StreamIterator",
+    "RawStreamIterator",
+    "start_tracing",
 ]
 __rust_all__ = [n for n in _rust_exported_names if n in globals()]
 

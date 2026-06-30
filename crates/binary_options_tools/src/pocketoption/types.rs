@@ -241,11 +241,10 @@ impl Rule for TwoStepRule {
                 }
                 false
             }
-            Message::Binary(_)
-                if self.valid.load(Ordering::SeqCst) => {
-                    self.valid.store(false, Ordering::SeqCst);
-                    true
-                }
+            Message::Binary(_) if self.valid.load(Ordering::SeqCst) => {
+                self.valid.store(false, Ordering::SeqCst);
+                true
+            }
             _ => false,
         }
     }
@@ -326,11 +325,10 @@ impl Rule for MultiPatternRule {
                 }
                 false
             }
-            Message::Binary(_)
-                if self.valid.load(Ordering::SeqCst) => {
-                    self.valid.store(false, Ordering::SeqCst);
-                    true
-                }
+            Message::Binary(_) if self.valid.load(Ordering::SeqCst) => {
+                self.valid.store(false, Ordering::SeqCst);
+                true
+            }
             _ => false,
         }
     }

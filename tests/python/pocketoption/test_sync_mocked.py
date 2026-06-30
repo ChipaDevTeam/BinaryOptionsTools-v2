@@ -1004,8 +1004,12 @@ class TestShutdown:
 
     def test_shutdown_exception_safety(self, mock_pocketoption_async):
         from unittest.mock import AsyncMock
-        mock_pocketoption_async.shutdown = AsyncMock(side_effect=[None, Exception("mock shutdown failure")])
+
+        mock_pocketoption_async.shutdown = AsyncMock(
+            side_effect=[None, Exception("mock shutdown failure")]
+        )
         from BinaryOptionsToolsV2.pocketoption.synchronous import PocketOption
+
         client = PocketOption("test_ssid", config={"terminal_logging": False})
         client.shutdown()
 
@@ -1175,4 +1179,3 @@ class TestSynchronousCoverage:
         assert raw_sub.__iter__() is raw_sub
         assert raw_sub.__aiter__() is raw_sub.subscription
         assert next(raw_sub) == "message"
-

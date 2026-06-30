@@ -70,6 +70,7 @@ class TestDemoConnection:
     async def test_balance(self, api):
         """Test getting balance."""
         import asyncio
+
         # Wait for balance to update from -1 to actual value
         balance = -1.0
         for _ in range(10):  # Try for up to 10 seconds

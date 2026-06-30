@@ -499,11 +499,10 @@ impl Rule for DealsUpdateRule {
                 }
                 false
             }
-            Message::Binary(_)
-                if self.valid.load(Ordering::SeqCst) => {
-                    self.valid.store(false, Ordering::SeqCst);
-                    true
-                }
+            Message::Binary(_) if self.valid.load(Ordering::SeqCst) => {
+                self.valid.store(false, Ordering::SeqCst);
+                true
+            }
             _ => false,
         }
     }

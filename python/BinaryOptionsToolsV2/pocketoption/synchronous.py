@@ -130,29 +130,25 @@ class PocketOption:
         self._loop_thread = threading.Thread(target=self._loop.run_forever, daemon=True)
         self._loop_thread.start()
         self._client = PocketOptionAsync(ssid, url=url, config=config)
-        future = asyncio.run_coroutine_threadsafe(
-            self._client.wait_for_assets(), self._loop
-        )
+        future = asyncio.run_coroutine_threadsafe(self._client.wait_for_assets(), self._loop)
         future.result()
 
     def __del__(self):
         self._cleanup_loop()
 
     def _cleanup_loop(self):
-        loop = getattr(self, '_loop', None)
+        loop = getattr(self, "_loop", None)
         if loop is None or loop.is_closed():
             return
         try:
-            client = getattr(self, '_client', None)
+            client = getattr(self, "_client", None)
             if client is not None:
-                future = asyncio.run_coroutine_threadsafe(
-                    client.shutdown(), loop
-                )
+                future = asyncio.run_coroutine_threadsafe(client.shutdown(), loop)
                 future.result(timeout=5)
         except Exception:
             pass
         loop.call_soon_threadsafe(loop.stop)
-        thread = getattr(self, '_loop_thread', None)
+        thread = getattr(self, "_loop_thread", None)
         if thread is not None and thread.is_alive():
             thread.join(timeout=2)
         loop.close()
@@ -444,8 +440,10 @@ class PocketOption:
         Returns:
             A SyncSubscription for iterating over price updates.
         """
+
         async def _sub():
             return await self._client.client.subscribe_symbol(asset)
+
         return SyncSubscription(self._run(_sub()))
 
     def subscribe_symbol_chunked(self, asset: str, chunk_size: int) -> SyncSubscription:
@@ -458,8 +456,10 @@ class PocketOption:
         Returns:
             A SyncSubscription for iterating over batched price updates.
         """
+
         async def _sub():
             return await self._client.client.subscribe_symbol_chunked(asset, chunk_size)
+
         return SyncSubscription(self._run(_sub()))
 
     def subscribe_symbol_timed(self, asset: str, time: timedelta) -> SyncSubscription:
@@ -472,8 +472,10 @@ class PocketOption:
         Returns:
             A SyncSubscription for iterating over timed price updates.
         """
+
         async def _sub():
             return await self._client.client.subscribe_symbol_timed(asset, time)
+
         return SyncSubscription(self._run(_sub()))
 
     def subscribe_symbol_time_aligned(self, asset: str, time: timedelta) -> SyncSubscription:
@@ -486,8 +488,10 @@ class PocketOption:
         Returns:
             A SyncSubscription for iterating over time-aligned price updates.
         """
+
         async def _sub():
             return await self._client.client.subscribe_symbol_time_aligned(asset, time)
+
         return SyncSubscription(self._run(_sub()))
 
     def get_server_time(self) -> int:

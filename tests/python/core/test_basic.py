@@ -20,7 +20,7 @@ def test_init_import_fallbacks():
     # Case 1: First import throws ImportError, fallback succeeds
     mock_rust = MagicMock()
     mock_rust.__dict__ = {"some_rust_attr_mock": "value"}
-    
+
     def side_effect(name, package=None):
         if name == ".BinaryOptionsToolsV2":
             raise ImportError("mock fail")
@@ -63,11 +63,15 @@ def test_init_import_fallbacks():
             raise ImportError("mock fail")
         return original_import_module(name, package)
 
-    with patch("importlib.import_module", side_effect=side_effect_fail_all), \
-         patch.dict("os.environ", {"PYTEST_CURRENT_TEST": "1"}), \
-         patch("builtins.print") as mock_print:
+    with (
+        patch("importlib.import_module", side_effect=side_effect_fail_all),
+        patch.dict("os.environ", {"PYTEST_CURRENT_TEST": "1"}),
+        patch("builtins.print") as mock_print,
+    ):
         importlib.reload(BinaryOptionsToolsV2)
-        mock_print.assert_any_call("[ERROR] Rust extension module not found (__package__=BinaryOptionsToolsV2)")
+        mock_print.assert_any_call(
+            "[ERROR] Rust extension module not found (__package__=BinaryOptionsToolsV2)"
+        )
 
     # Restore the module to a clean state by reloading without mocks
     importlib.reload(BinaryOptionsToolsV2)
