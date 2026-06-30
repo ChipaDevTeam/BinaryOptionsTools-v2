@@ -91,7 +91,7 @@ jobs:
           - target: i686-pc-windows-msvc
             arch: x86
     env:
-      RUSTC_WRAPPER: ""  # Disable sccache for Windows
+      RUSTC_WRAPPER: "" # Disable sccache for Windows
       SCCACHE_GHA_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4

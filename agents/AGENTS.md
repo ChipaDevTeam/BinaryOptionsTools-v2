@@ -48,27 +48,27 @@ To bridge the gap between low-level performance and high-level usability, provid
 
 ### Rust Core Libraries
 
-| Category | Libraries |
-|---|---|
-| Async Runtime | `tokio` |
-| Serialization | `serde`, `serde_json` |
-| Python Bindings | `pyo3`, `pyo3-async-runtimes` |
-| WebSockets | `tokio-tungstenite` (with `rustls`) |
-| HTTP | `reqwest` (with `rustls-tls`, no native OpenSSL) |
-| Error Handling | `thiserror`, `anyhow` |
-| Logging/Tracing | `tracing`, `tracing-subscriber` |
-| Time/Date | `chrono` |
-| Decimals | `rust_decimal` |
-| Proc-macros | `darling` for attribute parsing |
-| Cross-Platform | `UniFFI` (Kotlin, Swift, Go, Ruby, C#) |
+| Category        | Libraries                                        |
+| --------------- | ------------------------------------------------ |
+| Async Runtime   | `tokio`                                          |
+| Serialization   | `serde`, `serde_json`                            |
+| Python Bindings | `pyo3`, `pyo3-async-runtimes`                    |
+| WebSockets      | `tokio-tungstenite` (with `rustls`)              |
+| HTTP            | `reqwest` (with `rustls-tls`, no native OpenSSL) |
+| Error Handling  | `thiserror`, `anyhow`                            |
+| Logging/Tracing | `tracing`, `tracing-subscriber`                  |
+| Time/Date       | `chrono`                                         |
+| Decimals        | `rust_decimal`                                   |
+| Proc-macros     | `darling` for attribute parsing                  |
+| Cross-Platform  | `UniFFI` (Kotlin, Swift, Go, Ruby, C#)           |
 
 ### Python Bindings
 
-| Category | Tools |
-|---|---|
-| Build System | `maturin` |
-| Testing | `pytest`, `pytest-asyncio` |
-| Linting/Formatting | `ruff` |
+| Category           | Tools                      |
+| ------------------ | -------------------------- |
+| Build System       | `maturin`                  |
+| Testing            | `pytest`, `pytest-asyncio` |
+| Linting/Formatting | `ruff`                     |
 
 ### Infrastructure & Tooling
 

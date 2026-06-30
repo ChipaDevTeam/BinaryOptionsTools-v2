@@ -9,14 +9,14 @@
 
 ## Architecture Overview
 
-| Layer                      | Path                           | Description                                                                                                                                                                        |
-| -------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Layer                      | Path                                                         | Description                                                                                                                                                                        |
+| -------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Python SDK                 | [python/BinaryOptionsToolsV2/](python/BinaryOptionsToolsV2/) | User-facing Python API. Two entrypoints: synchronous (`PocketOption`) and asynchronous (`PocketOptionAsync`). Wraps Rust FFI via pyo3.                                             |
-| PyO3 Bindings              | [crates/bindings_pyo3/src/](crates/bindings_pyo3/src/)    | Rust crate compiled as cdylib. Bridges Python ↔ Rust via pyo3 and pyo3-async-runtimes. Exposes `RawPocketOption`, `RawValidator`, `PyBot`, `PyStrategy`, `PyConfig`, `Logger` etc. |
+| PyO3 Bindings              | [crates/bindings_pyo3/src/](crates/bindings_pyo3/src/)       | Rust crate compiled as cdylib. Bridges Python ↔ Rust via pyo3 and pyo3-async-runtimes. Exposes `RawPocketOption`, `RawValidator`, `PyBot`, `PyStrategy`, `PyConfig`, `Logger` etc. |
 | Binary Options Tools Crate | [crates/binary_options_tools/](crates/binary_options_tools/) | High-level Rust library. Platform client implementations (PocketOption, ExpertOption), config, validator, framework (Bot/Strategy/Market), all platform-specific modules.          |
-| Core Crate                 | [crates/core/](crates/core/)                 | Low-level WebSocket client framework. Connection lifecycle (`ClientRunner`), message routing (`Router`), middleware stack, signals, testing utilities, stream utilities.           |
-| Macros Crate               | [crates/macros/](crates/macros/)               | Proc macros for serialization (`serialize!`/`deserialize!`), timeout, action, config, region, lightweight_module generation.                                                       |
-| UniFFI Bindings            | [crates/bindings_uniffi/](crates/bindings_uniffi/)      | Experimental UniFFI bindings for multi-language support (Kotlin, Swift, Go, Python, C#, Ruby, JS). Shares `binary_options_tools` as dependency.                                    |
+| Core Crate                 | [crates/core/](crates/core/)                                 | Low-level WebSocket client framework. Connection lifecycle (`ClientRunner`), message routing (`Router`), middleware stack, signals, testing utilities, stream utilities.           |
+| Macros Crate               | [crates/macros/](crates/macros/)                             | Proc macros for serialization (`serialize!`/`deserialize!`), timeout, action, config, region, lightweight_module generation.                                                       |
+| UniFFI Bindings            | [crates/bindings_uniffi/](crates/bindings_uniffi/)           | Experimental UniFFI bindings for multi-language support (Kotlin, Swift, Go, Python, C#, Ruby, JS). Shares `binary_options_tools` as dependency.                                    |
 
 ---
 
@@ -24,81 +24,81 @@
 
 ### Python SDK — [python/BinaryOptionsToolsV2/](python/BinaryOptionsToolsV2/)
 
-| File                           | Description                                                                                                                                                                                                                                               |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [__init__.py](python/BinaryOptionsToolsV2/__init__.py)                  | Package entry. Imports Rust cdylib, re-exports all PyO3 classes. Sub-modules: config, tracing, validator, pocketoption.                                                                                                                                   |
-| [config.py](python/BinaryOptionsToolsV2/config.py)                    | Python Config dataclass. Wraps `PyConfig` (Rust). Lock-on-use pattern. Supports `from_dict`/`from_json`. Fields: `max_allowed_loops`, `sleep_interval`, `reconnect_time`, `urls`, `max_subscriptions`, `terminal_logging`, `log_level`, `extra_duration`. |
-| [tracing.py](python/BinaryOptionsToolsV2/tracing.py)                   | `Logger`, `LogBuilder`, `StreamLogsIterator`. Wraps Rust Logger/LogBuilder.                                                                                                                                                                               |
-| [validator.py](python/BinaryOptionsToolsV2/validator.py)                 | `Validator` class (high-level). Wraps `RawValidator` (Rust). Static methods: `regex`, `starts_with`, `ends_with`, `contains`, `ne` (not), `all`, `any`, `custom(func)`.                                                                                   |
+| File                                                                                     | Description                                                                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [**init**.py](python/BinaryOptionsToolsV2/__init__.py)                                   | Package entry. Imports Rust cdylib, re-exports all PyO3 classes. Sub-modules: config, tracing, validator, pocketoption.                                                                                                                                   |
+| [config.py](python/BinaryOptionsToolsV2/config.py)                                       | Python Config dataclass. Wraps `PyConfig` (Rust). Lock-on-use pattern. Supports `from_dict`/`from_json`. Fields: `max_allowed_loops`, `sleep_interval`, `reconnect_time`, `urls`, `max_subscriptions`, `terminal_logging`, `log_level`, `extra_duration`. |
+| [tracing.py](python/BinaryOptionsToolsV2/tracing.py)                                     | `Logger`, `LogBuilder`, `StreamLogsIterator`. Wraps Rust Logger/LogBuilder.                                                                                                                                                                               |
+| [validator.py](python/BinaryOptionsToolsV2/validator.py)                                 | `Validator` class (high-level). Wraps `RawValidator` (Rust). Static methods: `regex`, `starts_with`, `ends_with`, `contains`, `ne` (not), `all`, `any`, `custom(func)`.                                                                                   |
 | [pocketoption/\_\_init\_\_.py](python/BinaryOptionsToolsV2/pocketoption/__init__.py)     | Re-exports `PocketOptionAsync`, `PocketOption`, `RawHandler`, `RawHandlerSync`.                                                                                                                                                                           |
 | [pocketoption/asynchronous.py](python/BinaryOptionsToolsV2/pocketoption/asynchronous.py) | `PocketOptionAsync` class. Async context manager. Full API surface including `buy`/`sell`, `subscribe_symbol*` (4 variants), `create_raw_handler`, `create_raw_order*` (3 variants).                                                                      |
-| [pocketoption/synchronous.py](python/BinaryOptionsToolsV2/pocketoption/synchronous.py)  | `PocketOption` class. Creates new event loop, wraps all `PocketOptionAsync` methods via `run_until_complete`. Thread-safe with `RLock`.                                                                                                                   |
+| [pocketoption/synchronous.py](python/BinaryOptionsToolsV2/pocketoption/synchronous.py)   | `PocketOption` class. Creates new event loop, wraps all `PocketOptionAsync` methods via `run_until_complete`. Thread-safe with `RLock`.                                                                                                                   |
 
 ### PyO3 Bindings — [crates/bindings_pyo3/src/](crates/bindings_pyo3/src/)
 
-| File              | Description                                                                              |
-| ----------------- | ---------------------------------------------------------------------------------------- |
-| [lib.rs](crates/bindings_pyo3/src/lib.rs)          | PyO3 module entry. Registers all classes and functions with `#[pymodule]`.               |
+| File                                                        | Description                                                                              |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| [lib.rs](crates/bindings_pyo3/src/lib.rs)                   | PyO3 module entry. Registers all classes and functions with `#[pymodule]`.               |
 | [pocketoption.rs](crates/bindings_pyo3/src/pocketoption.rs) | `RawPocketOption` (~1123 lines). Core PyO3 class. Methods mirror Python API.             |
-| [framework.rs](crates/bindings_pyo3/src/framework.rs)    | `PyStrategy` (subclassable), `StrategyWrapper`, `PyContext`, `PyVirtualMarket`, `PyBot`. |
-| [config.rs](crates/bindings_pyo3/src/config.rs)       | `PyConfig` — wraps `binary_options_tools::config::Config`.                               |
-| [validator.rs](crates/bindings_pyo3/src/validator.rs)    | `RawValidator` enum. Converts to `CrateValidator`.                                       |
-| [error.rs](crates/bindings_pyo3/src/error.rs)        | `BinaryErrorPy` enum. Converts from `BinaryOptionsError`, `PocketError`.                 |
-| [runtime.rs](crates/bindings_pyo3/src/runtime.rs)      | Global tokio Runtime singleton via `PyOnceLock`.                                         |
-| [stream.rs](crates/bindings_pyo3/src/stream.rs)       | `next_stream` helper for async/sync iteration.                                           |
-| [logs.rs](crates/bindings_pyo3/src/logs.rs)         | `Logger`, `LogBuilder`, `StreamLogsIterator`, `StreamLogsLayer`.                         |
+| [framework.rs](crates/bindings_pyo3/src/framework.rs)       | `PyStrategy` (subclassable), `StrategyWrapper`, `PyContext`, `PyVirtualMarket`, `PyBot`. |
+| [config.rs](crates/bindings_pyo3/src/config.rs)             | `PyConfig` — wraps `binary_options_tools::config::Config`.                               |
+| [validator.rs](crates/bindings_pyo3/src/validator.rs)       | `RawValidator` enum. Converts to `CrateValidator`.                                       |
+| [error.rs](crates/bindings_pyo3/src/error.rs)               | `BinaryErrorPy` enum. Converts from `BinaryOptionsError`, `PocketError`.                 |
+| [runtime.rs](crates/bindings_pyo3/src/runtime.rs)           | Global tokio Runtime singleton via `PyOnceLock`.                                         |
+| [stream.rs](crates/bindings_pyo3/src/stream.rs)             | `next_stream` helper for async/sync iteration.                                           |
+| [logs.rs](crates/bindings_pyo3/src/logs.rs)                 | `Logger`, `LogBuilder`, `StreamLogsIterator`, `StreamLogsLayer`.                         |
 
 ### Core Crate — [crates/core/src/](crates/core/src/)
 
-| File/Dir           | Description                                                                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [lib.rs](crates/core/src/lib.rs)           | Re-exports `core_macros::rule` as `Rule`.                                                                                                               |
-| [client.rs](crates/core/src/client.rs)        | `Client<S: AppState>` — public handle. `Router<S>` — message routing with middleware. `ClientRunner<S>` — WebSocket lifecycle with exponential backoff. |
-| [connector.rs](crates/core/src/connector.rs)     | `Connector<S>` trait. `ConnectorError`.                                                                                                                 |
-| [traits.rs](crates/core/src/traits.rs)        | Core traits: `AppState`, `ApiModule<S>`, `Rule`, `ReconnectCallback`, `RunnerCommand`.                                                                  |
-| [middleware.rs](crates/core/src/middleware.rs)    | `MiddlewareStack<S>` with hooks: `on_connect`, `on_disconnect`, `on_send`, `on_receive`, `record_connection_attempt`.                                   |
-| [testing.rs](crates/core/src/testing.rs)       | `TestingWrapper` and `TestingWrapperBuilder` for mocking WebSocket streams.                                                                             |
-| [signals.rs](crates/core/src/signals.rs)       | `Signals` — connected/disconnected state notification.                                                                                                  |
-| [builder.rs](crates/core/src/builder.rs)       | `ClientBuilder` for constructing `Client` + `ClientRunner`.                                                                                             |
-| [utils/stream.rs](crates/core/src/utils/stream.rs)  | `ReceiverStream` — wraps kanal receiver as `Stream`.                                                                                                    |
+| File/Dir                                             | Description                                                                                                                                             |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [lib.rs](crates/core/src/lib.rs)                     | Re-exports `core_macros::rule` as `Rule`.                                                                                                               |
+| [client.rs](crates/core/src/client.rs)               | `Client<S: AppState>` — public handle. `Router<S>` — message routing with middleware. `ClientRunner<S>` — WebSocket lifecycle with exponential backoff. |
+| [connector.rs](crates/core/src/connector.rs)         | `Connector<S>` trait. `ConnectorError`.                                                                                                                 |
+| [traits.rs](crates/core/src/traits.rs)               | Core traits: `AppState`, `ApiModule<S>`, `Rule`, `ReconnectCallback`, `RunnerCommand`.                                                                  |
+| [middleware.rs](crates/core/src/middleware.rs)       | `MiddlewareStack<S>` with hooks: `on_connect`, `on_disconnect`, `on_send`, `on_receive`, `record_connection_attempt`.                                   |
+| [testing.rs](crates/core/src/testing.rs)             | `TestingWrapper` and `TestingWrapperBuilder` for mocking WebSocket streams.                                                                             |
+| [signals.rs](crates/core/src/signals.rs)             | `Signals` — connected/disconnected state notification.                                                                                                  |
+| [builder.rs](crates/core/src/builder.rs)             | `ClientBuilder` for constructing `Client` + `ClientRunner`.                                                                                             |
+| [utils/stream.rs](crates/core/src/utils/stream.rs)   | `ReceiverStream` — wraps kanal receiver as `Stream`.                                                                                                    |
 | [utils/tracing.rs](crates/core/src/utils/tracing.rs) | `stream_logs_layer` — tracing subscriber layer for log streaming.                                                                                       |
 
 ### Binary Options Tools Crate — [crates/binary_options_tools/src/](crates/binary_options_tools/src/)
 
-| Path                            | Description                                                                                                                                                   |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [lib.rs](crates/binary_options_tools/src/lib.rs)                        | Public modules: config, error, expertoptions, framework, pocketoption, reimports, traits, utils, validator.                                                   |
-| [config.rs](crates/binary_options_tools/src/config.rs)                     | `Config` struct — `max_allowed_loops`, `sleep_interval`, `reconnect_time`, `timeout`, `urls`, `max_subscriptions` etc.                                        |
-| [validator.rs](crates/binary_options_tools/src/validator.rs)                  | `CrateValidator` enum implementing `ValidatorTrait`.                                                                                                          |
+| Path                                                                                           | Description                                                                                                                                                   |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [lib.rs](crates/binary_options_tools/src/lib.rs)                                               | Public modules: config, error, expertoptions, framework, pocketoption, reimports, traits, utils, validator.                                                   |
+| [config.rs](crates/binary_options_tools/src/config.rs)                                         | `Config` struct — `max_allowed_loops`, `sleep_interval`, `reconnect_time`, `timeout`, `urls`, `max_subscriptions` etc.                                        |
+| [validator.rs](crates/binary_options_tools/src/validator.rs)                                   | `CrateValidator` enum implementing `ValidatorTrait`.                                                                                                          |
 | [pocketoption/pocket_client.rs](crates/binary_options_tools/src/pocketoption/pocket_client.rs) | `PocketOption` (~1430 lines). Main client. All trading operations.                                                                                            |
-| [pocketoption/modules/](crates/binary_options_tools/src/pocketoption/modules/)         | API modules: `keep_alive`, `balance`, `server_time`, `subscriptions`, `trades`, `deals`, `assets`, `get_candles`, `historical_data`, `pending_trades`, `raw`. |
-| [pocketoption/candle.rs](crates/binary_options_tools/src/pocketoption/candle.rs)        | `Candle`, `SubscriptionType` (none/chunk/time/time_aligned).                                                                                                  |
-| [pocketoption/ssid.rs](crates/binary_options_tools/src/pocketoption/ssid.rs)          | SSID parsing and validation.                                                                                                                                  |
-| [pocketoption/types.rs](crates/binary_options_tools/src/pocketoption/types.rs)         | `Action`, `Assets`, `Asset`, `Deal`, `Candle`, `PendingOrder`.                                                                                                |
-| [framework/](crates/binary_options_tools/src/framework/)                    | `Context`, `Strategy` trait, `Bot`, `VirtualMarket`.                                                                                                          |
-| [expertoptions/](crates/binary_options_tools/src/expertoptions/)                | ExpertOption platform integration (placeholder/stub).                                                                                                         |
+| [pocketoption/modules/](crates/binary_options_tools/src/pocketoption/modules/)                 | API modules: `keep_alive`, `balance`, `server_time`, `subscriptions`, `trades`, `deals`, `assets`, `get_candles`, `historical_data`, `pending_trades`, `raw`. |
+| [pocketoption/candle.rs](crates/binary_options_tools/src/pocketoption/candle.rs)               | `Candle`, `SubscriptionType` (none/chunk/time/time_aligned).                                                                                                  |
+| [pocketoption/ssid.rs](crates/binary_options_tools/src/pocketoption/ssid.rs)                   | SSID parsing and validation.                                                                                                                                  |
+| [pocketoption/types.rs](crates/binary_options_tools/src/pocketoption/types.rs)                 | `Action`, `Assets`, `Asset`, `Deal`, `Candle`, `PendingOrder`.                                                                                                |
+| [framework/](crates/binary_options_tools/src/framework/)                                       | `Context`, `Strategy` trait, `Bot`, `VirtualMarket`.                                                                                                          |
+| [expertoptions/](crates/binary_options_tools/src/expertoptions/)                               | ExpertOption platform integration (placeholder/stub).                                                                                                         |
 
 ### Macros Crate — [crates/macros/src/](crates/macros/src/)
 
-| File             | Description                                                                                             |
-| ---------------- | ------------------------------------------------------------------------------------------------------- |
-| [lib.rs](crates/macros/src/lib.rs)         | Proc macros: `impl_module!`, `impl_config!`, `action`, `region`, `serialize`, `deserialize`, `timeout`. |
-| [action.rs](crates/macros/src/action.rs)      | `Action` derive macro — implements `ActionName` trait + generates `Rule` struct.                        |
-| [config.rs](crates/macros/src/config.rs)      | `Config` derive macro — generates config struct + builder + `From`/`TryFrom` impls.                     |
-| [region.rs](crates/macros/src/region.rs)      | `Region` derive macro — generates region-based server URL constants from JSON.                          |
-| [serialize.rs](crates/macros/src/serialize.rs)   | `serialize!` proc macro — wraps `serde_json::to_string`.                                                |
+| File                                               | Description                                                                                             |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [lib.rs](crates/macros/src/lib.rs)                 | Proc macros: `impl_module!`, `impl_config!`, `action`, `region`, `serialize`, `deserialize`, `timeout`. |
+| [action.rs](crates/macros/src/action.rs)           | `Action` derive macro — implements `ActionName` trait + generates `Rule` struct.                        |
+| [config.rs](crates/macros/src/config.rs)           | `Config` derive macro — generates config struct + builder + `From`/`TryFrom` impls.                     |
+| [region.rs](crates/macros/src/region.rs)           | `Region` derive macro — generates region-based server URL constants from JSON.                          |
+| [serialize.rs](crates/macros/src/serialize.rs)     | `serialize!` proc macro — wraps `serde_json::to_string`.                                                |
 | [deserialize.rs](crates/macros/src/deserialize.rs) | `deserialize!` proc macro — wraps `serde_json::from_str`.                                               |
-| [timeout.rs](crates/macros/src/timeout.rs)     | `timeout!` attribute macro for async functions with optional `#[tracing::instrument]`.                  |
+| [timeout.rs](crates/macros/src/timeout.rs)         | `timeout!` attribute macro for async functions with optional `#[tracing::instrument]`.                  |
 
 ### UniFFI Bindings — [crates/bindings_uniffi/src/](crates/bindings_uniffi/src/)
 
-| File                                    | Description                                                                                             |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| [lib.rs](crates/bindings_uniffi/src/lib.rs)                                | Scaffolding. Re-exports `PocketOption`, `RawHandler`, `Action`, `Asset`, `Candle`, `Deal`, `Validator`. |
-| [platforms/pocketoption/client.rs](crates/bindings_uniffi/src/platforms/pocketoption/client.rs)      | PocketOption UniFFI client (subset of full API).                                                        |
-| [platforms/pocketoption/types.rs](crates/bindings_uniffi/src/platforms/pocketoption/types.rs)       | UniFFI-compatible types.                                                                                |
-| [platforms/pocketoption/validator.rs](crates/bindings_uniffi/src/platforms/pocketoption/validator.rs)   | Validator for UniFFI.                                                                                   |
-| [platforms/pocketoption/stream.rs](crates/bindings_uniffi/src/platforms/pocketoption/stream.rs)      | Subscription stream for UniFFI.                                                                         |
+| File                                                                                                      | Description                                                                                             |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [lib.rs](crates/bindings_uniffi/src/lib.rs)                                                               | Scaffolding. Re-exports `PocketOption`, `RawHandler`, `Action`, `Asset`, `Candle`, `Deal`, `Validator`. |
+| [platforms/pocketoption/client.rs](crates/bindings_uniffi/src/platforms/pocketoption/client.rs)           | PocketOption UniFFI client (subset of full API).                                                        |
+| [platforms/pocketoption/types.rs](crates/bindings_uniffi/src/platforms/pocketoption/types.rs)             | UniFFI-compatible types.                                                                                |
+| [platforms/pocketoption/validator.rs](crates/bindings_uniffi/src/platforms/pocketoption/validator.rs)     | Validator for UniFFI.                                                                                   |
+| [platforms/pocketoption/stream.rs](crates/bindings_uniffi/src/platforms/pocketoption/stream.rs)           | Subscription stream for UniFFI.                                                                         |
 | [platforms/pocketoption/raw_handler.rs](crates/bindings_uniffi/src/platforms/pocketoption/raw_handler.rs) | RawHandler for UniFFI.                                                                                  |
 
 ---

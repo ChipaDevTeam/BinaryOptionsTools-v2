@@ -60,9 +60,15 @@
     // STRICT EXCLUSION: If the URL host is events-po.com or one of its subdomains, bypass immediately
     let socketHost = "";
     try {
-      socketHost = new URL(rawSocketUrl, window.location.href).hostname.toLowerCase();
+      socketHost = new URL(
+        rawSocketUrl,
+        window.location.href,
+      ).hostname.toLowerCase();
     } catch (e) {}
-    if (socketHost === "events-po.com" || socketHost.endsWith(".events-po.com")) {
+    if (
+      socketHost === "events-po.com" ||
+      socketHost.endsWith(".events-po.com")
+    ) {
       return result;
     }
 

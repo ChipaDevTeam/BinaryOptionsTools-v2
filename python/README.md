@@ -120,7 +120,7 @@ Key Features of PocketOptionAsync
   - `is_demo()`: Returns whether the current session is a demo account.
   - `is_connected()`: Returns connection status.
   - `create_raw_handler()`: Sets up direct raw WebSocket message listeners with custom validators.
-Helper Class - `AsyncSubscription`
+    Helper Class - `AsyncSubscription`
 
 Facilitates asynchronous iteration over live data streams, enabling non-blocking operations.
 
@@ -193,7 +193,7 @@ Key Features of PocketOption
   - `is_demo()`: Returns whether the current session is a demo account.
   - `is_connected()`: Returns connection status.
   - `create_raw_handler()`: Sets up direct raw WebSocket message listeners with custom validators.
-Helper Class - `SyncSubscription`
+    Helper Class - `SyncSubscription`
 
 Allows synchronous iteration over real-time data streams for compatibility with simpler scripts.
 
