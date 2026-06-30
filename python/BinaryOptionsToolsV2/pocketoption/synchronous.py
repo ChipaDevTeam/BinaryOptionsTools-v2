@@ -3,6 +3,7 @@ import json
 import threading
 from datetime import timedelta
 from typing import Dict, List, Optional, Tuple, Union
+import sys 
 
 from ..config import Config
 from ..validator import Validator
@@ -91,7 +92,7 @@ class PocketOption:
 
     def __del__(self):
         self._cleanup_loop()
-
+    
     def _cleanup_loop(self):
         loop = getattr(self, '_loop', None)
         if loop is None or loop.is_closed():
@@ -105,11 +106,20 @@ class PocketOption:
                 future.result(timeout=5)
         except Exception:
             pass
+    
         loop.call_soon_threadsafe(loop.stop)
+    
         thread = getattr(self, '_loop_thread', None)
         if thread is not None and thread.is_alive():
-            thread.join(timeout=2)
-        loop.close()
+            # During interpreter shutdown, joining threads raises PythonFinalizationError.
+            # The daemon thread will be killed automatically, so just skip the join.
+            if not sys.is_finalizing():
+                thread.join(timeout=2)
+    
+        try:
+            loop.close()
+        except Exception:
+            pass
 
     @property
     def loop(self):
