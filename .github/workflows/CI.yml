@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Run sccache-cache
-        uses: mozilla/sccache-action@v0.0.6
+        uses: mozilla/sccache-action@v0.0.10
 
       - name: Install Zig
         uses: mlugg/setup-zig@v2
@@ -99,7 +99,7 @@ jobs:
           persist-credentials: false
       # Disable sccache for windows due to potential cross-compilation issues
       # - name: Run sccache-cache
-      #   uses: mozilla/sccache-action@v0.0.6
+      #   uses: mozilla/sccache-action@v0.0.10
       - uses: actions/setup-python@v6
         id: setup-python
         with:
@@ -125,7 +125,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Run sccache-cache
-        uses: mozilla/sccache-action@v0.0.6
+        uses: mozilla/sccache-action@v0.0.10
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13.12"
@@ -147,7 +147,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Run sccache-cache
-        uses: mozilla/sccache-action@v0.0.6
+        uses: mozilla/sccache-action@v0.0.10
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
