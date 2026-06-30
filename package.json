@@ -6,8 +6,12 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepare": "husky",
-    "docs:serve": "npm run start --prefix docs",
-    "docs:build": "npm run build --prefix docs"
+    "start": "docusaurus start",
+    "build": "docusaurus build",
+    "serve": "docusaurus serve",
+    "clear": "docusaurus clear",
+    "docs:serve": "npm run start",
+    "docs:build": "npm run build"
   },
   "keywords": [],
   "author": "",

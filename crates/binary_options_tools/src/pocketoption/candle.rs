@@ -793,40 +793,6 @@ impl TryFrom<(BaseCandle, String)> for Candle {
         })
     }
 }
-    /// Create a new Candle with explicit is_closed value
-    pub fn new_with_closed_status(
-        symbol: String,
-        timestamp: i64,
-        open: f64,
-        high: f64,
-        low: f64,
-        close: f64,
-        volume: Option<f64>,
-        is_closed: bool,
-    ) -> Result<Self, BinaryOptionsError> {
-        let volume_decimal = match volume {
-            Some(v) => Some(
-                Decimal::from_f64(v)
-                    .ok_or(BinaryOptionsError::General("Couldn't parse volume".into()))?,
-            ),
-            None => None,
-        };
-        
-        Ok(Candle {
-            symbol,
-            timestamp,
-            open: Decimal::from_f64(open)
-                .ok_or(BinaryOptionsError::General("Couldn't parse open".into()))?,
-            high: Decimal::from_f64(high)
-                .ok_or(BinaryOptionsError::General("Couldn't parse high".into()))?,
-            low: Decimal::from_f64(low)
-                .ok_or(BinaryOptionsError::General("Couldn't parse low".into()))?,
-            close: Decimal::from_f64(close)
-                .ok_or(BinaryOptionsError::General("Couldn't parse close".into()))?,
-            volume: volume_decimal,
-            is_closed,
-        })
-    }
 
 #[cfg(test)]
 mod tests {
