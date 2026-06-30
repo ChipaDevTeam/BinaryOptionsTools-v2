@@ -1,8 +1,7 @@
 POST /en/login/ HTTP/1.1
 Host: pocketoption.com
 Content-Type: application/x-www-form-urlencoded
-Content-Length: 581
-Origin: https://pocketoption.com
+Content-Length: 174
 Referer: https://pocketoption.com/en/login/
 Cookie: po_uuid=REDACTED; gbraid=REDACTED; cl_id=REDACTED; qrator_msid2=REDACTED; a=REDACTED; ac=REDACTED; link_id=REDACTED
 

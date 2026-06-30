@@ -20,6 +20,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Configure Git Credentials
         run: |
           git config user.name github-actions[bot]
@@ -55,6 +57,8 @@ jobs:
             libc: manylinux_2_28
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Run sccache-cache
         uses: mozilla/sccache-action@v0.0.10
@@ -74,7 +78,7 @@ jobs:
           working-directory: python
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: wheels-linux-${{ matrix.target }}
           path: python/dist
@@ -114,7 +118,7 @@ jobs:
           args: --release --strip --out dist -i "${{ steps.setup-python.outputs.python-path }}"
           working-directory: python
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: wheels-windows-${{ matrix.arch }}
           path: python/dist
@@ -124,6 +128,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Run sccache-cache
         uses: mozilla/sccache-action@v0.0.10
       - uses: actions/setup-python@v6
@@ -136,7 +142,7 @@ jobs:
           args: --release --strip --out dist -i python3.13
           working-directory: python
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: wheels-macos
           path: python/dist
@@ -146,6 +152,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Run sccache-cache
         uses: mozilla/sccache-action@v0.0.10
       - name: Build sdist
@@ -155,7 +163,7 @@ jobs:
           args: --out dist
           working-directory: python
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.0
         with:
           name: wheels-sdist
           path: python/dist
@@ -171,6 +179,8 @@ jobs:
       has_pypi_token: ${{ steps.check_token.outputs.has_token }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Check for PyPI token
         id: check_token
