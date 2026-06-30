@@ -19,12 +19,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure Git Credentials
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.x
       - name: Install uv
@@ -54,13 +54,13 @@ jobs:
           - target: armv7-unknown-linux-gnueabihf
             libc: manylinux_2_28
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Run sccache-cache
         uses: mozilla/sccache-action@v0.0.6
 
       - name: Install Zig
-        uses: mlugg/setup-zig@v1
+        uses: mlugg/setup-zig@v2
         with:
           version: 0.13.0 # Explicitly use stable to avoid 404s
 
@@ -94,13 +94,13 @@ jobs:
       RUSTC_WRAPPER: "" # Disable sccache for Windows
       SCCACHE_GHA_ENABLED: "false"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       # Disable sccache for windows due to potential cross-compilation issues
       # - name: Run sccache-cache
       #   uses: mozilla/sccache-action@v0.0.6
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         id: setup-python
         with:
           python-version: "3.13.12"
@@ -123,10 +123,10 @@ jobs:
   macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run sccache-cache
         uses: mozilla/sccache-action@v0.0.6
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13.12"
       - name: Build wheels
@@ -145,7 +145,7 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run sccache-cache
         uses: mozilla/sccache-action@v0.0.6
       - name: Build sdist
@@ -170,7 +170,7 @@ jobs:
     outputs:
       has_pypi_token: ${{ steps.check_token.outputs.has_token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check for PyPI token
         id: check_token
@@ -191,7 +191,7 @@ jobs:
           echo "TAG=v$VERSION" >> $GITHUB_OUTPUT
 
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: wheels
           pattern: wheels-*
@@ -231,7 +231,7 @@ jobs:
     if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) && needs.release.outputs.has_pypi_token == 'true'
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           pattern: wheels-*
