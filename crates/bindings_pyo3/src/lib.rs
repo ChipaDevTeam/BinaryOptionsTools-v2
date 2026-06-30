@@ -52,3 +52,20 @@ fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_action_enum_variants() {
+        assert_eq!(format!("{:?}", Action::Call), "Call");
+        assert_eq!(format!("{:?}", Action::Put), "Put");
+    }
+
+    #[test]
+    fn test_py_config_defaults() {
+        let config = PyConfig::default();
+        assert_eq!(config.inner.max_allowed_loops, 0);
+    }
+}

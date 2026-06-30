@@ -38,8 +38,8 @@ pub struct Candle {
     /// Volume is not provided by PocketOption
     // #[serde(skip_serializing_if = "Option::is_none")]
     pub volume: Option<Decimal>,
-    // /// Whether this candle is closed/finalized
-    // pub is_closed: bool,
+    /// Whether this candle is closed/finalized
+    pub is_closed: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -269,13 +269,13 @@ impl Candle {
         Ok(())
     }
 
-    // /// Mark the candle as closed/finalized
-    // ///
-    // /// Once a candle is closed, it should not be updated with new prices.
-    // /// This is typically called when a time-based candle period ends.
-    // pub fn close_candle(&mut self) {
-    //     self.is_closed = true;
-    // }
+    /// Mark the candle as closed/finalized
+    ///
+    /// Once a candle is closed, it should not be updated with new prices.
+    /// This is typically called when a time-based candle period ends.
+    pub fn close_candle(&mut self) {
+        self.is_closed = true;
+    }
 
     /// Get the price range (high - low) of the candle
     ///

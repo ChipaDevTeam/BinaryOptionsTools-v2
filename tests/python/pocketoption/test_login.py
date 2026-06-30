@@ -225,6 +225,83 @@ class TestLogin2CaptchaMock:
         assert '"isDemo":0' in result
 
 
+# ── NoCaptchaAI backend (mocked) ─────────────────────────────────────────────
+
+
+class TestLoginNoCaptchaAi:
+    @patch("BinaryOptionsToolsV2.pocketoption.tools.login._login_captcha_solver",
+           return_value=FAKE_SESSION)
+    def test_nocaptchaai_backend_used(self, mock_solver):
+        result = login("u@e.com", "p", backend="nocaptchaai", api_key="nc_key", demo=True)
+        mock_solver.assert_called_once_with(
+            "u@e.com", "p", api_key="nc_key", service="nocaptchaai", timeout=60
+        )
+        assert FAKE_SESSION in result
+        assert '"isDemo":1' in result
+
+    @patch("BinaryOptionsToolsV2.pocketoption.tools.login._login_captcha_solver",
+           return_value=FAKE_SESSION)
+    def test_nocaptchaai_backend_demo_false(self, mock_solver):
+        result = login("u@e.com", "p", backend="nocaptchaai", api_key="nc_key", demo=False)
+        mock_solver.assert_called_once_with(
+            "u@e.com", "p", api_key="nc_key", service="nocaptchaai", timeout=60
+        )
+        assert FAKE_SESSION in result
+        assert '"isDemo":0' in result
+
+
+@patch("requests.post")
+class TestSolveViaNoCaptchaAi:
+    """Unit tests for _solve_via_nocaptchaai matching capsolver coverage."""
+
+    def test_success(self, mock_post):
+        create_resp = MagicMock()
+        create_resp.json.return_value = {"errorId": 0, "taskId": "nc_task_123"}
+        poll_resp = MagicMock()
+        poll_resp.json.return_value = {
+            "errorId": 0,
+            "status": "ready",
+            "solution": {"gRecaptchaResponse": "nc_token_value"},
+        }
+        mock_post.side_effect = [create_resp, poll_resp]
+
+        from BinaryOptionsToolsV2.pocketoption.tools.login import _solve_via_nocaptchaai
+        token = _solve_via_nocaptchaai("api_key", timeout=10)
+        assert token == "nc_token_value"
+
+    def test_creation_error(self, mock_post):
+        resp = MagicMock()
+        resp.json.return_value = {"errorId": 1, "errorDescription": "Invalid API key"}
+        mock_post.return_value = resp
+
+        from BinaryOptionsToolsV2.pocketoption.tools.login import _solve_via_nocaptchaai
+        with pytest.raises(LoginError, match="NoCaptchaAI task creation failed: Invalid API key"):
+            _solve_via_nocaptchaai("api_key", timeout=10)
+
+    def test_polling_error(self, mock_post):
+        resp1 = MagicMock()
+        resp1.json.return_value = {"errorId": 0, "taskId": "nc_task_456"}
+        resp2 = MagicMock()
+        resp2.json.return_value = {"errorId": 9, "errorDescription": "Task expired"}
+        mock_post.side_effect = [resp1, resp2]
+
+        from BinaryOptionsToolsV2.pocketoption.tools.login import _solve_via_nocaptchaai
+        with pytest.raises(LoginError, match="NoCaptchaAI error: Task expired"):
+            _solve_via_nocaptchaai("api_key", timeout=10)
+
+    def test_timeout(self, mock_post):
+        resp1 = MagicMock()
+        resp1.json.return_value = {"errorId": 0, "taskId": "nc_task_789"}
+        resp2 = MagicMock()
+        resp2.json.return_value = {"errorId": 0, "status": "processing"}
+        mock_post.side_effect = [resp1, resp2, resp2, resp2, resp2, resp2]
+
+        from BinaryOptionsToolsV2.pocketoption.tools.login import _solve_via_nocaptchaai
+        with patch("time.time", side_effect=[0, 1, 15]):
+            with pytest.raises(LoginError, match="did not return a token within"):
+                _solve_via_nocaptchaai("api_key", timeout=10)
+
+
 # ── Integration tests ─────────────────────────────────────────────────────────
 
 

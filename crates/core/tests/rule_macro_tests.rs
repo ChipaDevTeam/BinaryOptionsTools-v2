@@ -1,9 +1,9 @@
 use binary_options_tools_core::{traits::Rule, Rule};
 
-#[allow(dead_code)]
+#[allow(dead_code)] // Test helper; never directly instantiated, used through Rule trait
 struct TestRuleImpl;
 
-#[allow(dead_code)]
+#[allow(dead_code)] // new() kept for documentation; not called directly in tests
 impl TestRuleImpl {
     pub fn new() -> Self {
         Self
@@ -620,23 +620,6 @@ mod tests {
         let _rule = CustomWithOr::new();
     }
 
-    // TODO: Fix chained method tests
-    /*
-    #[test]
-    fn test_chained_wait_compiles() {
-        let _rule = ChainedWait::new();
-    }
-
-    #[test]
-    fn test_chained_multiple_methods_compiles() {
-        let _rule = ChainedMultipleMethods::new();
-    }
-
-    #[test]
-    fn test_chained_lstrip_then_compiles() {
-        let _rule = ChainedLstripThen::new();
-    }
-    */
 
     #[test]
     fn test_edge_case_any_alone_compiles() {

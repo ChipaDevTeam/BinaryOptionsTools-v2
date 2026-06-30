@@ -1,4 +1,3 @@
-#![allow(warnings)]
 #![allow(unused_imports)]
 use std::any::Any;
 use std::sync::Arc;

@@ -752,7 +752,7 @@ mod tests {
 
     #[derive(serde::Deserialize)]
     struct TestData {
-        #[allow(dead_code)]
+        #[allow(dead_code)] // Field used only for JSON schema derivation, not accessed at runtime
         id: u32,
     }
 

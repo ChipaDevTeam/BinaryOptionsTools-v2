@@ -94,4 +94,4 @@ tests/assets.txt
 # ---- Build artifacts ----
 site
 logs_fail
-.arive-tasks
+.arive-tasks/

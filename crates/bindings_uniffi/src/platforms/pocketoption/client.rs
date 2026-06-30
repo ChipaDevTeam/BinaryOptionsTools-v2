@@ -30,20 +30,10 @@ pub struct PocketOption {
 
 #[uniffi::export]
 impl PocketOption {
-    /// Creates a new `PocketOption` client, authenticating with the given session ID.
-    ///
-    /// This is the primary constructor. Alias: `new`.
-    #[uniffi::constructor]
-    pub async fn init(ssid: String) -> Result<Arc<Self>, UniError> {
-        let inner = OriginalPocketOption::new(ssid)
-            .await
-            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
-        Ok(Arc::new(Self { inner }))
-    }
 
     /// Creates a new `PocketOption` client, authenticating with the given session ID.
     ///
-    /// Alias for `init`.
+    /// This is the primary constructor.
     #[uniffi::constructor]
     pub async fn new(ssid: String) -> Result<Arc<Self>, UniError> {
         let inner = OriginalPocketOption::new(ssid)

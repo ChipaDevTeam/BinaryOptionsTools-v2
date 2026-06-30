@@ -41,7 +41,6 @@ use uuid::Uuid;
 // ============================================================================
 
 /// Creates a minimal mock State with only the fields needed for testing
-#[allow(dead_code)]
 fn create_mock_state() -> Arc<State> {
     let ssid = Ssid::Demo(Demo {
         session: "test_ssid".to_string(),
@@ -64,7 +63,6 @@ fn create_mock_state() -> Arc<State> {
 }
 
 /// Creates a PendingOrder with test data
-#[allow(dead_code)]
 fn create_test_pending_order(req_id: Uuid) -> PendingOrder {
     PendingOrder {
         ticket: req_id,
@@ -82,7 +80,6 @@ fn create_test_pending_order(req_id: Uuid) -> PendingOrder {
 }
 
 /// Creates a WebSocket text message with Socket.IO framing: 42["event", {...}]
-#[allow(dead_code)]
 fn create_socket_io_text_message(event: &str, data: &serde_json::Value) -> String {
     format!(
         "42[{},{}]",
@@ -102,7 +99,6 @@ fn create_socket_io_text_message(event: &str, data: &serde_json::Value) -> Strin
 /// 4. Handle the response (success or error)
 ///
 /// This example shows the simplest use case with proper error handling.
-#[allow(dead_code)]
 async fn example_basic_pending_order() -> PocketResult<()> {
     println!("=== Example 1: Basic Pending Order Placement ===\n");
 
@@ -209,7 +205,6 @@ async fn example_basic_pending_order() -> PocketResult<()> {
 /// request at a time. Concurrent calls will work due to the lock, but they are
 /// serialized. For high-volume scenarios, consider batching or using multiple
 /// client instances.
-#[allow(dead_code)]
 async fn example_concurrent_pending_orders() -> PocketResult<()> {
     println!("=== Example 2: Concurrent Pending Orders ===\n");
 
@@ -361,7 +356,6 @@ async fn example_concurrent_pending_orders() -> PocketResult<()> {
 ///
 /// In a real application, the `PocketClient` manages all of this internally.
 /// This example is useful for understanding the architecture.
-#[allow(dead_code)]
 async fn example_integration_with_pocketclient() -> PocketResult<()> {
     println!("=== Example 3: Integration with PocketClient ===\n");
 
@@ -598,7 +592,6 @@ async fn scenario3_timeout() -> PocketResult<()> {
 use rust_decimal_macros::dec;
 
 /// Demonstrates timeout handling and the retry logic for mismatched responses.
-#[allow(dead_code)]
 async fn example_timeouts_and_retries() -> PocketResult<()> {
     println!("=== Example 4: Timeouts and Retries ===\n");
     scenario1_mismatched_responses().await?;

@@ -99,3 +99,45 @@ impl Connector<State> for PocketConnect {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fallback_urls_are_valid_urls() {
+        for url in FALLBACK_URLS {
+            assert!(url.starts_with("wss://"), "Expected wss:// URL, got: {url}");
+            assert!(url.contains(".market/"), "Expected .market/ in URL, got: {url}");
+        }
+    }
+
+    #[test]
+    fn test_fallback_urls_count() {
+        assert_eq!(FALLBACK_URLS.len(), 3, "Expected 3 fallback URLs");
+    }
+
+    #[test]
+    fn test_pocket_connect_construct() {
+        let _connector = PocketConnect;
+    }
+
+    #[test]
+    fn test_pocket_connect_is_clone() {
+        let _c1 = PocketConnect;
+        let _c2 = _c1.clone();
+    }
+
+    #[test]
+    fn test_connect_multiple_empty_urls_returns_error() {
+        let connector = PocketConnect;
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let ssid = Ssid::parse(
+            r#"42["auth",{"sessionToken":"test","uid":0,"platform":2,"currentUrl":"test","isFastHistory":false,"isOptimized":true}]"#
+        ).unwrap();
+        let result = rt.block_on(async {
+            connector.connect_multiple(vec![], ssid).await
+        });
+        assert!(result.is_err());
+    }
+}
