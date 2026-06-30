@@ -427,15 +427,25 @@ impl RuleBuilder {
         }
     }
 
-    pub fn text_regex(pattern: impl AsRef<str>) -> Self {
+    pub fn text_regex(s: impl AsRef<str>) -> Self {
+        let re = regex::Regex::new(s.as_ref()).expect("Invalid regex pattern");
         Self {
             inner: Rule::Matcher {
-                matcher: Matcher::Text(TextMatcher::Regex(
-                    regex::Regex::new(pattern.as_ref()).expect("Invalid regex in RuleBuilder"),
-                )),
+                matcher: Matcher::Text(TextMatcher::Regex(re)),
                 conditions: vec![],
             },
         }
+    }
+
+    pub fn regex(self, pattern: impl AsRef<str>) -> CoreResult<Self> {
+        let re = regex::Regex::new(pattern.as_ref())
+            .map_err(|e| CoreError::Other(format!("Invalid regex pattern: {e}")))?;
+        Ok(Self {
+            inner: Rule::Matcher {
+                matcher: Matcher::Text(TextMatcher::Regex(re)),
+                conditions: vec![],
+            },
+        })
     }
 
     pub fn binary_starts_with(data: impl Into<Vec<u8>>) -> Self {

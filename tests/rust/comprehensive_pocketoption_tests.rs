@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 //! Comprehensive integration tests for all PocketOption functions
 //!
 //! This test file covers all major PocketOption API functions including:

@@ -574,6 +574,10 @@ foreach (var deal in closedDeals)
 
 ### Get Historical Candles
 
+!!! info "UTC Candle Compilation"
+    Historical candles are fetched and manually compiled locally on the client from 1-second raw ticks. Timestamps are grouped strictly according to UTC calendar boundaries (`timestamp / period * period`), avoiding server-side candle time-alignment mismatches, gaps, or overlaps ("merges"). This applies to both `.candles()` (default 1000 periods lookback) and `.compile_candles()` (custom lookback period).
+
+
 #### Python
 
 ```python

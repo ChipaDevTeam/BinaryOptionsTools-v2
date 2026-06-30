@@ -71,7 +71,7 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 ### Market Data & Backtesting
 
 - **Live Stream**: Subscribe to real-time candles and price ticks.
-- **Historical**: Fetch OHLC data for analysis.
+- **Historical / UTC Candles**: Fetch and compile custom or standard candles directly from 1-second ticks aligned strictly to UTC boundaries, ensuring no server-side gaps or overlaps (merges).
 - **Virtual Market**: Built-in simulator for backtesting strategies without financial risk.
 - **Server Sync**: Precision timing via NTP-like synchronization.
 

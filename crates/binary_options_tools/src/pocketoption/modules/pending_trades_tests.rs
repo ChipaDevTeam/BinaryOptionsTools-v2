@@ -1,4 +1,4 @@
-#![allow(unused_imports)]
+#![allow(unused_imports, unused_mut, unused_variables, dead_code)]
 use std::any::Any;
 use std::sync::Arc;
 use std::time::Duration;

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! # Pending Trades Examples
 //!
 //! This file demonstrates various usage patterns for the `PendingTradesApiModule`.

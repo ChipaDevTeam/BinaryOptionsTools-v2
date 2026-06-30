@@ -171,6 +171,9 @@ impl AppState for State {
 
         // Clear stale trade state (but keep closed deals for history)
         self.trade_state.clear_opened_deals().await;
+        self.trade_state.pending_market_orders.write().await.clear();
+        self.trade_state.recent_trades.write().await.clear();
+        self.trade_state.pending_deals.write().await.clear();
 
         // Mark subscriptions as requiring re-subscription
         self.active_subscriptions.write().await.clear();
@@ -289,7 +292,7 @@ impl State {
     pub fn add_raw_validator(&self, id: Uuid, validator: Validator) {
         self.raw_validators
             .write()
-            .expect("Raw validators lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .insert(id, Arc::new(validator));
     }
 
@@ -297,7 +300,7 @@ impl State {
     pub fn remove_raw_validator(&self, id: &Uuid) -> bool {
         self.raw_validators
             .write()
-            .expect("Raw validators lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .remove(id)
             .is_some()
     }
@@ -306,7 +309,7 @@ impl State {
     pub fn clear_raw_validators(&self) {
         self.raw_validators
             .write()
-            .expect("Raw validators lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .clear();
     }
 }
@@ -433,7 +436,6 @@ impl TradeState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
 
     #[test]
     fn test_state_builder_defaults() {
@@ -446,7 +448,7 @@ mod tests {
     #[test]
     fn test_state_builder_ssid_method() {
         let ssid = Ssid::parse(
-            r#"42["auth",{"sessionToken":"test","uid":0,"platform":2,"currentUrl":"test","isFastHistory":false,"isOptimized":true}]"#
+            r#"42["auth",{"sessionToken":"test","uid":0,"platform":2,"currentUrl":"demo","isFastHistory":false,"isOptimized":true}]"#
         ).unwrap();
         let builder = StateBuilder::default()
             .ssid(ssid);

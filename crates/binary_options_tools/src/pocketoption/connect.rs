@@ -133,7 +133,7 @@ mod tests {
         let connector = PocketConnect;
         let rt = tokio::runtime::Runtime::new().unwrap();
         let ssid = Ssid::parse(
-            r#"42["auth",{"sessionToken":"test","uid":0,"platform":2,"currentUrl":"test","isFastHistory":false,"isOptimized":true}]"#
+            r#"42["auth",{"sessionToken":"test","uid":0,"platform":2,"currentUrl":"demo","isFastHistory":false,"isOptimized":true}]"#
         ).unwrap();
         let result = rt.block_on(async {
             connector.connect_multiple(vec![], ssid).await

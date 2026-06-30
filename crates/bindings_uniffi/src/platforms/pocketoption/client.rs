@@ -313,7 +313,7 @@ impl PocketOption {
     pub async fn history(&self, asset: String, period: u32) -> Result<Vec<Candle>, UniError> {
         let candles = self
             .inner
-            .history(asset, period)
+            .candles(asset, period)
             .await
             .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?
             .into_iter()

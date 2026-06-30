@@ -2,10 +2,13 @@ use bo2_macros::uniffi_doc;
 
 #[cfg(test)]
 mod tests {
+    use super::uniffi_doc;
+
     #[test]
     fn test_uniffi_doc_macro_exists() {
-        // Verify the uniffi_doc attribute macro is available
-        let _ = uniffi_doc::uniffi_doc;
+        #[uniffi_doc(name = "test", path = "docs_json/test.json")]
+        #[allow(dead_code)]
+        struct Dummy;
     }
 
     #[test]

@@ -547,7 +547,7 @@ impl RawPocketOption {
         let client = self.client.clone();
         future_into_py(py, async move {
             let res = client
-                .history(asset, period)
+                .candles(asset, period)
                 .await
                 .map_err(BinaryErrorPy::from)?;
             Python::attach(|py| {

@@ -440,16 +440,14 @@ impl<S: AppState> ClientRunner<S> {
             let mut attempts_reset = false;
             self.router.middleware_stack.on_connect(&middleware_context).await;
 
-            if self.is_hard_disconnect {
-                debug!(target: "Runner", "Executing on_connect callback.");
-                if let Err(err) = (self.connection_callback.on_connect)(self.state.clone(), &self.to_ws_sender).await {
-                    warn!(target: "Runner", "on_connect callback failed: {err:#?}");
-                }
-            } else {
-                debug!(target: "Runner", "Executing on_reconnect callback.");
-                if let Err(err) = self.connection_callback.on_reconnect.call(self.state.clone(), &self.to_ws_sender).await {
-                    warn!(target: "Runner", "on_reconnect callback failed: {err:#?}");
-                }
+            debug!(target: "Runner", "Executing on_connect callback.");
+            if let Err(err) = (self.connection_callback.on_connect)(self.state.clone(), &self.to_ws_sender).await {
+                warn!(target: "Runner", "on_connect callback failed: {err:#?}");
+            }
+
+            debug!(target: "Runner", "Executing on_reconnect callback.");
+            if let Err(err) = self.connection_callback.on_reconnect.call(self.state.clone(), &self.to_ws_sender).await {
+                warn!(target: "Runner", "on_reconnect callback failed: {err:#?}");
             }
             self.is_hard_disconnect = false;
 

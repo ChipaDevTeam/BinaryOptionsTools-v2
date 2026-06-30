@@ -495,6 +495,8 @@ impl HistoricalDataApiModule {
 
 impl Drop for HistoricalDataApiModule {
     fn drop(&mut self) {
-        tracing::debug!(target: "HistoricalDataApiModule", "HistoricalDataApiModule dropped");
+        if let Some((req_id, _, _, _)) = self.pending_request.take() {
+            let _ = self.command_responder.as_sync().try_send(CommandResponse::Shutdown { req_id });
+        }
     }
 }

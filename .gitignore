@@ -90,11 +90,8 @@ memory
 # Sensitive test data
 tests/login_test.txt
 tests/assets.txt
-<<<<<<< HEAD
 
 # ---- Build artifacts ----
 site
 logs_fail
 .arive-tasks/
-=======
->>>>>>> fec2b03de4423cee2d05b74030b74cd9e0f170ba

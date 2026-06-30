@@ -135,16 +135,16 @@ pub struct TradesApiModule {
     to_ws_sender: AsyncSender<Message>,
     pending_orders: HashMap<Uuid, PendingOrderTracker>,
     // Secondary index for matching failures (which lack UUID)
-    // Map of (Asset, Amount) -> Queue of UUIDs (FIFO)
+    // Map of (Asset, Amount, RequestUUID) -> Queue of UUIDs (each entry typically has 1 element)
     /// A heuristic-based mapping for correlating server-side failures to client requests.
     ///
     /// Since the PocketOption protocol does not return a `request_id` for `failopenOrder`
-    /// messages, we maintain a FIFO queue of pending requests per (Asset, Amount).
+    /// messages, we use a map keyed by (Asset, Amount, RequestUUID) to disambiguate
+    /// between multiple identical trades in flight.
     ///
-    /// # Warning
-    /// This is susceptible to race conditions if multiple identical trades are
-    /// executed simultaneously and the server responds out-of-order.
-    failure_matching: HashMap<(String, Decimal), VecDeque<Uuid>>,
+    /// Each request gets its own entry keyed by its UUID as a nonce, preventing
+    /// race conditions when identical trades are executed simultaneously.
+    failure_matching: HashMap<(String, Decimal, Uuid), VecDeque<Uuid>>,
 }
 
 impl TradesApiModule {
@@ -218,8 +218,8 @@ impl ApiModule<State> for TradesApiModule {
                           };
                           self.pending_orders.insert(req_id, tracker);
 
-                          // Add to failure matching queue
-                          let key = (asset.clone(), amount);
+                          // Add to failure matching queue (keyed with req_id as nonce for disambiguation)
+                          let key = (asset.clone(), amount, req_id);
                           self.failure_matching.entry(key).or_default().push_back(req_id);
 
                           // Create OpenOrder and send to WebSocket.
@@ -229,10 +229,8 @@ impl ApiModule<State> for TradesApiModule {
                               if let Some(tracker) = self.pending_orders.remove(&req_id) {
                                   let _ = tracker.responder.send(Err(CoreError::from(e).into()));
                               }
-                              let key = (asset_for_error, amount);
-                              if let Some(queue) = self.failure_matching.get_mut(&key) {
-                                  queue.retain(|&id| id != req_id);
-                              }
+                              let key = (asset_for_error, amount, req_id);
+                              self.failure_matching.remove(&key);
                           }
                       }
                       Err(_) => {
@@ -297,14 +295,10 @@ impl ApiModule<State> for TradesApiModule {
 
                                   if let Some(tracker) = self.pending_orders.remove(&id) {
                                       let _ = tracker.responder.send(Ok(*deal.clone()));
-
-                                      let key = (tracker.asset, tracker.amount);
-                                      if let Some(queue) = self.failure_matching.get_mut(&key) {
-                                          queue.retain(|&pending_id| pending_id != id);
-                                          if queue.is_empty() {
-                                              self.failure_matching.remove(&key);
-                                          }
-                                      }
+                                      
+                                      // Remove the specific failure_matching entry for this request
+                                      let key = (tracker.asset, tracker.amount, id);
+                                      self.failure_matching.remove(&key);
                                   } else {
                                       warn!(target: "TradesApiModule", "Received success for unknown request ID: {}", id);
                                   }
@@ -313,19 +307,22 @@ impl ApiModule<State> for TradesApiModule {
                               }
                           }
                           ServerResponse::Fail(fail) => {
-                              let key = (fail.asset.clone(), fail.amount);
-
-                              let found_req_id = if let Some(queue) = self.failure_matching.get_mut(&key) {
-                                  let id = queue.pop_front();
-                                  if queue.is_empty() {
-                                      self.failure_matching.remove(&key);
-                                  }
-                                  id
-                              } else {
-                                  None
+                              let asset = fail.asset.clone();
+                              let amount = fail.amount;
+                              
+                              // Find any entry in failure_matching matching this (asset, amount)
+                              // The triple key includes req_id as nonce for disambiguation
+                              let found_req_id = {
+                                  let matching: Vec<Uuid> = self.failure_matching.keys()
+                                      .filter(|(a, am, _)| a == &asset && *am == amount)
+                                      .map(|(_, _, req_id)| *req_id)
+                                      .collect();
+                                  matching.first().copied()
                               };
 
                               if let Some(req_id) = found_req_id {
+                                  self.failure_matching.remove(&(asset.clone(), amount, req_id));
+                                  
                                   // Clean up pending_market_orders in state
                                   self.state.trade_state.pending_market_orders.write().await.remove(&req_id);
 
@@ -342,10 +339,9 @@ impl ApiModule<State> for TradesApiModule {
                           }
                       }
                   } else {
-                      // Warn if parsing failed, but don't crash
-                      warn!(target: "TradesApiModule", "Failed to parse ServerResponse from message");
+                          warn!(target: "TradesApiModule", "Failed to parse ServerResponse from message");
+                      }
                   }
-              }
             }
         }
     }

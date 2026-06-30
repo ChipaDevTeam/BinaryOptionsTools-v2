@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use binary_options_tools_core::{
@@ -24,6 +25,10 @@ const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = ["loadHistoryPeriodFast", "loadH
 
 /// Default number of ticks/candles to fetch per pagination page.
 const DEFAULT_PAGE_OFFSET: i64 = 1000;
+/// Maximum number of ticks to keep per asset in `latest_ticks`.
+const MAX_TICKS_PER_ASSET: usize = 10000;
+/// Maximum age (in seconds) for ticks in `latest_ticks`. Ticks older than this are pruned.
+const MAX_TICK_AGE_SECS: u64 = 300;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoadHistoryPeriod {
@@ -425,6 +430,7 @@ impl ApiModule<State> for GetCandlesApiModule {
                                         if let Ok(text) = std::str::from_utf8(data) {
                                             if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
                                                 self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
+                                                self.prune_latest_ticks();
                                             }
                                         }
                                     }
@@ -452,6 +458,7 @@ impl ApiModule<State> for GetCandlesApiModule {
                                         }
                                     } else if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
                                         self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
+                                        self.prune_latest_ticks();
                                     }
                                 }
                                 _ => {
@@ -700,5 +707,24 @@ impl GetCandlesApiModule {
             warn!("Received data for unknown request index: {}", result.index);
         }
         Ok(())
+    }
+
+    /// Prune `latest_ticks` to enforce maximum size and maximum age limits.
+    fn prune_latest_ticks(&mut self) {
+        let cutoff = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            .saturating_sub(MAX_TICK_AGE_SECS) as i64;
+        self.latest_ticks.retain(|_, ticks| {
+            // Remove ticks older than the cutoff
+            ticks.retain(|&(ts, _)| ts >= cutoff);
+            // Enforce maximum size
+            if ticks.len() > MAX_TICKS_PER_ASSET {
+                ticks.drain(0..ticks.len() - MAX_TICKS_PER_ASSET);
+            }
+            // Remove the entry entirely if no ticks remain
+            !ticks.is_empty()
+        });
     }
 }

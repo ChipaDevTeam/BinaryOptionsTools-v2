@@ -54,14 +54,17 @@ impl ResponseRouter {
                 if let Some(id) = get_command_id(&resp) {
                     let mut pending = router_clone.pending.lock().await;
                     if let Some(tx) = pending.remove(&id) {
-                        let _ = tx.send(resp);
+                        if let Err(_) = tx.send(resp) {
+                            tracing::trace!(target: "ResponseRouter", "Failed to route response: receiver dropped");
+                        }
                     }
                 }
             }
-            // Notify all remaining pending waiters that the router (and thus the module) has stopped.
             let mut pending = router_clone.pending.lock().await;
             for (id, tx) in pending.drain() {
-                let _ = tx.send(CommandResponse::Shutdown { command_id: id });
+                if let Err(_) = tx.send(CommandResponse::Shutdown { command_id: id }) {
+                    tracing::trace!(target: "ResponseRouter", "Failed to send shutdown notification: receiver dropped");
+                }
             }
         });
         router
@@ -532,10 +535,12 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             command_id,
                         } => {
                             if self.is_max_subscriptions_reached().await {
-                                let _ = self.command_responder.send(CommandResponse::SubscriptionFailed {
+                                if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionFailed {
                                     command_id,
                                     error: Box::new(SubscriptionError::MaxSubscriptionsReached.into()),
-                                }).await;
+                                }).await {
+                                    warn!(target: "SubscriptionsApiModule", "Failed to send SubscriptionFailed (max subscriptions) response: {}", e);
+                                }
                                 continue;
                             }
 
@@ -545,69 +550,87 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             let subscription_id = Uuid::new_v4();
 
                             if let Err(e) = self.add_subscription(asset.clone(), sub_type.clone(), stream_sender.clone(), subscription_id).await {
-                                let _ = self.command_responder.send(CommandResponse::SubscriptionFailed {
+                                if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionFailed {
                                     command_id,
                                     error: Box::new(e),
-                                }).await;
+                                }).await {
+                                    warn!(target: "SubscriptionsApiModule", "Failed to send SubscriptionFailed (add_subscription) response: {}", e);
+                                }
                                 continue;
                             }
 
                             if let Err(e) = self.send_subscribe_message(&asset, period).await {
                                 let _ = self.remove_subscription(&asset, Some(subscription_id)).await;
-                                let _ = self.command_responder.send(CommandResponse::SubscriptionFailed {
+                                if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionFailed {
                                     command_id,
                                     error: Box::new(e.into()),
-                                }).await;
+                                }).await {
+                                    warn!(target: "SubscriptionsApiModule", "Failed to send SubscriptionFailed (send_subscribe) response: {}", e);
+                                }
                                 continue;
                             }
 
-                            let _ = self.command_responder.send(CommandResponse::SubscriptionSuccess {
+                            if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionSuccess {
                                 command_id,
                                 subscription_id,
                                 stream_receiver,
-                            }).await;
+                            }).await {
+                                warn!(target: "SubscriptionsApiModule", "Failed to send SubscriptionSuccess response: {}", e);
+                            }
                         }
                         Command::Unsubscribe { asset, subscription_id, command_id } => {
                             match self.remove_subscription(&asset, subscription_id).await {
                                 Ok(b) => {
                                     if b {
-                                        let _ = self.command_responder.send(CommandResponse::UnsubscriptionSuccess { command_id }).await;
+                                        if let Err(e) = self.command_responder.send(CommandResponse::UnsubscriptionSuccess { command_id }).await {
+                                            warn!(target: "SubscriptionsApiModule", "Failed to send UnsubscriptionSuccess response: {}", e);
+                                        }
                                     } else {
-                                        let _ = self.command_responder.send(CommandResponse::UnsubscriptionFailed {
+                                        if let Err(e) = self.command_responder.send(CommandResponse::UnsubscriptionFailed {
                                             command_id,
                                             error: Box::new(PocketError::General("Subscription not found".to_string())),
-                                        }).await;
+                                        }).await {
+                                            warn!(target: "SubscriptionsApiModule", "Failed to send UnsubscriptionFailed (not found) response: {}", e);
+                                        }
                                     }
                                 },
-                                Err(e) => {
-                                    let _ = self.command_responder.send(CommandResponse::UnsubscriptionFailed {
+                                Err(err) => {
+                                    if let Err(e) = self.command_responder.send(CommandResponse::UnsubscriptionFailed {
                                         command_id,
-                                        error: Box::new(e.into()),
-                                    }).await;
+                                        error: Box::new(err.into()),
+                                    }).await {
+                                        warn!(target: "SubscriptionsApiModule", "Failed to send UnsubscriptionFailed (error) response: {}", e);
+                                    }
                                 }
                             }
                         },
                         Command::SubscriptionCount { command_id } => {
                             let subscriptions = self.state.active_subscriptions.read().await;
                             let count = subscriptions.values().map(|v| v.len()).sum::<usize>() as u32;
-                            let _ = self.command_responder.send(CommandResponse::SubscriptionCount {
+                            if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionCount {
                                 command_id,
                                 count,
                                 max: self.state.max_subscriptions,
-                            }).await;
+                            }).await {
+                                warn!(target: "SubscriptionsApiModule", "Failed to send SubscriptionCount response: {}", e);
+                            }
                         },
                         Command::History { asset, period, command_id } => {
                             let is_duplicate = self.state.histories.read().await.iter().any(|(a, p, _)| a == &asset && *p == period);
                             if is_duplicate {
-                                let _ = self.command_responder.send(CommandResponse::HistoryFailed {
+                                if let Err(e) = self.command_responder.send(CommandResponse::HistoryFailed {
                                     command_id,
                                     error: Box::new(PocketError::General(format!("Duplicate history request for asset: {}, period: {}", asset, period))),
-                                }).await;
+                                }).await {
+                                    warn!(target: "SubscriptionsApiModule", "Failed to send HistoryFailed (duplicate) response: {}", e);
+                                }
                             } else if let Err(e) = self.send_subscribe_message(&asset, period).await {
-                                let _ = self.command_responder.send(CommandResponse::HistoryFailed {
+                                if let Err(e) = self.command_responder.send(CommandResponse::HistoryFailed {
                                     command_id,
                                     error: Box::new(e.into()),
-                                }).await;
+                                }).await {
+                                    warn!(target: "SubscriptionsApiModule", "Failed to send HistoryFailed (subscribe error) response: {}", e);
+                                }
                             } else {
                                 self.state.histories.write().await.push((asset, period, command_id));
                             }
@@ -691,16 +714,20 @@ impl ApiModule<State> for SubscriptionsApiModule {
 
                                     match candles_res {
                                         Ok(candles) => {
-                                            let _ = self.command_responder.send(CommandResponse::History {
+                                            if let Err(e) = self.command_responder.send(CommandResponse::History {
                                                 command_id,
                                                 data: candles
-                                            }).await;
+                                            }).await {
+                                                warn!(target: "SubscriptionsApiModule", "Failed to send History response: {}", e);
+                                            }
                                         }
                                         Err(e) => {
-                                            let _ = self.command_responder.send(CommandResponse::HistoryFailed {
+                                            if let Err(e) = self.command_responder.send(CommandResponse::HistoryFailed {
                                                 command_id,
                                                 error: Box::new(e)
-                                            }).await;
+                                            }).await {
+                                                warn!(target: "SubscriptionsApiModule", "Failed to send HistoryFailed response: {}", e);
+                                            }
                                         }
                                     }
                                 }
@@ -743,10 +770,12 @@ impl SubscriptionsApiModule {
         let mut histories_lock = self.state.histories.write().await;
         let pending = std::mem::take(&mut *histories_lock);
         for (_, _, command_id) in pending {
-            let _ = self
+            if let Err(e) = self
                 .command_responder
                 .send(CommandResponse::Shutdown { command_id })
-                .await;
+                .await {
+                warn!(target: "SubscriptionsApiModule", "Failed to send Shutdown response in notify_waiters: {}", e);
+            }
         }
 
         // Active streams should also be notified
@@ -754,9 +783,11 @@ impl SubscriptionsApiModule {
         let active = std::mem::take(&mut *subscriptions_lock);
         for (_, subs) in active {
             for (sender, _, _) in subs {
-                let _ = sender.send(SubscriptionEvent::Terminated {
+                if let Err(e) = sender.send(SubscriptionEvent::Terminated {
                     reason: "SubscriptionsApiModule stopped".to_string(),
-                }).await;
+                }).await {
+                    warn!(target: "SubscriptionsApiModule", "Failed to send Terminated event to stream: {}", e);
+                }
             }
         }
     }
@@ -820,11 +851,13 @@ impl SubscriptionsApiModule {
         };
 
         for stream_sender in removed_senders {
-            let _ = stream_sender
+            if let Err(e) = stream_sender
                 .send(SubscriptionEvent::Terminated {
                     reason: "Unsubscribed from main module".to_string(),
                 })
-                .await;
+                .await {
+                warn!(target: "SubscriptionsApiModule", "Failed to send Terminated event during remove_subscription: {}", e);
+            }
         }
 
         Ok(removed_at_least_one)
@@ -869,10 +902,10 @@ impl SubscriptionStream {
     }
 
     /// Unsubscribe from the stream
-    pub async fn unsubscribe(mut self) -> PocketResult<()> {
+    pub async fn unsubscribe(&self) -> PocketResult<()> {
         let command_id = Uuid::new_v4();
         let receiver = self.router.register(command_id).await;
-        if let Some(sender) = self.sender.take() {
+        if let Some(sender) = &self.sender {
             sender
                 .send(Command::Unsubscribe {
                     asset: self.asset.clone(),
@@ -968,7 +1001,11 @@ impl SubscriptionStream {
         }
     }
 
-    /// Convert to a futures Stream
+    /// Convert to a futures Stream.
+    ///
+    /// This method consumes the `SubscriptionStream` by value. After calling `to_stream()`,
+    /// cleanup is handled by the returned stream's `Drop` implementation, which will
+    /// automatically send an unsubscribe command when the stream is dropped.
     pub fn to_stream(self) -> impl futures_util::Stream<Item = PocketResult<Candle>> + 'static {
         Box::pin(unfold(self, |mut stream| async move {
             let result = stream.receive().await;

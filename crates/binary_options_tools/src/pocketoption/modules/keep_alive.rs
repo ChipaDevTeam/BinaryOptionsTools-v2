@@ -171,6 +171,7 @@ impl LightweightModule<State> for InitModule {
                                 r#"42["indicator/load"]"#.to_string(),
                                 r#"42["favorite/load"]"#.to_string(),
                                 r#"42["price-alert/load"]"#.to_string(),
+                                r#"42["getBalance"]"#.to_string(),
                                 format!(
                                     r#"42["changeSymbol",{{ "asset":"{}","period":60 }}]"#,
                                     self.state.default_symbol
