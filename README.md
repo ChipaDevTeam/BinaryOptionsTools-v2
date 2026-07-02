@@ -36,6 +36,14 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 - [Examples](#examples)
 - [Roadmap](#roadmap)
 - [Legal & Disclaimer](#legal-and-disclaimer)
+- [Known Bugs](#known-bugs)
+
+---
+
+## Known Bugs
+
+**Automatic email & password SSID fetching:**
+- 2FA may not be supported
 
 ---
 
