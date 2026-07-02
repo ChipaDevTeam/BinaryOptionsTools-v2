@@ -43,7 +43,7 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 ## Known Bugs
 
 **Automatic email & password SSID fetching:**
-- 2fa may not be supported
+- 2FA may not be supported
 
 ---
 
