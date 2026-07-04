@@ -145,7 +145,7 @@ git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
 cd BinaryOptionsTools-v2/python
 uv venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@main#subdirectory=python"
+uv pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@master#subdirectory=python"
 ```
 
 ### Rust
