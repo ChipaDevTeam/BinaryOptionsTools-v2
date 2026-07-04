@@ -189,7 +189,6 @@ release:
   image: python:3.13-bookworm
   tags:
     - linux
-  dependencies:
     - windows-x64
     - windows-x86
     - linux-x86_64-gnu
@@ -198,6 +197,8 @@ release:
     - linux-aarch64-musl
     - linux-armv7
     - sdist
+  # Note: macos-universal is omitted because this host has no macOS runner.
+  # Add it back once a macOS runner is available.
   script:
     - python3 -m pip install --quiet requests
     - python3 -c "import tomllib; print(tomllib.load(open('crates/bindings_pyo3/Cargo.toml','rb'))['package']['version'])" > version.txt
@@ -239,12 +240,12 @@ pypi-publish:
   image: python:3.13-bookworm
   tags:
     - linux
-  dependencies:
     - windows-x64
     - windows-x86
     - linux-x86_64-gnu
-    - macos-universal
     - sdist
+  # Note: macos-universal is omitted because this host has no macOS runner.
+  # Add it back once a macOS runner is available.
   script:
     - python3 -m pip install --quiet twine
     - twine upload python/dist/* --skip-existing --non-interactive
