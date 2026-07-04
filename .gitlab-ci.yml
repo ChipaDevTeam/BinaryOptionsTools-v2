@@ -233,6 +233,8 @@ pypi-publish:
   tags:
     - linux
   dependencies:
+    - windows-x64
+    - windows-x86
     - linux-x86_64-gnu
     - macos-universal
     - sdist
@@ -242,4 +244,3 @@ pypi-publish:
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
       when: manual
-  when: manual
