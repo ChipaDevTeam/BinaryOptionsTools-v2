@@ -83,27 +83,27 @@ const sidebars = {
         {
           type: 'link',
           label: 'Contributing',
-          href: 'https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/main/CONTRIBUTING.md',
+          href: 'https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/blob/master/CONTRIBUTING.md',
         },
         {
           type: 'link',
           label: 'Code of Conduct',
-          href: 'https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/main/CODE_OF_CONDUCT.md',
+          href: 'https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/blob/master/CODE_OF_CONDUCT.md',
         },
         {
           type: 'link',
           label: 'Security',
-          href: 'https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/main/SECURITY.md',
+          href: 'https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/blob/master/SECURITY.md',
         },
         {
           type: 'link',
           label: 'License',
-          href: 'https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/main/LICENSE',
+          href: 'https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/blob/master/LICENSE',
         },
         {
           type: 'link',
           label: 'Acknowledgments',
-          href: 'https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/blob/main/ACKNOWLEDGMENTS.md',
+          href: 'https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/blob/master/ACKNOWLEDGMENTS.md',
         },
         'project/deployment',
         'project/breaking-changes-0.2.6',

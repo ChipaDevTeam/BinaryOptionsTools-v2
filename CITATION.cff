@@ -9,8 +9,8 @@ authors:
   - family-names: "Rick"
     given-names: "Rick-29"
     alias: "Rick-29"
-repository-code: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
-url: "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+repository-code: "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"
+url: "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/"
 license: "BSD-3-Clause"
 keywords:
   - "binary options"
@@ -26,8 +26,8 @@ keywords:
 version: "0.2.9"
 identifiers:
   - type: url
-    value: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
-    description: "GitHub repository"
+    value: "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"
+    description: "GitLab repository"
   - type: url
     value: "https://pypi.org/project/binaryoptionstoolsv2/"
     description: "PyPI package"
@@ -41,4 +41,4 @@ preferred-citation:
       given-names: "Rick-29"
       alias: "Rick-29"
   year: 2026
-  url: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+  url: "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"

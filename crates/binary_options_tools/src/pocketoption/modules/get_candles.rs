@@ -481,7 +481,9 @@ impl ApiModule<State> for GetCandlesApiModule {
                         }
                         Err(_) => {
                             self.notify_waiters_module_stopped().await;
-                            break;
+                            return Err(binary_options_tools_core::error::CoreError::Other(
+                                "WebSocket receiver closed".to_string(),
+                            ));
                         }
                     }
                 }
@@ -681,8 +683,37 @@ impl GetCandlesApiModule {
                         }
                     }
 
-                    let candles =
-                        compile_candles_from_ticks(&history_items, requested_period, &asset);
+                    let mut candles: Vec<Candle> = Vec::new();
+                    let mut ticks_to_compile: Vec<HistoryItem> = Vec::new();
+
+                    for item in history_items {
+                        match item {
+                            HistoryItem::Candle(c) => {
+                                candles.push(Candle {
+                                    symbol: asset.clone(),
+                                    timestamp: c.timestamp,
+                                    open: rust_decimal::prelude::FromPrimitive::from_f64(c.open).unwrap_or_default(),
+                                    high: rust_decimal::prelude::FromPrimitive::from_f64(c.high).unwrap_or_default(),
+                                    low: rust_decimal::prelude::FromPrimitive::from_f64(c.low).unwrap_or_default(),
+                                    close: rust_decimal::prelude::FromPrimitive::from_f64(c.close).unwrap_or_default(),
+                                    volume: if c.volume > 0.0 {
+                                        rust_decimal::prelude::FromPrimitive::from_f64(c.volume)
+                                    } else {
+                                        None
+                                    },
+                                    is_closed: true,
+                                });
+                            }
+                            other => {
+                                ticks_to_compile.push(other);
+                            }
+                        }
+                    }
+
+                    if !ticks_to_compile.is_empty() {
+                        let compiled = compile_candles_from_ticks(&ticks_to_compile, requested_period, &asset);
+                        candles.extend(compiled);
+                    }
 
                     if let Err(e) = self
                         .command_responder

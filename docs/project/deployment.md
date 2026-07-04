@@ -3,19 +3,19 @@ sidebar_position: 1
 slug: /project/deployment
 ---
 
-# GitHub Pages Deployment Guide
+# GitLab Pages Deployment Guide
 
-This documentation site is deployed to GitHub Pages using Docusaurus.
+This documentation site is deployed to GitLab Pages using Docusaurus.
 
 ## Quick Deployment Steps
 
 ### 1. Enable GitHub Pages
 
-1. Go to your repository on GitHub
+1. Go to your repository on GitLab
 2. Click on **Settings** tab
 3. Scroll down to **Pages** section
 4. Under **Source**, select **Deploy from a branch**
-5. Choose **gh-pages** branch and **/ (root)** folder
+5. Choose `master` branch and `/` folder
 6. Click **Save**
 
 ### 2. Configure Docusaurus
@@ -23,15 +23,14 @@ This documentation site is deployed to GitHub Pages using Docusaurus.
 Update `docusaurus.config.js` with your project details:
 
 ```javascript
-url: 'https://chipadevteam.github.io',
-baseUrl: '/BinaryOptionsTools-v2/',
-organizationName: 'ChipaDevTeam',
+url: 'https://chipatrade.gitlab.io',
+baseUrl: '/chipadevorg/BinaryOptionsTools-v2/',
+organizationName: 'chipadevorg',
 projectName: 'BinaryOptionsTools-v2',
 ```
 
 ### 3. Deploy
-
-The site is automatically deployed via GitHub Actions on push to main branch.
+The site is automatically deployed via GitLab CI on push to master branch.
 
 Manual deployment:
 ```bash
@@ -47,47 +46,25 @@ npm run deploy
    ```
 2. Configure DNS settings with your domain provider
 
-## GitHub Actions Workflow
+## GitLab CI Workflow
 
-The deployment is handled by `.github/workflows/deploy.yml`:
+The deployment is handled by `.gitlab-ci.yml`:
 
 ```yaml
-name: Deploy to GitHub Pages
+stages:
+  - build
 
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: build
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+pages:
+  stage: build
+  image: node:20-bookworm
+  script:
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - public
+  only:
+    - master
 ```
 
 ## Features Enabled
@@ -150,10 +127,10 @@ Edit CSS custom properties in `src/css/custom.css`:
 
 ### Site not loading?
 
-1. Check if GitHub Pages is enabled in repository settings
-2. Ensure the branch and folder are correctly selected (gh-pages / root)
+1. Check if GitLab Pages is enabled in repository settings
+2. Ensure the branch and folder are correctly selected (master / public)
 3. Wait 5-10 minutes for changes to propagate
-4. Check GitHub Actions build logs
+4. Check GitLab CI build logs
 
 ### Styles not loading?
 

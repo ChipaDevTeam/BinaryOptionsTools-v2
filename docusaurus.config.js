@@ -7,15 +7,14 @@ const config = {
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-  url: 'https://chipadevteam.github.io',
+  url: 'https://chipatrade.gitlab.io',
   // Set the /<baseUrl>/ pathname under which your site is served
-  // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/BinaryOptionsTools-v2/',
+  // For GitLab Pages deployment, it is often '/<projectName>/'
+  baseUrl: '/chipadevorg/BinaryOptionsTools-v2/',
 
-  // GitHub pages deployment config.
-  organizationName: 'ChipaDevTeam',
+  // GitLab pages deployment config.
+  organizationName: 'chipadevorg',
   projectName: 'BinaryOptionsTools-v2',
-
   onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
 
@@ -35,7 +34,7 @@ const config = {
         docs: {
           sidebarPath: './sidebars.js',
           routeBasePath: '/',
-          editUrl: 'https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/main/docs/',
+          editUrl: 'https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/',
         },
         blog: false,
         theme: {
@@ -74,8 +73,8 @@ const config = {
             position: 'left',
           },
           {
-            href: 'https://github.com/ChipaDevTeam/BinaryOptionsTools-v2',
-            label: 'GitHub',
+            href: 'https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2',
+            label: 'GitLab',
             position: 'right',
           },
           {
@@ -114,7 +113,8 @@ const config = {
               },
               {
                 label: 'GitHub Issues',
-                href: 'https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues',
+                label: 'GitLab Issues',
+                href: 'https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues',
               },
             ],
           },
@@ -123,7 +123,8 @@ const config = {
             items: [
               {
                 label: 'GitHub',
-                href: 'https://github.com/ChipaDevTeam/BinaryOptionsTools-v2',
+                label: 'GitLab',
+                href: 'https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2',
               },
               {
                 label: 'PyPI',

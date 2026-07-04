@@ -126,11 +126,12 @@ class PocketOption:
             _: Additional keyword arguments forwarded to the async client.
         """
         self._lock = threading.RLock()
-        self._loop = asyncio.new_event_loop()
-        def _run_loop():
-            asyncio.set_event_loop(self._loop)
-            self._loop.run_forever()
-        self._loop_thread = threading.Thread(target=_run_loop, daemon=True)
+        loop = asyncio.new_event_loop()
+        self._loop = loop
+        def _run_loop(loop_to_run):
+            asyncio.set_event_loop(loop_to_run)
+            loop_to_run.run_forever()
+        self._loop_thread = threading.Thread(target=_run_loop, args=(loop,), daemon=True)
         self._loop_thread.start()
         self._client = PocketOptionAsync(ssid, url=url, config=config)
         future = asyncio.run_coroutine_threadsafe(self._client.wait_for_assets(), self._loop)

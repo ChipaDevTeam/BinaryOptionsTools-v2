@@ -58,7 +58,7 @@ docs/
 - [API Reference](/api/reference)
 - [Python API](/api/python)
 - [Examples](/examples)
-- [GitHub Repository](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2)
+- [GitLab Repository](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
 - [Discord Community](https://discord.gg/p7YyFqSmAz)
 - [PyPI Package](https://pypi.org/project/BinaryOptionsToolsV2/)
 - [crates.io](https://crates.io/crates/binary_options_tools)

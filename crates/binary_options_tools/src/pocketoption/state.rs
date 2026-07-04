@@ -417,6 +417,15 @@ impl TradeState {
         self.closed_deals.read().await.get(&deal_id).cloned()
     }
 
+    /// Non-blocking check of a closed deal by its ID.
+    pub fn try_get_closed_deal(&self, deal_id: &Uuid) -> Option<Deal> {
+        if let Ok(guard) = self.closed_deals.try_read() {
+            guard.get(deal_id).cloned()
+        } else {
+            None
+        }
+    }
+
     /// Retrieves a pending deal by its ID.
     pub async fn get_pending_deal(&self, deal_id: Uuid) -> Option<PendingOrder> {
         self.pending_deals.read().await.get(&deal_id).cloned()

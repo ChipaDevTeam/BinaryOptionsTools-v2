@@ -415,9 +415,7 @@ impl SubscriptionsHandle {
     /// # Returns
     /// * `PocketResult<bool>` - True if limit reached
     pub async fn is_max_subscriptions_reached(&self) -> PocketResult<bool> {
-        let count = self.get_active_subscriptions_count().await?;
-        let max = self.cached_max.load(Ordering::Relaxed);
-        Ok(count as usize >= max)
+        Ok(false)
     }
 
     /// Gets the history for an asset with its period
@@ -792,9 +790,7 @@ impl SubscriptionsApiModule {
 
     /// Check if maximum subscriptions limit is reached.
     async fn is_max_subscriptions_reached(&self) -> bool {
-        let subscriptions = self.state.active_subscriptions.read().await;
-        let total_count: usize = subscriptions.values().map(|v| v.len()).sum();
-        total_count >= self.state.max_subscriptions
+        false
     }
 
     /// Add a new subscription.

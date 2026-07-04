@@ -1,0 +1,249 @@
+stages:
+  - build
+  - docs
+  - release
+  - deploy
+
+.defaults: &defaults
+  image: rust:1.82-bookworm
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .cargo/registry
+      - .cargo/git
+      - target/
+      - python/dist/
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq python3 python3-pip python3-venv git curl
+    - python3 -m pip install --quiet maturin wheel
+
+variables:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+# Linux cross-compilation matrix
+.build-linux:
+  stage: build
+  image: python:3.13-bookworm
+  tags:
+    - linux
+  variables:
+    MATURIN_ARGS: "--release --strip --out dist -i python3.13 --zig"
+  before_script:
+    - python3 -m pip install --quiet maturin
+    - curl -fsSL https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz -o /tmp/zig.tar.xz
+    - tar -xf /tmp/zig.tar.xz -C /tmp
+    - echo "/tmp/zig-linux-x86_64-0.13.0" >> $CI_ENVIRONMENT_PATH
+  script:
+    - cd python
+    - |
+      case "$TARGET" in
+        x86_64-unknown-linux-gnu)    MANYLIB="manylinux_2_28"; ZIG_TARGET="x86_64-linux-gnu";;
+        x86_64-unknown-linux-musl)   MANYLIB="musllinux_1_1"; ZIG_TARGET="x86_64-linux-musl";;
+        aarch64-unknown-linux-gnu)   MANYLIB="manylinux_2_28"; ZIG_TARGET="aarch64-linux-gnu";;
+        aarch64-unknown-linux-musl)  MANYLIB="musllinux_1_1"; ZIG_TARGET="aarch64-linux-musl";;
+        armv7-unknown-linux-gnueabihf) MANYLIB="manylinux_2_28"; ZIG_TARGET="arm-linux-gnueabihf";;
+      esac
+    - maturin build $MATURIN_ARGS --target $TARGET --manylinux $MANYLIB
+  artifacts:
+    paths:
+      - python/dist/*.whl
+    expire_in: 7 days
+
+linux-x86_64-gnu:
+  extends: .build-linux
+  variables:
+    TARGET: x86_64-unknown-linux-gnu
+  allow_failure: true
+
+linux-x86_64-musl:
+  extends: .build-linux
+  variables:
+    TARGET: x86_64-unknown-linux-musl
+  allow_failure: true
+
+linux-aarch64-gnu:
+  extends: .build-linux
+  variables:
+    TARGET: aarch64-unknown-linux-gnu
+  allow_failure: true
+
+linux-aarch64-musl:
+  extends: .build-linux
+  variables:
+    TARGET: aarch64-unknown-linux-musl
+  allow_failure: true
+
+linux-armv7:
+  extends: .build-linux
+  variables:
+    TARGET: armv7-unknown-linux-gnueabihf
+  allow_failure: true
+
+# Windows builds
+.build-windows:
+  stage: build
+  image: python:3.13-windowsservercore-ltsc2022
+  tags:
+    - windows
+  variables:
+    RUSTC_WRAPPER: ""
+  before_script:
+    - python -m pip install --quiet maturin wheel
+    - rustup-init -y --default-toolchain stable
+    - echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+  script:
+    - cd python
+    - set PYO3_PYTHON=python
+    - maturin build --release --strip --out dist -i python --target %TARGET%
+  artifacts:
+    paths:
+      - python/dist/*.whl
+    expire_in: 7 days
+
+windows-x64:
+  extends: .build-windows
+  variables:
+    TARGET: x86_64-pc-windows-msvc
+
+windows-x86:
+  extends: .build-windows
+  variables:
+    TARGET: i686-pc-windows-msvc
+  allow_failure: true
+
+# macOS universal2
+.build-macos:
+  stage: build
+  image: ghcr.io/cirruslabs/macos-ventura-base:latest
+  tags:
+    - macos
+  before_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    - python3 -m pip install --quiet maturin
+  script:
+    - cd python
+    - maturin build --release --strip --out dist -i python3.13 --target universal2-apple-darwin
+  artifacts:
+    paths:
+      - python/dist/*.whl
+    expire_in: 7 days
+
+macos-universal:
+  extends: .build-macos
+
+# Source distribution
+sdist:
+  stage: build
+  image: rust:1.82-bookworm
+  tags:
+    - linux
+  before_script:
+    - python3 -m pip install --quiet maturin
+  script:
+    - cd python && maturin sdist --out dist
+  artifacts:
+    paths:
+      - python/dist/*.tar.gz
+    expire_in: 7 days
+
+# Documentation build
+pages:
+  stage: docs
+  image: node:20-bookworm
+  tags:
+    - linux
+  before_script:
+    - npm ci
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - public
+    expire_in: 7 days
+  only:
+    - main
+    - master
+  dependencies: []
+
+# Release job
+release:
+  stage: release
+  image: python:3.13-bookworm
+  tags:
+    - linux
+  dependencies:
+    - linux-x86_64-gnu
+    - linux-x86_64-musl
+    - linux-aarch64-gnu
+    - linux-aarch64-musl
+    - linux-armv7
+    - windows-x64
+    - windows-x86
+    - macos-universal
+    - sdist
+  script:
+    - python3 -m pip install --quiet requests
+    - python3 -c "import tomllib; print(tomllib.load(open('crates/bindings_pyo3/Cargo.toml','rb'))['package']['version'])" > version.txt
+    - |
+      TAG="v$(cat version.txt)"
+    - echo "Creating/updating release $TAG"
+    - |
+      curl --header "PRIVATE-TOKEN: ${RELEASE_TOKEN}" \
+        --data "name=$TAG" \
+        --data "tag_name=$TAG" \
+        --data "ref=refs/heads/master" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
+  artifacts:
+    paths:
+      - python/dist/*
+    expire_in: 7 days
+
+deploy:
+  stage: deploy
+  image: node:20-bookworm
+  tags:
+    - linux
+  script:
+    - echo "Deploy to GitLab Pages/"
+  environment:
+    name: production
+    url: https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+  dependencies:
+    - pages
+  when: manual
+
+# PyPI publish
+pypi-publish:
+  stage: deploy
+  image: python:3.13-bookworm
+  tags:
+    - linux
+  dependencies:
+    - linux-x86_64-gnu
+    - linux-x64
+    - macos-universal
+    - sdist
+  script:
+    - python3 -m pip install --quiet twine
+    - twine upload python/dist/* --skip-existing --non-interactive
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual
+  when: manual
+  only:
+    - main
+    - master

@@ -23,7 +23,7 @@ dotnet add package BinaryOptionsToolsUni
 ### Go
 
 ```bash
-go get github.com/ChipaDevTeam/BinaryOptionsTools-v2/bindings/go
+go get gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/bindings/go
 ```
 
 ### Kotlin
@@ -50,9 +50,9 @@ gem install binaryoptionstoolsuni
 
 ```swift
 // Add to Package.swift
-dependencies: [
-    .package(url: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2", from: "0.1.0")
-]
+dependencies: {
+    .package(url: "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2", from: "0.1.0")
+}
 ```
 
 ## 🚀 Quick Start
@@ -254,7 +254,7 @@ Comprehensive API documentation with examples in all supported languages:
 
 ```bash
 # Clone the repository
-git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git
+git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
 cd BinaryOptionsTools-v2/BinaryOptionsToolsUni
 
 # Build the Rust library
@@ -292,11 +292,8 @@ This software is provided "AS IS" without warranty. The authors and ChipaDevTeam
 
 Binary options trading carries significant risk. Use at your own risk.
 
-## 🆘 Support
-
-- **Discord**: [Join our community](https://discord.gg/p7YyFqSmAz)
-- **GitHub Issues**: [Report bugs](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues)
-- **Documentation**: [Full docs](https://chipadevteam.github.io/BinaryOptionsTools-v2/)
+- **GitLab Issues**: [Report bugs](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
+- **Documentation**: [Full docs](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)
 
 ## 🔗 Related Projects
 

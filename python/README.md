@@ -38,7 +38,7 @@ Supports **Python 3.8 to 3.13**.
 
 - Install [`maturin`](https://www.maturin.rs/installation) in order to compile the library
 
-- Once the source is downloaded (using `git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git`) execute the following commands:
+- Once the source is downloaded (using `git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git`) execute the following commands:
   To create the `.whl` file
 
 ```bash
@@ -490,8 +490,8 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 
 ## 📚 Additional Resources
 
-- **Full Examples**: [docs/examples/python](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/docs/examples/python)
-- **API Documentation**: [https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html](https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html)
+- **Full Examples**: [docs/examples/python](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/examples/python)
+- **API Documentation**: [https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html)
 - **Discord Community**: [Join us](https://discord.gg/T3FGXcmd)
 
 ## ⚠️ Risk Warning

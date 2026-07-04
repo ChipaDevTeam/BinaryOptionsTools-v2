@@ -92,6 +92,19 @@ class TestDemoConnection:
         print(f"  First candle: {first}")
 
     @pytest.mark.asyncio
+    async def test_compile_candles(self, api):
+        """Test compiling custom-period candles from tick history."""
+        candles = await api.compile_candles("EURUSD_otc", 20, 300)
+        print(f"  Compiled {len(candles)} custom 20s candles")
+        assert isinstance(candles, list), "Expected list of candles"
+        assert len(candles) > 0, "Expected at least one compiled candle"
+        first = candles[0]
+        print(f"  First compiled candle: {first}")
+        assert "timestamp" in first or "time" in first, "Expected timestamp/time in compiled candle"
+        for key in ["open", "high", "low", "close"]:
+            assert key in first, f"Expected key '{key}' in compiled candle"
+
+    @pytest.mark.asyncio
     async def test_subscribe(self, api):
         """Test subscribing to a symbol and receiving data."""
         stream = await api.subscribe_symbol("EURUSD_otc")
@@ -103,6 +116,23 @@ class TestDemoConnection:
         finally:
             if hasattr(stream, "cancel"):
                 stream.cancel()
+
+    @pytest.mark.asyncio
+    async def test_many_subscriptions(self, api):
+        """Test subscribing to more than 4 symbols concurrently to prove the limit is removed."""
+        assets = ["EURUSD_otc", "AUDJPY_otc", "USDCAD_otc", "XNGUSD_otc", "ETHUSD_otc"]
+        streams = []
+        try:
+            for asset in assets:
+                print(f"  Subscribing to {asset}...")
+                stream = await api.subscribe_symbol(asset)
+                streams.append(stream)
+            print(f"  Successfully subscribed to {len(streams)} assets concurrently.")
+            assert len(streams) == len(assets), "Expected to subscribe to all assets"
+        finally:
+            for stream in streams:
+                if hasattr(stream, "cancel"):
+                    stream.cancel()
 
 
 @pytest.mark.asyncio

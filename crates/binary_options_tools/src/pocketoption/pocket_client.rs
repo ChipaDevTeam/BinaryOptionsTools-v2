@@ -623,6 +623,11 @@ impl PocketOption {
         self.client.state.trade_state.get_closed_deal(deal_id).await
     }
 
+    /// Non-blocking check of a closed deal by its ID.
+    pub fn try_get_settled_deal(&self, deal_id: &Uuid) -> Option<Deal> {
+        self.client.state.trade_state.try_get_closed_deal(deal_id)
+    }
+
     /// Opens a pending order.
     /// # Arguments
     /// * `open_type` - The type of the pending order.
@@ -987,7 +992,7 @@ impl PocketOption {
     /// Shuts down the client and stops the runner.
     pub async fn shutdown_owned(self) -> PocketResult<()> {
         self._runner.abort();
-        self.client.shutdown().await.map_err(PocketError::from)
+        self.client.clone().shutdown().await.map_err(PocketError::from)
     }
 
     pub async fn new_testing_wrapper(ssid: impl ToString) -> PocketResult<TestingWrapper<State>> {
@@ -1004,6 +1009,14 @@ impl PocketOption {
             .await?;
 
         Ok(builder)
+    }
+}
+
+impl Drop for PocketOption {
+    fn drop(&mut self) {
+        if Arc::strong_count(&self._runner) == 1 {
+            self._runner.abort();
+        }
     }
 }
 

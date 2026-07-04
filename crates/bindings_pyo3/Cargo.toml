@@ -4,9 +4,9 @@ version = "0.2.12"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 description = "Python bindings for binary-options-tools. High-performance library for PocketOption trading automation with async/sync support, real-time data streaming, and WebSocket API access."
-homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
-repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
-documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html"
+homepage = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2"
+repository = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"
+documentation = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html"
 readme = "Readme.md"
 keywords = ["binary-options", "pocketoption", "trading", "python", "pyo3"]
 categories = ["api-bindings"]
@@ -18,7 +18,7 @@ crate-type = ["cdylib"]
 test = false
 
 [dependencies]
-pyo3 = { version = "0.29.0", features = ["abi3-py39"] }
+pyo3 = { version = "0.29.0", features = ["abi3-py310"] }
 pyo3-async-runtimes = { version = "0.29.0", features = ["tokio-runtime"] }
 
 binary_options_tools = { path = "../binary_options_tools", version = "0.2.12" }

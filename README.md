@@ -130,19 +130,19 @@ Install directly from our GitHub releases. Supports **Python 3.9 - 3.12**.
 **Windows**
 
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.12/binaryoptionstoolsv2-0.2.12-cp39-abi3-win_amd64.whl"
+pip install "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.12/downloads/binaryoptionstoolsv2-0.2.12-cp39-abi3-win_amd64.whl"
 ```
 
 **Linux**
 
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.12/binaryoptionstoolsv2-0.2.12-cp39-abi3-manylinux_2_28_x86_64.whl"
+pip install "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.12/downloads/binaryoptionstoolsv2-0.2.12-cp39-abi3-manylinux_2_28_x86_64.whl"
 ```
 
 **macOS (Apple Silicon)**
 
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.12/binaryoptionstoolsv2-0.2.12-cp39-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
+pip install "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.12/downloads/binaryoptionstoolsv2-0.2.12-cp39-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
 ```
 
 #### Option B: Build from Source
@@ -150,7 +150,7 @@ pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/down
 Requires `rustc`, `cargo`, and `maturin`.
 
 ```bash
-git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git
+git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
 cd BinaryOptionsTools-v2/python
 pip install maturin
 maturin develop --release
@@ -161,7 +161,7 @@ maturin develop --release
 Requires `rustc`, `cargo`, and `maturin`.
 
 ```bash
-pip install git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git#subdirectory=python
+pip install git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git#subdirectory=python
 ```
 
 ### Rust
@@ -336,4 +336,4 @@ We welcome contributions!
 
 ---
 
-[Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/) | [API Reference](https://chipadevteam.github.io/BinaryOptionsTools-v2/api/reference.md) | [Discord Community](https://discord.com/invite/p7YyFqSmAz) | [Agents & AI](agents/AGENTS.md)
+[Documentation](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/) | [API Reference](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/api/reference.md) | [Discord Community](https://discord.com/invite/p7YyFqSmAz) | [Agents & AI](agents/AGENTS.md)

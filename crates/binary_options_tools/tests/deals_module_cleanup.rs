@@ -85,7 +85,14 @@ async fn test_deals_module_cleanup_on_stop() {
             other => panic!("Expected ModuleStopped error, got {:?}", other),
         }
 
-        module_handle.await.unwrap().unwrap();
+        let module_res = module_handle.await.unwrap();
+        match module_res {
+            Ok(_) => {}
+            Err(e) => {
+                let err_str = e.to_string();
+                assert!(err_str.contains("WebSocket receiver closed") || err_str.contains("Command receiver closed"), "Unexpected module error: {:?}", e);
+            }
+        }
     })
     .await;
 

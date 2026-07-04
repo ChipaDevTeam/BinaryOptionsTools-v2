@@ -189,7 +189,7 @@ impl<'de> Deserialize<'de> for CandleItem {
                     .ok_or_else(|| serde::de::Error::invalid_length(4, &self))?;
                 let volume = seq
                     .next_element()?
-                    .ok_or_else(|| serde::de::Error::invalid_length(5, &self))?;
+                    .unwrap_or(0.0);
 
                 Ok(CandleItem {
                     timestamp,

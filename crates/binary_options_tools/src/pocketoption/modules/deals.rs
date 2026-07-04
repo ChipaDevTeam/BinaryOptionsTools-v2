@@ -385,7 +385,9 @@ impl ApiModule<State> for DealsApiModule {
                         Err(_) => {
                             tracing::info!("DealsApiModule: WebSocket receiver closed, shutting down...");
                             self.notify_waiters_module_stopped();
-                            break;
+                            return Err(binary_options_tools_core::error::CoreError::Other(
+                                "WebSocket receiver closed".to_string(),
+                            ));
                         }
                     }
                 }
