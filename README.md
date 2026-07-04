@@ -31,12 +31,13 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
   - [Async API](#async-api-recommended)
-  - [Bot Framework](#bot-framework--strategy-high-level)
+  - [Bot Framework](#bot-framework)
   - [Data Streaming](#real-time-data-streaming)
 - [Advanced Usage](#advanced-usage)
 - [Examples](#examples)
 - [Roadmap](#roadmap)
-- [Legal & Disclaimer](#legal-and-disclaimer)
+- [Contributing](#contributing)
+- [Legal & Disclaimer](#legal--disclaimer)
 - [Known Bugs](#known-bugs)
 
 ---
@@ -123,45 +124,22 @@ graph TD
 
 ### Python
 
-#### Option A: Prebuilt Wheels (Recommended)
-
-Install directly from our GitHub releases. Supports **Python 3.9 - 3.12**.
-
-**Windows**
-
-```bash
-pip install "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.12/downloads/binaryoptionstoolsv2-0.2.12-cp39-abi3-win_amd64.whl"
-```
-
-**Linux**
-
-```bash
-pip install "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.12/downloads/binaryoptionstoolsv2-0.2.12-cp39-abi3-manylinux_2_28_x86_64.whl"
-```
-
-**macOS (Apple Silicon)**
-
-```bash
-pip install "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.12/downloads/binaryoptionstoolsv2-0.2.12-cp39-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
-```
-
-#### Option B: Build from Source
-
-Requires `rustc`, `cargo`, and `maturin`.
+#### Option A: Install from Source (Recommended)
 
 ```bash
 git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
 cd BinaryOptionsTools-v2/python
-pip install maturin
-maturin develop --release
+git fetch --tags
+git checkout "$(git tag -l --sort=-v:refname | head -n 1)"
+pip install .
 ```
 
-#### Option C: Build from Source Automatically
+#### Option B: Install from Source Automatically
 
-Requires `rustc`, `cargo`, and `maturin`.
+Requires `git`, a C toolchain, and a Rust toolchain.
 
 ```bash
-pip install git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git#subdirectory=python
+pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@main#subdirectory=python"
 ```
 
 ### Rust
@@ -170,7 +148,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-binary_options_tools = { path = "crates/binary_options_tools" }
+binary_options_tools = { git = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git" }
 ```
 
 ---
@@ -197,7 +175,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### Bot Framework & Strategy (High-Level)
+### Bot Framework
 
 Implement the `Strategy` trait (Rust) or inherit from `PyStrategy` (Python) for structured bot development.
 
@@ -301,7 +279,7 @@ UniFFI-generated examples for Go, Kotlin, Swift, Ruby, C#, and Rust are availabl
 - [x] **Framework**: Bot & Strategy System
 - [x] **Backtesting**: Virtual Market Simulator
 - [ ] **Platform**: IQ Option Integration
-- [x] **Core**: Multi-language support via UniFFI (Kotlin, Swift, Go, C#)
+- [x] **Core**: Multi-language support via UniFFI (Kotlin, Swift, C#)
 - [ ] **Core**: JavaScript/TypeScript Bindings
 - [ ] **Core**: WebAssembly (WASM) Support
 - [ ] **Tools**: Advanced Strategy Optimizer
@@ -318,7 +296,7 @@ We welcome contributions!
 
 ---
 
-## Legal and Disclaimer
+## Legal & Disclaimer
 
 ### License
 
