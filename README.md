@@ -131,7 +131,9 @@ git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
 cd BinaryOptionsTools-v2/python
 git fetch --tags
 git checkout "$(git tag -l --sort=-v:refname | head -n 1)"
-pip install .
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install .
 ```
 
 #### Option B: Install from Source Automatically
@@ -139,7 +141,11 @@ pip install .
 Requires `git`, a C toolchain, and a Rust toolchain.
 
 ```bash
-pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@main#subdirectory=python"
+git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
+cd BinaryOptionsTools-v2/python
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@main#subdirectory=python"
 ```
 
 ### Rust
@@ -152,7 +158,6 @@ binary_options_tools = { git = "https://gitlab.chipatrade.com/chipadevorg/Binary
 ```
 
 ---
-
 ## Quick Start
 
 ### Async API (Recommended)
