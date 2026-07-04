@@ -18,10 +18,22 @@ Python bindings for BinaryOptionsTools - A powerful library for automated binary
 
 ## How to install
 
-Install it via PyPI:
+### Option A: Install from Source (Recommended)
 
 ```bash
-pip install binaryoptionstoolsv2
+git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
+cd BinaryOptionsTools-v2/python
+git fetch --tags
+git checkout "$(git tag -l --sort=-v:refname | head -n 1)"
+pip install .
+```
+
+### Option B: Install from Source Automatically
+
+Requires `git`, a C toolchain, and a Rust toolchain.
+
+```bash
+pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@main#subdirectory=python"
 ```
 
 ## Supported OS
@@ -32,37 +44,8 @@ Currently supported on **Windows**, **Linux**, and **macOS**.
 
 Supports **Python 3.8 to 3.13**.
 
-## Compile from source (Not recommended)
-
-- Make sure you have `rust` and `cargo` installed ([Check here](https://www.rust-lang.org/tools/install))
-
-- Install [`maturin`](https://www.maturin.rs/installation) in order to compile the library
-
-:- Once the source is downloaded (using `git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git`) execute the following commands:
-  To create the `.whl` file
-
-```bash
-# Inside the root folder
-cd BinaryOptionsToolsV2
-maturin build -r
-
-# Once the command is executed it should print a path to a .whl file, copy it and then run
-pip install path/to/file.whl
-```
-
-To install the library in a local virtual environment
-
-```bash
-# Inside the root folder
-cd BinaryOptionsToolsV2
-
-# Activate the virtual environment if not done already
-
-# Execute the following command and it should automatically install the library in the VM
-maturin develop
-```
-
 ## Docs
+
 
 Comprehensive Documentation for BinaryOptionsToolsV2
 
