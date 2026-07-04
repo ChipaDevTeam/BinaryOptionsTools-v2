@@ -55,7 +55,7 @@ manifest-path = "../crates/bindings_pyo3/Cargo.toml"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["../tests"]
+testpaths = ["../tests/python"]
 
 [tool.ruff]
 line-length = 120

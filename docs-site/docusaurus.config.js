@@ -4,7 +4,7 @@ import { themes as prismThemes } from 'prism-react-renderer';
 const config = {
   title: 'BinaryOptionsTools V2',
   tagline: 'The most advanced binary options trading library for Python, JavaScript, and Rust.',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/favicon.svg',
 
   // Set the production url of your site here
   url: 'https://chipatrade.gitlab.io',
@@ -33,6 +33,7 @@ const config = {
       ({
         docs: {
           sidebarPath: './sidebars.js',
+          path: '../docs',
           routeBasePath: '/',
           editUrl: 'https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/',
         },

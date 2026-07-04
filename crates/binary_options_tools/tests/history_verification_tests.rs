@@ -15,6 +15,7 @@ async fn test_history_validation_and_compilation() {
     let (resp_tx, resp_rx) = bounded_async(10);
     let (msg_tx, msg_rx) = bounded_async(10);
     let (ws_tx, ws_rx) = bounded_async(10);
+    let (runner_tx, _runner_rx) = bounded_async(10);
 
     // Create shared state
     let dummy_ssid_str =
@@ -28,7 +29,7 @@ async fn test_history_validation_and_compilation() {
     );
 
     // Initialize the module
-    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
     // Spawn the module loop
     tokio::spawn(async move {
@@ -111,11 +112,11 @@ async fn test_history_validation_and_compilation() {
 
             // Check first candle (bucket 1769988840)
             // Timestamp represents the start of the period
-            assert_eq!(candles[0].timestamp, 1769988840.0);
+            assert_eq!(candles[0].timestamp, 1769988840_i64);
 
             // Check second candle (bucket 1769988900)
             // Timestamp represents the start of the period
-            assert_eq!(candles[1].timestamp, 1769988900.0);
+            assert_eq!(candles[1].timestamp, 1769988900_i64);
         }
         _ => panic!("Expected Candles response"),
     }
@@ -128,6 +129,7 @@ async fn test_candle_format_ochlv() {
     let (resp_tx, resp_rx) = bounded_async(10);
     let (msg_tx, msg_rx) = bounded_async(10);
     let (ws_tx, ws_rx) = bounded_async(10);
+    let (runner_tx, _runner_rx) = bounded_async(10);
 
     // Create shared state
     let dummy_ssid_str =
@@ -141,7 +143,7 @@ async fn test_candle_format_ochlv() {
     );
 
     // Initialize the module
-    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
     // Spawn the module loop
     tokio::spawn(async move {
@@ -185,7 +187,7 @@ async fn test_candle_format_ochlv() {
     if let CommandResponse::Candles { candles, .. } = response {
         assert_eq!(candles.len(), 1);
         let c = &candles[0];
-        assert_eq!(c.timestamp, 1769988660.0);
+        assert_eq!(c.timestamp, 1769988660_i64);
         assert_eq!(c.open.to_string(), "0.89232");
         assert_eq!(c.close.to_string(), "0.89176");
         assert_eq!(c.high.to_string(), "0.89271");
@@ -203,6 +205,7 @@ async fn test_ticks_request() {
     let (resp_tx, resp_rx) = bounded_async(10);
     let (msg_tx, msg_rx) = bounded_async(10);
     let (ws_tx, ws_rx) = bounded_async(10);
+    let (runner_tx, _runner_rx) = bounded_async(10);
 
     // Create shared state
     let dummy_ssid_str =
@@ -216,7 +219,7 @@ async fn test_ticks_request() {
     );
 
     // Initialize the module
-    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
     // Spawn the module loop
     tokio::spawn(async move {
@@ -268,8 +271,8 @@ async fn test_ticks_request() {
     {
         assert_eq!(r_id, req_id);
         assert_eq!(ticks.len(), 2);
-        assert_eq!(ticks[0], (1769988869.465, 1.18206));
-        assert_eq!(ticks[1], (1769988870.000, 1.18210));
+        assert_eq!(ticks[0], (1769988869_i64, 1.18206));
+        assert_eq!(ticks[1], (1769988870_i64, 1.18210));
     } else {
         panic!("Expected Ticks response");
     }
@@ -282,6 +285,7 @@ async fn test_mismatched_response_handling() {
     let (resp_tx, resp_rx) = bounded_async(10);
     let (msg_tx, msg_rx) = bounded_async(10);
     let (ws_tx, ws_rx) = bounded_async(10);
+    let (runner_tx, _runner_rx) = bounded_async(10);
 
     // Create shared state
     let dummy_ssid_str =
@@ -295,7 +299,7 @@ async fn test_mismatched_response_handling() {
     );
 
     // Initialize the module
-    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
     // Spawn the module loop
     tokio::spawn(async move {
@@ -371,6 +375,7 @@ async fn test_tick_to_candle_data_integrity() {
     let (resp_tx, resp_rx) = bounded_async(10);
     let (msg_tx, msg_rx) = bounded_async(10);
     let (ws_tx, ws_rx) = bounded_async(10);
+    let (runner_tx, _runner_rx) = bounded_async(10);
 
     // Create shared state
     let dummy_ssid_str =
@@ -384,7 +389,7 @@ async fn test_tick_to_candle_data_integrity() {
     );
 
     // Initialize the module
-    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx);
+    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
     // Spawn the module loop
     tokio::spawn(async move {
@@ -410,21 +415,21 @@ async fn test_tick_to_candle_data_integrity() {
     let _ = ws_rx.recv().await.unwrap();
 
     // Send ticks that form a specific candle
-    // Bucket 0: 0-59.
+    // Bucket 60: 60-119.
     // Ticks:
-    // 10.0: 1.1000 (Open)
-    // 20.0: 1.2000 (High)
-    // 30.0: 1.0500 (Low)
-    // 40.0: 1.1500 (Close)
+    // 70.0: 1.1000 (Open)
+    // 80.0: 1.2000 (High)
+    // 90.0: 1.0500 (Low)
+    // 100.0: 1.1500 (Close)
 
     let payload = r#"{
         "asset": "EURUSD_otc",
         "period": 60,
         "history": [
-            [10.0, 1.1000],
-            [20.0, 1.2000],
-            [30.0, 1.0500],
-            [40.0, 1.1500]
+            [70.0, 1.1000],
+            [80.0, 1.2000],
+            [90.0, 1.0500],
+            [100.0, 1.1500]
         ],
         "candles": []
     }"#;
@@ -438,7 +443,7 @@ async fn test_tick_to_candle_data_integrity() {
     if let CommandResponse::Candles { candles, .. } = response {
         assert_eq!(candles.len(), 1);
         let c = &candles[0];
-        assert_eq!(c.timestamp, 0.0); // 10/60 floor = 0
+        assert_eq!(c.timestamp, 60_i64); // 70/60 floor = 1, 1*60 = 60
         assert_eq!(c.open.to_string(), "1.1");
         assert_eq!(c.high.to_string(), "1.2");
         assert_eq!(c.low.to_string(), "1.05");

@@ -7,11 +7,10 @@ async function main(ssid) {
   // Wait for connection to establish
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  // The subscribeSymbolChunked method does not exist in the current API implementation
-  // Please refer to the documentation for available methods
-  console.log(
-    "The subscribeSymbolChunked method is not available in the current API implementation.",
-  );
+  // Subscribe to real-time candle data for a symbol
+  const subscription = await api.subscribe("EURUSD_otc", 60);
+  console.log("Listening for real-time candles...");
+  console.log("Subscription created successfully!");
 }
 
 // Check if ssid is provided as command line argument

@@ -27,7 +27,12 @@ ruby buy.rb
 - `buy.rb` - Place buy trade
 - `sell.rb` - Place sell trade
 - `check_win.rb` - Check trade results
-- `subscribe.rb` - Subscribe to real-time data
+- `history.rb` - Get candle history
+- `logs.rb` - Start logging and place trades
+- `payout.rb` - Get payout information
+- `raw_send.rb` - Send raw WebSocket messages
+- `subscribe_symbol.rb` - Subscribe to real-time data
+- `validator.rb` - Demonstrate validator usage
 
 ## Important
 

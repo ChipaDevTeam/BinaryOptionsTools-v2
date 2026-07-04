@@ -104,3 +104,4 @@ __pycache__/
 #Build artifacts
 site
 logs_fail
+wheels/

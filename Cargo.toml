@@ -8,7 +8,6 @@ members = [
     "crates/bindings_pyo3",
     "crates/bindings_uniffi",
     "crates/bindings_uniffi/bo2_macros",
-    "tests/rust",
 ]
 
 [workspace.dependencies]
