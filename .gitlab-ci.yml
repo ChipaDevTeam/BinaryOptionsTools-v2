@@ -28,7 +28,16 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_PIPELINE_SOURCE == "web"
 
-# Linux cross-compilation matrix
+# Build cluster tags:
+# - linux   -> Linux Docker runners (Debian/Ubuntu)
+# - windows -> Windows Docker runner
+# - macos   -> macOS runners
+#
+# Runner registration:
+#   Linux:  gitlab-runner register --tag-list linux --executor docker ...
+#   Windows: gitlab-runner register --tag-list windows --executor docker ...
+#   macOS:  gitlab-runner register --tag-list macos --executor docker ...
+
 .build-linux:
   stage: build
   image: python:3.13-bookworm
@@ -119,7 +128,7 @@ windows-x86:
     TARGET: i686-pc-windows-msvc
   allow_failure: true
 
-# macOS universal2
+# macOS builds
 .build-macos:
   stage: build
   image: ghcr.io/cirruslabs/macos-ventura-base:latest
@@ -181,14 +190,13 @@ release:
   tags:
     - linux
   dependencies:
+    - windows-x64
+    - windows-x86
     - linux-x86_64-gnu
     - linux-x86_64-musl
     - linux-aarch64-gnu
     - linux-aarch64-musl
     - linux-armv7
-    - windows-x64
-    - windows-x86
-    - macos-universal
     - sdist
   script:
     - python3 -m pip install --quiet requests
@@ -224,7 +232,6 @@ deploy:
     - if: $CI_COMMIT_BRANCH == "master"
   dependencies:
     - pages
-  when: manual
 
 # PyPI publish
 pypi-publish:
