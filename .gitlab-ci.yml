@@ -234,7 +234,6 @@ pypi-publish:
     - linux
   dependencies:
     - linux-x86_64-gnu
-    - linux-x64
     - macos-universal
     - sdist
   script:
