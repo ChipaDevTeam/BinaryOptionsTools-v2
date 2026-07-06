@@ -1,5 +1,5 @@
 // Example showing how to subscribe to real-time candle data
-use binary_options_tools::{PocketOption, SubscriptionType};
+use binary_options_tools::pocketoption::{PocketOption, candle::SubscriptionType};
 use std::time::Duration;
 use tokio_stream::StreamExt;
 

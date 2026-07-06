@@ -7,7 +7,7 @@ regex = BinaryOptionsToolsUni::Validator.regex("([A-Z])\\w+")
 start = BinaryOptionsToolsUni::Validator.starts_with("Hello")
 ends = BinaryOptionsToolsUni::Validator.ends_with("Bye")
 contains = BinaryOptionsToolsUni::Validator.contains("World")
-rnot = BinaryOptionsToolsUni::Validator.not(contains)
+rnot = BinaryOptionsToolsUni::Validator.ne(contains)
 
 # Combined validators
 rall = BinaryOptionsToolsUni::Validator.all([regex, start])

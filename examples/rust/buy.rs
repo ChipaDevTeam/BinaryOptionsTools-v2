@@ -1,5 +1,6 @@
 // Example showing how to place a buy trade
-use binary_options_tools::PocketOption;
+use binary_options_tools::pocketoption::PocketOption;
+use rust_decimal::Decimal;
 use std::time::Duration;
 
 #[tokio::main]
@@ -15,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Balance before trade: ${:.2}", balance_before);
     
     // Place a buy trade on EURUSD for 60 seconds with $1
-    let (trade_id, deal) = client.buy("EURUSD_otc", 60, 1.0).await?;
+    let (trade_id, deal) = client.buy("EURUSD_otc", 60, Decimal::from(1)).await?;
     println!("\nTrade placed successfully!");
     println!("Trade ID: {}", trade_id);
     println!("Deal data: {:?}", deal);
