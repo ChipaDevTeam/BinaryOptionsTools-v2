@@ -7,6 +7,9 @@ build:wheel:
   stage: build
   tags:
     - linux
+  variables:
+    RUSTUP_HOME: C:\Users\vigop\.rustup
+    CARGO_HOME: C:\Users\vigop\.cargo
   script:
     - $env:Path += ";C:\Users\vigop\.cargo\bin;C:\Users\vigop\.local\bin"
     - cd python
