@@ -22,6 +22,25 @@ build:wheel:
     - if: $CI_COMMIT_BRANCH == "master"
     - if: $CI_COMMIT_TAG
 
+release:
+  stage: deploy
+  tags:
+    - linux
+  needs:
+    - build:wheel
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo "Creating release $CI_COMMIT_TAG"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "BinaryOptionsToolsV2 $CI_COMMIT_TAG"
+    description: "Release $CI_COMMIT_TAG. Windows wheel built by CI is attached."
+    assets:
+      links:
+        - name: "Python wheel (win_amd64)"
+          url: "$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/download?job=build:wheel"
+
 pages:
   stage: docs
   image: node:20-bookworm
