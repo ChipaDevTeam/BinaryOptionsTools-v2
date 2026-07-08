@@ -7,10 +7,15 @@ pages:
   image: node:20-bookworm
   tags:
     - linux
+  variables:
+    HUSKY: "0"
   before_script:
+    - cd docs-site
     - npm ci
   script:
     - npm run build
+    - cd ..
+    - Move-Item -Force docs-site/build public
   artifacts:
     paths:
       - public
