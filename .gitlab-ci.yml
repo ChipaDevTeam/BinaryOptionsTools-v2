@@ -41,22 +41,9 @@ build:wheel:linux:
     expire_in: 30 days
   <<: *wheel_rules
 
-build:wheel:macos:
-  stage: build
-  tags:
-    - macos
-  script:
-    - if ! command -v cargo >/dev/null; then curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; fi
-    - source "$HOME/.cargo/env"
-    - python3 -m pip install --user maturin
-    - export PATH="$HOME/.local/bin:$(python3 -m site --user-base)/bin:$PATH"
-    - cd python
-    - maturin build --release
-  artifacts:
-    paths:
-      - target/wheels/*.whl
-    expire_in: 30 days
-  <<: *wheel_rules
+# macOS wheel is built by GitHub Actions on the GitHub mirror
+# (.github/workflows/build-macos-wheel.yml) — no macOS containers exist,
+# so it needs Apple hardware.
 
 release:
   stage: deploy
@@ -65,7 +52,6 @@ release:
   needs:
     - build:wheel:windows
     - build:wheel:linux
-    - build:wheel:macos
   rules:
     - if: $CI_COMMIT_TAG
   script:
