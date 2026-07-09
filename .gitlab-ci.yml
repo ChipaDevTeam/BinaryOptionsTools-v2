@@ -3,7 +3,12 @@ stages:
   - docs
   - deploy
 
-build:wheel:
+.wheel_rules: &wheel_rules
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_TAG
+
+build:wheel:windows:
   stage: build
   tags:
     - linux
@@ -18,16 +23,49 @@ build:wheel:
     paths:
       - target/wheels/*.whl
     expire_in: 30 days
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-    - if: $CI_COMMIT_TAG
+  <<: *wheel_rules
+
+build:wheel:linux:
+  stage: build
+  tags:
+    - linux-docker
+  image:
+    name: ghcr.io/pyo3/maturin:latest
+    entrypoint: [""]
+  script:
+    - cd python
+    - maturin build --release --manylinux 2014
+  artifacts:
+    paths:
+      - target/wheels/*.whl
+    expire_in: 30 days
+  <<: *wheel_rules
+
+build:wheel:macos:
+  stage: build
+  tags:
+    - macos
+  script:
+    - if ! command -v cargo >/dev/null; then curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; fi
+    - source "$HOME/.cargo/env"
+    - python3 -m pip install --user maturin
+    - export PATH="$HOME/.local/bin:$(python3 -m site --user-base)/bin:$PATH"
+    - cd python
+    - maturin build --release
+  artifacts:
+    paths:
+      - target/wheels/*.whl
+    expire_in: 30 days
+  <<: *wheel_rules
 
 release:
   stage: deploy
   tags:
     - linux
   needs:
-    - build:wheel
+    - build:wheel:windows
+    - build:wheel:linux
+    - build:wheel:macos
   rules:
     - if: $CI_COMMIT_TAG
   script:
@@ -35,10 +73,14 @@ release:
       $body = @{
         tag_name    = $env:CI_COMMIT_TAG
         name        = "BinaryOptionsToolsV2 $($env:CI_COMMIT_TAG)"
-        description = "Release $($env:CI_COMMIT_TAG). Windows wheel built by CI is attached."
+        description = "Release $($env:CI_COMMIT_TAG). Wheels for Windows, Linux and macOS built by CI are attached."
         assets      = @{ links = @(
           @{ name = "Python wheel (win_amd64)"
-             url  = "$($env:CI_PROJECT_URL)/-/jobs/artifacts/$($env:CI_COMMIT_TAG)/download?job=build:wheel" }
+             url  = "$($env:CI_PROJECT_URL)/-/jobs/artifacts/$($env:CI_COMMIT_TAG)/download?job=build:wheel:windows" },
+          @{ name = "Python wheel (manylinux2014_x86_64)"
+             url  = "$($env:CI_PROJECT_URL)/-/jobs/artifacts/$($env:CI_COMMIT_TAG)/download?job=build:wheel:linux" },
+          @{ name = "Python wheel (macos)"
+             url  = "$($env:CI_PROJECT_URL)/-/jobs/artifacts/$($env:CI_COMMIT_TAG)/download?job=build:wheel:macos" }
         ) }
       } | ConvertTo-Json -Depth 5
       $r = Invoke-RestMethod -Method Post -Uri "$($env:CI_API_V4_URL)/projects/$($env:CI_PROJECT_ID)/releases" -Headers @{ 'JOB-TOKEN' = $env:CI_JOB_TOKEN } -ContentType 'application/json' -Body $body
