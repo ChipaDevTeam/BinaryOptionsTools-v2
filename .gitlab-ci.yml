@@ -59,14 +59,12 @@ release:
       $body = @{
         tag_name    = $env:CI_COMMIT_TAG
         name        = "BinaryOptionsToolsV2 $($env:CI_COMMIT_TAG)"
-        description = "Release $($env:CI_COMMIT_TAG). Wheels for Windows, Linux and macOS built by CI are attached."
+        description = "Release $($env:CI_COMMIT_TAG). Windows and Linux wheels built by CI are attached; the macOS wheel is published on the GitHub mirror release."
         assets      = @{ links = @(
           @{ name = "Python wheel (win_amd64)"
              url  = "$($env:CI_PROJECT_URL)/-/jobs/artifacts/$($env:CI_COMMIT_TAG)/download?job=build:wheel:windows" },
           @{ name = "Python wheel (manylinux2014_x86_64)"
-             url  = "$($env:CI_PROJECT_URL)/-/jobs/artifacts/$($env:CI_COMMIT_TAG)/download?job=build:wheel:linux" },
-          @{ name = "Python wheel (macos)"
-             url  = "$($env:CI_PROJECT_URL)/-/jobs/artifacts/$($env:CI_COMMIT_TAG)/download?job=build:wheel:macos" }
+             url  = "$($env:CI_PROJECT_URL)/-/jobs/artifacts/$($env:CI_COMMIT_TAG)/download?job=build:wheel:linux" }
         ) }
       } | ConvertTo-Json -Depth 5
       $r = Invoke-RestMethod -Method Post -Uri "$($env:CI_API_V4_URL)/projects/$($env:CI_PROJECT_ID)/releases" -Headers @{ 'JOB-TOKEN' = $env:CI_JOB_TOKEN } -ContentType 'application/json' -Body $body
