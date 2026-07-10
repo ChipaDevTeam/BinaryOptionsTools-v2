@@ -261,17 +261,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Links
 
-- [GitHub Releases](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases)
+- [GitLab Releases](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases)
 - [PyPI Package](https://pypi.org/project/binaryoptionstoolsv2/)
-- [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/)
+- [Documentation](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)
 
-[0.2.12]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.12
-[0.2.11]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.11
-[0.2.10]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.10
-[0.2.9]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.9
-[0.2.8]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.8
-[0.2.6]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.6
-[0.2.5]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.5
-[0.2.4]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.4
-[0.2.3]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.3
-[0.2.0]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.0
+[0.2.12]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.12
+[0.2.11]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.11
+[0.2.10]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.10
+[0.2.9]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.9
+[0.2.8]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.8
+[0.2.6]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.6
+[0.2.5]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.5
+[0.2.4]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.4
+[0.2.3]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.3
+[0.2.0]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.0

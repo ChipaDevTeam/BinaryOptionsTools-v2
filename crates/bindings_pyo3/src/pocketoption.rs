@@ -207,10 +207,6 @@ impl RawPocketOption {
         self.client.is_connected()
     }
 
-    /// Returns the configured maximum number of concurrent subscriptions.
-    pub fn max_subscriptions(&self) -> usize {
-        self.client.max_subscriptions()
-    }
 
     pub fn buy<'py>(
         &self,
@@ -609,6 +605,39 @@ impl RawPocketOption {
                     .map_err(BinaryErrorPy::from)?
                     .into_py_any(py)
             })
+        })
+    }
+
+    pub fn send_raw<'py>(&self, py: Python<'py>, message: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            client
+                .send_raw(message)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| py.None().into_py_any(py))
+        })
+    }
+
+    pub fn subscribe_raw<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let raw_stream = client
+                .subscribe_raw()
+                .await
+                .map_err(BinaryErrorPy::from)?;
+
+            let boxed_stream = async_stream::stream! {
+                tokio::pin!(raw_stream);
+                while let Some(msg) = raw_stream.next().await {
+                    yield Ok(arc_message_to_string(&msg));
+                }
+            }
+            .boxed()
+            .fuse();
+
+            let stream = Arc::new(Mutex::new(boxed_stream));
+            Python::attach(|py| RawStreamIterator { stream }.into_py_any(py))
         })
     }
 

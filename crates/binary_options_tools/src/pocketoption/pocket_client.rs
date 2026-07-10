@@ -124,9 +124,15 @@ impl PocketOption {
             .with_module::<HistoricalDataApiModule>()
             .with_module::<RawApiModule>()
             .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)))
+            .with_lightweight_handler(|msg, state, _| Box::pin(async move {
+                let subs = state.raw_subscribers.read().await;
+                for sub in subs.iter() {
+                    let _ = sub.send(msg.clone()).await;
+                }
+                Ok(())
+            }))
             .on_reconnect(Box::new(TradeReconciliationCallback))
     }
-
     async fn require_handle<M: ApiModule<State>>(
         &self,
         module_name: &str,
@@ -221,8 +227,7 @@ impl PocketOption {
 
         // Pass all URLs as fallbacks
         builder = builder
-            .urls(config.urls.iter().map(|u| u.to_string()).collect())
-            .max_subscriptions(config.max_subscriptions);
+            .urls(config.urls.iter().map(|u| u.to_string()).collect());
 
         let state = builder.build()?;
         let client_builder =
@@ -322,10 +327,6 @@ impl PocketOption {
         self.client.is_connected()
     }
 
-    /// Returns the configured maximum number of concurrent subscriptions.
-    pub fn max_subscriptions(&self) -> usize {
-        self.client.state.max_subscriptions
-    }
 
     /// Subscribes to an asset's stream and prepends historical data.
     ///
@@ -621,6 +622,11 @@ impl PocketOption {
     /// Gets a specific closed deal by its ID.
     pub async fn get_closed_deal(&self, deal_id: Uuid) -> Option<Deal> {
         self.client.state.trade_state.get_closed_deal(deal_id).await
+    }
+
+    /// Non-blocking check of a closed deal by its ID.
+    pub fn try_get_settled_deal(&self, deal_id: &Uuid) -> Option<Deal> {
+        self.client.state.trade_state.try_get_closed_deal(deal_id)
     }
 
     /// Opens a pending order.
@@ -987,7 +993,7 @@ impl PocketOption {
     /// Shuts down the client and stops the runner.
     pub async fn shutdown_owned(self) -> PocketResult<()> {
         self._runner.abort();
-        self.client.shutdown().await.map_err(PocketError::from)
+        self.client.clone().shutdown().await.map_err(PocketError::from)
     }
 
     pub async fn new_testing_wrapper(ssid: impl ToString) -> PocketResult<TestingWrapper<State>> {
@@ -1004,6 +1010,38 @@ impl PocketOption {
             .await?;
 
         Ok(builder)
+    }
+
+    /// Sends a raw message directly over the WebSocket connection.
+    pub async fn send_raw(&self, message: String) -> PocketResult<()> {
+        let msg = binary_options_tools_core::reimports::Message::Text(message.into());
+        self.client
+            .to_ws_sender
+            .send(msg)
+            .await
+            .map_err(|e| PocketError::General(format!("Failed to send raw message: {e}")))
+    }
+
+    /// Subscribes to a stream of all incoming WebSocket messages verbatim.
+    pub async fn subscribe_raw(&self) -> PocketResult<impl futures_util::Stream<Item = Arc<binary_options_tools_core::reimports::Message>> + 'static> {
+        let (tx, rx) = binary_options_tools_core::reimports::bounded_async::<Arc<binary_options_tools_core::reimports::Message>>(1000);
+        self.client.state.raw_subscribers.write().await.push(tx);
+        
+        let stream = futures_util::stream::unfold(rx, |rx| async move {
+            match rx.recv().await {
+                Ok(msg) => Some((msg, rx)),
+                Err(_) => None,
+            }
+        });
+        Ok(stream)
+    }
+}
+
+impl Drop for PocketOption {
+    fn drop(&mut self) {
+        if Arc::strong_count(&self._runner) == 1 {
+            self._runner.abort();
+        }
     }
 }
 

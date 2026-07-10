@@ -410,15 +410,6 @@ impl SubscriptionsHandle {
         }
     }
 
-    /// Check if maximum subscriptions limit is reached.
-    ///
-    /// # Returns
-    /// * `PocketResult<bool>` - True if limit reached
-    pub async fn is_max_subscriptions_reached(&self) -> PocketResult<bool> {
-        let count = self.get_active_subscriptions_count().await?;
-        let max = self.cached_max.load(Ordering::Relaxed);
-        Ok(count as usize >= max)
-    }
 
     /// Gets the history for an asset with its period
     ///
@@ -528,15 +519,6 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             sub_type,
                             command_id,
                         } => {
-                            if self.is_max_subscriptions_reached().await {
-                                if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionFailed {
-                                    command_id,
-                                    error: Box::new(SubscriptionError::MaxSubscriptionsReached.into()),
-                                }).await {
-                                    warn!(target: "SubscriptionsApiModule", "Failed to send SubscriptionFailed (max subscriptions) response: {}", e);
-                                }
-                                continue;
-                            }
 
                             let period = sub_type.period_secs().unwrap_or(1);
                             let (stream_sender, stream_receiver) =
@@ -604,7 +586,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionCount {
                                 command_id,
                                 count,
-                                max: self.state.max_subscriptions,
+                                max: usize::MAX,
                             }).await {
                                 warn!(target: "SubscriptionsApiModule", "Failed to send SubscriptionCount response: {}", e);
                             }
@@ -790,12 +772,6 @@ impl SubscriptionsApiModule {
         }
     }
 
-    /// Check if maximum subscriptions limit is reached.
-    async fn is_max_subscriptions_reached(&self) -> bool {
-        let subscriptions = self.state.active_subscriptions.read().await;
-        let total_count: usize = subscriptions.values().map(|v| v.len()).sum();
-        total_count >= self.state.max_subscriptions
-    }
 
     /// Add a new subscription.
     async fn add_subscription(
@@ -805,9 +781,6 @@ impl SubscriptionsApiModule {
         stream_sender: AsyncSender<SubscriptionEvent>,
         subscription_id: Uuid,
     ) -> PocketResult<()> {
-        if self.is_max_subscriptions_reached().await {
-            return Err(SubscriptionError::MaxSubscriptionsReached.into());
-        }
 
         let mut subscriptions = self.state.active_subscriptions.write().await;
         let entry = subscriptions.entry(asset).or_insert_with(Vec::new);

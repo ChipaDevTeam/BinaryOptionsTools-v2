@@ -1,0 +1,109 @@
+stages:
+  - build
+  - docs
+  - deploy
+
+.wheel_rules: &wheel_rules
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_TAG
+
+build:wheel:windows:
+  stage: build
+  tags:
+    - linux
+  variables:
+    RUSTUP_HOME: C:\Users\vigop\.rustup
+    CARGO_HOME: C:\Users\vigop\.cargo
+  script:
+    - $env:Path += ";C:\Users\vigop\.cargo\bin;C:\Users\vigop\.local\bin"
+    - cd python
+    - uv tool run maturin build --release
+  artifacts:
+    paths:
+      - target/wheels/*.whl
+    expire_in: 30 days
+  <<: *wheel_rules
+
+build:wheel:linux:
+  stage: build
+  tags:
+    - linux-docker
+  image:
+    name: ghcr.io/pyo3/maturin:latest
+    entrypoint: [""]
+  script:
+    - cd python
+    - maturin build --release --manylinux 2014
+  artifacts:
+    paths:
+      - target/wheels/*.whl
+    expire_in: 30 days
+  <<: *wheel_rules
+
+# macOS wheel is built by GitHub Actions on the GitHub mirror
+# (.github/workflows/build-macos-wheel.yml) — no macOS containers exist,
+# so it needs Apple hardware.
+
+release:
+  stage: deploy
+  tags:
+    - linux
+  needs:
+    - build:wheel:windows
+    - build:wheel:linux
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - |
+      $body = @{
+        tag_name    = $env:CI_COMMIT_TAG
+        name        = "BinaryOptionsToolsV2 $($env:CI_COMMIT_TAG)"
+        description = "Release $($env:CI_COMMIT_TAG). Windows and Linux wheels built by CI are attached; the macOS wheel is published on the GitHub mirror release."
+        assets      = @{ links = @(
+          @{ name = "Python wheel (win_amd64)"
+             url  = "$($env:CI_PROJECT_URL)/-/jobs/artifacts/$($env:CI_COMMIT_TAG)/download?job=build:wheel:windows" },
+          @{ name = "Python wheel (manylinux2014_x86_64)"
+             url  = "$($env:CI_PROJECT_URL)/-/jobs/artifacts/$($env:CI_COMMIT_TAG)/download?job=build:wheel:linux" }
+        ) }
+      } | ConvertTo-Json -Depth 5
+      $r = Invoke-RestMethod -Method Post -Uri "$($env:CI_API_V4_URL)/projects/$($env:CI_PROJECT_ID)/releases" -Headers @{ 'JOB-TOKEN' = $env:CI_JOB_TOKEN } -ContentType 'application/json' -Body $body
+      Write-Output "Created release: $($r.name)"
+
+pages:
+  stage: docs
+  image: node:20-bookworm
+  tags:
+    - linux
+  variables:
+    HUSKY: "0"
+  before_script:
+    - cd docs-site
+    - npm ci
+  script:
+    - npm run build
+    - cd ..
+    - Move-Item -Force docs-site/build public
+  artifacts:
+    paths:
+      - public
+    expire_in: 7 days
+  only:
+    - main
+    - master
+  dependencies: []
+
+deploy:
+  stage: deploy
+  image: node:20-bookworm
+  tags:
+    - linux
+  script:
+    - echo "Deploy to GitLab Pages/"
+  environment:
+    name: production
+    url: https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+  dependencies:
+    - pages

@@ -635,6 +635,6 @@ asyncio.run(main())
 ## Support
 
 - **Discord**: [Join our community](https://discord.gg/p7YyFqSmAz)
-- **GitHub Issues**: [Report problems](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues)
+- **GitLab Issues**: [Report problems](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
 
 **Remember**: Trading binary options involves significant risk. Never trade with money you cannot afford to lose.

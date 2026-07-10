@@ -1,8 +1,8 @@
 # Import necessary modules
 import time
+import json
 from datetime import timedelta
 from multiprocessing import Process
-
 from BinaryOptionsToolsV2.tracing import LogBuilder, Logger
 
 
@@ -68,8 +68,8 @@ def main():
         try:
             for log in log_iterator:
                 print(f"Received log: {log}")
-                # Each log is a dict so we can access the message
-                print(f"Log message: {log['message']}")
+                log_data = json.loads(log)
+                print(f"Log message: {log_data['message']}")
         except Exception as e:
             print(f"Error processing logs: {e}")
 

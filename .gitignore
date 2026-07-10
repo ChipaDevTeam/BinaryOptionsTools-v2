@@ -1,24 +1,29 @@
-# ---- Rust ----
-# ignore build artifacts
+# Rust
+
 **/target/
 Cargo.lock
-# backups
+
+# Backups
+
 **/*.rs.bk
 **/*.exe
 **/chipadocs.toml
-# ---- Python ----
-# bytecode/cache
+
+# Python
+
 __pycache__/
 *.py[cod]
 *$py.class
 
-# virtualenvs
+# venvs
+
 venv/
 .venv/
 ENV/
 env/
 
 # build / packaging artifacts
+
 build/
 dist/
 *.egg-info/
@@ -28,15 +33,18 @@ dist/
 MANIFEST
 
 # C-extension / compiled files
+
 *.so
 *.pyd
 
 # test / coverage
+
 .coverage
 htmlcov/
 pytest_cache/
 
-# ---- Node (if used) ----
+# Node
+
 node_modules/
 *.node
 bun-debug.log*
@@ -45,24 +53,29 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# ---- Logs / env ----
+# Logs / env
+
 *.log
 /examples/*.log
 .env
 
-# ---- IDE / editor ----
+# IDE / editor
+
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# ---- OS ----
+# OS
+
 .DS_Store
 Thumbs.db
 nul
 nul/
-# ---- Misc ----
+
+#Misc
+
 *.egg
 .eggs/
 downloads/
@@ -75,7 +88,7 @@ bin/
 lib64
 pyvenv.cfg
 
-# debug
+# Debugging
 debug/
 .pytest_cache/
 
@@ -84,15 +97,12 @@ __pycache__/
 *.py[cod]
 .agents
 
-# arive mcp n stuff
-assets
+# ARIVE MCP - https://github.com/sixtysixx/ARIVE
 .arive
-memory
-# Sensitive test data
-tests/login_test.txt
-tests/assets.txt
+.arive-tasks
 
-# ---- Build artifacts ----
+#Build artifacts
 site
 logs_fail
-.arive-tasks/
+wheels/
+config.toml

@@ -194,6 +194,15 @@ class MockRawClient:
     async def send_raw_message(self, message):
         pass
 
+    async def send_raw(self, message):
+        pass
+
+    async def subscribe_raw(self):
+        async def subscription():
+            yield '42["raw_msg"]'
+
+        return subscription()
+
     async def create_raw_order(self, message, validator):
         return '42["response"]'
 
@@ -1469,3 +1478,17 @@ class TestAsynchronousExtraCoverage:
             mock_modules.get.return_value = None
             client = PocketOptionAsync("test_ssid", config={"terminal_logging": False})
             assert client is not None
+@pytest.mark.asyncio
+async def test_raw_websocket_apis(monkeypatch):
+    monkeypatch.setattr(
+        "BinaryOptionsToolsV2.pocketoption.asynchronous.RawPocketOption",
+        MockRawClient,
+    )
+    client = PocketOptionAsync('42["auth",{"session":"test_sess","uid":12345}]')
+    await client.send_raw('42["ping"]')
+    stream = await client.subscribe_raw()
+    messages = []
+    async for msg in stream:
+        messages.append(msg)
+        break
+    assert messages == ['42["raw_msg"]']

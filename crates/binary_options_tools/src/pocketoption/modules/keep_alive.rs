@@ -106,12 +106,8 @@ impl LightweightModule<State> for InitModule {
                             tracing::debug!(target: "InitModule", "Socket.IO session established ({}). Sending auth SSID: {}", text, redacted_ssid);
 
                             if let Err(e) = self.ws_sender.send(Message::text(ssid_str)).await {
-                                let err_str = e.to_string().to_lowercase();
-                                if !err_str.contains("closed") && !err_str.contains("broken pipe") {
-                                    warn!(target: "InitModule", "Failed to send SSID: {}", e);
-                                    return Err(e.into());
-                                }
-                                debug!(target: "InitModule", "Socket closed before SSID could be sent");
+                                warn!(target: "InitModule", "Failed to send SSID: {}", e);
+                                return Err(e.into());
                             }
                             continue;
                         }

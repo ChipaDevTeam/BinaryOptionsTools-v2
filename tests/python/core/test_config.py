@@ -65,8 +65,6 @@ def test_config_validation_errors():
         Config(connection_initialization_timeout_secs=0)._validate()
     with pytest.raises(ValueError, match="timeout_secs"):
         Config(timeout_secs=0)._validate()
-    with pytest.raises(ValueError, match="max_subscriptions"):
-        Config(max_subscriptions=0)._validate()
 
 
 def test_config_get_pyconfig_fallback():

@@ -2,7 +2,7 @@ from BinaryOptionsToolsV2.validator import Validator
 
 if __name__ == "__main__":
     none = Validator()
-    regex = Validator.regex("([A-Z])\w+")
+    regex = Validator.regex(r"([A-Z])\w+")
     start = Validator.starts_with("Hello")
     end = Validator.ends_with("Bye")
     contains = Validator.contains("World")

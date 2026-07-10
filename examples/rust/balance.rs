@@ -1,5 +1,5 @@
 // Example showing how to get account balance
-use binary_options_tools::PocketOption;
+use binary_options_tools::pocketoption::PocketOption;
 use std::time::Duration;
 
 #[tokio::main]

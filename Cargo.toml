@@ -8,7 +8,6 @@ members = [
     "crates/bindings_pyo3",
     "crates/bindings_uniffi",
     "crates/bindings_uniffi/bo2_macros",
-    "tests/rust",
 ]
 
 [workspace.dependencies]
@@ -36,14 +35,14 @@ zyn = "0.5.4"
 
 [profile.release]
 opt-level = 3
-lto = "thin"
+lto = false
 codegen-units = 16
 panic = 'abort'
 strip = true
 
 [profile.dev]
 opt-level = 0
-debug = true
+debug = 1
 lto = false
 codegen-units = 256
 

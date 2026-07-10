@@ -239,5 +239,5 @@ trade_handler = await client.create_raw_handler(
 ## Support
 
 - **Discord**: [Join our community](https://discord.gg/p7YyFqSmAz)
-- **GitHub Issues**: [Report bugs](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues)
-- **Documentation**: [Full docs](https://chipadevteam.github.io/BinaryOptionsTools-v2/)
+- **GitLab Issues**: [Report bugs](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
+- **Documentation**: [Full docs](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)

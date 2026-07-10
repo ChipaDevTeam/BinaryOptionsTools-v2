@@ -14,12 +14,12 @@ Visit [PocketOption](https://pocketoption.com), open DevTools (F12), find `ssid`
 
 ## Examples
 
-- `Basic.kt` - Initialize and get balance
-- `Balance.kt` - Get account balance
+- `basic.kt` - Initialize and get balance
+- `get_balance.kt` - Get account balance
 - `Buy.kt` - Place buy trade
 - `Sell.kt` - Place sell trade
 - `CheckWin.kt` - Check trade results
-- `Subscribe.kt` - Subscribe to real-time data
+- `subscribe_symbol.kt` - Subscribe to real-time data
 
 ## Important
 

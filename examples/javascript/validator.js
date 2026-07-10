@@ -2,11 +2,11 @@ const { Validator } = require("./binary-options-tools.node");
 
 // Create validator instances
 const none = new Validator();
-const regex = Validator.regex(/([A-Z])\w+/);
+const regex = Validator.regex("([A-Z])\\w+");
 const start = Validator.startsWith("Hello");
 const end = Validator.endsWith("Bye");
 const contains = Validator.contains("World");
-const rnot = Validator.not(contains);
+const rnot = Validator.ne(contains);
 
 // Modified for better testing - smaller groups with predictable outcomes
 const rall = Validator.all([regex, start]); // Will need both capital letter and "Hello" at start

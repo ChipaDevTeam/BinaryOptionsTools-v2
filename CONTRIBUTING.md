@@ -10,7 +10,7 @@ This project and everyone participating in it is governed by our [Code of Conduc
 
 ### Reporting Bugs
 
-Before creating bug reports, please check the [existing issues](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues) as you might find that you don't need to create one. When you are creating a bug report, please include as many details as possible:
+Before creating bug reports, please check the [existing issues](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues) as you might find that you don't need to create one. When you are creating a bug report, please include as many details as possible:
 
 - **Use a clear and descriptive title** for the issue
 - **Describe the exact steps to reproduce the problem** with as many details as possible
@@ -21,7 +21,7 @@ Before creating bug reports, please check the [existing issues](https://github.c
 
 ### Suggesting Enhancements
 
-Enhancement suggestions are tracked as [GitHub issues](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues). When creating an enhancement suggestion, please include:
+Enhancement suggestions are tracked as [issues](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues). When creating an enhancement suggestion, please include:
 
 - **Use a clear and descriptive title**
 - **Provide a detailed description of the suggested enhancement**
@@ -52,7 +52,7 @@ Please follow these steps for sending us your pull requests:
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/BinaryOptionsTools-v2.git
+git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
 cd BinaryOptionsTools-v2
 
 # Build the Rust core

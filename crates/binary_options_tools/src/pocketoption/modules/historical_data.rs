@@ -284,8 +284,12 @@ impl ApiModule<State> for HistoricalDataApiModule {
                         Ok(cmd) => {
                             match cmd {
                                 Command::GetTicks { asset, period, req_id } => {
-                                    if self.pending_request.is_some() {
-                                        warn!(target: "HistoricalDataApiModule", "Overwriting a pending request. Concurrent calls are not supported.");
+                                    if let Some((prev_id, _, _, _)) = self.pending_request.take() {
+                                        warn!(target: "HistoricalDataApiModule", "Overwriting pending request {} due to concurrent call", prev_id);
+                                        let _ = self.command_responder.send(CommandResponse::Error {
+                                            req_id: prev_id,
+                                            error: "Request superseded by another concurrent call".to_string(),
+                                        }).await;
                                     }
                                     self.latest_ticks.remove(&asset);
                                     self.pending_request = Some((req_id, asset.clone(), period, RequestType::Ticks));
@@ -298,8 +302,12 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                     }
                                 }
                                 Command::GetCandles { asset, period, req_id } => {
-                                    if self.pending_request.is_some() {
-                                        warn!(target: "HistoricalDataApiModule", "Overwriting a pending request. Concurrent calls are not supported.");
+                                    if let Some((prev_id, _, _, _)) = self.pending_request.take() {
+                                        warn!(target: "HistoricalDataApiModule", "Overwriting pending request {} due to concurrent call", prev_id);
+                                        let _ = self.command_responder.send(CommandResponse::Error {
+                                            req_id: prev_id,
+                                            error: "Request superseded by another concurrent call".to_string(),
+                                        }).await;
                                     }
                                     self.latest_ticks.remove(&asset);
                                     self.pending_request = Some((req_id, asset.clone(), period, RequestType::Candles));

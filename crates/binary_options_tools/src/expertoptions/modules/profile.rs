@@ -13,7 +13,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::select;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::expertoptions::state::{Balance, State};
 use crate::expertoptions::{Action, ActionName};
@@ -225,7 +225,7 @@ impl ApiModule<State> for ProfileModule {
     /// The main run loop for the module's background task.
     async fn run(&mut self) -> CoreResult<()> {
         // Send initial multipleAction and ensure demo context on first run
-        println!("Here");
+        debug!(target: "ProfileModule", "ProfileModule starting run loop");
         self.send_startup_messages().await?;
 
         loop {
@@ -244,7 +244,9 @@ impl ApiModule<State> for ProfileModule {
                                             }
                                             ProfileResponse::Profile(profile) => {
                                                 debug!(target: "ProfileModule", "Profile received: {:?}", profile);
-                                                self.parse_profile(profile.actions).await?;
+                                                if let Err(e) = self.parse_profile(profile.actions).await {
+                                                    warn!(target: "ProfileModule", "Failed to parse profile actions: {:?}", e);
+                                                }
                                             }
                                         }
                                     },

@@ -43,14 +43,12 @@ Add to `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2", from: "0.1.0")
-]
-```
-
-### Go
+dependencies: {
+    .package(url: "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2", from: "0.1.0")
+}
 
 ```bash
-go get github.com/ChipaDevTeam/BinaryOptionsTools-v2/bindings/go
+go get gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/bindings/go
 ```
 
 ### Ruby
@@ -659,8 +657,8 @@ See the [examples directory](/examples) for complete working examples in each la
 ## Support
 
 - **Discord**: [Join our community](https://discord.gg/p7YyFqSmAz)
-- **GitHub Issues**: [Report bugs](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues)
-- **Documentation**: [Full docs](https://chipadevteam.github.io/BinaryOptionsTools-v2/)
+- **GitLab Issues**: [Report bugs](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
+- **Documentation**: [Full docs](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)
 
 ---
 

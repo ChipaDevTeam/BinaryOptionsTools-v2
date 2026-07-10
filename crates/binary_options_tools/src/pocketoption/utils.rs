@@ -1,51 +1,27 @@
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use binary_options_tools_core::connector::{ConnectorError, ConnectorResult};
 use binary_options_tools_core::error::{CoreError, CoreResult};
 use binary_options_tools_core::reimports::{
-    connect_async_tls_with_config, generate_key, Connector, MaybeTlsStream, Request,
+    generate_key, MaybeTlsStream, Request,
     WebSocketStream,
 };
-use std::sync::OnceLock;
 use std::time::Duration as StdDuration;
 
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
-    ssid::Ssid,
+    state::State,
 };
 use crate::utils::init_crypto_provider;
 use serde_json::Value;
 use tokio::net::TcpStream;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio_tungstenite::client_async_with_config;
+use rustls::pki_types::ServerName;
 
 use url::Url;
 
-static CONNECTOR: OnceLock<Connector> = OnceLock::new();
-
-fn get_connector() -> CoreResult<&'static Connector> {
-    if let Some(connector) = CONNECTOR.get() {
-        return Ok(connector);
-    }
-
-    let mut root_store = rustls::RootCertStore::empty();
-    let certs = rustls_native_certs::load_native_certs().certs;
-    if certs.is_empty() {
-        return Err(CoreError::Connection(ConnectorError::Custom(
-            "Could not load any native certificates".to_string(),
-        )));
-    }
-    for cert in certs {
-        root_store.add(cert).ok();
-    }
-    let tls_config = rustls::ClientConfig::builder()
-        .with_root_certificates(root_store)
-        .with_no_client_auth();
-
-    let connector = Connector::Rustls(std::sync::Arc::new(tls_config));
-    let _ = CONNECTOR.set(connector);
-    CONNECTOR
-        .get()
-        .ok_or_else(|| CoreError::Other("Connector not initialized".into()))
-}
 
 const IP_PROVIDERS: &[&str] = &[
     "https://i.pn/json/",
@@ -173,41 +149,342 @@ pub async fn get_public_ip() -> PocketResult<String> {
     ))
 }
 
+fn base64_encode(input: &[u8]) -> String {
+    const CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::with_capacity((input.len() + 2) / 3 * 4);
+    for chunk in input.chunks(3) {
+        match chunk.len() {
+            3 => {
+                result.push(CHARSET[(chunk[0] >> 2) as usize] as char);
+                result.push(CHARSET[(((chunk[0] & 0x03) << 4) | (chunk[1] >> 4)) as usize] as char);
+                result.push(CHARSET[(((chunk[1] & 0x0f) << 2) | (chunk[2] >> 6)) as usize] as char);
+                result.push(CHARSET[(chunk[2] & 0x3f) as usize] as char);
+            }
+            2 => {
+                result.push(CHARSET[(chunk[0] >> 2) as usize] as char);
+                result.push(CHARSET[(((chunk[0] & 0x03) << 4) | (chunk[1] >> 4)) as usize] as char);
+                result.push(CHARSET[((chunk[1] & 0x0f) << 2) as usize] as char);
+                result.push('=');
+            }
+            1 => {
+                result.push(CHARSET[(chunk[0] >> 2) as usize] as char);
+                result.push(CHARSET[((chunk[0] & 0x03) << 4) as usize] as char);
+                result.push('=');
+                result.push('=');
+            }
+            _ => unreachable!(),
+        }
+    }
+    result
+}
+
+fn parse_auth(url: &Url) -> Option<(String, String)> {
+    let username = url.username();
+    if !username.is_empty() {
+        let password = url.password().unwrap_or("");
+        Some((username.to_string(), password.to_string()))
+    } else {
+        None
+    }
+}
+
+async fn socks5_handshake<S>(
+    stream: &mut S,
+    target_host: &str,
+    target_port: u16,
+    auth: Option<(String, String)>,
+) -> ConnectorResult<()>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    if let Some((_user, _pass)) = &auth {
+        stream.write_all(&[0x05, 0x02, 0x00, 0x02]).await
+            .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting send failed: {e}")))?;
+    } else {
+        stream.write_all(&[0x05, 0x01, 0x00]).await
+            .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting send failed: {e}")))?;
+    }
+
+    let mut resp = [0u8; 2];
+    stream.read_exact(&mut resp).await
+        .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting read failed: {e}")))?;
+
+    if resp[0] != 0x05 {
+        return Err(ConnectorError::Custom("Invalid SOCKS5 version".into()));
+    }
+
+    if resp[1] == 0x02 {
+        if let Some((user, pass)) = &auth {
+            let user_bytes = user.as_bytes();
+            let pass_bytes = pass.as_bytes();
+            
+            let mut auth_req = Vec::new();
+            auth_req.push(0x01);
+            auth_req.push(user_bytes.len() as u8);
+            auth_req.extend_from_slice(user_bytes);
+            auth_req.push(pass_bytes.len() as u8);
+            auth_req.extend_from_slice(pass_bytes);
+
+            stream.write_all(&auth_req).await
+                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 auth failed: {e}")))?;
+
+            let mut auth_resp = [0u8; 2];
+            stream.read_exact(&mut auth_resp).await
+                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 auth read failed: {e}")))?;
+
+            if auth_resp[1] != 0x00 {
+                return Err(ConnectorError::Custom("SOCKS5 authentication failed".into()));
+            }
+        } else {
+            return Err(ConnectorError::Custom("SOCKS5 proxy requested auth but no credentials provided".into()));
+        }
+    } else if resp[1] != 0x00 {
+        return Err(ConnectorError::Custom("SOCKS5 authentication method rejected".into()));
+    }
+
+    let host_bytes = target_host.as_bytes();
+    let mut req = Vec::new();
+    req.extend_from_slice(&[0x05, 0x01, 0x00, 0x03, host_bytes.len() as u8]);
+    req.extend_from_slice(host_bytes);
+    req.extend_from_slice(&target_port.to_be_bytes());
+
+    stream.write_all(&req).await
+        .map_err(|e| ConnectorError::Custom(format!("SOCKS5 connect request failed: {e}")))?;
+
+    let mut resp_hdr = [0u8; 4];
+    stream.read_exact(&mut resp_hdr).await
+        .map_err(|e| ConnectorError::Custom(format!("SOCKS5 connect response read failed: {e}")))?;
+
+    if resp_hdr[1] != 0x00 {
+        return Err(ConnectorError::Custom(format!("SOCKS5 connect request failed with error code: {}", resp_hdr[1])));
+    }
+
+    match resp_hdr[3] {
+        0x01 => {
+            let mut addr = [0u8; 4 + 2];
+            stream.read_exact(&mut addr).await
+                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 address read failed: {e}")))?;
+        }
+        0x03 => {
+            let mut len_buf = [0u8; 1];
+            stream.read_exact(&mut len_buf).await
+                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 domain len read failed: {e}")))?;
+            let mut domain_and_port = vec![0u8; len_buf[0] as usize + 2];
+            stream.read_exact(&mut domain_and_port).await
+                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 domain read failed: {e}")))?;
+        }
+        0x04 => {
+            let mut addr = [0u8; 16 + 2];
+            stream.read_exact(&mut addr).await
+                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 address read failed: {e}")))?;
+        }
+        _ => return Err(ConnectorError::Custom("Unsupported address type".into())),
+    }
+
+    Ok(())
+}
+
+async fn http_connect_handshake<S>(
+    stream: &mut S,
+    target_host: &str,
+    target_port: u16,
+    auth: Option<(String, String)>,
+) -> ConnectorResult<()>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    let mut req_str = format!("CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n");
+    if let Some((user, pass)) = &auth {
+        let creds = format!("{user}:{pass}");
+        let encoded = base64_encode(creds.as_bytes());
+        req_str.push_str(&format!("Proxy-Authorization: Basic {encoded}\r\n"));
+    }
+    req_str.push_str("\r\n");
+
+    stream.write_all(req_str.as_bytes()).await
+        .map_err(|e| ConnectorError::Custom(format!("HTTP proxy CONNECT failed: {e}")))?;
+
+    let mut header_buf = Vec::new();
+    let mut temp = [0u8; 1];
+    loop {
+        stream.read_exact(&mut temp).await
+            .map_err(|e| ConnectorError::Custom(format!("HTTP proxy read failed: {e}")))?;
+        header_buf.push(temp[0]);
+        if header_buf.ends_with(b"\r\n\r\n") {
+            break;
+        }
+        if header_buf.len() > 8192 {
+            return Err(ConnectorError::Custom("HTTP proxy response header too large".into()));
+        }
+    }
+
+    let headers_text = String::from_utf8_lossy(&header_buf);
+    let first_line = headers_text.lines().next().ok_or_else(|| ConnectorError::Custom("Empty HTTP proxy response".into()))?;
+    if !first_line.contains(" 200 ") {
+        return Err(ConnectorError::Custom(format!("HTTP proxy CONNECT rejected: {first_line}")));
+    }
+
+    Ok(())
+}
+
+fn get_tls_config(
+    tls_cipher_suites: &Option<Vec<String>>,
+    tls_alpn: &Option<Vec<String>>,
+) -> CoreResult<rustls::ClientConfig> {
+    let mut root_store = rustls::RootCertStore::empty();
+    let certs = rustls_native_certs::load_native_certs().certs;
+    for cert in certs {
+        root_store.add(cert).ok();
+    }
+
+    let provider = rustls::crypto::ring::default_provider();
+    let mut cipher_suites = provider.cipher_suites;
+
+    if let Some(custom_suites) = tls_cipher_suites {
+        cipher_suites.retain(|cs| {
+            let name = format!("{:?}", cs.suite()).to_uppercase();
+            custom_suites.iter().any(|c| name.contains(&c.to_uppercase()))
+        });
+    } else {
+        use rand::seq::SliceRandom;
+        let mut rng = rand::rng();
+        cipher_suites.shuffle(&mut rng);
+    }
+
+    let custom_provider = rustls::crypto::CryptoProvider {
+        cipher_suites,
+        ..provider
+    };
+
+    let mut tls_config = rustls::ClientConfig::builder_with_provider(std::sync::Arc::new(custom_provider))
+        .with_safe_default_protocol_versions()
+        .map_err(|e| CoreError::Connection(ConnectorError::Tls(e.to_string())))?
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
+
+    if let Some(alpn) = tls_alpn {
+        tls_config.alpn_protocols = alpn.iter().map(|s| s.as_bytes().to_vec()).collect();
+    } else {
+        tls_config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
+    }
+
+    Ok(tls_config)
+}
+
 pub async fn try_connect(
-    ssid: Ssid,
+    state: Arc<State>,
     url: String,
 ) -> ConnectorResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
     init_crypto_provider();
-    let connector = get_connector().map_err(|e| ConnectorError::Core(e.to_string()))?;
-
-    let user_agent = ssid.user_agent();
 
     let t_url = Url::parse(&url).map_err(|e| ConnectorError::UrlParsing(e.to_string()))?;
-    let host = t_url
+    let target_host = t_url
         .host_str()
         .ok_or(ConnectorError::UrlParsing("Host not found".into()))?;
+    let target_port = t_url.port().unwrap_or(match t_url.scheme() {
+        "wss" => 443,
+        "ws" => 80,
+        _ => return Err(ConnectorError::Custom(format!("Unsupported scheme: {}", t_url.scheme()))),
+    });
 
-    tracing::debug!(target: "PocketConnect", "Connecting to {} with UA: {} and Origin: https://pocketoption.com", host, user_agent);
+    let socket = if let Some(proxy_str) = &state.proxy {
+        let proxy_url = Url::parse(proxy_str)
+            .map_err(|e| ConnectorError::Custom(format!("Invalid proxy URL: {e}")))?;
+        let proxy_host = proxy_url
+            .host_str()
+            .ok_or_else(|| ConnectorError::Custom("Proxy host not found".into()))?;
+        let proxy_port = proxy_url.port().unwrap_or(match proxy_url.scheme() {
+            "https" => 443,
+            "http" => 80,
+            "socks5" | "socks5h" => 1080,
+            _ => return Err(ConnectorError::Custom(format!("Unsupported proxy scheme: {}", proxy_url.scheme()))),
+        });
 
-    let request = Request::builder()
+        let mut tcp = TcpStream::connect((proxy_host, proxy_port)).await
+            .map_err(|e| ConnectorError::Custom(format!("Failed to connect to proxy {proxy_host}:{proxy_port}: {e}")))?;
+
+        let auth = parse_auth(&proxy_url);
+        if proxy_url.scheme() == "https" {
+            let proxy_tls_config = get_tls_config(&state.tls_cipher_suites, &state.tls_alpn)
+                .map_err(|e| ConnectorError::Custom(format!("Failed to build proxy TLS config: {e}")))?;
+            let proxy_connector = tokio_rustls::TlsConnector::from(Arc::new(proxy_tls_config));
+            let server_name = ServerName::try_from(proxy_host)
+                .map_err(|e| ConnectorError::Custom(format!("Invalid proxy server name: {e}")))?
+                .to_owned();
+            let mut tls_stream = proxy_connector.connect(server_name, tcp).await
+                .map_err(|e| ConnectorError::Custom(format!("Proxy TLS handshake failed: {e}")))?;
+
+            http_connect_handshake(&mut tls_stream, target_host, target_port, auth).await?;
+            MaybeTlsStream::Rustls(tls_stream)
+        } else if proxy_url.scheme() == "http" {
+            http_connect_handshake(&mut tcp, target_host, target_port, auth).await?;
+            MaybeTlsStream::Plain(tcp)
+        } else if proxy_url.scheme() == "socks5" || proxy_url.scheme() == "socks5h" {
+            socks5_handshake(&mut tcp, target_host, target_port, auth).await?;
+            MaybeTlsStream::Plain(tcp)
+        } else {
+            return Err(ConnectorError::Custom(format!("Unsupported proxy scheme: {}", proxy_url.scheme())));
+        }
+    } else {
+        let tcp = TcpStream::connect((target_host, target_port)).await
+            .map_err(|e| ConnectorError::Custom(format!("Failed to connect to {target_host}:{target_port}: {e}")))?;
+        MaybeTlsStream::Plain(tcp)
+    };
+
+    let final_stream = if t_url.scheme() == "wss" {
+        let tls_config = get_tls_config(&state.tls_cipher_suites, &state.tls_alpn)
+            .map_err(|e| ConnectorError::Custom(format!("Failed to build TLS config: {e}")))?;
+        let connector = tokio_rustls::TlsConnector::from(Arc::new(tls_config));
+        let server_name = ServerName::try_from(target_host)
+            .map_err(|e| ConnectorError::Custom(format!("Invalid target server name: {e}")))?
+            .to_owned();
+
+        let tls_stream = match socket {
+            MaybeTlsStream::Plain(tcp) => {
+                connector.connect(server_name, tcp).await
+                    .map_err(|e| ConnectorError::Custom(format!("TLS handshake failed: {e}")))?
+            }
+            MaybeTlsStream::Rustls(_) => {
+                return Err(ConnectorError::Custom("Chained TLS streams are not supported".into()));
+            }
+            _ => {
+                return Err(ConnectorError::Custom("Unsupported stream type".into()));
+            }
+        };
+        MaybeTlsStream::Rustls(tls_stream)
+    } else {
+        socket
+    };
+
+    let user_agent = state.user_agent.clone().unwrap_or_else(|| state.ssid.user_agent());
+    let origin = state.origin.clone().unwrap_or_else(|| "https://pocketoption.com".to_string());
+
+    let mut request_builder = Request::builder()
         .uri(t_url.to_string())
-        .header("Host", host)
+        .header("Host", target_host)
         .header("User-Agent", user_agent)
-        .header("Origin", "https://pocketoption.com")
+        .header("Origin", origin)
         .header("Upgrade", "websocket")
         .header("Connection", "upgrade")
         .header("Sec-Websocket-Key", generate_key())
-        .header("Sec-Websocket-Version", "13")
+        .header("Sec-Websocket-Version", "13");
+
+    if let Some(ext) = &state.sec_websocket_extensions {
+        request_builder = request_builder.header("Sec-WebSocket-Extensions", ext);
+    }
+
+    let request = request_builder
         .body(())
         .map_err(|e| ConnectorError::HttpRequestBuild(e.to_string()))?;
 
     let (ws, _) = tokio::time::timeout(
         StdDuration::from_secs(10),
-        connect_async_tls_with_config(request, None, false, Some(connector.clone())),
+        client_async_with_config(request, final_stream, None),
     )
     .await
     .map_err(|_| ConnectorError::Timeout)?
     .map_err(|e| ConnectorError::Custom(e.to_string()))?;
+
     Ok(ws)
 }
 
