@@ -59,12 +59,6 @@ class TestDemoConnection:
         print(f"  is_demo: {is_demo}")
         assert isinstance(is_demo, bool), "Expected boolean from is_demo()"
 
-    @pytest.mark.asyncio
-    async def test_max_subscriptions_default(self, api):
-        """Test max_subscriptions returns default value of 4."""
-        max_subs = api.max_subscriptions()
-        print(f"  max_subscriptions: {max_subs}")
-        assert max_subs == 4, f"Expected 4, got {max_subs}"
 
     @pytest.mark.asyncio
     async def test_balance(self, api):
@@ -119,7 +113,7 @@ class TestDemoConnection:
 
     @pytest.mark.asyncio
     async def test_many_subscriptions(self, api):
-        """Test subscribing to more than 4 symbols concurrently to prove the limit is removed."""
+        """Test subscribing to many symbols concurrently."""
         assets = ["EURUSD_otc", "AUDJPY_otc", "USDCAD_otc", "XNGUSD_otc", "ETHUSD_otc"]
         streams = []
         try:
@@ -134,33 +128,6 @@ class TestDemoConnection:
                 if hasattr(stream, "cancel"):
                     stream.cancel()
 
-
-@pytest.mark.asyncio
-async def test_custom_max_subscriptions():
-    """Test configuring max_subscriptions via config."""
-    if not SSID:
-        pytest.skip("POCKET_OPTION_SSID not set")
-    from BinaryOptionsToolsV2.pocketoption.asynchronous import PocketOptionAsync
-
-    config = {
-        "connection_initialization_timeout_secs": 30,
-        "max_allowed_loops": 0,  # Unlimited reconnection attempts
-        "timeout_secs": 60,
-        "max_subscriptions": 8,
-    }
-    client = PocketOptionAsync(SSID, config=config)
-    # Wait for connection to stabilize
-    await asyncio.sleep(5)
-
-    max_subs = client.max_subscriptions()
-    print(f"  max_subscriptions: {max_subs}")
-    assert max_subs == 8, f"Expected 8, got {max_subs}"
-
-    connected = client.is_connected()
-    print(f"  is_connected: {connected}")
-    assert connected is True
-
-    await client.shutdown()
 
 
 if __name__ == "__main__":

@@ -25,6 +25,18 @@ class SyncSubscription:
         return json.loads(next(self.subscription))
 
 
+class SyncRawSubscription:
+    def __init__(self, subscription):
+        self.subscription = subscription
+
+    def __iter__(self):
+        return self
+
+    def __aiter__(self):
+        return self.subscription
+
+    def __next__(self):
+        return next(self.subscription)
 class RawHandlerSync:
     """Synchronous handler for advanced raw WebSocket message operations."""
 
@@ -443,6 +455,14 @@ class PocketOption:
         """
         return self._run(self._client.compile_candles(asset, custom_period, lookback_period))
 
+    def send_raw(self, message: str) -> None:
+        """Send a raw Engine.io/Socket.io message directly over the connection."""
+        self._run(self._client.send_raw(message))
+
+    def subscribe_raw(self) -> SyncRawSubscription:
+        """Subscribe to all incoming WebSocket messages verbatim."""
+        return SyncRawSubscription(self._run(self._client.subscribe_raw()))
+
     def subscribe_symbol(self, asset: str) -> SyncSubscription:
         """Subscribe to real-time price updates for a symbol.
 
@@ -538,13 +558,6 @@ class PocketOption:
         """
         return self._client.is_connected()
 
-    def max_subscriptions(self) -> int:
-        """Get the maximum number of concurrent subscriptions.
-
-        Returns:
-            The maximum number of allowed subscriptions.
-        """
-        return self._client.max_subscriptions()
 
     def wait_for_assets(self, timeout: float = 60.0) -> None:
         """Wait for asset data to finish loading.

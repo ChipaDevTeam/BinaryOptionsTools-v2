@@ -9,8 +9,7 @@ async def main(ssid: str):
     # Use context manager to ensure connection is authenticated and assets are loaded
     async with PocketOptionAsync(ssid) as api:
         # Create a validator for price updates
-        validator = Validator.regex(r'{"price":\d+\.\d+}')
-
+        validator = Validator.regex(r'\{"price":\d+\.\d+\}')
         # Create an iterator with 5 minute timeout
         stream = await api.create_raw_iterator(
             '42["price/subscribe"]',  # WebSocket subscription message

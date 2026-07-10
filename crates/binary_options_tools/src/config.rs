@@ -9,10 +9,12 @@ pub struct Config {
     pub connection_initialization_timeout: Duration,
     pub timeout: Duration,
     pub urls: Vec<Url>,
-    /// Maximum number of concurrent asset subscriptions per connection.
-    /// The PocketOption server typically limits this to 4, but demo accounts
-    /// may allow more. Defaults to 4.
-    pub max_subscriptions: usize,
+    pub proxy: Option<String>,
+    pub user_agent: Option<String>,
+    pub origin: Option<String>,
+    pub sec_websocket_extensions: Option<String>,
+    pub tls_cipher_suites: Option<Vec<String>>,
+    pub tls_alpn: Option<Vec<String>>,
 }
 
 impl Default for Config {
@@ -24,7 +26,12 @@ impl Default for Config {
             connection_initialization_timeout: Duration::from_secs(60),
             timeout: Duration::from_secs(30),
             urls: Vec::new(),
-            max_subscriptions: 4,
+            proxy: None,
+            user_agent: None,
+            origin: None,
+            sec_websocket_extensions: None,
+            tls_cipher_suites: None,
+            tls_alpn: None,
         }
     }
 }
@@ -46,7 +53,7 @@ mod tests {
         );
         assert_eq!(config.timeout, Duration::from_secs(30));
         assert!(config.urls.is_empty());
-        assert_eq!(config.max_subscriptions, 4);
+        assert!(config.proxy.is_none());
     }
 
     #[test]

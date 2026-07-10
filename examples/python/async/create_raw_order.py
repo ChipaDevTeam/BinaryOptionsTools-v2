@@ -18,7 +18,7 @@ async def main(ssid: str):
 
         # Raw order with timeout example
         try:
-            validator = Validator.regex(r'{"type":"signal","data":.*}')
+            validator = Validator.regex(r'\{"type":"signal","data":.*\}')
             response = await api.create_raw_order_with_timeout(
                 '42["signals/load"]', validator, timeout=timedelta(seconds=5)
             )

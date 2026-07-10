@@ -30,6 +30,17 @@ class AsyncSubscription:
         return json.loads(await anext(self.subscription))
 
 
+class AsyncRawSubscription:
+    def __init__(self, subscription):
+        """Asynchronous Iterator over raw message strings"""
+        self.subscription = subscription
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        return await anext(self.subscription)
+
 class RawHandler:
     """
     Handler for advanced raw WebSocket message operations.
@@ -987,6 +998,14 @@ class PocketOptionAsync:
 
         return json.loads(await self.client.compile_candles(asset, custom_period, lookback_period))
 
+    async def send_raw(self, message: str) -> None:
+        """Send a raw Engine.io/Socket.io message directly over the connection."""
+        await self.client.send_raw(message)
+
+    async def subscribe_raw(self) -> AsyncRawSubscription:
+        """Subscribe to all incoming WebSocket messages verbatim."""
+        return AsyncRawSubscription(await self.client.subscribe_raw())
+
     async def subscribe_symbol(self, asset: str) -> AsyncSubscription:
         """Subscribe to real-time raw price updates for an asset.
 
@@ -1128,14 +1147,6 @@ class PocketOptionAsync:
         """Returns whether the SSID passed basic format validation during init."""
         return self._ssid_valid
 
-    def max_subscriptions(self) -> int:
-        """
-        Returns the configured maximum number of concurrent subscriptions.
-
-        Returns:
-            int: Maximum number of concurrent asset subscriptions allowed
-        """
-        return self.client.max_subscriptions()
 
     async def disconnect(self) -> None:
         """

@@ -67,10 +67,6 @@ async fn test_connection_and_basic_info() {
             let server_time = api.server_time().await;
             println!("✓ Server time: {}", server_time);
 
-            // Test max_subscriptions
-            let max_subs = api.max_subscriptions();
-            assert!(max_subs > 0, "Max subscriptions should be positive");
-            println!("✓ Max subscriptions: {}", max_subs);
 
             // Shutdown
             api.shutdown().await.unwrap();
