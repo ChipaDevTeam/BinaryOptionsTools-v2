@@ -105,3 +105,4 @@ __pycache__/
 site
 logs_fail
 wheels/
+config.toml
