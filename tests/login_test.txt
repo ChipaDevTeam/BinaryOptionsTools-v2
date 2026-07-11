@@ -6,3 +6,4 @@ Referer: https://pocketoption.com/en/login/
 Cookie: po_uuid=REDACTED; gbraid=REDACTED; cl_id=REDACTED; qrator_msid2=REDACTED; a=REDACTED; ac=REDACTED; link_id=REDACTED
 
 email=user%40example.com&password=CHANGE-ME-PASSWORD&remember=on&gbraid=REDACTED&po_uuid=REDACTED&cl_id=REDACTED&a=REDACTED&ac=REDACTED&link_id=REDACTED&qrator_msid2=REDACTED
+
