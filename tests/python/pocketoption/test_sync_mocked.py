@@ -239,7 +239,6 @@ class MockPocketOptionAsync:
     def is_connected(self):
         return self._connected
 
-
     async def disconnect(self):
         self._connected = False
 
@@ -1163,7 +1162,6 @@ class TestSynchronousCoverage:
 
         # 4. is_connected
         assert sync_client.is_connected() is True
-
 
     def test_sync_subscription_magic_methods(self, sync_client):
         sub = sync_client.subscribe_symbol("EURUSD_otc")

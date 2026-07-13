@@ -371,6 +371,10 @@ fn get_tls_config(
     Ok(tls_config)
 }
 
+fn per_url_connect_timeout() -> StdDuration {
+    StdDuration::from_secs(15)
+}
+
 pub async fn try_connect(
     state: Arc<State>,
     url: String,
@@ -400,8 +404,13 @@ pub async fn try_connect(
             _ => return Err(ConnectorError::Custom(format!("Unsupported proxy scheme: {}", proxy_url.scheme()))),
         });
 
-        let mut tcp = TcpStream::connect((proxy_host, proxy_port)).await
-            .map_err(|e| ConnectorError::Custom(format!("Failed to connect to proxy {proxy_host}:{proxy_port}: {e}")))?;
+        let mut tcp = tokio::time::timeout(
+            per_url_connect_timeout(),
+            TcpStream::connect((proxy_host, proxy_port)),
+        )
+        .await
+        .map_err(|_| ConnectorError::Timeout)?
+        .map_err(|e| ConnectorError::Custom(format!("Failed to connect to proxy {proxy_host}:{proxy_port}: {e}")))?;
 
         let auth = parse_auth(&proxy_url);
         if proxy_url.scheme() == "https" {
@@ -411,8 +420,13 @@ pub async fn try_connect(
             let server_name = ServerName::try_from(proxy_host)
                 .map_err(|e| ConnectorError::Custom(format!("Invalid proxy server name: {e}")))?
                 .to_owned();
-            let mut tls_stream = proxy_connector.connect(server_name, tcp).await
-                .map_err(|e| ConnectorError::Custom(format!("Proxy TLS handshake failed: {e}")))?;
+            let mut tls_stream = tokio::time::timeout(
+                per_url_connect_timeout(),
+                proxy_connector.connect(server_name, tcp),
+            )
+            .await
+            .map_err(|_| ConnectorError::Timeout)?
+            .map_err(|e| ConnectorError::Custom(format!("Proxy TLS handshake failed: {e}")))?;
 
             http_connect_handshake(&mut tls_stream, target_host, target_port, auth).await?;
             MaybeTlsStream::Rustls(tls_stream)
@@ -426,8 +440,13 @@ pub async fn try_connect(
             return Err(ConnectorError::Custom(format!("Unsupported proxy scheme: {}", proxy_url.scheme())));
         }
     } else {
-        let tcp = TcpStream::connect((target_host, target_port)).await
-            .map_err(|e| ConnectorError::Custom(format!("Failed to connect to {target_host}:{target_port}: {e}")))?;
+        let tcp = tokio::time::timeout(
+            per_url_connect_timeout(),
+            TcpStream::connect((target_host, target_port)),
+        )
+        .await
+        .map_err(|_| ConnectorError::Timeout)?
+        .map_err(|e| ConnectorError::Custom(format!("Failed to connect to {target_host}:{target_port}: {e}")))?;
         MaybeTlsStream::Plain(tcp)
     };
 
@@ -441,8 +460,13 @@ pub async fn try_connect(
 
         let tls_stream = match socket {
             MaybeTlsStream::Plain(tcp) => {
-                connector.connect(server_name, tcp).await
-                    .map_err(|e| ConnectorError::Custom(format!("TLS handshake failed: {e}")))?
+                tokio::time::timeout(
+                    per_url_connect_timeout(),
+                    connector.connect(server_name, tcp),
+                )
+                .await
+                .map_err(|_| ConnectorError::Timeout)?
+                .map_err(|e| ConnectorError::Custom(format!("TLS handshake failed: {e}")))?
             }
             MaybeTlsStream::Rustls(_) => {
                 return Err(ConnectorError::Custom("Chained TLS streams are not supported".into()));

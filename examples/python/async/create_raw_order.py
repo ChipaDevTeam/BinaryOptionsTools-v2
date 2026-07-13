@@ -45,6 +45,7 @@ async def main(ssid: str):
         except Exception as e:
             print(f"Order with retry failed: {e}")
 
+
 if __name__ == "__main__":
     ssid = input("Please enter your ssid: ")
     asyncio.run(main(ssid))

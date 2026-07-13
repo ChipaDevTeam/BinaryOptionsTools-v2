@@ -15,6 +15,7 @@ async def main(ssid: str):
         async for candle in stream:
             print(f"Candle: {candle}")  # Each candle is in format of a dictionary
 
+
 if __name__ == "__main__":
     ssid = input("Please enter your ssid: ")
     asyncio.run(main(ssid))

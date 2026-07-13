@@ -3,7 +3,7 @@ import json
 import threading
 from datetime import timedelta
 from typing import Dict, List, Optional, Tuple, Union
-import sys 
+import sys
 
 from ..config import Config
 from ..validator import Validator as Validator
@@ -37,6 +37,8 @@ class SyncRawSubscription:
 
     def __next__(self):
         return next(self.subscription)
+
+
 class RawHandlerSync:
     """Synchronous handler for advanced raw WebSocket message operations."""
 
@@ -140,9 +142,11 @@ class PocketOption:
         self._lock = threading.RLock()
         loop = asyncio.new_event_loop()
         self._loop = loop
+
         def _run_loop(loop_to_run):
             asyncio.set_event_loop(loop_to_run)
             loop_to_run.run_forever()
+
         self._loop_thread = threading.Thread(target=_run_loop, args=(loop,), daemon=True)
         self._loop_thread.start()
         self._client = PocketOptionAsync(ssid, url=url, config=config)
@@ -151,7 +155,7 @@ class PocketOption:
 
     def __del__(self):
         self._cleanup_loop()
-    
+
     def _cleanup_loop(self):
         loop = getattr(self, "_loop", None)
         if loop is None or loop.is_closed():
@@ -163,7 +167,7 @@ class PocketOption:
                 future.result(timeout=5)
         except Exception:
             pass
-    
+
         loop.call_soon_threadsafe(loop.stop)
         thread = getattr(self, "_loop_thread", None)
         if thread is not None and thread.is_alive():
@@ -171,7 +175,7 @@ class PocketOption:
             # The daemon thread will be killed automatically, so just skip the join.
             if not sys.is_finalizing():
                 thread.join(timeout=2)
-    
+
         try:
             loop.close()
         except Exception:
@@ -557,7 +561,6 @@ class PocketOption:
             True if connected, False otherwise.
         """
         return self._client.is_connected()
-
 
     def wait_for_assets(self, timeout: float = 60.0) -> None:
         """Wait for asset data to finish loading.
