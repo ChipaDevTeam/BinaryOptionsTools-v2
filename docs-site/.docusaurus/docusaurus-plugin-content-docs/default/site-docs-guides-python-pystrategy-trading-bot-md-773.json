@@ -1,0 +1,24 @@
+{
+  "id": "guides/python-pystrategy-trading-bot",
+  "title": "Python Trading Bot Guide - PyStrategy Framework",
+  "description": "Complete guide for building an advanced Pocket Option trading bot using the PyStrategy framework with async support.",
+  "source": "@site/../docs/guides/python-pystrategy-trading-bot.md",
+  "sourceDirName": "guides",
+  "slug": "/guides/python-pystrategy-trading-bot",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/guides/python-pystrategy-trading-bot",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/guides/python-pystrategy-trading-bot.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Supported Assets and Timeframes",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/guides/assets-timeframes"
+  },
+  "next": {
+    "title": "System Architecture: Project Structure",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/architecture/structure"
+  }
+}

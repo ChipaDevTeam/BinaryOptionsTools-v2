@@ -1,0 +1,28 @@
+{
+  "id": "examples/kotlin/index",
+  "title": "Kotlin Examples for BinaryOptionsTools",
+  "description": "Example Kotlin programs demonstrating UniFFI bindings usage with coroutines.",
+  "source": "@site/../docs/examples/kotlin/index.md",
+  "sourceDirName": "examples/kotlin",
+  "slug": "/examples/kotlin",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/kotlin",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/examples/kotlin/index.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 6,
+  "frontMatter": {
+    "sidebar_position": 6,
+    "slug": "/examples/kotlin"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Swift Examples for BinaryOptionsTools",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/swift"
+  },
+  "next": {
+    "title": "Go Examples for BinaryOptionsTools",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/go"
+  }
+}

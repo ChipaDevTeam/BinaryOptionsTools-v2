@@ -1,0 +1,28 @@
+{
+  "id": "architecture/raw-module",
+  "title": "Raw Module Architecture and Usage",
+  "description": "This document explains the design of the Raw module: a flexible, validator-driven pipeline that lets you build features not covered by the built-in API (e.g., custom signals) while reusing the WebSocket connection, reconnection, and keep-alive logic.",
+  "source": "@site/../docs/architecture/raw-module.md",
+  "sourceDirName": "architecture",
+  "slug": "/architecture/raw-module",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/architecture/raw-module",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/architecture/raw-module.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "sidebar_position": 3,
+    "slug": "/architecture/raw-module"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "System Architecture: Data Flow and Components",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/architecture/dataflow"
+  },
+  "next": {
+    "title": "Tutorials",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/tutorials"
+  }
+}

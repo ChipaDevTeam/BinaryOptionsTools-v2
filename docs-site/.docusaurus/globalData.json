@@ -1,0 +1,165 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "path": "/chipadevorg/BinaryOptionsTools-v2/",
+      "versions": [
+        {
+          "name": "current",
+          "label": "Next",
+          "isLast": true,
+          "path": "/chipadevorg/BinaryOptionsTools-v2/",
+          "mainDocId": "INDEX",
+          "docs": [
+            {
+              "id": "api/python",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/api/python",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "api/reference",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/api/reference",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "architecture/dataflow",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/architecture/dataflow",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "architecture/raw-module",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/architecture/raw-module",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "architecture/structure",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/architecture/structure",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "examples/csharp/index",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/examples/csharp",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "examples/go/index",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/examples/go",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "examples/index",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/examples"
+            },
+            {
+              "id": "examples/javascript/index",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/examples/javascript",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "examples/kotlin/index",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/examples/kotlin",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "examples/python/async/index",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/examples/python/async",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "examples/python/sync/index",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/examples/python/sync",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "examples/ruby/index",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/examples/ruby",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "examples/rust/index",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/examples/rust",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "examples/swift/index",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/examples/swift",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "guides/assets-timeframes",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/guides/assets-timeframes",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "guides/python-pystrategy-trading-bot",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/guides/python-pystrategy-trading-bot",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "guides/raw-handler",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/guides/raw-handler",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "guides/trading",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/guides/trading",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "INDEX",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/"
+            },
+            {
+              "id": "intro",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/intro",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "macro_proposals",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/macro_proposals"
+            },
+            {
+              "id": "OVERVIEW",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/overview",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "project/breaking-changes-0.2.6",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/project/breaking-changes-0.2.6",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "project/deployment",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/project/deployment",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "project/raw-handler-summary",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/project/raw-handler-summary",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "tutorials/index",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/tutorials",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "tutorials/scripts/index",
+              "path": "/chipadevorg/BinaryOptionsTools-v2/tutorials/scripts",
+              "sidebar": "tutorialSidebar"
+            }
+          ],
+          "draftIds": [],
+          "sidebars": {
+            "tutorialSidebar": {
+              "link": {
+                "path": "/chipadevorg/BinaryOptionsTools-v2/intro",
+                "label": "Getting Started"
+              }
+            }
+          }
+        }
+      ],
+      "breadcrumbs": true
+    }
+  }
+}

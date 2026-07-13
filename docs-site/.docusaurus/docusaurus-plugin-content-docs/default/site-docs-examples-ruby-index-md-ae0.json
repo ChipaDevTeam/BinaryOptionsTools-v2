@@ -1,0 +1,28 @@
+{
+  "id": "examples/ruby/index",
+  "title": "Ruby Examples for BinaryOptionsTools",
+  "description": "Example Ruby programs demonstrating the BinaryOptionsTools library with Async fiber support.",
+  "source": "@site/../docs/examples/ruby/index.md",
+  "sourceDirName": "examples/ruby",
+  "slug": "/examples/ruby",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/ruby",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/examples/ruby/index.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 8,
+  "frontMatter": {
+    "sidebar_position": 8,
+    "slug": "/examples/ruby"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Go Examples for BinaryOptionsTools",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/go"
+  },
+  "next": {
+    "title": "C# Examples for BinaryOptionsTools",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/csharp"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "examples/go/index",
+  "title": "Go Examples for BinaryOptionsTools",
+  "description": "Example Go programs demonstrating the BinaryOptionsTools library.",
+  "source": "@site/../docs/examples/go/index.md",
+  "sourceDirName": "examples/go",
+  "slug": "/examples/go",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/go",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/examples/go/index.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 7,
+  "frontMatter": {
+    "sidebar_position": 7,
+    "slug": "/examples/go"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Kotlin Examples for BinaryOptionsTools",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/kotlin"
+  },
+  "next": {
+    "title": "Ruby Examples for BinaryOptionsTools",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/ruby"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "examples/rust/index",
+  "title": "Rust Examples",
+  "description": "This directory contains example Rust programs demonstrating how to use the BinaryOptionsTools library.",
+  "source": "@site/../docs/examples/rust/index.md",
+  "sourceDirName": "examples/rust",
+  "slug": "/examples/rust",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/rust",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/examples/rust/index.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "sidebar_position": 3,
+    "slug": "/examples/rust"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Python Sync Examples",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/python/sync"
+  },
+  "next": {
+    "title": "JavaScript / TypeScript Examples",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/javascript"
+  }
+}

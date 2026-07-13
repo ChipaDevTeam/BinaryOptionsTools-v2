@@ -1,0 +1,28 @@
+{
+  "id": "examples/python/async/index",
+  "title": "Python Async Examples",
+  "description": "This directory contains asynchronous examples using BinaryOptionsToolsV2.",
+  "source": "@site/../docs/examples/python/async/index.md",
+  "sourceDirName": "examples/python/async",
+  "slug": "/examples/python/async",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/python/async",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/examples/python/async/index.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "sidebar_position": 1,
+    "slug": "/examples/python/async"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "BinaryOptionsToolsV2 Python API Reference",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/api/python"
+  },
+  "next": {
+    "title": "Python Sync Examples",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/python/sync"
+  }
+}

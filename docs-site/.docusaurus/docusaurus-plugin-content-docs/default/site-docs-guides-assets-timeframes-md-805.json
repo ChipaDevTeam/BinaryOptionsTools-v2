@@ -1,0 +1,24 @@
+{
+  "id": "guides/assets-timeframes",
+  "title": "Supported Assets and Timeframes",
+  "description": "This document lists all supported assets and timeframes for the BinaryOptionsTools-v2 API.",
+  "source": "@site/../docs/guides/assets-timeframes.md",
+  "sourceDirName": "guides",
+  "slug": "/guides/assets-timeframes",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/guides/assets-timeframes",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/guides/assets-timeframes.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Raw Handler & Validator Examples",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/guides/raw-handler"
+  },
+  "next": {
+    "title": "Python Trading Bot Guide - PyStrategy Framework",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/guides/python-pystrategy-trading-bot"
+  }
+}

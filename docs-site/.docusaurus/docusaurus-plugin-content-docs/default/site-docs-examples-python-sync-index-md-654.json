@@ -1,0 +1,28 @@
+{
+  "id": "examples/python/sync/index",
+  "title": "Python Sync Examples",
+  "description": "This directory contains synchronous examples using BinaryOptionsToolsV2.",
+  "source": "@site/../docs/examples/python/sync/index.md",
+  "sourceDirName": "examples/python/sync",
+  "slug": "/examples/python/sync",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/python/sync",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/examples/python/sync/index.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "sidebar_position": 2,
+    "slug": "/examples/python/sync"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Python Async Examples",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/python/async"
+  },
+  "next": {
+    "title": "Rust Examples",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/rust"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "examples/csharp/index",
+  "title": "C# Examples for BinaryOptionsTools",
+  "description": "Examples for BinaryOptionsTools",
+  "source": "@site/../docs/examples/csharp/index.md",
+  "sourceDirName": "examples/csharp",
+  "slug": "/examples/csharp",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/csharp",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/examples/csharp/index.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 9,
+  "frontMatter": {
+    "sidebar_position": 9,
+    "slug": "/examples/csharp"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Ruby Examples for BinaryOptionsTools",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/ruby"
+  },
+  "next": {
+    "title": "Trading Guide - BinaryOptionsToolsUni",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/guides/trading"
+  }
+}

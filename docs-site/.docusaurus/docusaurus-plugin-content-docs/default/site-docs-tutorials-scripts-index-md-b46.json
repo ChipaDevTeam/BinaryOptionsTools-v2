@@ -1,0 +1,28 @@
+{
+  "id": "tutorials/scripts/index",
+  "title": "SSID Fetcher Userscript",
+  "description": "Automated SSID retrieval script for PocketOption.",
+  "source": "@site/../docs/tutorials/scripts/index.md",
+  "sourceDirName": "tutorials/scripts",
+  "slug": "/tutorials/scripts",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/tutorials/scripts",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/tutorials/scripts/index.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "sidebar_position": 1,
+    "slug": "/tutorials/scripts"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Tutorials",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/tutorials"
+  },
+  "next": {
+    "title": "GitLab Pages Deployment Guide",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/project/deployment"
+  }
+}

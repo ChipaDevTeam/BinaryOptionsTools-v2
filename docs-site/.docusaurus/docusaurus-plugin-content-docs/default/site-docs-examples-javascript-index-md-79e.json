@@ -1,0 +1,28 @@
+{
+  "id": "examples/javascript/index",
+  "title": "JavaScript / TypeScript Examples",
+  "description": "This directory contains JavaScript examples using BinaryOptionsToolsV2.",
+  "source": "@site/../docs/examples/javascript/index.md",
+  "sourceDirName": "examples/javascript",
+  "slug": "/examples/javascript",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/javascript",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/examples/javascript/index.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "sidebar_position": 4,
+    "slug": "/examples/javascript"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Rust Examples",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/rust"
+  },
+  "next": {
+    "title": "Swift Examples for BinaryOptionsTools",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/examples/swift"
+  }
+}

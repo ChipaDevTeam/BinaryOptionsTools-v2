@@ -1,0 +1,28 @@
+{
+  "id": "project/deployment",
+  "title": "GitLab Pages Deployment Guide",
+  "description": "This documentation site is deployed to GitLab Pages using Docusaurus.",
+  "source": "@site/../docs/project/deployment.md",
+  "sourceDirName": "project",
+  "slug": "/project/deployment",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/project/deployment",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/project/deployment.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "sidebar_position": 1,
+    "slug": "/project/deployment"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "SSID Fetcher Userscript",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/tutorials/scripts"
+  },
+  "next": {
+    "title": "Breaking Changes in Version 0.2.6",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/project/breaking-changes-0.2.6"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "architecture/dataflow",
+  "title": "System Architecture: Data Flow and Components",
+  "description": "This document shows how data moves through the system: Client, Runner, Router, Middleware, ApiModules, LightweightModules, Lightweight Handlers, and Handles.",
+  "source": "@site/../docs/architecture/dataflow.md",
+  "sourceDirName": "architecture",
+  "slug": "/architecture/dataflow",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/architecture/dataflow",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/architecture/dataflow.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "sidebar_position": 2,
+    "slug": "/architecture/dataflow"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "System Architecture: Project Structure",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/architecture/structure"
+  },
+  "next": {
+    "title": "Raw Module Architecture and Usage",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/architecture/raw-module"
+  }
+}

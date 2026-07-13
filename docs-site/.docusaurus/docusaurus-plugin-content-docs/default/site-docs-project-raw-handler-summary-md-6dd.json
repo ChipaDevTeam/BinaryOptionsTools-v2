@@ -1,0 +1,20 @@
+{
+  "id": "project/raw-handler-summary",
+  "title": "✅ Raw Handler & Validator Support Added",
+  "description": "Summary",
+  "source": "@site/../docs/project/raw-handler-summary.md",
+  "sourceDirName": "project",
+  "slug": "/project/raw-handler-summary",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/project/raw-handler-summary",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/project/raw-handler-summary.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Breaking Changes in Version 0.2.6",
+    "permalink": "/chipadevorg/BinaryOptionsTools-v2/project/breaking-changes-0.2.6"
+  }
+}

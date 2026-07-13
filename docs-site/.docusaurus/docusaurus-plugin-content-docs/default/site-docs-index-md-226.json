@@ -1,0 +1,15 @@
+{
+  "id": "INDEX",
+  "title": "BinaryOptionsToolsUni Documentation",
+  "description": "Complete multi-language documentation for the BinaryOptionsTools library.",
+  "source": "@site/../docs/INDEX.md",
+  "sourceDirName": ".",
+  "slug": "/",
+  "permalink": "/chipadevorg/BinaryOptionsTools-v2/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/../docs/INDEX.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {}
+}
