@@ -1,45 +1,60 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::sync::Notify;
+use tokio::sync::watch;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct Signals {
-    is_connected: Arc<AtomicBool>,
-    connected_notify: Arc<Notify>,
-    disconnected_notify: Arc<Notify>,
+    connected_watch: Arc<watch::Sender<bool>>,
+    connected_receiver: watch::Receiver<bool>,
 }
 
 impl Signals {
-    /// Call this when a connection is established.
+    pub fn new() -> Self {
+        let (tx, rx) = watch::channel(false);
+        Self {
+            connected_watch: Arc::new(tx),
+            connected_receiver: rx,
+        }
+    }
+
     pub fn set_connected(&self) {
-        self.is_connected.store(true, Ordering::SeqCst);
-        self.connected_notify.notify_waiters();
+        let _ = self.connected_watch.send_replace(true);
     }
 
-    /// Call this when a disconnection occurs.
     pub fn set_disconnected(&self) {
-        self.is_connected.store(false, Ordering::SeqCst);
-        self.disconnected_notify.notify_waiters();
+        let _ = self.connected_watch.send_replace(false);
     }
 
-    /// Check current connection state.
     pub fn is_connected(&self) -> bool {
-        self.is_connected.load(Ordering::SeqCst)
+        *self.connected_receiver.borrow()
     }
 
-    /// Wait for the next connection event.
     pub async fn wait_connected(&self) {
-        // Only wait if not already connected
-        if !self.is_connected() {
-            self.connected_notify.notified().await;
+        let mut rx = self.connected_receiver.clone();
+        if *rx.borrow_and_update() {
+            return;
+        }
+        while rx.changed().await.is_ok() {
+            if *rx.borrow_and_update() {
+                return;
+            }
         }
     }
 
-    /// Wait for the next disconnection event.
     pub async fn wait_disconnected(&self) {
-        // Only wait if currently connected
-        if self.is_connected() {
-            self.disconnected_notify.notified().await;
+        let mut rx = self.connected_receiver.clone();
+        if !*rx.borrow_and_update() {
+            return;
         }
+        while rx.changed().await.is_ok() {
+            if !*rx.borrow_and_update() {
+                return;
+            }
+        }
+    }
+}
+
+impl Default for Signals {
+    fn default() -> Self {
+        Self::new()
     }
 }

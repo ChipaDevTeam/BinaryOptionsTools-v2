@@ -114,7 +114,7 @@ impl Validator {
         &self.inner
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Kept for API consistency; mirrors RawHandler::from_inner pattern
     pub(crate) fn from_inner(inner: InnerValidator) -> Arc<Self> {
         Arc::new(Self { inner })
     }
@@ -127,4 +127,3 @@ impl Default for Validator {
         }
     }
 }
-

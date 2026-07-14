@@ -5,6 +5,29 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.12] - 2026-06-30
+
+### Added
+
+- **UTC Candle Compilation**: Refactored candle compilation to fetch raw 1-second ticks and manually build candles based on UTC time boundaries (`timestamp / period * period`), avoiding server-side candle time-alignment mismatches, overlaps, and gaps.
+- Added `getBalance` to initial connection messages to ensure balance is fetched immediately upon reconnecting.
+- Added warnings and logging to previously swallowed async channel errors.
+- Exposed more functions in the python documentation wrapper.
+
+### Changed
+
+- Replaced the Notify-based wait primitives in `Signals` with stateful `tokio::sync::watch` to prevent TOCTOU race conditions.
+- Derived `Debug` for `Action` in `crates/bindings_pyo3/src/framework.rs` to fix test compilation.
+- Updated all internal crates and dependencies to version `0.2.12`.
+
+### Fixed
+
+- Fixed subscription restoration to fire on both `on_connect` and `on_reconnect` paths so subscriptions are not lost on explicit disconnects.
+- Fixed memory leaks: Added pruning/eviction to `latest_ticks` in `GetCandlesApiModule` and cleared pending state (`pending_market_orders`, `recent_trades`, `pending_deals`) on reconnection.
+- Fixed panics: Replaced `.expect()` calls with poison recovery (`.unwrap_or_else(|e| e.into_inner())`) in `state.rs` and `raw.rs`, and returned `Result` from `RuleBuilder::regex()` instead of panicking on invalid regexes.
+- Fixed module lifecycle hang: Implemented proper waiter notification on module `Drop` for `PendingTrades`, `Raw`, and `HistoricalData` modules.
+- Fixed command queue mismatches in `pending_trades.rs` by separating queues per command type.
+
 ## [0.2.10] - 2026-03-22
 
 ### Added
@@ -238,15 +261,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Links
 
-- [GitHub Releases](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases)
+- [GitLab Releases](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases)
 - [PyPI Package](https://pypi.org/project/binaryoptionstoolsv2/)
-- [Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/)
+- [Documentation](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)
 
-[0.2.10]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.10
-[0.2.9]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.9
-[0.2.8]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/v0.2.8
-[0.2.6]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.6
-[0.2.5]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.5
-[0.2.4]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.4
-[0.2.3]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.3
-[0.2.0]: https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/tag/BinaryOptionsToolsV2-0.2.0
+[0.2.12]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.12
+[0.2.11]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.11
+[0.2.10]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.10
+[0.2.9]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.9
+[0.2.8]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.8
+[0.2.6]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.6
+[0.2.5]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.5
+[0.2.4]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.4
+[0.2.3]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.3
+[0.2.0]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.0

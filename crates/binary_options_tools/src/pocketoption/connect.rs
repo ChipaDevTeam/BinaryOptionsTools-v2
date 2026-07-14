@@ -1,6 +1,6 @@
 use crate::{
     pocketoption::utils::try_connect,
-    pocketoption::{ssid::Ssid, state::State},
+    pocketoption::state::State,
 };
 use binary_options_tools_core::{
     connector::{Connector, ConnectorError, ConnectorResult},
@@ -25,11 +25,11 @@ impl PocketConnect {
     async fn connect_multiple(
         &self,
         url: Vec<String>,
-        ssid: Ssid,
+        state: Arc<State>,
     ) -> ConnectorResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
         for u in url {
             info!(target: "PocketConnectThread", "Connecting to PocketOption at {}", u);
-            match try_connect(ssid.clone(), u.clone()).await {
+            match try_connect(state.clone(), u.clone()).await {
                 Ok(stream) => {
                     debug!(target: "PocketConnect", "Successfully connected to PocketOption");
                     return Ok(stream);
@@ -58,7 +58,7 @@ impl Connector<State> for PocketConnect {
         let url = state.default_connection_url.clone();
         if let Some(url) = url {
             debug!(target: "PocketConnect", "Connecting to PocketOption at {}", url);
-            match try_connect(creds.clone(), url.clone()).await {
+            match try_connect(state.clone(), url.clone()).await {
                 Ok(stream) => return Ok(stream),
                 Err(e) => {
                     warn!(target: "PocketConnect", "Failed to connect to default URL {}: {}", url, e)
@@ -69,7 +69,7 @@ impl Connector<State> for PocketConnect {
         if !state.urls.is_empty() {
             debug!(target: "PocketConnect", "Trying fallback URLs from config...");
             if let Ok(stream) = self
-                .connect_multiple(state.urls.clone(), creds.clone())
+                .connect_multiple(state.urls.clone(), state.clone())
                 .await
             {
                 return Ok(stream);
@@ -83,7 +83,7 @@ impl Connector<State> for PocketConnect {
                 FALLBACK_URLS.iter().map(|s| s.to_string()).collect()
             }
         };
-        self.connect_multiple(urls, creds).await
+        self.connect_multiple(urls, state).await
     }
 
     /// Gracefully disconnects from the PocketOption server.
@@ -97,5 +97,50 @@ impl Connector<State> for PocketConnect {
         debug!(target: "PocketConnect", "Sent Socket.io disconnect signal (41).");
         debug!(target: "PocketConnect", "Closing WebSocket transport.");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pocketoption::ssid::Ssid;
+
+    #[test]
+    fn test_fallback_urls_are_valid_urls() {
+        for url in FALLBACK_URLS {
+            assert!(url.starts_with("wss://"), "Expected wss:// URL, got: {url}");
+            assert!(
+                url.contains(".market/"),
+                "Expected .market/ in URL, got: {url}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_fallback_urls_count() {
+        assert_eq!(FALLBACK_URLS.len(), 3, "Expected 3 fallback URLs");
+    }
+
+    #[test]
+    fn test_pocket_connect_construct() {
+        let _connector = PocketConnect;
+    }
+
+    #[test]
+    fn test_pocket_connect_is_clone() {
+        let _c1 = PocketConnect;
+        let _c2 = _c1.clone();
+    }
+
+    #[test]
+    fn connect_multiple_empty_urls_returns_error() {
+        let connector = PocketConnect;
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let ssid = Ssid::parse(
+            r#"42["auth",{"sessionToken":"test","uid":0,"platform":2,"currentUrl":"demo","isFastHistory":false,"isOptimized":true}]"#
+        ).unwrap();
+        let state = Arc::new(crate::pocketoption::state::StateBuilder::default().ssid(ssid).build().unwrap());
+        let result = rt.block_on(async { connector.connect_multiple(vec![], state).await });
+        assert!(result.is_err());
     }
 }

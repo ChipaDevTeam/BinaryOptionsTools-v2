@@ -30,6 +30,17 @@ class AsyncSubscription:
         return json.loads(await anext(self.subscription))
 
 
+class AsyncRawSubscription:
+    def __init__(self, subscription):
+        """Asynchronous Iterator over raw message strings"""
+        self.subscription = subscription
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        return await anext(self.subscription)
+
 class RawHandler:
     """
     Handler for advanced raw WebSocket message operations.
@@ -191,7 +202,7 @@ def sanitize_and_validate_ssid(ssid: str, logger: "Logger") -> str:
             warnings_list.append(f"missing required field '{field}'")
 
     session = auth_data.get("session", "")
-    if session and not re.match(r'^[a-zA-Z0-9_\-]{10,}$', str(session)):
+    if session and not re.match(r"^[a-zA-Z0-9_\-]{10,}$", str(session)):
         warnings_list.append(f"session token has unexpected format (length={len(str(session))})")
 
     uid = auth_data.get("uid")
@@ -219,7 +230,8 @@ def sanitize_and_validate_ssid(ssid: str, logger: "Logger") -> str:
         raise ValueError(
             "Invalid SSID: " + "; ".join(critical) + ". "
             "The SSID payload must contain 'session' and 'uid' fields. "
-            "Ensure your SSID follows the format: 42['auth',{{'session':'...','uid':123,...}}]")
+            "Ensure your SSID follows the format: 42['auth',{{'session':'...','uid':123,...}}]"
+        )
 
     return ssid
 
@@ -589,7 +601,7 @@ class PocketOptionAsync:
         if deal_json is None:
             return None
         return json.loads(deal_json)
-    
+
     async def open_pending_order(
         self,
         open_type: int,
@@ -608,7 +620,7 @@ class PocketOptionAsync:
             open_type (int): The type of the pending order.
             amount (float): The amount to trade.
             asset (str): The asset symbol (e.g., "EURUSD_otc").
-            open_time (int | str): The server time to open the trade. 
+            open_time (int | str): The server time to open the trade.
                 Can be a Unix timestamp (int) or a formatted string "YYYY-MM-DD HH:MM:SS".
             open_price (float): The price to open the trade at.
             timeframe (int): The duration of the trade in seconds.
@@ -641,13 +653,14 @@ class PocketOptionAsync:
                         # We can't easily convert "YYYY-MM-DD" to timestamp without more info,
                         # but for the sake of not crashing, we'll try to parse it or use 0.
                         from datetime import datetime
+
                         try:
                             # PocketOption strings are usually UTC
-                            dt = datetime.strptime(open_time, '%Y-%m-%d %H:%M:%S')
+                            dt = datetime.strptime(open_time, "%Y-%m-%d %H:%M:%S")
                             actual_open_time = int(dt.timestamp())
                         except Exception:
                             actual_open_time = 0
-                
+
                 # Retry with converted integer
                 order = await self.client.open_pending_order(
                     open_type, amount, asset, actual_open_time, open_price, timeframe, min_payout, command
@@ -788,7 +801,6 @@ class PocketOptionAsync:
         if deal_json is None:
             return None
         return json.loads(deal_json)
-
 
     async def clear_closed_deals(self) -> None:
         """Removes all closed deals from the client's memory.
@@ -986,6 +998,14 @@ class PocketOptionAsync:
 
         return json.loads(await self.client.compile_candles(asset, custom_period, lookback_period))
 
+    async def send_raw(self, message: str) -> None:
+        """Send a raw Engine.io/Socket.io message directly over the connection."""
+        await self.client.send_raw(message)
+
+    async def subscribe_raw(self) -> AsyncRawSubscription:
+        """Subscribe to all incoming WebSocket messages verbatim."""
+        return AsyncRawSubscription(await self.client.subscribe_raw())
+
     async def subscribe_symbol(self, asset: str) -> AsyncSubscription:
         """Subscribe to real-time raw price updates for an asset.
 
@@ -1127,14 +1147,6 @@ class PocketOptionAsync:
         """Returns whether the SSID passed basic format validation during init."""
         return self._ssid_valid
 
-    def max_subscriptions(self) -> int:
-        """
-        Returns the configured maximum number of concurrent subscriptions.
-
-        Returns:
-            int: Maximum number of concurrent asset subscriptions allowed
-        """
-        return self.client.max_subscriptions()
 
     async def disconnect(self) -> None:
         """
@@ -1520,6 +1532,3 @@ class PocketOptionAsync:
             async context manager or when it is garbage collected.
         """
         return await self.client.create_raw_iterator(message, validator.raw_validator, timeout)
-
-
-

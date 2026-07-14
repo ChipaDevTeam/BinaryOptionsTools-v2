@@ -1,46 +1,15 @@
 mod action;
-mod config;
-mod deserialize;
-mod impls;
 mod region;
-mod serialize;
 mod timeout;
 
 use action::ActionImpl;
-use config::Config;
-use deserialize::Deserializer;
 use region::RegionImpl;
 use timeout::{Timeout, TimeoutArgs, TimeoutBody};
 
 use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use quote::quote;
-use serialize::Serializer;
-use syn::{parse_macro_input, DeriveInput, ItemStruct};
-
-#[proc_macro_attribute]
-pub fn lightweight_module(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as ItemStruct);
-    impls::module_impl::expand_lightweight_module(input).into()
-}
-
-#[proc_macro_attribute]
-pub fn api_module(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as ItemStruct);
-    impls::module_impl::expand_api_module(input).into()
-}
-
-#[proc_macro]
-pub fn deserialize(input: TokenStream) -> TokenStream {
-    let d = parse_macro_input!(input as Deserializer);
-    quote! { #d }.into()
-}
-
-#[proc_macro]
-pub fn serialize(input: TokenStream) -> TokenStream {
-    let s = parse_macro_input!(input as Serializer);
-    quote! { #s }.into()
-}
+use syn::{parse_macro_input, DeriveInput};
 
 /// This macro wraps any async function and transforms it's output `T` into `anyhow::Result<T>`,
 /// if the function doesn't end before the timeout it will raise an error
@@ -57,16 +26,6 @@ pub fn timeout(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // println!("{q}");
     q.into()
-}
-
-#[proc_macro_derive(Config, attributes(config))]
-pub fn config(input: TokenStream) -> TokenStream {
-    let parsed = parse_macro_input!(input as DeriveInput);
-    let config = match Config::from_derive_input(&parsed) {
-        Ok(config) => config,
-        Err(e) => return e.write_errors().into(),
-    };
-    quote! { #config }.into()
 }
 
 #[proc_macro_derive(RegionImpl, attributes(region))]

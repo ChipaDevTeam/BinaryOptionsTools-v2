@@ -11,7 +11,7 @@ def main(ssid: str):
     time.sleep(5)  # Wait for connection to establish
 
     # Create a validator for price updates
-    validator = Validator.regex(r'{"price":\d+\.\d+}')
+    validator = Validator.regex(r'\{"price":\d+\.\d+\}')
 
     # Create an iterator with 5 minute timeout
     stream = api.create_raw_iterator(

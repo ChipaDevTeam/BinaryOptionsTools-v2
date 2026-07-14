@@ -11,7 +11,7 @@ authors = [
 ]
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 keywords = ["binary options", "trading", "pocketoption", "finance", "async"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -20,7 +20,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -40,11 +39,11 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
-Documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html"
-Repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
-"Bug Reports" = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/issues"
-"Source Code" = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
+Homepage = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/"
+Documentation = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html"
+Repository = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"
+"Bug Reports" = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues"
+"Source Code" = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"
 Discord = "https://discord.com/invite/chipa-1261483112991555665"
 
 [tool.maturin]
@@ -56,8 +55,8 @@ manifest-path = "../crates/bindings_pyo3/Cargo.toml"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["../tests"]
+testpaths = ["../tests/python"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py38"
+target-version = "py39"

@@ -1,5 +1,6 @@
 // Example showing how to check trade results
-use binary_options_tools::PocketOption;
+use binary_options_tools::pocketoption::PocketOption;
+use rust_decimal::Decimal;
 use std::time::Duration;
 
 #[tokio::main]
@@ -11,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::time::sleep(Duration::from_secs(5)).await;
     
     // Place a buy trade
-    let (trade_id, deal) = client.buy("EURUSD_otc", 60, 1.0).await?;
+    let (trade_id, deal) = client.buy("EURUSD_otc", 60, Decimal::from(1)).await?;
     println!("Trade placed with ID: {}", trade_id);
     println!("Deal data: {:?}", deal);
     
@@ -26,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // You can also use result_with_timeout to wait for the result automatically
     println!("\n--- Placing another trade with automatic result checking ---");
-    let (trade_id2, _) = client.buy("EURUSD_otc", 60, 1.0).await?;
+    let (trade_id2, _) = client.buy("EURUSD_otc", 60, Decimal::from(1)).await?;
     println!("Trade placed with ID: {}", trade_id2);
     
     // This will wait for the trade to complete (with 70 second timeout)

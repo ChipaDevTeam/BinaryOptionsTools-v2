@@ -4,14 +4,20 @@
 
 ### ChipaDevTeam
 
-- **GitHub**: [@ChipaDevTeam](https://github.com/ChipaDevTeam)
+- **GitLab**: [@ChipaDevTeam](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
 - **Role**: Project maintainer and lead developer
 - **Contributions**: Architecture design, Rust core implementation, project management
 
 ### Rick-29
 
-- **GitHub**: [@Rick-29](https://github.com/Rick-29)
+- **GitLab**: [@Rick-29](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
 - **Role**: Core developer
+- **Contributions**: Python bindings, API design, testing infrastructure
+
+### Vigo Walker
+
+- **GitLab**: [@theshadow76](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
+- **Role**: developer
 - **Contributions**: Python bindings, API design, testing infrastructure
 
 ## Contributors
@@ -43,8 +49,8 @@ Special thanks to our community members who:
 ### Join Our Community
 
 - **Discord**: [Join our server](https://discord.gg/p7YyFqSmAz)
-- **GitHub**: [Star and watch the repo](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2)
-- **Discussions**: [GitHub Discussions](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/discussions)
+- **GitLab**: [View the repo](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
+- **Discussions**: [Issues](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
 
 ## Recognition
 

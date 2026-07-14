@@ -13,7 +13,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::select;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::expertoptions::state::{Balance, State};
 use crate::expertoptions::{Action, ActionName};
@@ -225,7 +225,7 @@ impl ApiModule<State> for ProfileModule {
     /// The main run loop for the module's background task.
     async fn run(&mut self) -> CoreResult<()> {
         // Send initial multipleAction and ensure demo context on first run
-        println!("Here");
+        debug!(target: "ProfileModule", "ProfileModule starting run loop");
         self.send_startup_messages().await?;
 
         loop {
@@ -244,7 +244,9 @@ impl ApiModule<State> for ProfileModule {
                                             }
                                             ProfileResponse::Profile(profile) => {
                                                 debug!(target: "ProfileModule", "Profile received: {:?}", profile);
-                                                self.parse_profile(profile.actions).await?;
+                                                if let Err(e) = self.parse_profile(profile.actions).await {
+                                                    warn!(target: "ProfileModule", "Failed to parse profile actions: {:?}", e);
+                                                }
                                             }
                                         }
                                     },
@@ -304,8 +306,8 @@ impl ApiModule<State> for ProfileModule {
             ) -> CoreResult<()> {
                 // On reconnect, re-send multipleAction and ensure context if demo
                 let token = state.token.clone();
-                let timezone = state.timezone.read().await;
-                let multi = multiple_action_action(token.clone(), *timezone)?.to_message()?;
+                let timezone = *state.timezone.read().await;
+                let multi = multiple_action_action(token.clone(), timezone)?.to_message()?;
                 ws_sender.send(multi).await?;
                 if state.is_demo().await {
                     let demo = Demo::new(true);
@@ -325,10 +327,12 @@ impl ApiModule<State> for ProfileModule {
 impl ProfileModule {
     async fn send_startup_messages(&self) -> CoreResult<()> {
         let token = self.state.token.clone();
-        let timezone = self.state.timezone.read().await;
+        let timezone = *self.state.timezone.read().await;
         // Ensure demo context if currently demo
-        if dbg!(self.state.is_demo().await) {
-            dbg!("Sent demo message");
+        let is_demo = self.state.is_demo().await;
+        debug!("Current demo state: {}", is_demo);
+        if is_demo {
+            debug!("Sending demo context startup message");
             let demo = Demo::new(true);
             let msg = demo
                 .action(token.clone())
@@ -337,7 +341,7 @@ impl ProfileModule {
             self.ws_sender.send(msg).await?;
         }
         // Send multipleAction with basic actions placeholder (can be extended)
-        let multi = multiple_action_action(token, *timezone)?.to_message()?;
+        let multi = multiple_action_action(token, timezone)?.to_message()?;
         self.ws_sender.send(multi).await?;
         Ok(())
     }

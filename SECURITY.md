@@ -172,6 +172,6 @@ Security updates will be announced through:
 For security concerns, please contact us through:
 
 - [Discord](https://discord.gg/p7YyFqSmAz) - Direct message to moderators
-- [GitHub Security Advisories](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/security/advisories)
+- [GitLab Issues](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
 
 Thank you for helping keep BinaryOptionsTools v2 and our users secure!

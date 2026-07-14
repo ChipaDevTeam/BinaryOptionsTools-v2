@@ -1,11 +1,11 @@
 [package]
 name = "binary_options_tools_uni"
-version = "0.1.0"
+version = "0.2.12"
 edition = "2021"
 authors = ["ChipaDevTeam"]
-repository = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2"
-homepage = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
-documentation = "https://chipadevteam.github.io/BinaryOptionsTools-v2/"
+repository = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"
+homepage = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2"
+documentation = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/"
 description = "UniFFI bindings for binary-options-tools. Enables multi-language support (Kotlin, Swift, Python) for cross-platform binary options trading automation."
 keywords = ["binary-options", "uniffi", "cross-platform", "trading"]
 categories = ["api-bindings"]
@@ -33,14 +33,17 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 uniffi = { workspace = true }
-binary_options_tools = { path = "../binary_options_tools", version = "0.2.1" }
+binary_options_tools = { path = "../binary_options_tools", version = "0.2.12" }
 tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 thiserror = { workspace = true }
 rust_decimal = { workspace = true }
 futures-util = { workspace = true }
 uuid = { workspace = true }
 regex = { workspace = true }
-bo2_macros = { version = "0.1.0", path = "bo2_macros" }
+bo2_macros = { version = "0.2.12", path = "bo2_macros" }
+url = { workspace = true }
 
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"] }

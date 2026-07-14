@@ -7,17 +7,13 @@ use binary_options_tools::pocketoption::candle::{Candle, SubscriptionType};
 use binary_options_tools::pocketoption::error::PocketResult;
 use binary_options_tools::pocketoption::pocket_client::PocketOption;
 use binary_options_tools::utils::f64_to_decimal;
-use rust_decimal::prelude::ToPrimitive;
-// use binary_options_tools::pocketoption::types::base::RawWebsocketMessage;
-// use binary_options_tools::pocketoption::types::update::DataCandle;
-// use binary_options_tools::pocketoption::ws::stream::StreamAsset;
-// use binary_options_tools::reimports::FilteredRecieverStream;
 use binary_options_tools::validator::Validator as CrateValidator;
 use binary_options_tools::validator::Validator;
 use futures_util::stream::{BoxStream, Fuse};
 use futures_util::StreamExt;
 use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python};
 use pyo3_async_runtimes::tokio::future_into_py;
+use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
 
 use crate::config::PyConfig;
@@ -211,10 +207,6 @@ impl RawPocketOption {
         self.client.is_connected()
     }
 
-    /// Returns the configured maximum number of concurrent subscriptions.
-    pub fn max_subscriptions(&self) -> usize {
-        self.client.max_subscriptions()
-    }
 
     pub fn buy<'py>(
         &self,
@@ -458,7 +450,11 @@ impl RawPocketOption {
         })
     }
 
-    pub fn get_closed_deal<'py>(&self, py: Python<'py>, trade_id: String) -> PyResult<Bound<'py, PyAny>> {
+    pub fn get_closed_deal<'py>(
+        &self,
+        py: Python<'py>,
+        trade_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
             let uuid = Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?;
@@ -488,7 +484,11 @@ impl RawPocketOption {
         })
     }
 
-    pub fn get_opened_deal<'py>(&self, py: Python<'py>, trade_id: String) -> PyResult<Bound<'py, PyAny>> {
+    pub fn get_opened_deal<'py>(
+        &self,
+        py: Python<'py>,
+        trade_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
             let uuid = Uuid::parse_str(&trade_id).map_err(BinaryErrorPy::from)?;
@@ -504,7 +504,6 @@ impl RawPocketOption {
     pub fn payout<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
-            // Work in progress - this feature is not yet implemented in the new API
             match client.assets().await {
                 Some(assets) => {
                     let payouts: HashMap<&String, i32> = assets
@@ -549,11 +548,10 @@ impl RawPocketOption {
         asset: String,
         period: u32,
     ) -> PyResult<Bound<'py, PyAny>> {
-        // Work in progress - this feature is not yet implemented in the new API
         let client = self.client.clone();
         future_into_py(py, async move {
             let res = client
-                .history(asset, period)
+                .candles(asset, period)
                 .await
                 .map_err(BinaryErrorPy::from)?;
             Python::attach(|py| {
@@ -607,6 +605,39 @@ impl RawPocketOption {
                     .map_err(BinaryErrorPy::from)?
                     .into_py_any(py)
             })
+        })
+    }
+
+    pub fn send_raw<'py>(&self, py: Python<'py>, message: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            client
+                .send_raw(message)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| py.None().into_py_any(py))
+        })
+    }
+
+    pub fn subscribe_raw<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let raw_stream = client
+                .subscribe_raw()
+                .await
+                .map_err(BinaryErrorPy::from)?;
+
+            let boxed_stream = async_stream::stream! {
+                tokio::pin!(raw_stream);
+                while let Some(msg) = raw_stream.next().await {
+                    yield Ok(arc_message_to_string(&msg));
+                }
+            }
+            .boxed()
+            .fuse();
+
+            let stream = Arc::new(Mutex::new(boxed_stream));
+            Python::attach(|py| RawStreamIterator { stream }.into_py_any(py))
         })
     }
 

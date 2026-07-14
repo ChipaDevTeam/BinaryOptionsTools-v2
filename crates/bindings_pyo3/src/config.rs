@@ -99,13 +99,64 @@ impl PyConfig {
         Ok(())
     }
 
+
     #[getter]
-    fn max_subscriptions(&self) -> usize {
-        self.inner.max_subscriptions
+    fn proxy(&self) -> Option<String> {
+        self.inner.proxy.clone()
     }
 
     #[setter]
-    fn set_max_subscriptions(&mut self, value: usize) {
-        self.inner.max_subscriptions = value;
+    fn set_proxy(&mut self, value: Option<String>) {
+        self.inner.proxy = value;
+    }
+
+    #[getter]
+    fn user_agent(&self) -> Option<String> {
+        self.inner.user_agent.clone()
+    }
+
+    #[setter]
+    fn set_user_agent(&mut self, value: Option<String>) {
+        self.inner.user_agent = value;
+    }
+
+    #[getter]
+    fn origin(&self) -> Option<String> {
+        self.inner.origin.clone()
+    }
+
+    #[setter]
+    fn set_origin(&mut self, value: Option<String>) {
+        self.inner.origin = value;
+    }
+
+    #[getter]
+    fn sec_websocket_extensions(&self) -> Option<String> {
+        self.inner.sec_websocket_extensions.clone()
+    }
+
+    #[setter]
+    fn set_sec_websocket_extensions(&mut self, value: Option<String>) {
+        self.inner.sec_websocket_extensions = value;
+    }
+
+    #[getter]
+    fn tls_cipher_suites(&self) -> Option<Vec<String>> {
+        self.inner.tls_cipher_suites.clone()
+    }
+
+    #[setter]
+    fn set_tls_cipher_suites(&mut self, value: Option<Vec<String>>) {
+        self.inner.tls_cipher_suites = value;
+    }
+
+    #[getter]
+    fn tls_alpn(&self) -> Option<Vec<String>> {
+        self.inner.tls_alpn.clone()
+    }
+
+    #[setter]
+    fn set_tls_alpn(&mut self, value: Option<Vec<String>>) {
+        self.inner.tls_alpn = value;
     }
 }

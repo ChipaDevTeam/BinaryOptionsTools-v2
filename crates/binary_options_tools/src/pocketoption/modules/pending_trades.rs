@@ -8,10 +8,10 @@ use binary_options_tools_core::{
 };
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 use tokio::{select, time::timeout};
 use tracing::warn;
 use uuid::Uuid;
-use tokio::sync::Mutex;
 
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
@@ -74,19 +74,10 @@ pub enum CommandResponse {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(untagged)]
 pub enum CancelServerResponse {
-    SingleSuccess {
-        ticket: String,
-    },
-    BatchSuccess {
-        cancelled: Vec<String>,
-    },
-    Placeholder {
-        id: u32,
-        success: bool,
-    },
-    Error {
-        error: String,
-    },
+    SingleSuccess { ticket: String },
+    BatchSuccess { cancelled: Vec<String> },
+    Placeholder { id: u32, success: bool },
+    Error { error: String },
 }
 
 #[derive(Deserialize, Serialize)]
@@ -119,17 +110,7 @@ impl PendingTradesHandle {
     }
 
     /// Creates a new pending order on the PocketOption platform.
-    pub async fn open_pending_order(
-        &self,
-        open_type: u32,
-        amount: Decimal,
-        asset: String,
-        open_time: String,
-        open_price: Decimal,
-        timeframe: u32,
-        min_payout: u32,
-        command: u32,
-    ) -> PocketResult<PendingOrder> {
+    pub async fn open_pending_order(&self, order: OpenPendingOrder) -> PocketResult<PendingOrder> {
         let _lock = self.call_lock.lock().await;
 
         // Drain the receiver of any stale responses
@@ -138,11 +119,22 @@ impl PendingTradesHandle {
         }
 
         let id = Uuid::new_v4();
+        let OpenPendingOrder {
+            open_type,
+            amount,
+            asset: order_asset,
+            open_time,
+            open_price,
+            timeframe,
+            min_payout,
+            command,
+        } = order;
+        let asset = order_asset.clone();
         self.sender
             .send(Command::OpenPendingOrder {
                 open_type,
                 amount,
-                asset: asset.clone(),
+                asset: order_asset,
                 open_time,
                 open_price,
                 timeframe,
@@ -163,7 +155,10 @@ impl PendingTradesHandle {
                     if req_id == id {
                         return Ok(*pending_order);
                     } else {
-                        warn!("Received mismatched req_id in open_pending_order: expected {}, got {}", id, req_id);
+                        warn!(
+                            "Received mismatched req_id in open_pending_order: expected {}, got {}",
+                            id, req_id
+                        );
                         mismatch_count += 1;
                         if mismatch_count >= MAX_MISMATCH_RETRIES {
                             return Err(PocketError::Timeout {
@@ -189,12 +184,18 @@ impl PendingTradesHandle {
                     });
                 }
                 Ok(Ok(other)) => {
-                    warn!("Received unexpected response type in open_pending_order: {:?}", other);
+                    warn!(
+                        "Received unexpected response type in open_pending_order: {:?}",
+                        other
+                    );
                     mismatch_count += 1;
                     if mismatch_count >= MAX_MISMATCH_RETRIES {
                         return Err(PocketError::Timeout {
                             task: "open_pending_order".to_string(),
-                            context: format!("asset: {}, exceeded mismatch retries (unexpected response)", asset),
+                            context: format!(
+                                "asset: {}, exceeded mismatch retries (unexpected response)",
+                                asset
+                            ),
                             duration: PENDING_ORDER_TIMEOUT,
                         });
                     }
@@ -230,7 +231,10 @@ impl PendingTradesHandle {
             .map_err(CoreError::from)?;
 
         match timeout(PENDING_ORDER_TIMEOUT, self.receiver.recv()).await {
-            Ok(Ok(CommandResponse::CancelSuccess { req_id, ticket: cancelled_ticket })) => {
+            Ok(Ok(CommandResponse::CancelSuccess {
+                req_id,
+                ticket: cancelled_ticket,
+            })) => {
                 if req_id == id {
                     Ok(cancelled_ticket)
                 } else {
@@ -253,7 +257,10 @@ impl PendingTradesHandle {
                 context: "PendingTradesApiModule stopped during request".to_string(),
             }),
             Ok(Ok(other)) => {
-                warn!("Received unexpected response in cancel_pending_order: {:?}", other);
+                warn!(
+                    "Received unexpected response in cancel_pending_order: {:?}",
+                    other
+                );
                 Err(PocketError::Timeout {
                     task: "cancel_pending_order".to_string(),
                     context: format!("Unexpected response type for ticket: {}", ticket),
@@ -310,7 +317,10 @@ impl PendingTradesHandle {
                 context: "PendingTradesApiModule stopped during request".to_string(),
             }),
             Ok(Ok(other)) => {
-                warn!("Received unexpected response in cancel_pending_orders: {:?}", other);
+                warn!(
+                    "Received unexpected response in cancel_pending_orders: {:?}",
+                    other
+                );
                 Err(PocketError::Timeout {
                     task: "cancel_pending_orders".to_string(),
                     context: "Unexpected response type".to_string(),
@@ -333,7 +343,9 @@ pub struct PendingTradesApiModule {
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
-    pending_requests: std::collections::VecDeque<Uuid>,
+    pending_open_requests: std::collections::VecDeque<Uuid>,
+    pending_cancel_requests: std::collections::VecDeque<(Uuid, String)>,
+    pending_cancel_multiple_requests: std::collections::VecDeque<(Uuid, Vec<String>)>,
 }
 
 #[async_trait]
@@ -356,7 +368,9 @@ impl ApiModule<State> for PendingTradesApiModule {
             command_responder,
             message_receiver,
             to_ws_sender,
-            pending_requests: std::collections::VecDeque::new(),
+            pending_open_requests: std::collections::VecDeque::new(),
+            pending_cancel_requests: std::collections::VecDeque::new(),
+            pending_cancel_multiple_requests: std::collections::VecDeque::new(),
         }
     }
 
@@ -376,7 +390,7 @@ impl ApiModule<State> for PendingTradesApiModule {
                         Ok(cmd) => {
                             match cmd {
                                 Command::OpenPendingOrder { open_type, amount, asset, open_time, open_price, timeframe, min_payout, command, req_id } => {
-                                    self.pending_requests.push_back(req_id);
+                                    self.pending_open_requests.push_back(req_id);
                                     let order = OpenPendingOrder::new(open_type, amount, asset, open_time, open_price, timeframe, min_payout, command);
                                     if let Err(e) = self.to_ws_sender.send(Message::text(order.to_string())).await {
                                         warn!(target: "PendingTradesApiModule", "Failed to send order to WS: {}", e);
@@ -385,7 +399,7 @@ impl ApiModule<State> for PendingTradesApiModule {
                                     }
                                 }
                                 Command::CancelPendingOrder { ticket, req_id } => {
-                                    self.pending_requests.push_back(req_id);
+                                    self.pending_cancel_requests.push_back((req_id, ticket.clone()));
                                     let cancel_msg = serde_json::json!(["cancelPendingOrder", { "ticket": ticket }]);
                                     if let Err(e) = self.to_ws_sender.send(Message::text(format!("42{}", cancel_msg))).await {
                                         warn!(target: "PendingTradesApiModule", "Failed to send cancel order to WS: {}", e);
@@ -394,7 +408,7 @@ impl ApiModule<State> for PendingTradesApiModule {
                                     }
                                 }
                                 Command::CancelPendingOrders { tickets, req_id } => {
-                                    self.pending_requests.push_back(req_id);
+                                    self.pending_cancel_multiple_requests.push_back((req_id, tickets.clone()));
                                     let cancel_msg = serde_json::json!(["cancelPendingOrders", { "tickets": tickets }]);
                                     if let Err(e) = self.to_ws_sender.send(Message::text(format!("42{}", cancel_msg))).await {
                                         warn!(target: "PendingTradesApiModule", "Failed to send batch cancel to WS: {}", e);
@@ -424,7 +438,7 @@ impl ApiModule<State> for PendingTradesApiModule {
                                                         if let ServerResponse::Success(ref pending_order) = response {
                                                             self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
                                                         }
-                                                        if let Some(req_id) = self.pending_requests.pop_front() {
+                                                        if let Some(req_id) = self.pending_open_requests.pop_front() {
                                                             match response {
                                                                 ServerResponse::Success(pending_order) => {
                                                                     let _ = self.command_responder.send(CommandResponse::Success { req_id, pending_order }).await;
@@ -437,10 +451,23 @@ impl ApiModule<State> for PendingTradesApiModule {
                                                     }
                                                     continue;
                                                 }
-                                                "successcancelPendingOrder" | "failcancelPendingOrder" | 
+                                                "successcancelPendingOrder" | "failcancelPendingOrder" => {
+                                                    if let Ok(cancel_res) = serde_json::from_value::<CancelServerResponse>(payload) {
+                                                        if let Some((req_id, _ticket)) = self.pending_cancel_requests.pop_front() {
+                                                            let resp = match cancel_res {
+                                                                CancelServerResponse::SingleSuccess { ticket } => CommandResponse::CancelSuccess { req_id, ticket },
+                                                                CancelServerResponse::BatchSuccess { cancelled } => CommandResponse::BatchCancelSuccess { req_id, cancelled },
+                                                                CancelServerResponse::Placeholder { .. } => CommandResponse::CancelSuccess { req_id, ticket: String::new() },
+                                                                CancelServerResponse::Error { error } => CommandResponse::CancelError { req_id, error },
+                                                            };
+                                                            let _ = self.command_responder.send(resp).await;
+                                                        }
+                                                    }
+                                                    continue;
+                                                }
                                                 "successcancelPendingOrders" | "failcancelPendingOrders" => {
                                                     if let Ok(cancel_res) = serde_json::from_value::<CancelServerResponse>(payload) {
-                                                        if let Some(req_id) = self.pending_requests.pop_front() {
+                                                        if let Some((req_id, _tickets)) = self.pending_cancel_multiple_requests.pop_front() {
                                                             let resp = match cancel_res {
                                                                 CancelServerResponse::SingleSuccess { ticket } => CommandResponse::CancelSuccess { req_id, ticket },
                                                                 CancelServerResponse::BatchSuccess { cancelled } => CommandResponse::BatchCancelSuccess { req_id, cancelled },
@@ -463,7 +490,7 @@ impl ApiModule<State> for PendingTradesApiModule {
                                             if let ServerResponse::Success(ref pending_order) = response {
                                                 self.state.trade_state.add_pending_deal(*pending_order.clone()).await;
                                             }
-                                            if let Some(req_id) = self.pending_requests.pop_front() {
+                                            if let Some(req_id) = self.pending_open_requests.pop_front() {
                                                 match response {
                                                     ServerResponse::Success(pending_order) => {
                                                         let _ = self.command_responder.send(CommandResponse::Success { req_id, pending_order }).await;
@@ -509,15 +536,52 @@ impl ApiModule<State> for PendingTradesApiModule {
 
 impl PendingTradesApiModule {
     async fn notify_waiters_module_stopped(&mut self) {
-        let waiters = std::mem::take(&mut self.pending_requests);
-        for req_id in waiters {
-            let _ = self.command_responder.send(CommandResponse::Shutdown { req_id }).await;
+        let open_waiters = std::mem::take(&mut self.pending_open_requests);
+        for req_id in open_waiters {
+            let _ = self
+                .command_responder
+                .send(CommandResponse::Shutdown { req_id })
+                .await;
+        }
+        let cancel_waiters = std::mem::take(&mut self.pending_cancel_requests);
+        for (req_id, _ticket) in cancel_waiters {
+            let _ = self
+                .command_responder
+                .send(CommandResponse::Shutdown { req_id })
+                .await;
+        }
+        let cancel_multi_waiters = std::mem::take(&mut self.pending_cancel_multiple_requests);
+        for (req_id, _tickets) in cancel_multi_waiters {
+            let _ = self
+                .command_responder
+                .send(CommandResponse::Shutdown { req_id })
+                .await;
         }
     }
 }
 
 impl Drop for PendingTradesApiModule {
     fn drop(&mut self) {
-        tracing::debug!(target: "PendingTradesApiModule", "PendingTradesApiModule dropped");
+        let open_waiters = std::mem::take(&mut self.pending_open_requests);
+        for req_id in &open_waiters {
+            let _ = self
+                .command_responder
+                .as_sync()
+                .try_send(CommandResponse::Shutdown { req_id: *req_id });
+        }
+        let cancel_waiters = std::mem::take(&mut self.pending_cancel_requests);
+        for (req_id, _) in &cancel_waiters {
+            let _ = self
+                .command_responder
+                .as_sync()
+                .try_send(CommandResponse::Shutdown { req_id: *req_id });
+        }
+        let cancel_multi_waiters = std::mem::take(&mut self.pending_cancel_multiple_requests);
+        for (req_id, _) in &cancel_multi_waiters {
+            let _ = self
+                .command_responder
+                .as_sync()
+                .try_send(CommandResponse::Shutdown { req_id: *req_id });
+        }
     }
 }

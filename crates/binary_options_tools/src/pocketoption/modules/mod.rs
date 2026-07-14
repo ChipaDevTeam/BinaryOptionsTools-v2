@@ -49,10 +49,6 @@ pub mod raw;
 pub mod server_time;
 pub mod subscriptions;
 pub mod trades;
-// pub use subscriptions::{
-//     CandleConfig, MAX_SUBSCRIPTIONS, SubscriptionCommand, SubscriptionHandle, SubscriptionModule,
-//     SubscriptionResponse,
-// };
 
 #[cfg(test)]
 mod deals_tests;

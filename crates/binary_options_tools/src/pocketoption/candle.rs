@@ -38,8 +38,8 @@ pub struct Candle {
     /// Volume is not provided by PocketOption
     // #[serde(skip_serializing_if = "Option::is_none")]
     pub volume: Option<Decimal>,
-    // /// Whether this candle is closed/finalized
-    // pub is_closed: bool,
+    /// Whether this candle is closed/finalized
+    pub is_closed: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -189,7 +189,7 @@ impl<'de> Deserialize<'de> for CandleItem {
                     .ok_or_else(|| serde::de::Error::invalid_length(4, &self))?;
                 let volume = seq
                     .next_element()?
-                    .ok_or_else(|| serde::de::Error::invalid_length(5, &self))?;
+                    .unwrap_or(0.0);
 
                 Ok(CandleItem {
                     timestamp,
@@ -228,7 +228,7 @@ impl Candle {
             low: price,
             close: price,
             volume: None, // PocketOption doesn't provide volume
-                          // is_closed: false,
+            is_closed: false,
         })
     }
 
@@ -269,13 +269,13 @@ impl Candle {
         Ok(())
     }
 
-    // /// Mark the candle as closed/finalized
-    // ///
-    // /// Once a candle is closed, it should not be updated with new prices.
-    // /// This is typically called when a time-based candle period ends.
-    // pub fn close_candle(&mut self) {
-    //     self.is_closed = true;
-    // }
+    /// Mark the candle as closed/finalized
+    ///
+    /// Once a candle is closed, it should not be updated with new prices.
+    /// This is typically called when a time-based candle period ends.
+    pub fn close_candle(&mut self) {
+        self.is_closed = true;
+    }
 
     /// Get the price range (high - low) of the candle
     ///
@@ -391,7 +391,57 @@ impl Candle {
     pub fn datetime(&self) -> DateTime<Utc> {
         DateTime::from_timestamp(self.timestamp, 0).unwrap_or_else(Utc::now)
     }
+
+    /// Create a new Candle with explicit is_closed value
+    ///
+    /// # Arguments
+    /// * `symbol` - Trading symbol
+    /// * `timestamp` - Unix timestamp for the candle start
+    /// * `open` - Opening price
+    /// * `high` - Highest price
+    /// * `low` - Lowest price
+    /// * `close` - Closing price
+    /// * `volume` - Optional volume data
+    /// * `is_closed` - Whether the candle is finalized/closed
+    ///
+    /// # Returns
+    /// New Candle instance with specified values
+    pub fn new_with_closed_status(
+        symbol: String,
+        timestamp: i64,
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+        volume: Option<f64>,
+        is_closed: bool,
+    ) -> BinaryOptionsResult<Self> {
+        let volume_decimal = match volume {
+            Some(v) => Some(
+                Decimal::from_f64(v)
+                    .ok_or(BinaryOptionsError::General("Couldn't parse volume".into()))?,
+            ),
+            None => None,
+        };
+        
+        Ok(Candle {
+            symbol,
+            timestamp,
+            open: Decimal::from_f64(open)
+                .ok_or(BinaryOptionsError::General("Couldn't parse open".into()))?,
+            high: Decimal::from_f64(high)
+                .ok_or(BinaryOptionsError::General("Couldn't parse high".into()))?,
+            low: Decimal::from_f64(low)
+                .ok_or(BinaryOptionsError::General("Couldn't parse low".into()))?,
+            close: Decimal::from_f64(close)
+                .ok_or(BinaryOptionsError::General("Couldn't parse close".into()))?,
+            volume: volume_decimal,
+            is_closed,
+        })
+    }
 }
+
+
 
 /// Represents the type of subscription for candle data.
 #[derive(Clone, Debug)]
@@ -460,7 +510,7 @@ pub fn compile_candles_from_ticks(ticks: &[HistoryItem], period: u32, symbol: &s
 
     // Sort ticks by timestamp just in case
     let mut sorted_ticks: Vec<(i64, f64)> = ticks.iter().map(|t| t.to_tick()).collect();
-    sorted_ticks.sort_by(|a, b| a.0.cmp(&b.0));
+    sorted_ticks.sort_by_key(|a| a.0);
 
     let mut current_candle: Option<BaseCandle> = None;
     let mut current_boundary_idx: Option<i64> = None;
@@ -478,8 +528,17 @@ pub fn compile_candles_from_ticks(ticks: &[HistoryItem], period: u32, symbol: &s
                 candle.close = price;
                 current_candle = Some(candle);
             } else {
-                // New candle, push old one
-                match Candle::try_from((candle, symbol.to_string())) {
+                // New candle, push old one (mark as closed)
+                match Candle::new_with_closed_status(
+                    symbol.to_string(),
+                    candle.timestamp,
+                    candle.open,
+                    candle.high,
+                    candle.low,
+                    candle.close,
+                    candle.volume,
+                    true, // This candle is finalized/closed
+                ) {
                     Ok(c) => candles.push(c),
                     Err(e) => warn!("Failed to convert final candle for {}: {}", symbol, e),
                 }
@@ -509,7 +568,16 @@ pub fn compile_candles_from_ticks(ticks: &[HistoryItem], period: u32, symbol: &s
     }
 
     if let Some(candle) = current_candle {
-        match Candle::try_from((candle, symbol.to_string())) {
+        match Candle::new_with_closed_status(
+            symbol.to_string(),
+            candle.timestamp,
+            candle.open,
+            candle.high,
+            candle.low,
+            candle.close,
+            candle.volume,
+            false, // This is the trailing in-progress candle
+        ) {
             Ok(c) => candles.push(c),
             Err(e) => warn!("Failed to convert final candle for {}: {}", symbol, e),
         }
@@ -721,6 +789,7 @@ impl TryFrom<(BaseCandle, String)> for Candle {
             close: Decimal::from_f64(base_candle.close)
                 .ok_or(BinaryOptionsError::General("Couldn't parse close".into()))?,
             volume,
+            is_closed: false,
         })
     }
 }

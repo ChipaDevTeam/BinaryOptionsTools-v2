@@ -31,7 +31,12 @@ go run buy.go
 - `buy.go` - Place a buy trade
 - `sell.go` - Place a sell trade
 - `check_win.go` - Check trade results
-- `subscribe.go` - Subscribe to real-time data
+- `history.go` - Get candle history
+- `logs.go` - Start logging and place trades
+- `payout.go` - Get payout information
+- `raw_send.go` - Send raw WebSocket messages
+- `subscribe_symbol.go` - Subscribe to real-time data
+- `validator.go` - Demonstrate validator usage
 
 ## Important: Always wait 5 seconds after creating the client!
 

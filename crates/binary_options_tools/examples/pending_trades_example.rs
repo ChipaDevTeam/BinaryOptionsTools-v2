@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! # Pending Trades Examples
 //!
 //! This file demonstrates various usage patterns for the `PendingTradesApiModule`.
@@ -28,7 +30,7 @@ use binary_options_tools::pocketoption::{
     error::PocketResult,
     ssid::{Demo, Ssid},
     state::{State, StateBuilder},
-    types::PendingOrder,
+    types::{OpenPendingOrder, PendingOrder},
 };
 use binary_options_tools_core::reimports::Message;
 use binary_options_tools_core::traits::{ApiModule, RunnerCommand};
@@ -41,7 +43,6 @@ use uuid::Uuid;
 // ============================================================================
 
 /// Creates a minimal mock State with only the fields needed for testing
-#[allow(dead_code)]
 fn create_mock_state() -> Arc<State> {
     let ssid = Ssid::Demo(Demo {
         session: "test_ssid".to_string(),
@@ -64,7 +65,6 @@ fn create_mock_state() -> Arc<State> {
 }
 
 /// Creates a PendingOrder with test data
-#[allow(dead_code)]
 fn create_test_pending_order(req_id: Uuid) -> PendingOrder {
     PendingOrder {
         ticket: req_id,
@@ -82,7 +82,6 @@ fn create_test_pending_order(req_id: Uuid) -> PendingOrder {
 }
 
 /// Creates a WebSocket text message with Socket.IO framing: 42["event", {...}]
-#[allow(dead_code)]
 fn create_socket_io_text_message(event: &str, data: &serde_json::Value) -> String {
     format!(
         "42[{},{}]",
@@ -102,7 +101,6 @@ fn create_socket_io_text_message(event: &str, data: &serde_json::Value) -> Strin
 /// 4. Handle the response (success or error)
 ///
 /// This example shows the simplest use case with proper error handling.
-#[allow(dead_code)]
 async fn example_basic_pending_order() -> PocketResult<()> {
     println!("=== Example 1: Basic Pending Order Placement ===\n");
 
@@ -154,16 +152,16 @@ async fn example_basic_pending_order() -> PocketResult<()> {
     });
 
     let result = client_handle
-        .open_pending_order(
-            1,                                         // open_type: 1 = typical for binary options
-            Decimal::from_f64_retain(100.0).unwrap(),  // amount
-            "EURUSD_otc".to_string(),                  // asset (OTC EUR/USD)
-            "2026-04-07 22:50:00".to_string(),          // open_time: specific trigger time (for openType 0) or expiration (for openType 1)
-            Decimal::from_f64_retain(1.1950).unwrap(), // open_price: current market price
-            60,                                        // timeframe: 60 seconds
-            85,                                        // min_payout: 85% minimum payout
-            0,                                         // command: 0 (typically for buy/call)
-        )
+        .open_pending_order(OpenPendingOrder {
+            open_type: 1, // open_type: 1 = typical for binary options
+            amount: Decimal::from_f64_retain(100.0).unwrap(), // amount
+            asset: "EURUSD_otc".to_string(), // asset (OTC EUR/USD)
+            open_time: "2026-04-07 22:50:00".to_string(), // open_time: specific trigger time (for openType 0) or expiration (for openType 1)
+            open_price: Decimal::from_f64_retain(1.1950).unwrap(), // open_price: current market price
+            timeframe: 60,                                         // timeframe: 60 seconds
+            min_payout: 85,                                        // min_payout: 85% minimum payout
+            command: 0, // command: 0 (typically for buy/call)
+        })
         .await;
 
     // 7. Handle the result
@@ -209,7 +207,6 @@ async fn example_basic_pending_order() -> PocketResult<()> {
 /// request at a time. Concurrent calls will work due to the lock, but they are
 /// serialized. For high-volume scenarios, consider batching or using multiple
 /// client instances.
-#[allow(dead_code)]
 async fn example_concurrent_pending_orders() -> PocketResult<()> {
     println!("=== Example 2: Concurrent Pending Orders ===\n");
 
@@ -262,16 +259,16 @@ async fn example_concurrent_pending_orders() -> PocketResult<()> {
 
             let order_fut = tokio::spawn(async move {
                 handle_clone2
-                    .open_pending_order(
-                        1,
-                        amount2,
-                        asset2,
-                        "2026-04-07 22:50:00".to_string(),
-                        Decimal::from_f64_retain(1.0).unwrap(),
-                        60,
-                        85,
-                        0,
-                    )
+                    .open_pending_order(OpenPendingOrder {
+                        open_type: 1,
+                        amount: amount2,
+                        asset: asset2,
+                        open_time: "2026-04-07 22:50:00".to_string(),
+                        open_price: Decimal::from_f64_retain(1.0).unwrap(),
+                        timeframe: 60,
+                        min_payout: 85,
+                        command: 0,
+                    })
                     .await
             });
 
@@ -361,7 +358,6 @@ async fn example_concurrent_pending_orders() -> PocketResult<()> {
 ///
 /// In a real application, the `PocketClient` manages all of this internally.
 /// This example is useful for understanding the architecture.
-#[allow(dead_code)]
 async fn example_integration_with_pocketclient() -> PocketResult<()> {
     println!("=== Example 3: Integration with PocketClient ===\n");
 
@@ -456,16 +452,16 @@ async fn example_integration_with_pocketclient() -> PocketResult<()> {
 
     let order_result = timeout(
         Duration::from_secs(30),
-        pending_trades_handle.open_pending_order(
-            1,
-            Decimal::from_f64_retain(250.0).unwrap(),
-            "EURUSD_otc".to_string(),
-            "2026-04-07 22:50:00".to_string(),
-            Decimal::from_f64_retain(1.1850).unwrap(),
-            60,
-            90,
-            0,
-        ),
+        pending_trades_handle.open_pending_order(OpenPendingOrder {
+            open_type: 1,
+            amount: Decimal::from_f64_retain(250.0).unwrap(),
+            asset: "EURUSD_otc".to_string(),
+            open_time: "2026-04-07 22:50:00".to_string(),
+            open_price: Decimal::from_f64_retain(1.1850).unwrap(),
+            timeframe: 60,
+            min_payout: 90,
+            command: 0,
+        }),
     )
     .await;
 
@@ -527,9 +523,13 @@ async fn scenario1_mismatched_responses() -> PocketResult<()> {
     tokio::spawn(async move {
         sleep(Duration::from_millis(50)).await;
         for _ in 0..3 {
-            let server_response = ServerResponse::Success(Box::new(create_test_pending_order(Uuid::new_v4())));
+            let server_response =
+                ServerResponse::Success(Box::new(create_test_pending_order(Uuid::new_v4())));
             let response_json = serde_json::to_string(&server_response).unwrap();
-            msg_tx_clone.send(Arc::new(Message::Text(response_json.into()))).await.unwrap();
+            msg_tx_clone
+                .send(Arc::new(Message::Text(response_json.into())))
+                .await
+                .unwrap();
             sleep(Duration::from_millis(10)).await;
         }
         // Finally send the correct one (module will match by asset/amount/etc if req_id is missing or use internal tracking)
@@ -537,8 +537,18 @@ async fn scenario1_mismatched_responses() -> PocketResult<()> {
     });
 
     println!("Waiting for order (should handle mismatches)...");
-    // This might still fail if the module's matching logic is strict, but it demonstrates the retry loop
-    let _ = client_handle.open_pending_order(1, dec!(100), "EURUSD_otc".into(), "2026-04-07 22:50:00".into(), dec!(1.1950), 60, 85, 0).await;
+    let _ = client_handle
+        .open_pending_order(OpenPendingOrder {
+            open_type: 1,
+            amount: dec!(100),
+            asset: "EURUSD_otc".into(),
+            open_time: "2026-04-07 22:50:00".into(),
+            open_price: dec!(1.1950),
+            timeframe: 60,
+            min_payout: 85,
+            command: 0,
+        })
+        .await;
 
     module_task.abort();
     Ok(())
@@ -567,7 +577,20 @@ async fn scenario3_timeout() -> PocketResult<()> {
     let module_task = tokio::spawn(async move { module.run().await.ok() });
 
     println!("Requesting order with no server response (expect timeout)...");
-    let result = timeout(Duration::from_secs(2), client_handle.open_pending_order(1, dec!(100), "EURUSD_otc".into(), "2026-04-07 22:50:00".into(), dec!(1.1950), 60, 85, 0)).await;
+    let result = timeout(
+        Duration::from_secs(2),
+        client_handle.open_pending_order(OpenPendingOrder {
+            open_type: 1,
+            amount: dec!(100),
+            asset: "EURUSD_otc".into(),
+            open_time: "2026-04-07 22:50:00".into(),
+            open_price: dec!(1.1950),
+            timeframe: 60,
+            min_payout: 85,
+            command: 0,
+        }),
+    )
+    .await;
 
     match result {
         Err(_) => println!("✓ Correctly timed out!"),
@@ -581,7 +604,6 @@ async fn scenario3_timeout() -> PocketResult<()> {
 use rust_decimal_macros::dec;
 
 /// Demonstrates timeout handling and the retry logic for mismatched responses.
-#[allow(dead_code)]
 async fn example_timeouts_and_retries() -> PocketResult<()> {
     println!("=== Example 4: Timeouts and Retries ===\n");
     scenario1_mismatched_responses().await?;

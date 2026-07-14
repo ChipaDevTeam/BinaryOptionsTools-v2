@@ -82,3 +82,37 @@ def test_validator_custom_exception_safety():
     v = Validator.custom(crashing_func)
     # This should return False instead of crashing the process
     assert not v.check("any message")
+
+
+def test_validator_non_callable():
+    import pytest
+
+    with pytest.raises(TypeError, match="must be callable"):
+        Validator.custom(123)
+
+
+def test_validator_eq_not_implemented():
+    v = Validator.starts_with("Hello")
+    assert (v == 123) is False
+
+
+def test_validator_eq():
+    v1 = Validator.starts_with("Hello")
+    assert v1 == v1
+    v2 = Validator.starts_with("Hello")
+    assert (v1 == v2) is False
+
+
+def test_validator_repr():
+    v = Validator.starts_with("Hello")
+    assert "Validator" in repr(v)
+
+
+def test_validator_get_raw_validator_fallback():
+    from unittest.mock import patch
+    from BinaryOptionsToolsV2.validator import _get_raw_validator
+
+    with patch("sys.modules") as mock_modules:
+        mock_modules.get.return_value = None
+        raw_val = _get_raw_validator()
+        assert raw_val is not None

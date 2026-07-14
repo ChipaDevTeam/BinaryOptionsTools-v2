@@ -1,5 +1,4 @@
-#![allow(warnings)]
-#![allow(unused_imports)]
+#![allow(unused_imports, unused_mut, unused_variables, dead_code)]
 use std::any::Any;
 use std::sync::Arc;
 use std::time::Duration;
@@ -66,7 +65,13 @@ fn create_mock_state() -> Arc<State> {
         raw_sinks: tokio::sync::RwLock::new(HashMap::new()),
         raw_keep_alive: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
         urls: Vec::new(),
-        max_subscriptions: 4,
+        proxy: None,
+        user_agent: None,
+        origin: None,
+        sec_websocket_extensions: None,
+        tls_cipher_suites: None,
+        tls_alpn: None,
+        raw_subscribers: tokio::sync::RwLock::new(Vec::new()),
     })
 }
 
@@ -125,11 +130,9 @@ async fn test_open_pending_order_success_integrated() {
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
-    
+
     let mut ws_rx_clone = ws_rx.clone();
-    tokio::spawn(async move {
-        while let Ok(_) = ws_rx_clone.recv().await {}
-    });
+    tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
 
@@ -147,24 +150,26 @@ async fn test_open_pending_order_success_integrated() {
     });
 
     let pending_order = create_test_pending_order(Uuid::new_v4());
-    let data_json = serde_json::to_string(
-        &ServerResponse::Success(Box::new(pending_order.clone()))
-    ).unwrap();
+    let data_json =
+        serde_json::to_string(&ServerResponse::Success(Box::new(pending_order.clone()))).unwrap();
     let socket_io_msg = format!("42[\"successopenPendingOrder\",{}]", data_json);
 
     // Send the command directly instead of going through the handle
     let req_id = Uuid::new_v4();
-    cmd_tx.send(Command::OpenPendingOrder {
-        open_type: 1,
-        amount: Decimal::from_f64_retain(100.0).unwrap(),
-        asset: "EURUSD_otc".to_string(),
-        open_time: "2026-04-07 22:50:00".to_string(),
-        open_price: Decimal::from_f64_retain(1.1950).unwrap(),
-        timeframe: 60,
-        min_payout: 85,
-        command: 0,
-        req_id,
-    }).await.unwrap();
+    cmd_tx
+        .send(Command::OpenPendingOrder {
+            open_type: 1,
+            amount: Decimal::from_f64_retain(100.0).unwrap(),
+            asset: "EURUSD_otc".to_string(),
+            open_time: "2026-04-07 22:50:00".to_string(),
+            open_price: Decimal::from_f64_retain(1.1950).unwrap(),
+            timeframe: 60,
+            min_payout: 85,
+            command: 0,
+            req_id,
+        })
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_millis(10)).await;
 
@@ -177,7 +182,10 @@ async fn test_open_pending_order_success_integrated() {
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             match resp_rx.recv().await {
-                Ok(CommandResponse::Success { req_id: rid, pending_order: po }) if rid == req_id => {
+                Ok(CommandResponse::Success {
+                    req_id: rid,
+                    pending_order: po,
+                }) if rid == req_id => {
                     return po;
                 }
                 Ok(CommandResponse::Error(_)) => panic!("Expected success"),
@@ -185,7 +193,9 @@ async fn test_open_pending_order_success_integrated() {
                 Err(_) => panic!("Channel closed"),
             }
         }
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     let pending_deals = state.trade_state.get_pending_deals().await;
     assert_eq!(pending_deals.len(), 1);
@@ -201,11 +211,9 @@ async fn test_open_pending_order_failure() {
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
-    
+
     let mut ws_rx_clone = ws_rx.clone();
-    tokio::spawn(async move {
-        while let Ok(_) = ws_rx_clone.recv().await {}
-    });
+    tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
 
@@ -223,23 +231,25 @@ async fn test_open_pending_order_failure() {
     });
 
     let fail_order = create_test_fail_open_order();
-    let data_json = serde_json::to_string(
-        &ServerResponse::Fail(Box::new(fail_order.clone()))
-    ).unwrap();
+    let data_json =
+        serde_json::to_string(&ServerResponse::Fail(Box::new(fail_order.clone()))).unwrap();
     let socket_io_msg = format!("42[\"failopenPendingOrder\",{}]", data_json);
 
     let req_id = Uuid::new_v4();
-    cmd_tx.send(Command::OpenPendingOrder {
-        open_type: 1,
-        amount: Decimal::from_f64_retain(100.0).unwrap(),
-        asset: "EURUSD_otc".to_string(),
-        open_time: "2026-04-07 22:50:00".to_string(),
-        open_price: Decimal::from_f64_retain(1.1950).unwrap(),
-        timeframe: 60,
-        min_payout: 85,
-        command: 0,
-        req_id,
-    }).await.unwrap();
+    cmd_tx
+        .send(Command::OpenPendingOrder {
+            open_type: 1,
+            amount: Decimal::from_f64_retain(100.0).unwrap(),
+            asset: "EURUSD_otc".to_string(),
+            open_time: "2026-04-07 22:50:00".to_string(),
+            open_price: Decimal::from_f64_retain(1.1950).unwrap(),
+            timeframe: 60,
+            min_payout: 85,
+            command: 0,
+            req_id,
+        })
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_millis(10)).await;
 
@@ -257,7 +267,9 @@ async fn test_open_pending_order_failure() {
                 Err(_) => panic!("Channel closed"),
             }
         }
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     assert_eq!(result.error, fail_order.error);
     assert_eq!(result.amount, fail_order.amount);
@@ -280,47 +292,75 @@ async fn test_open_pending_order_mismatch_retry() {
         let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
         let (runner_tx, _) = kanal::bounded_async(10);
         let mut ws_rx_clone = ws_rx.clone();
-        tokio::spawn(async move {
-            while let Ok(_) = ws_rx_clone.recv().await {}
-        });
+        tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
         let state = create_mock_state();
         let mut module = PendingTradesApiModule::new(
-            state, cmd_rx, resp_tx_for_module.clone(), msg_rx, ws_tx.clone(), runner_tx,
+            state,
+            cmd_rx,
+            resp_tx_for_module.clone(),
+            msg_rx,
+            ws_tx.clone(),
+            runner_tx,
         );
         module.run().await.ok();
     });
 
     let req_id = Uuid::new_v4();
-    cmd_tx.send(Command::OpenPendingOrder {
-        open_type: 1, amount: Decimal::from_f64_retain(100.0).unwrap(),
-        asset: "EURUSD_otc".to_string(), open_time: "2026-04-07 22:50:00".to_string(),
-        open_price: Decimal::from_f64_retain(1.1950).unwrap(),
-        timeframe: 60, min_payout: 85, command: 0, req_id,
-    }).await.unwrap();
+    cmd_tx
+        .send(Command::OpenPendingOrder {
+            open_type: 1,
+            amount: Decimal::from_f64_retain(100.0).unwrap(),
+            asset: "EURUSD_otc".to_string(),
+            open_time: "2026-04-07 22:50:00".to_string(),
+            open_price: Decimal::from_f64_retain(1.1950).unwrap(),
+            timeframe: 60,
+            min_payout: 85,
+            command: 0,
+            req_id,
+        })
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_millis(10)).await;
 
     let wrong_id1 = Uuid::new_v4();
     let wrong_id2 = Uuid::new_v4();
-    resp_tx.send(CommandResponse::Success {
-        req_id: wrong_id1, pending_order: Box::new(pending_order.clone()),
-    }).await.unwrap();
-    resp_tx.send(CommandResponse::Success {
-        req_id: wrong_id2, pending_order: Box::new(pending_order.clone()),
-    }).await.unwrap();
-    resp_tx.send(CommandResponse::Success {
-        req_id, pending_order: Box::new(pending_order.clone()),
-    }).await.unwrap();
+    resp_tx
+        .send(CommandResponse::Success {
+            req_id: wrong_id1,
+            pending_order: Box::new(pending_order.clone()),
+        })
+        .await
+        .unwrap();
+    resp_tx
+        .send(CommandResponse::Success {
+            req_id: wrong_id2,
+            pending_order: Box::new(pending_order.clone()),
+        })
+        .await
+        .unwrap();
+    resp_tx
+        .send(CommandResponse::Success {
+            req_id,
+            pending_order: Box::new(pending_order.clone()),
+        })
+        .await
+        .unwrap();
 
     let received = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             match resp_rx.recv().await {
-                Ok(CommandResponse::Success { req_id: rid, pending_order: po }) if rid == req_id => return po,
+                Ok(CommandResponse::Success {
+                    req_id: rid,
+                    pending_order: po,
+                }) if rid == req_id => return po,
                 Ok(_) => continue,
                 Err(_) => panic!("Channel closed"),
             }
         }
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     assert_eq!(received.ticket, pending_order.ticket);
     module_task.abort();
@@ -335,10 +375,13 @@ async fn test_open_pending_order_mismatch_max_retries_exceeded() {
     let req_id = Uuid::new_v4();
     for _ in 0..5 {
         let wrong_id = Uuid::new_v4();
-        resp_tx.send(CommandResponse::Success {
-            req_id: wrong_id,
-            pending_order: Box::new(create_test_pending_order(Uuid::new_v4())),
-        }).await.unwrap();
+        resp_tx
+            .send(CommandResponse::Success {
+                req_id: wrong_id,
+                pending_order: Box::new(create_test_pending_order(Uuid::new_v4())),
+            })
+            .await
+            .unwrap();
     }
 
     // Verify none of the responses have the expected req_id
@@ -381,15 +424,16 @@ async fn test_open_pending_order_channel_error_sender_closed() {
     let _ = module_task.await;
 
     let result = client_handle
-        .open_pending_order(
-            1,
-            Decimal::from_f64_retain(100.0).unwrap(),
-            "EURUSD_otc".to_string(),
-            "2026-04-07 22:50:00".to_string(),
-                            Decimal::from_f64_retain(1.1950).unwrap(),
-                            60,            85,
-            0,
-        )
+        .open_pending_order(OpenPendingOrder {
+            open_type: 1,
+            amount: Decimal::from_f64_retain(100.0).unwrap(),
+            asset: "EURUSD_otc".to_string(),
+            open_time: "2026-04-07 22:50:00".to_string(),
+            open_price: Decimal::from_f64_retain(1.1950).unwrap(),
+            timeframe: 60,
+            min_payout: 85,
+            command: 0,
+        })
         .await;
 
     assert!(result.is_err());
@@ -406,11 +450,9 @@ async fn test_open_pending_order_with_socket_io_framing() {
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
-    
+
     let mut ws_rx_clone = ws_rx.clone();
-    tokio::spawn(async move {
-        while let Ok(_) = ws_rx_clone.recv().await {}
-    });
+    tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
 
@@ -429,17 +471,20 @@ async fn test_open_pending_order_with_socket_io_framing() {
 
     let pending_order = create_test_pending_order(Uuid::new_v4());
     let req_id = Uuid::new_v4();
-    cmd_tx.send(Command::OpenPendingOrder {
-        open_type: 1,
-        amount: Decimal::from_f64_retain(100.0).unwrap(),
-        asset: "EURUSD_otc".to_string(),
-        open_time: "2026-04-07 22:50:00".to_string(),
-        open_price: Decimal::from_f64_retain(1.1950).unwrap(),
-        timeframe: 60,
-        min_payout: 85,
-        command: 0,
-        req_id,
-    }).await.unwrap();
+    cmd_tx
+        .send(Command::OpenPendingOrder {
+            open_type: 1,
+            amount: Decimal::from_f64_retain(100.0).unwrap(),
+            asset: "EURUSD_otc".to_string(),
+            open_time: "2026-04-07 22:50:00".to_string(),
+            open_price: Decimal::from_f64_retain(1.1950).unwrap(),
+            timeframe: 60,
+            min_payout: 85,
+            command: 0,
+            req_id,
+        })
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_millis(10)).await;
 
@@ -454,13 +499,18 @@ async fn test_open_pending_order_with_socket_io_framing() {
     let received = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             match resp_rx.recv().await {
-                Ok(CommandResponse::Success { req_id: rid, pending_order: po }) if rid == req_id => return po,
+                Ok(CommandResponse::Success {
+                    req_id: rid,
+                    pending_order: po,
+                }) if rid == req_id => return po,
                 Ok(CommandResponse::Error(_)) => panic!("Expected success"),
                 Ok(_) => continue,
                 Err(_) => panic!("Channel closed"),
             }
         }
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     assert_eq!(received.ticket, pending_order.ticket);
 
@@ -476,12 +526,10 @@ async fn test_run_routes_command_to_websocket() {
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
-    
+
     // Drain ws_rx in background using a clone to prevent blocking
     let mut ws_rx_clone = ws_rx.clone();
-    tokio::spawn(async move {
-        while let Ok(_) = ws_rx_clone.recv().await {}
-    });
+    tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
 
@@ -574,12 +622,10 @@ async fn test_run_handles_socket_io_text_success() {
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
-    
+
     // Drain ws_rx in background using a clone to prevent blocking
     let mut ws_rx_clone = ws_rx.clone();
-    tokio::spawn(async move {
-        while let Ok(_) = ws_rx_clone.recv().await {}
-    });
+    tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
 
@@ -647,12 +693,10 @@ async fn test_run_handles_failure_response() {
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
-    
+
     // Drain ws_rx in background using a clone to prevent blocking
     let mut ws_rx_clone = ws_rx.clone();
-    tokio::spawn(async move {
-        while let Ok(_) = ws_rx_clone.recv().await {}
-    });
+    tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
 
@@ -826,11 +870,9 @@ async fn test_cancel_pending_order_success() {
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
-    
+
     let mut ws_rx_clone = ws_rx.clone();
-    tokio::spawn(async move {
-        while let Ok(_) = ws_rx_clone.recv().await {}
-    });
+    tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
 
@@ -850,10 +892,13 @@ async fn test_cancel_pending_order_success() {
     let ticket = Uuid::new_v4().to_string();
     let ticket_for_assert = ticket.clone();
     let req_id = Uuid::new_v4();
-    cmd_tx.send(Command::CancelPendingOrder {
-        ticket: ticket.clone(),
-        req_id,
-    }).await.unwrap();
+    cmd_tx
+        .send(Command::CancelPendingOrder {
+            ticket: ticket.clone(),
+            req_id,
+        })
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_millis(10)).await;
 
@@ -873,13 +918,18 @@ async fn test_cancel_pending_order_success() {
     let received = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             match resp_rx.recv().await {
-                Ok(CommandResponse::CancelSuccess { req_id: rid, ticket: t }) if rid == req_id => return t,
+                Ok(CommandResponse::CancelSuccess {
+                    req_id: rid,
+                    ticket: t,
+                }) if rid == req_id => return t,
                 Ok(CommandResponse::CancelError { .. }) => panic!("Expected success"),
                 Ok(_) => continue,
                 Err(_) => panic!("Channel closed"),
             }
         }
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     assert_eq!(received, ticket_for_assert);
 
@@ -893,11 +943,9 @@ async fn test_cancel_pending_order_failure() {
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
-    
+
     let mut ws_rx_clone = ws_rx.clone();
-    tokio::spawn(async move {
-        while let Ok(_) = ws_rx_clone.recv().await {}
-    });
+    tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
 
@@ -916,10 +964,13 @@ async fn test_cancel_pending_order_failure() {
 
     let ticket = Uuid::new_v4().to_string();
     let req_id = Uuid::new_v4();
-    cmd_tx.send(Command::CancelPendingOrder {
-        ticket: ticket.clone(),
-        req_id,
-    }).await.unwrap();
+    cmd_tx
+        .send(Command::CancelPendingOrder {
+            ticket: ticket.clone(),
+            req_id,
+        })
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_millis(10)).await;
 
@@ -947,7 +998,9 @@ async fn test_cancel_pending_order_failure() {
                 Err(_) => panic!("Channel closed"),
             }
         }
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     assert_eq!(received, "Deal not found");
 
@@ -961,11 +1014,9 @@ async fn test_cancel_pending_orders_batch_success() {
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
-    
+
     let mut ws_rx_clone = ws_rx.clone();
-    tokio::spawn(async move {
-        while let Ok(_) = ws_rx_clone.recv().await {}
-    });
+    tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
 
@@ -986,10 +1037,13 @@ async fn test_cancel_pending_orders_batch_success() {
     let ticket2 = Uuid::new_v4().to_string();
     let tickets = vec![ticket1.clone(), ticket2.clone()];
     let req_id = Uuid::new_v4();
-    cmd_tx.send(Command::CancelPendingOrders {
-        tickets: tickets.clone(),
-        req_id,
-    }).await.unwrap();
+    cmd_tx
+        .send(Command::CancelPendingOrders {
+            tickets: tickets.clone(),
+            req_id,
+        })
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_millis(10)).await;
 
@@ -1009,13 +1063,19 @@ async fn test_cancel_pending_orders_batch_success() {
     let received = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             match resp_rx.recv().await {
-                Ok(CommandResponse::BatchCancelSuccess { req_id: rid, cancelled }) if rid == req_id => return cancelled,
-                Ok(CommandResponse::CancelSuccess { .. }) | Ok(CommandResponse::CancelError { .. }) => panic!("Expected batch success"),
+                Ok(CommandResponse::BatchCancelSuccess {
+                    req_id: rid,
+                    cancelled,
+                }) if rid == req_id => return cancelled,
+                Ok(CommandResponse::CancelSuccess { .. })
+                | Ok(CommandResponse::CancelError { .. }) => panic!("Expected batch success"),
                 Ok(_) => continue,
                 Err(_) => panic!("Channel closed"),
             }
         }
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     assert_eq!(received.len(), 2);
 
@@ -1029,11 +1089,9 @@ async fn test_cancel_pending_orders_batch_partial_success() {
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
-    
+
     let mut ws_rx_clone = ws_rx.clone();
-    tokio::spawn(async move {
-        while let Ok(_) = ws_rx_clone.recv().await {}
-    });
+    tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
 
@@ -1054,10 +1112,13 @@ async fn test_cancel_pending_orders_batch_partial_success() {
     let ticket2 = Uuid::new_v4().to_string();
     let tickets = vec![ticket1.clone(), ticket2.clone()];
     let req_id = Uuid::new_v4();
-    cmd_tx.send(Command::CancelPendingOrders {
-        tickets: tickets.clone(),
-        req_id,
-    }).await.unwrap();
+    cmd_tx
+        .send(Command::CancelPendingOrders {
+            tickets: tickets.clone(),
+            req_id,
+        })
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_millis(10)).await;
 
@@ -1077,13 +1138,19 @@ async fn test_cancel_pending_orders_batch_partial_success() {
     let received = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             match resp_rx.recv().await {
-                Ok(CommandResponse::BatchCancelSuccess { req_id: rid, cancelled }) if rid == req_id => return cancelled,
-                Ok(CommandResponse::CancelSuccess { .. }) | Ok(CommandResponse::CancelError { .. }) => panic!("Expected batch success"),
+                Ok(CommandResponse::BatchCancelSuccess {
+                    req_id: rid,
+                    cancelled,
+                }) if rid == req_id => return cancelled,
+                Ok(CommandResponse::CancelSuccess { .. })
+                | Ok(CommandResponse::CancelError { .. }) => panic!("Expected batch success"),
                 Ok(_) => continue,
                 Err(_) => panic!("Channel closed"),
             }
         }
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     assert_eq!(received.len(), 1);
 

@@ -215,7 +215,7 @@ impl Rule for TwoStepRule {
                 if text.starts_with(&self.pattern) {
                     // Check for binary placeholder in Socket.IO format
                     let has_placeholder = text.contains(r#""_placeholder":true"#);
-                    
+
                     // If it has a placeholder, we MUST wait for the next (binary) message
                     if has_placeholder {
                         tracing::debug!(target: "TwoStepRule", "Detected binary placeholder for pattern '{}'. Waiting for next message.", self.pattern);
@@ -229,7 +229,7 @@ impl Rule for TwoStepRule {
                         self.valid.store(false, Ordering::SeqCst);
                         return true;
                     }
-                    
+
                     tracing::debug!(target: "TwoStepRule", "Pattern '{}' matched! Next message will be accepted.", self.pattern);
                     self.valid.store(true, Ordering::SeqCst);
                     return false;
@@ -241,13 +241,9 @@ impl Rule for TwoStepRule {
                 }
                 false
             }
-            Message::Binary(_) => {
-                if self.valid.load(Ordering::SeqCst) {
-                    self.valid.store(false, Ordering::SeqCst);
-                    true
-                } else {
-                    false
-                }
+            Message::Binary(_) if self.valid.load(Ordering::SeqCst) => {
+                self.valid.store(false, Ordering::SeqCst);
+                true
             }
             _ => false,
         }
@@ -329,13 +325,9 @@ impl Rule for MultiPatternRule {
                 }
                 false
             }
-            Message::Binary(_) => {
-                if self.valid.load(Ordering::SeqCst) {
-                    self.valid.store(false, Ordering::SeqCst);
-                    true
-                } else {
-                    false
-                }
+            Message::Binary(_) if self.valid.load(Ordering::SeqCst) => {
+                self.valid.store(false, Ordering::SeqCst);
+                true
             }
             _ => false,
         }
@@ -423,10 +415,8 @@ impl Asset {
         if !self.is_active {
             return Err(PocketError::InvalidAsset("Asset is not active".into()));
         }
-        if 24 * 60 * 60 % time != 0 {
-            return Err(PocketError::InvalidAsset(
-                "Time must be a divisor of 86400 (24 hours)".into(),
-            ));
+        if time == 0 {
+            return Err(PocketError::InvalidAsset("Time must be a positive value".into()));
         }
         Ok(())
     }

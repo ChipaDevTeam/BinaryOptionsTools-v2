@@ -1,24 +1,29 @@
-# ---- Rust ----
-# ignore build artifacts
+# Rust
+
 **/target/
 Cargo.lock
-# backups
+
+# Backups
+
 **/*.rs.bk
 **/*.exe
 **/chipadocs.toml
-# ---- Python ----
-# bytecode/cache
+
+# Python
+
 __pycache__/
 *.py[cod]
 *$py.class
 
-# virtualenvs
+# venvs
+
 venv/
 .venv/
 ENV/
 env/
 
 # build / packaging artifacts
+
 build/
 dist/
 *.egg-info/
@@ -28,15 +33,18 @@ dist/
 MANIFEST
 
 # C-extension / compiled files
+
 *.so
 *.pyd
 
 # test / coverage
+
 .coverage
 htmlcov/
 pytest_cache/
 
-# ---- Node (if used) ----
+# Node
+
 node_modules/
 *.node
 bun-debug.log*
@@ -45,23 +53,29 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# ---- Logs / env ----
+# Logs / env
+
 *.log
 /examples/*.log
 .env
 
-# ---- IDE / editor ----
+# IDE / editor
+
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# ---- OS ----
+# OS
+
 .DS_Store
 Thumbs.db
+nul
+nul/
 
-# ---- Misc ----
+#Misc
+
 *.egg
 .eggs/
 downloads/
@@ -74,17 +88,21 @@ bin/
 lib64
 pyvenv.cfg
 
-# debug (i have my uncensored websocket history in here and don't want to accidentally commit it if i forget to rm it lol)
+# Debugging
 debug/
 .pytest_cache/
-testing_before_push
 
 # Python
 __pycache__/
 *.py[cod]
 .agents
 
-# omg n stuff
-assets
-.omg
-memory
+# ARIVE MCP - https://github.com/sixtysixx/ARIVE
+.arive
+.arive-tasks
+
+#Build artifacts
+site
+logs_fail
+wheels/
+config.toml

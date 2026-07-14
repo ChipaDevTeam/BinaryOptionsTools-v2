@@ -4,6 +4,7 @@ import sys
 import types
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
+from urllib.parse import urlparse
 
 import pytest
 
@@ -192,6 +193,15 @@ class MockRawClient:
 
     async def send_raw_message(self, message):
         pass
+
+    async def send_raw(self, message):
+        pass
+
+    async def subscribe_raw(self):
+        async def subscription():
+            yield '42["raw_msg"]'
+
+        return subscription()
 
     async def create_raw_order(self, message, validator):
         return '42["response"]'
@@ -425,7 +435,10 @@ class TestPocketOptionAsyncInit:
     async def test_init_with_custom_url(self, mock_raw_pocketoption):
         """Test that custom URL is added to config."""
         client = PocketOptionAsync("test_ssid", url="wss://custom.com")
-        assert "wss://custom.com" in client.config.urls
+        assert any(
+            parsed.scheme == "wss" and parsed.hostname == "custom.com"
+            for parsed in (urlparse(url) for url in client.config.urls)
+        )
         await client.shutdown()
 
 
@@ -1292,3 +1305,190 @@ class TestSsidValidation:
         """A None SSID skips validation and marks as invalid."""
         client = PocketOptionAsync(None, config={"terminal_logging": False})
         assert client.is_ssid_valid() is False
+
+
+class TestAsynchronousExtraCoverage:
+    """Extra tests to ensure 100% coverage of asynchronous.py methods, fallbacks, and errors."""
+
+    def test_validate_ssid_auth_data_not_dict(self):
+        # auth_data is not a dict
+        ssid = '42["auth", "not-a-dict"]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    @pytest.mark.asyncio
+    async def test_async_config_url_insert(self):
+        # Config is not None and url is not None
+        client = PocketOptionAsync("test_ssid", config=Config(), url="wss://custom-url")
+        assert client.config.urls[0] == "wss://custom-url"
+
+    @pytest.mark.asyncio
+    async def test_terminal_logging_exception_safety(self):
+        from unittest.mock import patch
+
+        # terminal_logging is True and LogBuilder raises Exception
+        with patch(
+            "BinaryOptionsToolsV2.tracing.LogBuilder.terminal",
+            side_effect=Exception("mock"),
+        ):
+            client = PocketOptionAsync("test_ssid", config={"terminal_logging": True})
+            assert client is not None
+
+    @pytest.mark.asyncio
+    async def test_terminal_logging_success(self):
+        # terminal_logging is True and works without exception
+        client = PocketOptionAsync("test_ssid", config={"terminal_logging": True})
+        assert client is not None
+
+    @pytest.mark.asyncio
+    async def test_asynchronous_relative_import_fallback(self):
+        from unittest.mock import patch
+
+        with patch.dict(
+            "sys.modules", {"BinaryOptionsToolsV2.BinaryOptionsToolsV2": None}
+        ):
+            client = PocketOptionAsync("test_ssid", config={"terminal_logging": False})
+            assert client is not None
+
+    @pytest.mark.asyncio
+    async def test_check_win_timeout(self):
+        client = PocketOptionAsync("test_ssid")
+
+        async def slow_get_trade(id):
+            await asyncio.sleep(2)
+            return {"id": id}
+
+        client._get_trade_result = slow_get_trade
+        with pytest.raises(TimeoutError, match="Timeout waiting for trade result"):
+            await client.check_win("deal_1", timeout_seconds=0.1)
+
+    @pytest.mark.asyncio
+    async def test_get_opened_deal_coverage(self, mock_raw_pocketoption):
+        client = PocketOptionAsync("test_ssid")
+        # 1. Normal
+        mock_raw_pocketoption.get_opened_deal = AsyncMock(
+            return_value='{"id": "deal_123", "status": "open"}'
+        )
+        deal = await client.get_opened_deal("deal_123")
+        assert deal is not None
+        assert deal["id"] == "deal_123"
+
+        # 2. None
+        mock_raw_pocketoption.get_opened_deal = AsyncMock(return_value=None)
+        assert await client.get_opened_deal("not_found") is None
+
+    @pytest.mark.asyncio
+    async def test_get_closed_deal_coverage(self, mock_raw_pocketoption):
+        client = PocketOptionAsync("test_ssid")
+        # 1. Normal
+        mock_raw_pocketoption.get_closed_deal = AsyncMock(
+            return_value='{"id": "deal_456", "status": "closed"}'
+        )
+        deal = await client.get_closed_deal("deal_456")
+        assert deal is not None
+        assert deal["id"] == "deal_456"
+
+        # 2. None
+        mock_raw_pocketoption.get_closed_deal = AsyncMock(return_value=None)
+        assert await client.get_closed_deal("not_found") is None
+
+    @pytest.mark.asyncio
+    async def test_open_pending_order_type_error_fallbacks(self, mock_raw_pocketoption):
+        client = PocketOptionAsync("test_ssid")
+
+        # We want open_pending_order to raise TypeError on the first call, then succeed
+        call_count = 0
+
+        async def mock_open(ot, amt, asset, optime, opprice, tf, minp, cmd):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise TypeError("object cannot be interpreted as an integer")
+            return json.dumps({"optime": optime})
+
+        mock_raw_pocketoption.open_pending_order = mock_open
+
+        # Test "0" string
+        call_count = 0
+        res = await client.open_pending_order(1, 10.0, "EURUSD", "0", 1.1, 60, 80, 0)
+        assert res["optime"] == 0
+
+        # Test numeric string
+        call_count = 0
+        res = await client.open_pending_order(
+            1, 10.0, "EURUSD", "12345678", 1.1, 60, 80, 0
+        )
+        assert res["optime"] == 12345678
+
+        # Test date string YYYY-MM-DD HH:MM:SS
+        call_count = 0
+        res = await client.open_pending_order(
+            1, 10.0, "EURUSD", "2026-06-25 12:00:00", 1.1, 60, 80, 0
+        )
+        assert res["optime"] > 0
+
+        # Test invalid date string
+        call_count = 0
+        res = await client.open_pending_order(
+            1, 10.0, "EURUSD", "invalid_date", 1.1, 60, 80, 0
+        )
+        assert res["optime"] == 0
+
+        # Test other TypeError is re-raised
+        async def mock_other_type_error(*args):
+            raise TypeError("some other error")
+
+        mock_raw_pocketoption.open_pending_order = mock_other_type_error
+        with pytest.raises(TypeError, match="some other error"):
+            await client.open_pending_order(1, 10.0, "EURUSD", "0", 1.1, 60, 80, 0)
+
+    def test_anext_polyfill_coverage(self):
+        import sys
+        import importlib
+
+        original_version = sys.version_info
+        sys.version_info = (3, 9, 0)
+        try:
+            import BinaryOptionsToolsV2.pocketoption.asynchronous as async_mod
+
+            importlib.reload(async_mod)
+            assert hasattr(async_mod, "anext")
+
+            class MockIter:
+                async def __anext__(self):
+                    return 42
+
+            import anyio
+
+            async def run_test():
+                assert await async_mod.anext(MockIter()) == 42
+
+            anyio.run(run_test)
+        finally:
+            sys.version_info = original_version
+            import BinaryOptionsToolsV2.pocketoption.asynchronous as async_mod
+
+            importlib.reload(async_mod)
+
+    def test_raw_pocket_option_import_fallback(self):
+        from unittest.mock import patch
+
+        # Force fallback import of RawPocketOption
+        with patch("sys.modules") as mock_modules:
+            mock_modules.get.return_value = None
+            client = PocketOptionAsync("test_ssid", config={"terminal_logging": False})
+            assert client is not None
+@pytest.mark.asyncio
+async def test_raw_websocket_apis(monkeypatch):
+    monkeypatch.setattr(
+        "BinaryOptionsToolsV2.pocketoption.asynchronous.RawPocketOption",
+        MockRawClient,
+    )
+    client = PocketOptionAsync('42["auth",{"session":"test_sess","uid":12345}]')
+    await client.send_raw('42["ping"]')
+    stream = await client.subscribe_raw()
+    messages = []
+    async for msg in stream:
+        messages.append(msg)
+        break
+    assert messages == ['42["raw_msg"]']

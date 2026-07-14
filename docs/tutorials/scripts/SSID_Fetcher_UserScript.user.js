@@ -54,10 +54,21 @@
     const result = originalSend.apply(this, arguments);
 
     // Get the URL from the native property or our fallback tag
-    const socketUrl = (this.url || this._interceptUrl || "").toLowerCase();
+    const rawSocketUrl = this.url || this._interceptUrl || "";
+    const socketUrl = rawSocketUrl.toLowerCase();
 
-    // STRICT EXCLUSION: If the URL belongs to events-po.com, bypass the logic immediately
-    if (socketUrl.includes("events-po.com")) {
+    // STRICT EXCLUSION: If the URL host is events-po.com or one of its subdomains, bypass immediately
+    let socketHost = "";
+    try {
+      socketHost = new URL(
+        rawSocketUrl,
+        window.location.href,
+      ).hostname.toLowerCase();
+    } catch (e) {}
+    if (
+      socketHost === "events-po.com" ||
+      socketHost.endsWith(".events-po.com")
+    ) {
       return result;
     }
 

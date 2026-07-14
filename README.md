@@ -1,4 +1,5 @@
 # BinaryOptionsTools V2
+> **✨ Build with [Chipa Editor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_term=support&utm_content=header) — the AI-powered strategy editor for Traders. Try it free!**
 
 [![Discord](https://img.shields.io/discord/1261483112991555665?label=Discord&logo=discord&color=7289da)](https://discord.com/invite/p7YyFqSmAz)
 [![Python Version](https://img.shields.io/badge/python-3.9%20|%203.10%20|%203.11%20|%203.12-blue)](https://www.python.org/)
@@ -30,12 +31,21 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
   - [Async API](#async-api-recommended)
-  - [Bot Framework](#bot-framework--strategy-high-level)
+  - [Bot Framework](#bot-framework)
   - [Data Streaming](#real-time-data-streaming)
 - [Advanced Usage](#advanced-usage)
 - [Examples](#examples)
 - [Roadmap](#roadmap)
-- [Legal & Disclaimer](#legal-and-disclaimer)
+- [Contributing](#contributing)
+- [Legal & Disclaimer](#legal--disclaimer)
+- [Known Bugs](#known-bugs)
+
+---
+
+## Known Bugs
+
+**Automatic email & password SSID fetching:**
+- 2FA may not be supported
 
 ---
 
@@ -71,7 +81,7 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 ### Market Data & Backtesting
 
 - **Live Stream**: Subscribe to real-time candles and price ticks.
-- **Historical**: Fetch OHLC data for analysis.
+- **Historical / UTC Candles**: Fetch and compile custom or standard candles directly from 1-second ticks aligned strictly to UTC boundaries, ensuring no server-side gaps or overlaps (merges).
 - **Virtual Market**: Built-in simulator for backtesting strategies without financial risk.
 - **Server Sync**: Precision timing via NTP-like synchronization.
 
@@ -114,45 +124,28 @@ graph TD
 
 ### Python
 
-#### Option A: Prebuilt Wheels (Recommended)
-
-Install directly from our GitHub releases. Supports **Python 3.9 - 3.12**.
-
-**Windows**
+#### Option A: Install from Source (Recommended)
 
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.9/binaryoptionstoolsv2-0.2.9-cp39-abi3-win_amd64.whl"
+git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
+cd BinaryOptionsTools-v2/python
+git fetch --tags
+git checkout "$(git tag -l --sort=-v:refname | head -n 1)"
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install .
 ```
 
-**Linux**
+#### Option B: Install from Source Automatically
+
+Requires `git`, a C toolchain, and a Rust toolchain.
 
 ```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.9/binaryoptionstoolsv2-0.2.9-cp39-abi3-manylinux_2_28_x86_64.whl"
-```
-
-**macOS (Apple Silicon)**
-
-```bash
-pip install "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/releases/download/v0.2.9/binaryoptionstoolsv2-0.2.9-cp39-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl"
-```
-
-#### Option B: Build from Source
-
-Requires `rustc`, `cargo`, and `maturin`.
-
-```bash
-git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git
-cd BinaryOptionsTools-v2/BinaryOptionsToolsV2
-pip install maturin
-maturin develop --release
-```
-
-#### Option C: Build from Source Automatically
-
-Requires `rustc`, `cargo`, and `maturin`.
-
-```bash
-pip install git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git#subdirectory=python
+git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
+cd BinaryOptionsTools-v2/python
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@master#subdirectory=python"
 ```
 
 ### Rust
@@ -161,11 +154,10 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-binary_options_tools = { path = "crates/binary_options_tools" }
+binary_options_tools = { git = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git" }
 ```
 
 ---
-
 ## Quick Start
 
 ### Async API (Recommended)
@@ -188,7 +180,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### Bot Framework & Strategy (High-Level)
+### Bot Framework
 
 Implement the `Strategy` trait (Rust) or inherit from `PyStrategy` (Python) for structured bot development.
 
@@ -292,7 +284,7 @@ UniFFI-generated examples for Go, Kotlin, Swift, Ruby, C#, and Rust are availabl
 - [x] **Framework**: Bot & Strategy System
 - [x] **Backtesting**: Virtual Market Simulator
 - [ ] **Platform**: IQ Option Integration
-- [x] **Core**: Multi-language support via UniFFI (Kotlin, Swift, Go, C#)
+- [x] **Core**: Multi-language support via UniFFI (Kotlin, Swift, C#)
 - [ ] **Core**: JavaScript/TypeScript Bindings
 - [ ] **Core**: WebAssembly (WASM) Support
 - [ ] **Tools**: Advanced Strategy Optimizer
@@ -309,7 +301,7 @@ We welcome contributions!
 
 ---
 
-## Legal and Disclaimer
+## Legal & Disclaimer
 
 ### License
 
@@ -327,4 +319,4 @@ We welcome contributions!
 
 ---
 
-[Documentation](https://chipadevteam.github.io/BinaryOptionsTools-v2/) | [API Reference](https://chipadevteam.github.io/BinaryOptionsTools-v2/api/reference.md) | [Discord Community](https://discord.com/invite/p7YyFqSmAz) | [Agents & AI](agents/AGENTS.md)
+[Documentation](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/) | [API Reference](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/api/reference.md) | [Discord Community](https://discord.com/invite/p7YyFqSmAz) | [Agents & AI](agents/AGENTS.md)

@@ -19,10 +19,9 @@ This directory contains example C# programs demonstrating how to use the BinaryO
 ## Running the Examples
 
 Compile and run each example using:
-
 ```bash
-csc /reference:binary_options_tools_uni.dll Basic.cs
-./Basic.exe
+csc /reference:binary_options_tools_uni.dll basic.cs
+./basic.exe
 ```
 
 Or create a .csproj file and run with:
@@ -33,14 +32,14 @@ dotnet run
 
 ## Available Examples
 
-### `Basic.cs`
+### `basic.cs`
 
 Basic example showing:
 
 - Client initialization
 - Getting account balance
 
-### `Balance.cs`
+### `get_balance.cs`
 
 Simple example showing how to get your account balance.
 
@@ -56,9 +55,29 @@ Example demonstrating how to place a sell trade and check profit/loss.
 
 Example showing how to check trade results after completion.
 
-### `Subscribe.cs`
+### `subscribe_symbol.cs`
 
 Example demonstrating how to subscribe to real-time candle data.
+
+### `history.cs`
+
+Example showing how to get candle history.
+
+### `logs.cs`
+
+Example showing how to start logging and place trades.
+
+### `payout.cs`
+
+Example showing how to get payout information.
+
+### `raw_send.cs`
+
+Example demonstrating sending raw WebSocket messages.
+
+### `validator.cs`
+
+Example demonstrating validator usage.
 
 ## Important Notes
 
@@ -90,7 +109,7 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 
 ## Additional Resources
 
-- **Full Documentation**: [https://chipadevteam.github.io/BinaryOptionsTools-v2/](https://chipadevteam.github.io/BinaryOptionsTools-v2/)
+- **Full Documentation**: [https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)
 - **Discord Community**: [Join us](https://discord.gg/p7YyFqSmAz)
 
 ## ⚠️ Risk Warning

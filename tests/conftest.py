@@ -25,9 +25,7 @@ if os.path.exists(env_path):
                     value = value[1:-1]
                 os.environ[key] = value
                 if key == "POCKET_OPTION_SSID":
-                    print(
-                        f"[TEST_ENV] Found POCKET_OPTION_SSID (starts with {value[:10]}...)"
-                    )
+                    print("[TEST_ENV] Found POCKET_OPTION_SSID (loaded from .env)")
 else:
     print(f"\n[TEST_ENV] No .env file found at {env_path}")
 
@@ -45,9 +43,7 @@ except ImportError:
         "\n[TEST_ENV] BinaryOptionsToolsV2 not found in site-packages, attempting to load from source..."
     )
     # Add source directory to sys.path as a fallback
-    source_path = os.path.join(
-        os.path.dirname(__file__), "../python"
-    )
+    source_path = os.path.join(os.path.dirname(__file__), "../python")
     if source_path not in sys.path:
         sys.path.insert(0, source_path)
 

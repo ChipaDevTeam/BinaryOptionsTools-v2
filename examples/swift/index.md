@@ -18,17 +18,17 @@ Add files to your Xcode project and run, or use Swift Package Manager:
 
 ```bash
 swift Basic.swift
-swift Balance.swift
+swift get_balance.swift
 ```
 
 ## Examples
 
 - `Basic.swift` - Initialize and get balance
-- `Balance.swift` - Get account balance
+- `get_balance.swift` - Get account balance
 - `Buy.swift` - Place buy trade
 - `Sell.swift` - Place sell trade
 - `CheckWin.swift` - Check trade results
-- `Subscribe.swift` - Subscribe to real-time data
+- `subscribe_symbol.swift` - Subscribe to real-time data
 
 ## Important
 

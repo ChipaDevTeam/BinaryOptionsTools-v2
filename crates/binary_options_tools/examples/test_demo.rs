@@ -9,7 +9,6 @@
 
 use std::time::Duration;
 
-use binary_options_tools::config::Config;
 use binary_options_tools::pocketoption::PocketOption;
 
 #[tokio::main]
@@ -36,12 +35,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  is_connected: {}", connected);
     assert!(connected, "Expected to be connected after initialization");
     println!("  [PASS] is_connected() returns true");
-
-    // Test max_subscriptions default
-    let max_subs = client.max_subscriptions();
-    println!("  max_subscriptions: {}", max_subs);
-    assert_eq!(max_subs, 4, "Expected default max_subscriptions of 4");
-    println!("  [PASS] max_subscriptions() returns 4");
 
     // Test is_demo
     let is_demo = client.is_demo();
@@ -111,22 +104,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("\n=== Test 4: Custom max_subscriptions ===");
-    let mut config = Config::default();
-    config.max_subscriptions = 8;
-    let client2 = PocketOption::new_with_config(&ssid, config).await?;
-    tokio::time::sleep(Duration::from_secs(3)).await;
-
-    let max_subs2 = client2.max_subscriptions();
-    println!("  max_subscriptions: {}", max_subs2);
-    assert_eq!(max_subs2, 8, "Expected max_subscriptions of 8");
-    println!("  [PASS] Custom max_subscriptions works");
-
-    let connected2 = client2.is_connected();
+    println!("\n=== Test 4: Verify connection is stable ===");
+    let connected2 = client.is_connected();
     println!("  is_connected: {}", connected2);
-    assert!(connected2, "Expected to be connected");
-    println!("  [PASS] Second client connected");
-
+    assert!(connected2, "Expected client to remain connected");
+    println!("  [PASS] Client connection is stable");
     println!("\n=== All tests passed ===");
     Ok(())
 }

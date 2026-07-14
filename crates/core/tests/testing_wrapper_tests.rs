@@ -70,7 +70,7 @@ impl ApiModule<()> for TestModule {
 }
 
 #[derive(Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Test handle fields are set but never read; kept for trait completeness
 pub struct TestHandle {
     sender: AsyncSender<String>,
     receiver: AsyncReceiver<String>,

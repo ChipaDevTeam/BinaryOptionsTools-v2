@@ -14,6 +14,71 @@ This is a dual-language project: **Rust** core with **Python** bindings (via PyO
 - `docs/` — MkDocs documentation
 - `data/` — Test fixtures and JSON data
 
+## Product Context
+
+A high-performance, cross-platform package for automating binary options trading, built with a Rust core and high-level bindings for Python and other languages.
+
+### Primary Users
+
+- **Trading Bot Developers**: Individuals building automated trading systems.
+- **Quantitative Traders**: Users requiring high-performance data streaming and execution for strategies.
+- **Retail Traders**: Users looking for reliable tools to interface with binary options platforms programmatically.
+
+### Main Goal
+
+To bridge the gap between low-level performance and high-level usability, providing a robust, type-safe, and scalable framework for real-time market data streaming and instant trade execution on binary options platforms (starting with PocketOption).
+
+### Key Features
+
+- **High-Performance Rust Core**: Leveraging Rust for concurrency and memory safety.
+- **Cross-Platform Bindings**: Seamless integration with Python (PyO3) and multiple other languages via UniFFI (Kotlin, Swift, Go, Ruby, C#).
+- **Real-Time Data Streaming**: Native WebSocket support for live OHLC candles and market updates.
+- **Instant Trade Execution**: Fast placement and monitoring of trades with configurable timeouts.
+- **Historical Data Support**: Fetching OHLC data for backtesting and analysis.
+- **Robust Connectivity**: Automatic reconnection, keep-alive monitoring, and server time synchronization.
+- **Extensible Architecture**: Raw Handler API for custom protocols and built-in message validators.
+
+## Tech Stack
+
+### Languages
+
+- **Rust**: Core logic, performance-critical components, and WebSocket handling.
+- **Python**: Primary user interface via high-level bindings (3.8 – 3.13 support).
+- **JavaScript/TypeScript**: Documentation tooling and potential future bindings.
+
+### Rust Core Libraries
+
+| Category        | Libraries                                        |
+| --------------- | ------------------------------------------------ |
+| Async Runtime   | `tokio`                                          |
+| Serialization   | `serde`, `serde_json`                            |
+| Python Bindings | `pyo3`, `pyo3-async-runtimes`                    |
+| WebSockets      | `tokio-tungstenite` (with `rustls`)              |
+| HTTP            | `reqwest` (with `rustls-tls`, no native OpenSSL) |
+| Error Handling  | `thiserror`, `anyhow`                            |
+| Logging/Tracing | `tracing`, `tracing-subscriber`                  |
+| Time/Date       | `chrono`                                         |
+| Decimals        | `rust_decimal`                                   |
+| Proc-macros     | `darling` for attribute parsing                  |
+| Cross-Platform  | `UniFFI` (Kotlin, Swift, Go, Ruby, C#)           |
+
+### Python Bindings
+
+| Category           | Tools                      |
+| ------------------ | -------------------------- |
+| Build System       | `maturin`                  |
+| Testing            | `pytest`, `pytest-asyncio` |
+| Linting/Formatting | `ruff`                     |
+
+### Infrastructure & Tooling
+
+- **Version Control**: Git (GitHub)
+- **CI/CD**: GitHub Actions
+- **Documentation**: MkDocs (Material theme)
+- **Containerization**: Docker (multi-platform builds)
+- **Dependency Management**: Rust — `cargo`; Python — `pip`, `uv.lock`; JS — `bun`
+- **Quality Control**: `husky`, `lint-staged`, `rustfmt`, `prettier`, `markdownlint`
+
 ## Build Commands
 
 ### Rust
@@ -58,6 +123,7 @@ pytest --cov=BinaryOptionsToolsV2        # With coverage
 - Config: `pytest.ini` sets `asyncio_mode = auto`, `timeout = 60`, testpaths = `tests/python/core tests/python/pocketoption tests/python/tracing`
 - `conftest.py` loads `.env` for `POCKET_OPTION_SSID`; tests skip if not set
 - Fixtures: `api` (async), `api_sync` — module-scoped, reuse connections
+- Tests located in `tests/` directory
 
 ### Rust
 
@@ -68,6 +134,10 @@ cargo test test_name                     # By name
 cargo test -- --nocapture                # Show output
 cargo test --package binary_options_tools --lib framework::tests  # Framework tests
 ```
+
+- Implement unit tests in each crate's `src` or `tests` directory
+- Ensure all tests pass (`cargo test` and `pytest`) before submitting a PR
+- Tests must be deterministic and use mocks for network calls where appropriate
 
 ## Lint & Format
 
@@ -121,6 +191,8 @@ Install hooks: `bun install` (uses `bun@1.3.10`)
 - **Modules**: One module per file; `mod.rs` for submodules
 - **Public APIs**: Explicit types; type inference OK in local scope
 - **Python interop**: `#[pyfunction]`, `#[pymodule]`, `#[pyclass]`; convert errors with `PyErr::new::<PyRuntimeError, _>(msg)`
+- **Documentation**: Triple-slash (`///`) doc comments for all public APIs
+- **Warnings**: Fix all clippy warnings; no warnings allowed in the final code
 
 ## Code Style — Python
 
@@ -136,6 +208,22 @@ Install hooks: `bun install` (uses `bun@1.3.10`)
 - **Logging**: Use `BinaryOptionsToolsV2.tracing` bridge; avoid `print()` in library code
 - **Stub files**: `.pyi` files generated from Rust via `stubgen` feature; Python wrapper should be thin
 
+## Commit Conventions
+
+- **Subject line**: Present tense, imperative mood ("Add feature" not "Added feature"), ≤ 72 characters
+- **Body**: Detailed description of the "why" behind the change
+- **Footer**: Reference issues using `Fixes #123` or `Closes #123`
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for full commit message guidelines and examples.
+
+## Workflow & PRs
+
+- **Branching**: Create feature branches from `master`
+- **Pre-commit**: `husky` and `lint-staged` run automatic formatting and linting on commit
+- **Testing**: Ensure all tests pass (`cargo test` and `pytest`) before submitting a PR
+- **Documentation**: Update `docs/` and `README.md` if the change affects public behavior
+- **Reviews**: All PRs require a clear description and must pass all CI checks
+
 ## Cross-language Conventions
 
 - Business logic lives in Rust; Python wrapper is thin
@@ -143,12 +231,6 @@ Install hooks: `bun install` (uses `bun@1.3.10`)
 - Errors surface as Python exceptions via PyO3 conversion
 - Version managed in Cargo.toml; maturin reads it for Python package
 - Stub generation: `stubgen` feature on `BinaryOptionsToolsV2` crate → `.pyi` in `python/BinaryOptionsToolsV2/`
-
-## Commit Messages
-
-- Present tense, imperative mood: "Add feature" not "Added feature"
-- First line ≤ 72 chars
-- Reference issues: `Fixes #123`
 
 ## CI
 

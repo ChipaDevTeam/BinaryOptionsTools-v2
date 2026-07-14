@@ -18,10 +18,26 @@ Python bindings for BinaryOptionsTools - A powerful library for automated binary
 
 ## How to install
 
-Install it via PyPI:
+### Option A: Install from Source (Recommended)
 
 ```bash
-pip install binaryoptionstoolsv2
+git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
+cd BinaryOptionsTools-v2/python
+git fetch --tags
+git checkout "$(git tag -l --sort=-v:refname | head -n 1)"
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install .
+```
+
+### Option B: Install from Source Automatically
+
+Requires `git`, a C toolchain, and a Rust toolchain.
+
+```bash
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@master#subdirectory=python"
 ```
 
 ## Supported OS
@@ -31,36 +47,6 @@ Currently supported on **Windows**, **Linux**, and **macOS**.
 ## Supported Python versions
 
 Supports **Python 3.8 to 3.13**.
-
-## Compile from source (Not recommended)
-
-- Make sure you have `rust` and `cargo` installed ([Check here](https://www.rust-lang.org/tools/install))
-
-- Install [`maturin`](https://www.maturin.rs/installation) in order to compile the library
-
-- Once the source is downloaded (using `git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git`) execute the following commands:
-  To create the `.whl` file
-
-```bash
-# Inside the root folder
-cd BinaryOptionsToolsV2
-maturin build -r
-
-# Once the command is executed it should print a path to a .whl file, copy it and then run
-pip install path/to/file.whl
-```
-
-To install the library in a local virtual environment
-
-```bash
-# Inside the root folder
-cd BinaryOptionsToolsV2
-
-# Activate the virtual environment if not done already
-
-# Execute the following command and it should automatically install the library in the VM
-maturin develop
-```
 
 ## Docs
 
@@ -92,9 +78,9 @@ Key Features of PocketOptionAsync
   - `sell()`: Places a sell trade asynchronously.
   - `check_win()`: Checks the outcome of a trade ('win', 'draw', or 'loss').
 - **Market Data**:
-  - `get_candles()`: Fetches historical candle data.
-  - `history()`: Retrieves recent data for a specific asset.
-  - `compile_candles()`: Compiles custom-period candlesticks from base candle data.
+  - `candles()` / `get_candles()`: Fetches and manually compiles historical candle data from 1-second ticks strictly on UTC boundaries to avoid server-side gaps/overlaps.
+  - `history()`: Retrieves recent data for a specific asset (delegates to `candles()`).
+  - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
 - **Account Management**:
   - `balance()`: Returns the current account balance.
   - `opened_deals()`: Lists all open trades.
@@ -104,13 +90,23 @@ Key Features of PocketOptionAsync
   - `subscribe_symbol()`: Provides an asynchronous iterator for real-time candle updates.
   - `subscribe_symbol_timed()`: Provides an asynchronous iterator for timed real-time candle updates.
   - `subscribe_symbol_chunked()`: Provides an asynchronous iterator for chunked real-time candle updates.
+- **Pending Orders**:
+  - `open_pending_order()`: Places a pending limit order.
+  - `cancel_pending_order()`: Cancels a specific pending order by ticket ID.
+  - `cancel_pending_orders()`: Cancels multiple pending orders in a batch.
+  - `get_pending_deals()`: Lists all active pending orders.
+  - `get_pending_deal()`: Retrieves details of a specific pending order.
 - **Server Information**:
   - `server_time()`: Gets the current server time.
 - **Connection Management**:
   - `reconnect()`: Manually reconnect to the server.
   - `shutdown()`: Properly close the connection.
-
-Helper Class - `AsyncSubscription`
+- **Advanced / Utilities**:
+  - `wait_for_assets()`: Awaits until the assets list is fully loaded from the server.
+  - `is_demo()`: Returns whether the current session is a demo account.
+  - `is_connected()`: Returns connection status.
+  - `create_raw_handler()`: Sets up direct raw WebSocket message listeners with custom validators.
+    Helper Class - `AsyncSubscription`
 
 Facilitates asynchronous iteration over live data streams, enabling non-blocking operations.
 
@@ -155,9 +151,9 @@ Key Features of PocketOption
   - `sell()`: Places a sell trade.
   - `check_win()`: Checks the trade outcome synchronously.
 - **Market Data**:
-  - `get_candles()`: Fetches historical candle data.
-  - `history()`: Retrieves recent data for a specific asset.
-  - `compile_candles()`: Compiles custom-period candlesticks from base candle data.
+  - `candles()` / `get_candles()`: Fetches and manually compiles historical candle data from 1-second ticks strictly on UTC boundaries to avoid server-side gaps/overlaps ("merges").
+  - `history()`: Retrieves recent data for a specific asset (delegates to `candles()`).
+  - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
 - **Account Management**:
   - `balance()`: Retrieves account balance.
   - `opened_deals()`: Lists all open trades.
@@ -167,13 +163,23 @@ Key Features of PocketOption
   - `subscribe_symbol()`: Provides a synchronous iterator for live data updates.
   - `subscribe_symbol_timed()`: Provides a synchronous iterator for timed real-time candle updates.
   - `subscribe_symbol_chunked()`: Provides a synchronous iterator for chunked real-time candle updates.
+- **Pending Orders**:
+  - `open_pending_order()`: Places a pending limit order.
+  - `cancel_pending_order()`: Cancels a specific pending order by ticket ID.
+  - `cancel_pending_orders()`: Cancels multiple pending orders in a batch.
+  - `get_pending_deals()`: Lists all active pending orders.
+  - `get_pending_deal()`: Retrieves details of a specific pending order.
 - **Server Information**:
   - `server_time()`: Gets the current server time.
 - **Connection Management**:
   - `reconnect()`: Manually reconnect to the server.
   - `shutdown()`: Properly close the connection.
-
-Helper Class - `SyncSubscription`
+- **Advanced / Utilities**:
+  - `wait_for_assets()`: Awaits until the assets list is fully loaded from the server.
+  - `is_demo()`: Returns whether the current session is a demo account.
+  - `is_connected()`: Returns connection status.
+  - `create_raw_handler()`: Sets up direct raw WebSocket message listeners with custom validators.
+    Helper Class - `SyncSubscription`
 
 Allows synchronous iteration over real-time data streams for compatibility with simpler scripts.
 
@@ -470,8 +476,8 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 
 ## 📚 Additional Resources
 
-- **Full Examples**: [docs/examples/python](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/docs/examples/python)
-- **API Documentation**: [https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html](https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html)
+- **Full Examples**: [docs/examples/python](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/examples/python)
+- **API Documentation**: [https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html)
 - **Discord Community**: [Join us](https://discord.gg/T3FGXcmd)
 
 ## ⚠️ Risk Warning

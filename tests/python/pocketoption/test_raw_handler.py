@@ -41,7 +41,10 @@ async def test_async_connection_control():
 @pytest.mark.asyncio
 async def test_async_raw_handler(api):
     """Test async raw handler functionality."""
-    pytest.skip("Raw handler subscription test - stream may not receive matching messages")
+    pytest.skip(
+        "Raw handler subscription test - stream may not receive matching messages"
+    )
+
 
 @pytest.mark.asyncio
 async def test_async_unsubscribe(api):
@@ -99,7 +102,11 @@ def test_sync_connection_control():
 
 def test_sync_raw_handler(api_sync):
     """Test sync raw handler functionality."""
-    pytest.skip("Raw handler subscription test - stream may not receive matching messages")
+    pytest.skip(
+        "Raw handler subscription test - stream may not receive matching messages"
+    )
+
+
 def test_sync_unsubscribe(api_sync):
     """Test unsubscribing from asset streams (sync)."""
     print("\n=== Testing Sync Unsubscribe ===\n")

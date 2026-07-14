@@ -18,12 +18,27 @@ Python bindings for BinaryOptionsTools - A powerful library for automated binary
 
 ## How to install
 
-Install it via PyPI:
+### Option A: Install from Source (Recommended)
 
 ```bash
-pip install binaryoptionstoolsv2
+git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
+cd BinaryOptionsTools-v2/python
+git fetch --tags
+git checkout "$(git tag -l --sort=-v:refname | head -n 1)"
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install .
 ```
 
+### Option B: Install from Source Automatically
+
+Requires `git`, a C toolchain, and a Rust toolchain.
+
+```bash
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@master#subdirectory=python"
+```
 ## Supported OS
 
 Currently supported on **Windows**, **Linux**, and **macOS**.
@@ -32,37 +47,8 @@ Currently supported on **Windows**, **Linux**, and **macOS**.
 
 Supports **Python 3.8 to 3.13**.
 
-## Compile from source (Not recommended)
-
-- Make sure you have `rust` and `cargo` installed ([Check here](https://www.rust-lang.org/tools/install))
-
-- Install [`maturin`](https://www.maturin.rs/installation) in order to compile the library
-
-- Once the source is downloaded (using `git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git`) execute the following commands:
-  To create the `.whl` file
-
-```bash
-# Inside the root folder
-cd BinaryOptionsToolsV2
-maturin build -r
-
-# Once the command is executed it should print a path to a .whl file, copy it and then run
-pip install path/to/file.whl
-```
-
-To install the library in a local virtual environment
-
-```bash
-# Inside the root folder
-cd BinaryOptionsToolsV2
-
-# Activate the virtual environment if not done already
-
-# Execute the following command and it should automatically install the library in the VM
-maturin develop
-```
-
 ## Docs
+
 
 Comprehensive Documentation for BinaryOptionsToolsV2
 
@@ -470,8 +456,8 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 
 ## 📚 Additional Resources
 
-- **Full Examples**: [docs/examples/python](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2/tree/master/docs/examples/python)
-- **API Documentation**: [https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html](https://chipadevteam.github.io/BinaryOptionsTools-v2/python.html)
+- **Full Examples**: [docs/examples/python](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/examples/python)
+- **API Documentation**: [https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html)
 - **Discord Community**: [Join us](https://discord.gg/T3FGXcmd)
 
 ## ⚠️ Risk Warning

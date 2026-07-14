@@ -473,7 +473,7 @@ mod tests {
 
         let parsed = Ssid::parse(stripped_ssid)?;
         assert_eq!(parsed.session_id(), "swag");
-        assert_eq!(parsed.demo(), true);
+        assert!(parsed.demo());
 
         // Round-trip: to_string() should produce valid JSON that re-parses identically
         let emitted = parsed.to_string();
@@ -489,7 +489,7 @@ mod tests {
     fn test_provided_auth_message() -> Result<(), Box<dyn std::error::Error>> {
         let auth_msg = r#"42["auth",{"session":"dummy_session_id","isDemo":1,"uid":12345678,"platform":2,"isFastHistory":true,"isOptimized":true}]"#;
         let parsed = Ssid::parse(auth_msg)?;
-        
+
         match parsed {
             Ssid::Demo(ref demo) => {
                 assert_eq!(demo.session, "dummy_session_id");
@@ -498,15 +498,15 @@ mod tests {
                 assert_eq!(demo.platform, 2);
                 assert_eq!(demo.is_fast_history, Some(true));
                 assert_eq!(demo.is_optimized, Some(true));
-            },
+            }
             Ssid::Real(_) => panic!("Expected Demo SSID, got Real"),
         }
-        
+
         let reconstructed = parsed.to_string();
         assert!(reconstructed.starts_with("42[\"auth\","));
         assert!(reconstructed.contains("\"isFastHistory\":true"));
         assert!(reconstructed.contains("\"isOptimized\":true"));
-        
+
         Ok(())
     }
 
@@ -529,8 +529,14 @@ mod tests {
         let reconstructed = parsed.to_string();
         assert!(reconstructed.starts_with("42[\"auth\","));
         assert!(reconstructed.contains(&format!("\"session\":\"{}\"", parsed.session_id())));
-        assert!(reconstructed.contains("\"isFastHistory\":true") || reconstructed.contains("\"isFastHistory\":false"));
-        assert!(reconstructed.contains("\"isOptimized\":true") || reconstructed.contains("\"isOptimized\":false"));
+        assert!(
+            reconstructed.contains("\"isFastHistory\":true")
+                || reconstructed.contains("\"isFastHistory\":false")
+        );
+        assert!(
+            reconstructed.contains("\"isOptimized\":true")
+                || reconstructed.contains("\"isOptimized\":false")
+        );
 
         let re_parsed = Ssid::parse(&reconstructed)?;
         assert_eq!(re_parsed.session_id(), parsed.session_id());
@@ -557,7 +563,7 @@ mod tests {
 
         let parsed_json = Ssid::parse(json_only)?;
         assert_eq!(parsed_json.session_id(), session_id);
-        assert_eq!(parsed_json.demo(), true);
+        assert!(parsed_json.demo());
 
         let reconstructed = parsed_json.to_string();
         assert!(reconstructed.starts_with("42[\"auth\","));
@@ -571,8 +577,14 @@ mod tests {
     fn test_demo_ssid_current_url_demo() -> Result<(), Box<dyn std::error::Error>> {
         let raw = r#"42["auth",{"session":"demo_session","isDemo":0,"uid":1111,"platform":2,"currentUrl":"wss://wsdemo.pocketoption.com"}]"#;
         let parsed = Ssid::parse(raw)?;
-        assert!(parsed.demo(), "Should detect demo via currentUrl containing 'demo'");
-        assert_eq!(parsed.current_url(), Some("wss://wsdemo.pocketoption.com".into()));
+        assert!(
+            parsed.demo(),
+            "Should detect demo via currentUrl containing 'demo'"
+        );
+        assert_eq!(
+            parsed.current_url(),
+            Some("wss://wsdemo.pocketoption.com".into())
+        );
         Ok(())
     }
 

@@ -106,23 +106,14 @@ async def test_config_json_and_trades():
 
     # Test Config from JSON string (Line 143)
     config_json = '{"terminal_logging": false, "log_level": "DEBUG"}'
-    api = PocketOption(ssid, config=config_json)
-    assert api.config.terminal_logging is False
+    async with PocketOption(ssid, config=config_json) as api:
+        assert api.config.terminal_logging is False
 
-    # Test buy/sell without check_win to avoid skipping on real accounts (Line 274-279, 306-311)
-    # Note: This might still fail if account has no money or asset is closed,
-    # but it will cover the lines.
-    try:
+        # Test buy/sell without check_win to avoid skipping on real accounts (Line 274-279, 306-311)
+        # Note: This might still fail if account has no money or asset is closed,
+        # but it will cover the lines.
         await api.buy("EURUSD_otc", 1.0, 60, check_win=False)
-    except Exception:
-        pass
-
-    try:
         await api.sell("EURUSD_otc", 1.0, 60, check_win=False)
-    except Exception:
-        pass
-
-    await api.shutdown()
 
 
 @pytest.mark.asyncio
@@ -130,16 +121,16 @@ async def test_raw_handler_extended(api):
     """Test raw handler extended functionality."""
     pytest.skip("Raw handler extended test - handler may not receive matching messages")
 
+
 @pytest.mark.asyncio
 async def test_extra_api_methods(api):
     # Test reconnect (Line 717)
     await api.reconnect()
 
     # Test unsubscribe (Line 735)
-    try:
-        await api.unsubscribe("EURUSD_otc")
-    except Exception:
-        pass
+    # We must subscribe first to unsubscribe without "Subscription not found" error
+    sub = await api.subscribe_symbol("EURUSD_otc")
+    await api.unsubscribe("EURUSD_otc")
 
     # Test send_raw_message (Line 783)
     await api.send_raw_message('42["ping"]')

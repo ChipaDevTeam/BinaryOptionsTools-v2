@@ -70,10 +70,14 @@ pub struct State {
     pub raw_keep_alive: Arc<RwLock<HashMap<Uuid, Outgoing>>>,
     /// List of fallback WebSocket URLs
     pub urls: Vec<String>,
-    /// Maximum number of concurrent asset subscriptions allowed
-    pub max_subscriptions: usize,
+    pub proxy: Option<String>,
+    pub user_agent: Option<String>,
+    pub origin: Option<String>,
+    pub sec_websocket_extensions: Option<String>,
+    pub tls_cipher_suites: Option<Vec<String>>,
+    pub tls_alpn: Option<Vec<String>>,
+    pub raw_subscribers: RwLock<Vec<AsyncSender<Arc<Message>>>>,
 }
-
 /// Builder pattern for creating State instances
 ///
 /// This builder provides a fluent interface for constructing State objects
@@ -84,7 +88,12 @@ pub struct StateBuilder {
     default_connection_url: Option<String>,
     default_symbol: Option<String>,
     urls: Vec<String>,
-    max_subscriptions: Option<usize>,
+    proxy: Option<String>,
+    user_agent: Option<String>,
+    origin: Option<String>,
+    sec_websocket_extensions: Option<String>,
+    tls_cipher_suites: Option<Vec<String>>,
+    tls_alpn: Option<Vec<String>>,
 }
 
 impl StateBuilder {
@@ -121,15 +130,35 @@ impl StateBuilder {
         self
     }
 
-    /// Set the maximum number of concurrent asset subscriptions
-    ///
-    /// # Arguments
-    /// * `max` - Maximum subscriptions allowed (default: 4)
-    pub fn max_subscriptions(mut self, max: usize) -> Self {
-        self.max_subscriptions = Some(max);
+    pub fn proxy(mut self, proxy: Option<String>) -> Self {
+        self.proxy = proxy;
         self
     }
 
+    pub fn user_agent(mut self, user_agent: Option<String>) -> Self {
+        self.user_agent = user_agent;
+        self
+    }
+
+    pub fn origin(mut self, origin: Option<String>) -> Self {
+        self.origin = origin;
+        self
+    }
+
+    pub fn sec_websocket_extensions(mut self, ext: Option<String>) -> Self {
+        self.sec_websocket_extensions = ext;
+        self
+    }
+
+    pub fn tls_cipher_suites(mut self, suites: Option<Vec<String>>) -> Self {
+        self.tls_cipher_suites = suites;
+        self
+    }
+
+    pub fn tls_alpn(mut self, alpn: Option<Vec<String>>) -> Self {
+        self.tls_alpn = alpn;
+        self
+    }
     /// Build the final State instance
     pub fn build(self) -> PocketResult<State> {
         self.build_with_trade_state(Arc::new(TradeState::default()))
@@ -157,7 +186,13 @@ impl StateBuilder {
             raw_sinks: RwLock::new(HashMap::new()),
             raw_keep_alive: Arc::new(RwLock::new(HashMap::new())),
             urls: self.urls,
-            max_subscriptions: self.max_subscriptions.unwrap_or(4),
+            proxy: self.proxy,
+            user_agent: self.user_agent,
+            origin: self.origin,
+            sec_websocket_extensions: self.sec_websocket_extensions,
+            tls_cipher_suites: self.tls_cipher_suites,
+            tls_alpn: self.tls_alpn,
+            raw_subscribers: RwLock::new(Vec::new()),
         })
     }
 }
@@ -171,6 +206,9 @@ impl AppState for State {
 
         // Clear stale trade state (but keep closed deals for history)
         self.trade_state.clear_opened_deals().await;
+        self.trade_state.pending_market_orders.write().await.clear();
+        self.trade_state.recent_trades.write().await.clear();
+        self.trade_state.pending_deals.write().await.clear();
 
         // Mark subscriptions as requiring re-subscription
         self.active_subscriptions.write().await.clear();
@@ -289,7 +327,7 @@ impl State {
     pub fn add_raw_validator(&self, id: Uuid, validator: Validator) {
         self.raw_validators
             .write()
-            .expect("Raw validators lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .insert(id, Arc::new(validator));
     }
 
@@ -297,7 +335,7 @@ impl State {
     pub fn remove_raw_validator(&self, id: &Uuid) -> bool {
         self.raw_validators
             .write()
-            .expect("Raw validators lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .remove(id)
             .is_some()
     }
@@ -306,7 +344,7 @@ impl State {
     pub fn clear_raw_validators(&self) {
         self.raw_validators
             .write()
-            .expect("Raw validators lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .clear();
     }
 }
@@ -414,6 +452,15 @@ impl TradeState {
         self.closed_deals.read().await.get(&deal_id).cloned()
     }
 
+    /// Non-blocking check of a closed deal by its ID.
+    pub fn try_get_closed_deal(&self, deal_id: &Uuid) -> Option<Deal> {
+        if let Ok(guard) = self.closed_deals.try_read() {
+            guard.get(deal_id).cloned()
+        } else {
+            None
+        }
+    }
+
     /// Retrieves a pending deal by its ID.
     pub async fn get_pending_deal(&self, deal_id: Uuid) -> Option<PendingOrder> {
         self.pending_deals.read().await.get(&deal_id).cloned()
@@ -427,5 +474,52 @@ impl TradeState {
     /// Removes a pending deal by its ID.
     pub async fn remove_pending_deal(&self, deal_id: &Uuid) -> Option<PendingOrder> {
         self.pending_deals.write().await.remove(deal_id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_state_builder_defaults() {
+        let builder = StateBuilder::default();
+        assert!(builder.ssid.is_none());
+        assert!(builder.urls.is_empty());
+        assert!(builder.default_connection_url.is_none());
+    }
+
+    #[test]
+    fn test_state_builder_ssid_method() {
+        let ssid = Ssid::parse(
+            r#"42["auth",{"sessionToken":"test","uid":0,"platform":2,"currentUrl":"demo","isFastHistory":false,"isOptimized":true}]"#
+        ).unwrap();
+        let builder = StateBuilder::default().ssid(ssid);
+        assert!(builder.ssid.is_some());
+    }
+
+    #[test]
+    fn test_state_builder_urls_method() {
+        let urls = vec!["wss://example.com".to_string()];
+        let builder = StateBuilder::default().urls(urls.clone());
+        assert_eq!(builder.urls, urls);
+    }
+
+    #[test]
+    fn test_state_builder_default_symbol() {
+        let builder = StateBuilder::default().default_symbol("EURUSD_otc".to_string());
+        assert_eq!(builder.default_symbol, Some("EURUSD_otc".to_string()));
+    }
+
+    #[test]
+    fn test_trade_state_default() {
+        let ts = TradeState::default();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let opened = ts.get_opened_deals().await;
+            assert!(opened.is_empty());
+            let pending = ts.get_pending_deals().await;
+            assert!(pending.is_empty());
+        });
     }
 }

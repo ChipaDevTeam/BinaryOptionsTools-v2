@@ -1,167 +1,174 @@
-# GitHub Pages Deployment Guide
+---
+sidebar_position: 1
+slug: /project/deployment
+---
+
+# GitLab Pages Deployment Guide
+
+This documentation site is deployed to GitLab Pages using Docusaurus.
 
 ## Quick Deployment Steps
 
 ### 1. Enable GitHub Pages
 
-1. Go to your repository on GitHub
+1. Go to your repository on GitLab
 2. Click on **Settings** tab
 3. Scroll down to **Pages** section
 4. Under **Source**, select **Deploy from a branch**
-5. Choose **main** branch and **/docs** folder
+5. Choose `master` branch and `/` folder
 6. Click **Save**
 
-### 2. Update Configuration
+### 2. Configure Docusaurus
 
-Before deploying, update these values in the documentation:
+Update `docusaurus.config.js` with your project details:
 
-#### In `_config.yml`
-
-```yaml
-url: "https://yourusername.github.io"
-baseurl: "/your-repository-name"
+```javascript
+url: 'https://chipatrade.gitlab.io',
+baseUrl: '/chipadevorg/BinaryOptionsTools-v2/',
+organizationName: 'chipadevorg',
+projectName: 'BinaryOptionsTools-v2',
 ```
 
-#### Replace placeholders
+### 3. Deploy
+The site is automatically deployed via GitLab CI on push to master branch.
 
-- `yourusername` → Your GitHub username
-- `your-repository-name` → Your actual repository name
-- `your-google-site-verification-code` → Your Google Search Console verification code
-- `your-bing-site-verification-code` → Your Bing Webmaster verification code
-
-### 3. Test Locally (Optional)
-
+Manual deployment:
 ```bash
-cd docs
-python -m http.server 8000
-# Open http://localhost:8000 in your browser
+npm run build
+npm run deploy
 ```
 
 ### 4. Custom Domain (Optional)
 
-1. Add a `CNAME` file to the docs folder with your domain:
-
+1. Add a `CNAME` file to `static/` folder with your domain:
    ```
    your-domain.com
    ```
-
 2. Configure DNS settings with your domain provider
+
+## GitLab CI Workflow
+
+The deployment is handled by `.gitlab-ci.yml`:
+
+```yaml
+stages:
+  - build
+
+pages:
+  stage: build
+  image: node:20-bookworm
+  script:
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - public
+  only:
+    - master
+```
 
 ## Features Enabled
 
-✅ **Purple Theme** - Modern glassmorphism design with purple color scheme
-✅ **Multi-language Support** - Python, JavaScript, and Rust documentation
-✅ **Interactive Examples** - Live code examples with syntax highlighting
-✅ **Responsive Design** - Mobile-friendly navigation and layouts
-✅ **SEO Optimized** - Complete sitemap.xml and meta tags
-✅ **Performance Optimized** - GPU-accelerated animations and lazy loading
-✅ **Bot Services Integration** - chipa.tech bot creation services
-✅ **API Documentation** - Complete reference for all languages
-✅ **Copy-to-clipboard** - Easy code copying functionality
-✅ **Search Functionality** - Built-in documentation search
+- ✅ **Responsive Design** - Works on desktop, tablet, and mobile
+- ✅ **Dark/Light Mode** - Choose your preferred viewing theme
+- ✅ **Search** - Full-text search via Algolia DocSearch
+- ✅ **Versioned Docs** - Maintain documentation for multiple versions
+- ✅ **Internationalization** - Ready for multi-language support
+- ✅ **SEO Optimized** - Sitemap, meta tags, Open Graph
 
 ## File Structure
 
 ```
 docs/
-├── index.html              # Homepage
-├── python.html            # Python documentation
-├── javascript.html        # JavaScript documentation
-├── rust.html             # Rust documentation
-├── api.html              # API reference
-├── examples.html         # Interactive examples
-├── sitemap.xml           # SEO sitemap
-├── favicon.svg           # Site icon
-├── _config.yml           # GitHub Pages config
-├── .nojekyll            # Skip Jekyll processing
-├── README.md            # Documentation guide
-└── assets/
-    ├── css/
-    │   ├── main.css         # Main styles
-    │   ├── animations.css   # Animation library
-    │   └── code-highlight.css # Syntax highlighting
-    └── js/
-        ├── main.js          # Core functionality
-        ├── animations.js    # Animation controller
-        └── code-highlight.js # Code highlighting
+├── intro.md              # Homepage
+├── overview.md           # Documentation overview
+├── api/                  # API Reference
+├── guides/               # Trading guides
+├── architecture/         # Architecture docs
+├── examples/             # Code examples
+├── tutorials/            # Step-by-step tutorials
+├── project/              # Project info
+├── docusaurus.config.js  # Docusaurus configuration
+├── sidebars.js           # Sidebar navigation
+├── package.json          # Dependencies
+├── src/
+│   └── css/
+│       └── custom.css    # Custom styles
+└── static/
+    ├── img/              # Images
+    └── CNAME             # Custom domain (optional)
 ```
 
 ## Customization
 
 ### Colors
 
-Edit the CSS custom properties in `assets/css/main.css`:
+Edit CSS custom properties in `src/css/custom.css`:
 
 ```css
 :root {
-  --primary-color: #8b5cf6; /* Main purple */
-  --secondary-color: #a855f7; /* Secondary purple */
-  --accent-color: #c084fc; /* Light purple */
+  --ifm-color-primary: #4f46e5;
+  --ifm-color-primary-dark: #4338ca;
+  --ifm-color-primary-darker: #3730a3;
+  --ifm-color-primary-darkest: #312e81;
+  --ifm-color-primary-light: #6366f1;
+  --ifm-color-primary-lighter: #818cf8;
+  --ifm-color-primary-lightest: #a5b4fc;
 }
 ```
 
 ### Content
 
-- Edit HTML files directly for content changes
-- Modify JavaScript files for functionality changes
-- Update CSS files for styling changes
+- Edit markdown files in `docs/` for content changes
+- Modify `sidebars.js` for navigation structure
+- Update `docusaurus.config.js` for site configuration
 
 ## Troubleshooting
 
 ### Site not loading?
 
-1. Check if GitHub Pages is enabled in repository settings
-2. Ensure the branch and folder are correctly selected
+1. Check if GitLab Pages is enabled in repository settings
+2. Ensure the branch and folder are correctly selected (master / public)
 3. Wait 5-10 minutes for changes to propagate
+4. Check GitLab CI build logs
 
 ### Styles not loading?
 
 1. Check file paths in HTML files
-2. Ensure all CSS files are in `assets/css/`
-3. Verify `.nojekyll` file exists
+2. Ensure all CSS files are properly imported
+3. Verify baseUrl in docusaurus.config.js
 
-### JavaScript not working?
+### Build failing?
 
-1. Check browser console for errors
-2. Ensure all JS files are in `assets/js/`
-3. Verify file paths in HTML files
+1. Check Node.js version (requires 18+)
+2. Run `npm ci` to reinstall dependencies
+3. Check for markdown syntax errors
 
 ## Performance Tips
 
-1. **Images**: Add images to `assets/images/` and optimize them
+1. **Images**: Add optimized images to `static/img/`
 2. **Caching**: GitHub Pages automatically handles caching
-3. **CDN**: Consider using a CDN for better global performance
-4. **Minification**: Minify CSS/JS files for production
+3. **CDN**: GitHub Pages uses a global CDN
+4. **Minification**: Docusaurus minifies CSS/JS in production
 
 ## Analytics Integration
 
-Add Google Analytics by inserting this code before `</head>` in all HTML files:
+Add Google Analytics by updating `docusaurus.config.js`:
 
-```html
-<!-- Google tag (gtag.js) -->
-<script
-  async
-  src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"
-></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag() {
-    dataLayer.push(arguments);
-  }
-  gtag("js", new Date());
-  gtag("config", "GA_MEASUREMENT_ID");
-</script>
+```javascript
+themeConfig: {
+  // ...
+  gtag: {
+    trackingID: 'GA_MEASUREMENT_ID',
+    anonymizeIP: true,
+  },
+}
 ```
-
-Replace `GA_MEASUREMENT_ID` with your actual Google Analytics measurement ID.
 
 ## Support
 
 For issues with the documentation site:
-
 1. Check this deployment guide
 2. Verify all file paths are correct
-3. Test locally before deploying
-4. Check GitHub Pages build logs in repository Actions tab
-
-Your documentation site is now ready for deployment! 🚀
+3. Test locally with `npm run start`
+4. Check GitHub Actions build logs in repository Actions tab

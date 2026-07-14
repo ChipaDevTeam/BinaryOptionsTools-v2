@@ -39,32 +39,24 @@ fn test_exponential_backoff_calculation() {
     let base_delay: u64 = 5;
 
     // Attempt 0: 5 * 2^0 = 5
-    let delay0 = base_delay
-        .saturating_mul(2u64.saturating_pow(0.min(10)))
-        .min(300);
+    let delay0 = base_delay.saturating_mul(2u64.saturating_pow(0)).min(300);
     assert_eq!(delay0, 5);
 
     // Attempt 1: 5 * 2^1 = 10
-    let delay1 = base_delay
-        .saturating_mul(2u64.saturating_pow(1.min(10)))
-        .min(300);
+    let delay1 = base_delay.saturating_mul(2u64.saturating_pow(1)).min(300);
     assert_eq!(delay1, 10);
 
     // Attempt 5: 5 * 2^5 = 160
-    let delay5 = base_delay
-        .saturating_mul(2u64.saturating_pow(5.min(10)))
-        .min(300);
+    let delay5 = base_delay.saturating_mul(2u64.saturating_pow(5)).min(300);
     assert_eq!(delay5, 160);
 
     // Attempt 10 (exponent at cap): 5 * 2^10 = 5120, capped at 300
-    let delay10 = base_delay
-        .saturating_mul(2u64.saturating_pow(10.min(10)))
-        .min(300);
+    let delay10 = base_delay.saturating_mul(2u64.saturating_pow(10)).min(300);
     assert_eq!(delay10, 300);
 
     // Attempt 15 (exponent capped at 10): same as attempt 10
     let delay15 = base_delay
-        .saturating_mul(2u64.saturating_pow(15.min(10)))
+        .saturating_mul(2u64.saturating_pow(15u32.min(10)))
         .min(300);
     assert_eq!(delay15, 300);
 }
@@ -75,14 +67,12 @@ fn test_exponential_backoff_with_large_base_delay() {
     let base_delay: u64 = 100;
 
     // Attempt 10: 100 * 2^10 = 102400, capped at 300
-    let delay = base_delay
-        .saturating_mul(2u64.saturating_pow(10.min(10)))
-        .min(300);
+    let delay = base_delay.saturating_mul(2u64.saturating_pow(10)).min(300);
     assert_eq!(delay, 300);
 
     // Attempt 20 (exponent capped): same result
     let delay_capped = base_delay
-        .saturating_mul(2u64.saturating_pow(20.min(10)))
+        .saturating_mul(2u64.saturating_pow(20u32.min(10)))
         .min(300);
     assert_eq!(delay_capped, 300);
 }
@@ -92,9 +82,7 @@ fn test_exponential_backoff_with_zero_base_delay() {
     // Edge case: base_delay = 0 should still produce valid results
     let base_delay: u64 = 0;
 
-    let delay = base_delay
-        .saturating_mul(2u64.saturating_pow(5.min(10)))
-        .min(300);
+    let delay = base_delay.saturating_mul(2u64.saturating_pow(5)).min(300);
     assert_eq!(delay, 0);
 }
 

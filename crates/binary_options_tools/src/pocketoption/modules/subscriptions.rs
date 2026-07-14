@@ -28,12 +28,12 @@ use crate::pocketoption::candle::{
 };
 use crate::pocketoption::error::PocketError;
 use crate::pocketoption::types::{MultiPatternRule, StreamData as RawCandle, SubscriptionEvent};
+use crate::pocketoption::utils::SocketIoFrame;
 use crate::pocketoption::{
     candle::Candle, // Assuming this exists in your types
     error::PocketResult,
     state::State,
 };
-use crate::pocketoption::utils::SocketIoFrame;
 
 /// Default maximum cached subscriptions, mirrors [`State`] default `max_subscriptions`.
 const DEFAULT_CACHED_MAX: usize = 4;
@@ -54,14 +54,17 @@ impl ResponseRouter {
                 if let Some(id) = get_command_id(&resp) {
                     let mut pending = router_clone.pending.lock().await;
                     if let Some(tx) = pending.remove(&id) {
-                        let _ = tx.send(resp);
+                        if let Err(_) = tx.send(resp) {
+                            tracing::trace!(target: "ResponseRouter", "Failed to route response: receiver dropped");
+                        }
                     }
                 }
             }
-            // Notify all remaining pending waiters that the router (and thus the module) has stopped.
             let mut pending = router_clone.pending.lock().await;
             for (id, tx) in pending.drain() {
-                let _ = tx.send(CommandResponse::Shutdown { command_id: id });
+                if let Err(_) = tx.send(CommandResponse::Shutdown { command_id: id }) {
+                    tracing::trace!(target: "ResponseRouter", "Failed to send shutdown notification: receiver dropped");
+                }
             }
         });
         router
@@ -204,9 +207,7 @@ pub enum CommandResponse {
         error: Box<PocketError>,
     },
     /// The module has stopped and cannot fulfill the request.
-    Shutdown {
-        command_id: Uuid,
-    },
+    Shutdown { command_id: Uuid },
 }
 
 /// Represents the data sent through the subscription stream.
@@ -304,8 +305,7 @@ impl SubscriptionsHandle {
             .map_err(|_| PocketError::ModuleStopped {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "Response router channel closed".to_string(),
-            })?
-        {
+            })? {
             CommandResponse::SubscriptionSuccess {
                 command_id: _,
                 subscription_id,
@@ -359,8 +359,7 @@ impl SubscriptionsHandle {
             .map_err(|_| PocketError::ModuleStopped {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "Response router channel closed".to_string(),
-            })?
-        {
+            })? {
             CommandResponse::UnsubscriptionSuccess { .. } => Ok(()),
             CommandResponse::UnsubscriptionFailed { error, .. } => Err(*error),
             CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
@@ -396,8 +395,7 @@ impl SubscriptionsHandle {
             .map_err(|_| PocketError::ModuleStopped {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "Response router channel closed".to_string(),
-            })?
-        {
+            })? {
             CommandResponse::SubscriptionCount { count, max, .. } => {
                 self.cached_max.store(max, Ordering::Relaxed);
                 Ok(count)
@@ -412,15 +410,6 @@ impl SubscriptionsHandle {
         }
     }
 
-    /// Check if maximum subscriptions limit is reached.
-    ///
-    /// # Returns
-    /// * `PocketResult<bool>` - True if limit reached
-    pub async fn is_max_subscriptions_reached(&self) -> PocketResult<bool> {
-        let count = self.get_active_subscriptions_count().await?;
-        let max = self.cached_max.load(Ordering::Relaxed);
-        Ok(count as usize >= max)
-    }
 
     /// Gets the history for an asset with its period
     ///
@@ -456,8 +445,7 @@ impl SubscriptionsHandle {
             .map_err(|_| PocketError::ModuleStopped {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "Response router channel closed".to_string(),
-            })?
-        {
+            })? {
             CommandResponse::History { data, .. } => Ok(data),
             CommandResponse::HistoryFailed { error, .. } => Err(*error),
             CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
@@ -531,13 +519,6 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             sub_type,
                             command_id,
                         } => {
-                            if self.is_max_subscriptions_reached().await {
-                                let _ = self.command_responder.send(CommandResponse::SubscriptionFailed {
-                                    command_id,
-                                    error: Box::new(SubscriptionError::MaxSubscriptionsReached.into()),
-                                }).await;
-                                continue;
-                            }
 
                             let period = sub_type.period_secs().unwrap_or(1);
                             let (stream_sender, stream_receiver) =
@@ -545,69 +526,87 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             let subscription_id = Uuid::new_v4();
 
                             if let Err(e) = self.add_subscription(asset.clone(), sub_type.clone(), stream_sender.clone(), subscription_id).await {
-                                let _ = self.command_responder.send(CommandResponse::SubscriptionFailed {
+                                if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionFailed {
                                     command_id,
                                     error: Box::new(e),
-                                }).await;
+                                }).await {
+                                    warn!(target: "SubscriptionsApiModule", "Failed to send SubscriptionFailed (add_subscription) response: {}", e);
+                                }
                                 continue;
                             }
 
                             if let Err(e) = self.send_subscribe_message(&asset, period).await {
                                 let _ = self.remove_subscription(&asset, Some(subscription_id)).await;
-                                let _ = self.command_responder.send(CommandResponse::SubscriptionFailed {
+                                if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionFailed {
                                     command_id,
                                     error: Box::new(e.into()),
-                                }).await;
+                                }).await {
+                                    warn!(target: "SubscriptionsApiModule", "Failed to send SubscriptionFailed (send_subscribe) response: {}", e);
+                                }
                                 continue;
                             }
 
-                            let _ = self.command_responder.send(CommandResponse::SubscriptionSuccess {
+                            if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionSuccess {
                                 command_id,
                                 subscription_id,
                                 stream_receiver,
-                            }).await;
+                            }).await {
+                                warn!(target: "SubscriptionsApiModule", "Failed to send SubscriptionSuccess response: {}", e);
+                            }
                         }
                         Command::Unsubscribe { asset, subscription_id, command_id } => {
                             match self.remove_subscription(&asset, subscription_id).await {
                                 Ok(b) => {
                                     if b {
-                                        let _ = self.command_responder.send(CommandResponse::UnsubscriptionSuccess { command_id }).await;
+                                        if let Err(e) = self.command_responder.send(CommandResponse::UnsubscriptionSuccess { command_id }).await {
+                                            warn!(target: "SubscriptionsApiModule", "Failed to send UnsubscriptionSuccess response: {}", e);
+                                        }
                                     } else {
-                                        let _ = self.command_responder.send(CommandResponse::UnsubscriptionFailed {
+                                        if let Err(e) = self.command_responder.send(CommandResponse::UnsubscriptionFailed {
                                             command_id,
                                             error: Box::new(PocketError::General("Subscription not found".to_string())),
-                                        }).await;
+                                        }).await {
+                                            warn!(target: "SubscriptionsApiModule", "Failed to send UnsubscriptionFailed (not found) response: {}", e);
+                                        }
                                     }
                                 },
-                                Err(e) => {
-                                    let _ = self.command_responder.send(CommandResponse::UnsubscriptionFailed {
+                                Err(err) => {
+                                    if let Err(e) = self.command_responder.send(CommandResponse::UnsubscriptionFailed {
                                         command_id,
-                                        error: Box::new(e.into()),
-                                    }).await;
+                                        error: Box::new(err.into()),
+                                    }).await {
+                                        warn!(target: "SubscriptionsApiModule", "Failed to send UnsubscriptionFailed (error) response: {}", e);
+                                    }
                                 }
                             }
                         },
                         Command::SubscriptionCount { command_id } => {
                             let subscriptions = self.state.active_subscriptions.read().await;
                             let count = subscriptions.values().map(|v| v.len()).sum::<usize>() as u32;
-                            let _ = self.command_responder.send(CommandResponse::SubscriptionCount {
+                            if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionCount {
                                 command_id,
                                 count,
-                                max: self.state.max_subscriptions,
-                            }).await;
+                                max: usize::MAX,
+                            }).await {
+                                warn!(target: "SubscriptionsApiModule", "Failed to send SubscriptionCount response: {}", e);
+                            }
                         },
                         Command::History { asset, period, command_id } => {
                             let is_duplicate = self.state.histories.read().await.iter().any(|(a, p, _)| a == &asset && *p == period);
                             if is_duplicate {
-                                let _ = self.command_responder.send(CommandResponse::HistoryFailed {
+                                if let Err(e) = self.command_responder.send(CommandResponse::HistoryFailed {
                                     command_id,
                                     error: Box::new(PocketError::General(format!("Duplicate history request for asset: {}, period: {}", asset, period))),
-                                }).await;
+                                }).await {
+                                    warn!(target: "SubscriptionsApiModule", "Failed to send HistoryFailed (duplicate) response: {}", e);
+                                }
                             } else if let Err(e) = self.send_subscribe_message(&asset, period).await {
-                                let _ = self.command_responder.send(CommandResponse::HistoryFailed {
+                                if let Err(e) = self.command_responder.send(CommandResponse::HistoryFailed {
                                     command_id,
                                     error: Box::new(e.into()),
-                                }).await;
+                                }).await {
+                                    warn!(target: "SubscriptionsApiModule", "Failed to send HistoryFailed (subscribe error) response: {}", e);
+                                }
                             } else {
                                 self.state.histories.write().await.push((asset, period, command_id));
                             }
@@ -622,7 +621,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             return Ok(());
                         }
                     };
-                    
+
                     let response = match msg.as_ref() {
                         Message::Binary(data) => match serde_json::from_slice::<ServerResponse>(data) {
                             Ok(res) => Some(res),
@@ -691,16 +690,20 @@ impl ApiModule<State> for SubscriptionsApiModule {
 
                                     match candles_res {
                                         Ok(candles) => {
-                                            let _ = self.command_responder.send(CommandResponse::History {
+                                            if let Err(e) = self.command_responder.send(CommandResponse::History {
                                                 command_id,
                                                 data: candles
-                                            }).await;
+                                            }).await {
+                                                warn!(target: "SubscriptionsApiModule", "Failed to send History response: {}", e);
+                                            }
                                         }
                                         Err(e) => {
-                                            let _ = self.command_responder.send(CommandResponse::HistoryFailed {
+                                            if let Err(e) = self.command_responder.send(CommandResponse::HistoryFailed {
                                                 command_id,
                                                 error: Box::new(e)
-                                            }).await;
+                                            }).await {
+                                                warn!(target: "SubscriptionsApiModule", "Failed to send HistoryFailed response: {}", e);
+                                            }
                                         }
                                     }
                                 }
@@ -743,10 +746,13 @@ impl SubscriptionsApiModule {
         let mut histories_lock = self.state.histories.write().await;
         let pending = std::mem::take(&mut *histories_lock);
         for (_, _, command_id) in pending {
-            let _ = self
+            if let Err(e) = self
                 .command_responder
                 .send(CommandResponse::Shutdown { command_id })
-                .await;
+                .await
+            {
+                warn!(target: "SubscriptionsApiModule", "Failed to send Shutdown response in notify_waiters: {}", e);
+            }
         }
 
         // Active streams should also be notified
@@ -754,19 +760,18 @@ impl SubscriptionsApiModule {
         let active = std::mem::take(&mut *subscriptions_lock);
         for (_, subs) in active {
             for (sender, _, _) in subs {
-                let _ = sender.send(SubscriptionEvent::Terminated {
-                    reason: "SubscriptionsApiModule stopped".to_string(),
-                }).await;
+                if let Err(e) = sender
+                    .send(SubscriptionEvent::Terminated {
+                        reason: "SubscriptionsApiModule stopped".to_string(),
+                    })
+                    .await
+                {
+                    warn!(target: "SubscriptionsApiModule", "Failed to send Terminated event to stream: {}", e);
+                }
             }
         }
     }
 
-    /// Check if maximum subscriptions limit is reached.
-    async fn is_max_subscriptions_reached(&self) -> bool {
-        let subscriptions = self.state.active_subscriptions.read().await;
-        let total_count: usize = subscriptions.values().map(|v| v.len()).sum();
-        total_count >= self.state.max_subscriptions
-    }
 
     /// Add a new subscription.
     async fn add_subscription(
@@ -776,9 +781,6 @@ impl SubscriptionsApiModule {
         stream_sender: AsyncSender<SubscriptionEvent>,
         subscription_id: Uuid,
     ) -> PocketResult<()> {
-        if self.is_max_subscriptions_reached().await {
-            return Err(SubscriptionError::MaxSubscriptionsReached.into());
-        }
 
         let mut subscriptions = self.state.active_subscriptions.write().await;
         let entry = subscriptions.entry(asset).or_insert_with(Vec::new);
@@ -820,11 +822,14 @@ impl SubscriptionsApiModule {
         };
 
         for stream_sender in removed_senders {
-            let _ = stream_sender
+            if let Err(e) = stream_sender
                 .send(SubscriptionEvent::Terminated {
                     reason: "Unsubscribed from main module".to_string(),
                 })
-                .await;
+                .await
+            {
+                warn!(target: "SubscriptionsApiModule", "Failed to send Terminated event during remove_subscription: {}", e);
+            }
         }
 
         Ok(removed_at_least_one)
@@ -869,10 +874,10 @@ impl SubscriptionStream {
     }
 
     /// Unsubscribe from the stream
-    pub async fn unsubscribe(mut self) -> PocketResult<()> {
+    pub async fn unsubscribe(&self) -> PocketResult<()> {
         let command_id = Uuid::new_v4();
         let receiver = self.router.register(command_id).await;
-        if let Some(sender) = self.sender.take() {
+        if let Some(sender) = &self.sender {
             sender
                 .send(Command::Unsubscribe {
                     asset: self.asset.clone(),
@@ -896,8 +901,7 @@ impl SubscriptionStream {
             .map_err(|_| PocketError::ModuleStopped {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "Response router channel closed".to_string(),
-            })?
-        {
+            })? {
             CommandResponse::UnsubscriptionSuccess { .. } => Ok(()),
             CommandResponse::UnsubscriptionFailed { error, .. } => Err(*error),
             CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
@@ -968,7 +972,11 @@ impl SubscriptionStream {
         }
     }
 
-    /// Convert to a futures Stream
+    /// Convert to a futures Stream.
+    ///
+    /// This method consumes the `SubscriptionStream` by value. After calling `to_stream()`,
+    /// cleanup is handled by the returned stream's `Drop` implementation, which will
+    /// automatically send an unsubscribe command when the stream is dropped.
     pub fn to_stream(self) -> impl futures_util::Stream<Item = PocketResult<Candle>> + 'static {
         Box::pin(unfold(self, |mut stream| async move {
             let result = stream.receive().await;

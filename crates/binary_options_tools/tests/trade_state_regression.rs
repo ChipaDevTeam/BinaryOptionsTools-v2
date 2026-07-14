@@ -1,6 +1,5 @@
 use binary_options_tools::pocketoption::state::TradeState;
 use binary_options_tools::pocketoption::types::Deal;
-use serde_json;
 use std::sync::Arc;
 
 #[tokio::test]

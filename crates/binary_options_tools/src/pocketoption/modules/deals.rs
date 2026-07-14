@@ -194,7 +194,10 @@ impl DealsApiModule {
     fn notify_waiters_module_stopped(&mut self) {
         let waiters = std::mem::take(&mut self.waiting_requests);
         if !waiters.is_empty() {
-            tracing::info!("DealsApiModule: Notifying {} pending waiters that module has stopped", waiters.len());
+            tracing::info!(
+                "DealsApiModule: Notifying {} pending waiters that module has stopped",
+                waiters.len()
+            );
         }
         for (trade_id, responders) in waiters {
             for responder in responders {
@@ -382,7 +385,9 @@ impl ApiModule<State> for DealsApiModule {
                         Err(_) => {
                             tracing::info!("DealsApiModule: WebSocket receiver closed, shutting down...");
                             self.notify_waiters_module_stopped();
-                            break;
+                            return Err(binary_options_tools_core::error::CoreError::Other(
+                                "WebSocket receiver closed".to_string(),
+                            ));
                         }
                     }
                 }
@@ -496,13 +501,9 @@ impl Rule for DealsUpdateRule {
                 }
                 false
             }
-            Message::Binary(_) => {
-                if self.valid.load(Ordering::SeqCst) {
-                    self.valid.store(false, Ordering::SeqCst);
-                    true
-                } else {
-                    false
-                }
+            Message::Binary(_) if self.valid.load(Ordering::SeqCst) => {
+                self.valid.store(false, Ordering::SeqCst);
+                true
             }
             _ => false,
         }

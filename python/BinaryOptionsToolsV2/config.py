@@ -27,7 +27,12 @@ class Config:
     connection_initialization_timeout_secs: int = 60
     timeout_secs: int = 30
     urls: List[str] = field(default_factory=list)
-    max_subscriptions: int = 4
+    proxy: str = None
+    user_agent: str = None
+    origin: str = None
+    sec_websocket_extensions: str = None
+    tls_cipher_suites: List[str] = None
+    tls_alpn: List[str] = None
 
     # Logging configuration
     terminal_logging: bool = False
@@ -67,7 +72,12 @@ class Config:
         self._pyconfig.connection_initialization_timeout_secs = self.connection_initialization_timeout_secs
         self._pyconfig.timeout_secs = self.timeout_secs
         self._pyconfig.urls = self.urls
-        self._pyconfig.max_subscriptions = self.max_subscriptions
+        self._pyconfig.proxy = self.proxy
+        self._pyconfig.user_agent = self.user_agent
+        self._pyconfig.origin = self.origin
+        self._pyconfig.sec_websocket_extensions = self.sec_websocket_extensions
+        self._pyconfig.tls_cipher_suites = self.tls_cipher_suites
+        self._pyconfig.tls_alpn = self.tls_alpn
 
     def _validate(self):
         """Validate config values, raising ValueError on invalid input."""
@@ -81,8 +91,6 @@ class Config:
             raise ValueError("connection_initialization_timeout_secs must be at least 1")
         if self.timeout_secs < 1:
             raise ValueError("timeout_secs must be at least 1")
-        if self.max_subscriptions < 1:
-            raise ValueError("max_subscriptions must be at least 1")
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "Config":
@@ -105,7 +113,6 @@ class Config:
             "connection_initialization_timeout_secs": self.connection_initialization_timeout_secs,
             "timeout_secs": self.timeout_secs,
             "urls": self.urls,
-            "max_subscriptions": self.max_subscriptions,
             "terminal_logging": self.terminal_logging,
             "log_level": self.log_level,
             "extra_duration": self.extra_duration,

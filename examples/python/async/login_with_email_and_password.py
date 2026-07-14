@@ -30,9 +30,9 @@ from BinaryOptionsToolsV2.pocketoption.tools.login import LoginError, login_asyn
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 
-EMAIL    = os.getenv("POCKET_OPTION_EMAIL")    or input("Email: ")
+EMAIL = os.getenv("POCKET_OPTION_EMAIL") or input("Email: ")
 PASSWORD = os.getenv("POCKET_OPTION_PASSWORD") or input("Password: ")
-DEMO     = True   # set False for real-money account
+DEMO = True  # set False for real-money account
 
 # Leave empty to use the Playwright browser backend.
 # Set to your CapSolver key to use the HTTP + captcha-solver backend instead.
@@ -40,6 +40,7 @@ DEMO     = True   # set False for real-money account
 CAPSOLVER_API_KEY = os.getenv("CAPSOLVER_API_KEY", "")
 
 # ── Login ──────────────────────────────────────────────────────────────────────
+
 
 async def main() -> None:
     if CAPSOLVER_API_KEY:

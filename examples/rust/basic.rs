@@ -1,5 +1,5 @@
 // Basic example showing how to initialize the client and get balance
-use binary_options_tools::PocketOption;
+use binary_options_tools::pocketoption::PocketOption;
 use std::time::Duration;
 
 #[tokio::main]
@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Server Time: {}", server_time);
     
     // Check if account is demo
-    let is_demo = client.is_demo().await;
+    let is_demo = client.is_demo();
     println!("Is Demo Account: {}", is_demo);
     
     Ok(())
