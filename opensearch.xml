@@ -4,8 +4,8 @@
   <ShortName>BinaryOptionsTools V2</ShortName>
   <Description>Search BinaryOptionsTools V2</Description>
   <InputEncoding>UTF-8</InputEncoding>
-  <Image width="16" height="16" type="image/x-icon">https://chipadevteam.github.io/BinaryOptionsTools-v2/img/favicon.ico</Image>
-  <Url type="text/html" method="get" template="https://chipadevteam.github.io/BinaryOptionsTools-v2/search?q={searchTerms}"/>
-  <Url type="application/opensearchdescription+xml" rel="self" template="https://chipadevteam.github.io/BinaryOptionsTools-v2/opensearch.xml" />
-  <moz:SearchForm>https://chipadevteam.github.io/BinaryOptionsTools-v2/</moz:SearchForm>
+  <Image width="16" height="16" type="image/x-icon">https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/img/favicon.svg</Image>
+  <Url type="text/html" method="get" template="https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/search?q={searchTerms}"/>
+  <Url type="application/opensearchdescription+xml" rel="self" template="https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/opensearch.xml" />
+  <moz:SearchForm>https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/</moz:SearchForm>
 </OpenSearchDescription>
