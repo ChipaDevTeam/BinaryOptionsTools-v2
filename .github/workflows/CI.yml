@@ -30,15 +30,18 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: docs-site/package-lock.json
       - name: Install dependencies
         run: npm ci
+        working-directory: docs-site
       - name: Build
         run: npm run build
+        working-directory: docs-site
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build
+          publish_dir: ./docs-site/build
           publish_branch: gh-pages
   # --- 1. LINUX BUILD ---
   linux:
