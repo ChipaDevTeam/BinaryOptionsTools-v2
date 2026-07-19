@@ -2,7 +2,7 @@
 
 **High-performance binary options trading automation library.** Python-first with Rust core via PyO3. Supports PocketOption (primary) and ExpertOption platforms. Provides async/sync Python clients, real-time data streaming, automated trading strategies, and raw WebSocket API access.
 
-- **Version:** 0.2.12
+- **Version:** 0.2.13
 - **Repo:** <https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2>
 
 ---

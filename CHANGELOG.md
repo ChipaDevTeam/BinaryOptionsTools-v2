@@ -5,6 +5,24 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.13] - 2026-07-19
+
+### Added
+
+- **Live Candle Streaming**: Added `get_candles_live` method to both `PocketOptionAsync` (async) and `PocketOption` (sync) clients, which implements gap-free real-time candle building and backfilling.
+- Added a 15-second per-test-function global timeout to the pytest suite to prevent hangs.
+
+### Changed
+
+- Deprecated duplicate candle functions `candles()` and `get_candles()` in favor of `get_candles_live()`.
+- Redirected the deprecated methods to run `get_candles_live()` internally (returning the first yielded closed candle list) to maintain backward compatibility.
+
+### Fixed
+
+- **Robust Connection Handoff**: Wrapped historical candle fetching API calls within `get_candles_live()` with short timeouts and try-except fallbacks, preventing connection initialization hangs when compile-candles or tick history endpoints are slow or rate-limited.
+- Removed anti-pattern `hasattr(client, "send_raw")` in unit tests, replacing it with direct calls to `await client.send_raw(...)`.
+- Updated all internal crates and dependencies to version `0.2.13`.
+
 ## [0.2.12] - 2026-06-30
 
 ### Added
@@ -265,6 +283,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [PyPI Package](https://pypi.org/project/binaryoptionstoolsv2/)
 - [Documentation](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)
 
+[0.2.13]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.13
 [0.2.12]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.12
 [0.2.11]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.11
 [0.2.10]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.10

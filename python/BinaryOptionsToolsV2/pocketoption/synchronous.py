@@ -1,10 +1,10 @@
 import asyncio
 import json
 import threading
+import sys
+import warnings
 from datetime import timedelta
 from typing import Dict, List, Optional, Tuple, Union
-import sys
-
 from ..config import Config
 from ..validator import Validator as Validator
 from .asynchronous import PocketOptionAsync as PocketOptionAsync
@@ -39,6 +39,27 @@ class SyncRawSubscription:
         return next(self.subscription)
 
 
+class SyncCandleLiveIterator:
+    """Synchronous iterator for live candle updates."""
+
+    def __init__(self, async_gen, loop):
+        self.async_gen = async_gen
+        self.loop = loop
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        async def get_next():
+            try:
+                return await self.async_gen.__anext__()
+            except StopAsyncIteration:
+                raise StopIteration
+
+        try:
+            return asyncio.run_coroutine_threadsafe(get_next(), self.loop).result()
+        except StopIteration:
+            raise StopIteration
 class RawHandlerSync:
     """Synchronous handler for advanced raw WebSocket message operations."""
 
@@ -287,8 +308,24 @@ class PocketOption:
 
         Returns:
             A list of candle dictionaries.
+
+        Note:
+            WARNING: This function only fetches closed historical candles and is intended
+            for training models, backtesting, or historical analysis. It is NOT designed
+            for real-time/live trading as it does not include the current forming candle
+            and can introduce gaps if called sequentially during live trading.
+            For live gap-free candle feeds, use `get_candles_live()` instead.
         """
-        return self._run(self._client.get_candles(asset, period, offset))
+        warnings.warn(
+            "get_candles() is deprecated and will be removed in a new release. "
+            "Please use get_candles_live() for live gap-free candles instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        hours = max(0.1, offset / 3600.0)
+        iterator = self.get_candles_live(asset, period, hours=hours)
+        closed, forming = next(iterator)
+        return closed
 
     def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> List[Dict]:
         """Get historical candle data with a specific reference time.
@@ -301,6 +338,13 @@ class PocketOption:
 
         Returns:
             A list of candle dictionaries.
+
+        Note:
+            WARNING: This function only fetches closed historical candles and is intended
+            for training models, backtesting, or historical analysis. It is NOT designed
+            for real-time/live trading as it does not include the current forming candle
+            and can introduce gaps if called sequentially during live trading.
+            For live gap-free candle feeds, use `get_candles_live()` instead.
         """
         return self._run(self._client.get_candles_advanced(asset, period, offset, time))
 
@@ -313,8 +357,57 @@ class PocketOption:
 
         Returns:
             A list of candle dictionaries.
+
+        Note:
+            WARNING: This function only fetches closed historical candles and is intended
+            for training models, backtesting, or historical analysis. It is NOT designed
+            for real-time/live trading as it does not include the current forming candle
+            and can introduce gaps if called sequentially during live trading.
+            For live gap-free candle feeds, use `get_candles_live()` instead.
         """
-        return self._run(self._client.candles(asset, period))
+        warnings.warn(
+            "candles() is deprecated and will be removed in a new release. "
+            "Please use get_candles_live() for live gap-free candles instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        iterator = self.get_candles_live(asset, period, hours=2.0)
+        closed, forming = next(iterator)
+        return closed
+
+    def get_candles_live(
+        self,
+        asset: str,
+        period: int,
+        hours: float = 2.0,
+        max_rows: int = 100,
+    ) -> SyncCandleLiveIterator:
+        """Fetches historical backfill and streams live candles.
+
+        This method subscribes to raw ticks first and buffers them, then fetches
+        historical candles, merges them, replays the buffered ticks, and returns
+        a generator yielding updated candles (both closed historical candles and
+        the current forming candle) in real-time.
+
+        Args:
+            asset: Trading asset (e.g., "EURUSD_otc")
+            period: Candle timeframe in seconds (e.g., 60 for 1-minute candles)
+            hours: Hours of history to backfill. Defaults to 2.0.
+            max_rows: Maximum number of closed candles to retain in history. Defaults to 100.
+
+        Returns:
+            An iterator yielding (closed_candles, forming_candle).
+        """
+        async def create_gen():
+            return self._client.get_candles_live(
+                asset=asset,
+                period=period,
+                hours=hours,
+                max_rows=max_rows,
+            )
+
+        async_gen = self._run(create_gen())
+        return SyncCandleLiveIterator(async_gen, self.loop)
 
     def balance(self) -> float:
         """Get the current account balance.

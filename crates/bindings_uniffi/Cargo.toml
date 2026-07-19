@@ -1,6 +1,6 @@
 [package]
 name = "binary_options_tools_uni"
-version = "0.2.12"
+version = "0.2.13"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 repository = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"
@@ -33,7 +33,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 uniffi = { workspace = true }
-binary_options_tools = { path = "../binary_options_tools", version = "0.2.12" }
+binary_options_tools = { path = "../binary_options_tools", version = "0.2.13" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -42,7 +42,7 @@ rust_decimal = { workspace = true }
 futures-util = { workspace = true }
 uuid = { workspace = true }
 regex = { workspace = true }
-bo2_macros = { version = "0.2.12", path = "bo2_macros" }
+bo2_macros = { version = "0.2.13", path = "bo2_macros" }
 url = { workspace = true }
 
 [build-dependencies]

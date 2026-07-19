@@ -130,6 +130,10 @@ class MockRawClient:
             [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
         )
 
+    async def compile_candles(self, asset, custom_period, lookback_period):
+        return json.dumps(
+            [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
+        )
     async def subscribe_symbol(self, asset):
         async def subscription():
             yield json.dumps({"symbol": asset, "price": 1.11})
@@ -582,7 +586,18 @@ class TestCandles:
         ):
             await async_client.compile_candles("EURUSD_otc", 20, -1)
 
-
+    @pytest.mark.asyncio
+    async def test_get_candles_live_success(self, async_client, mock_raw_pocketoption):
+        """Test get_candles_live streaming."""
+        mock_raw_pocketoption.compile_candles = AsyncMock(
+            return_value=json.dumps(
+                [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
+            )
+        )
+        gen = async_client.get_candles_live("EURUSD_otc", period=60, hours=0.1, max_rows=10)
+        closed, forming = await anext(gen)
+        assert isinstance(closed, list)
+        assert len(closed) > 0
 class TestBalance:
     """Tests for balance method."""
 
@@ -1489,8 +1504,7 @@ async def test_raw_websocket_apis(monkeypatch):
         MockRawClient,
     )
     client = PocketOptionAsync('42["auth",{"session":"test_sess","uid":12345}]')
-    if hasattr(client, "send_raw"):
-        await client.send_raw('42["ping"]')
+    await client.send_raw('42["ping"]')
     stream = await client.subscribe_raw()
     messages = []
     async for msg in stream:

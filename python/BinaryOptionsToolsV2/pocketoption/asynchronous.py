@@ -2,8 +2,11 @@ import asyncio
 import json
 import re
 import sys
-from datetime import timedelta
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+import time
+import warnings
+from collections import deque
+from datetime import datetime, timezone, timedelta
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union, AsyncGenerator
 
 from ..config import Config
 from ..validator import Validator
@@ -465,9 +468,23 @@ class PocketOptionAsync:
                 - high: Highest price
                 - low: Lowest price
                 - close: Closing price
+
+        Note:
+            WARNING: This function only fetches closed historical candles and is intended
+            for training models, backtesting, or historical analysis. It is NOT designed
+            for real-time/live trading as it does not include the current forming candle
+            and can introduce gaps if called sequentially during live trading.
+            For live gap-free candle feeds, use `get_candles_live()` instead.
         """
-        candles = await self.client.candles(asset, period)
-        return json.loads(candles)
+        warnings.warn(
+            "candles() is deprecated and will be removed in a new release. "
+            "Please use get_candles_live() for live gap-free candles instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        gen = self.get_candles_live(asset, period, hours=2.0)
+        closed, forming = await anext(gen)
+        return closed
 
     async def get_candles(self, asset: str, period: int, offset: int) -> List[Dict]:
         """
@@ -487,11 +504,24 @@ class PocketOptionAsync:
                 - close: Closing price
 
         Note:
-            Available timeframes: 1, 5, 15, 30, 60, 300 seconds
-            Maximum period depends on the timeframe
+            - Available timeframes: 1, 5, 15, 30, 60, 300 seconds
+            - Maximum period depends on the timeframe
+            - WARNING: This function only fetches closed historical candles and is intended
+              for training models, backtesting, or historical analysis. It is NOT designed
+              for real-time/live trading as it does not include the current forming candle
+              and can introduce gaps if called sequentially during live trading.
+              For live gap-free candle feeds, use `get_candles_live()` instead.
         """
-        candles = await self.client.get_candles(asset, period, offset)
-        return json.loads(candles)
+        warnings.warn(
+            "get_candles() is deprecated and will be removed in a new release. "
+            "Please use get_candles_live() for live gap-free candles instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        hours = max(0.1, offset / 3600.0)
+        gen = self.get_candles_live(asset, period, hours=hours)
+        closed, forming = await anext(gen)
+        return closed
 
     async def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> List[Dict]:
         """
@@ -512,11 +542,208 @@ class PocketOptionAsync:
                 - close: Closing price
 
         Note:
-            Available timeframes: 1, 5, 15, 30, 60, 300 seconds
-            Maximum period depends on the timeframe
+            - Available timeframes: 1, 5, 15, 30, 60, 300 seconds
+            - Maximum period depends on the timeframe
+            - WARNING: This function only fetches closed historical candles and is intended
+              for training models, backtesting, or historical analysis. It is NOT designed
+              for real-time/live trading as it does not include the current forming candle
+              and can introduce gaps if called sequentially during live trading.
+              For live gap-free candle feeds, use `get_candles_live()` instead.
         """
         candles = await self.client.get_candles_advanced(asset, period, offset, time)
         return json.loads(candles)
+
+    async def get_candles_live(
+        self,
+        asset: str,
+        period: int,
+        hours: float = 2.0,
+        max_rows: int = 100,
+    ) -> AsyncGenerator[Tuple[List[Dict], Optional[Dict]], None]:
+        """Fetches historical backfill and streams gap-free live candles.
+
+        This method subscribes to raw ticks first and buffers them, then fetches
+        historical candles (using get_candles_advanced, history, and compile_candles),
+        merges them, replays the buffered ticks, and yields updated candles (both
+        closed historical candles and the current forming candle) in real-time.
+
+        Args:
+            asset (str): Trading asset (e.g., "EURUSD_otc")
+            period (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
+            hours (float): Hours of history to backfill. Defaults to 2.0.
+            max_rows (int): Maximum number of closed candles to retain in history. Defaults to 100.
+
+        Yields:
+            Tuple[List[Dict], Optional[Dict]]: A tuple containing:
+                - List[Dict]: List of closed candles (up to max_rows), each containing
+                  'time', 'open', 'high', 'low', 'close'.
+                - Optional[Dict]: The currently forming candle, containing 'time', 'open',
+                  'high', 'low', 'close', or None if not yet started.
+        """
+        platform_time_offset = 7200
+
+        def bucket_start(timestamp: int, p: int) -> int:
+            return (timestamp // p) * p
+
+        def extract_time(candle: Dict) -> int:
+            val = int(float(candle.get("timestamp", candle.get("time", 0))))
+            if val > 10_000_000_000:
+                val //= 1000
+            return val - platform_time_offset
+
+        def merge_candles(*groups: List[Dict]) -> List[Dict]:
+            res: Dict[int, Dict] = {}
+            for group in groups:
+                for candle in group:
+                    res[extract_time(candle)] = candle
+            return [res[ts] for ts in sorted(res)]
+
+        # Initialize feed
+        feed_candles: deque = deque(maxlen=max_rows)
+        forming: Optional[Dict] = None
+
+        def seed_history(history: List[Dict]) -> None:
+            cutoff = bucket_start(int(time.time()), period)
+            ordered = sorted(
+                (c for c in history if extract_time(c) < cutoff),
+                key=extract_time,
+            )
+            for c in ordered[-max_rows:]:
+                feed_candles.append(
+                    {
+                        "time": extract_time(c),
+                        "open": float(c["open"]),
+                        "high": float(c["high"]),
+                        "low": float(c["low"]),
+                        "close": float(c["close"]),
+                    }
+                )
+
+        def ingest_tick(timestamp: int, price: float) -> None:
+            nonlocal forming
+            if forming is None:
+                start = bucket_start(timestamp, period)
+                forming = {
+                    "time": start,
+                    "open": price,
+                    "high": price,
+                    "low": price,
+                    "close": price,
+                }
+                return
+
+            start = bucket_start(timestamp, period)
+            if start == forming["time"]:
+                forming["high"] = max(forming["high"], price)
+                forming["low"] = min(forming["low"], price)
+                forming["close"] = price
+            elif start > forming["time"]:
+                feed_candles.append(dict(forming))
+                forming = {
+                    "time": start,
+                    "open": price,
+                    "high": price,
+                    "low": price,
+                    "close": price,
+                }
+
+        # 1. Subscribe to ticks FIRST
+        tick_buffer: List[Tuple[int, float]] = []
+        buffering = True
+        stream = await self.subscribe_symbol(asset)
+
+        queue = asyncio.Queue()
+
+        async def tick_reader():
+            nonlocal buffering
+            try:
+                async for tick in stream:
+                    ts = extract_time(tick)
+                    price = float(tick.get("close", tick.get("price", 0.0)))
+                    if buffering:
+                        tick_buffer.append((ts, price))
+                    else:
+                        ingest_tick(ts, price)
+                        await queue.put((list(feed_candles), dict(forming) if forming else None))
+            except asyncio.CancelledError:
+                pass
+            finally:
+                await queue.put(None)
+
+        reader_task = asyncio.create_task(tick_reader())
+
+        try:
+            # 2. Fetch history while buffering ticks
+            offset_seconds = int(hours * 3600)
+            platform_time = int(time.time()) + platform_time_offset
+            
+            try:
+                advanced_candles = await asyncio.wait_for(
+                    self.get_candles_advanced(
+                        asset,
+                        period,
+                        offset_seconds,
+                        platform_time,
+                    ),
+                    timeout=3.0
+                )
+            except Exception:
+                advanced_candles = []
+
+            try:
+                recent_candles = await asyncio.wait_for(
+                    self.history(asset, period),
+                    timeout=3.0
+                )
+            except Exception:
+                recent_candles = []
+
+            try:
+                compiled_candles = await asyncio.wait_for(
+                    self.compile_candles(
+                        asset,
+                        period,
+                        offset_seconds,
+                    ),
+                    timeout=3.0
+                )
+            except Exception:
+                compiled_candles = []
+
+            history = merge_candles(
+                compiled_candles,
+                recent_candles,
+                advanced_candles,
+            )
+            seed_history(history)
+
+            # 3. Replay backlog
+            cutoff = 0
+            if feed_candles:
+                cutoff = feed_candles[-1]["time"] + period
+            for ts, price in sorted(tick_buffer):
+                if ts < cutoff:
+                    continue
+                ingest_tick(ts, price)
+
+            buffering = False
+            # Yield initial seed state
+            yield list(feed_candles), dict(forming) if forming else None
+
+            # 4. Stream loop
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                yield item
+
+        finally:
+            reader_task.cancel()
+            try:
+                await reader_task
+            except asyncio.CancelledError:
+                pass
+            await self.unsubscribe(asset)
 
     async def balance(self) -> float:
         """

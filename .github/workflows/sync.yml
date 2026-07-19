@@ -1,0 +1,23 @@
+name: Sync to GitLab
+on:
+  push:
+    branches: [main, master]
+    tags: ['*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Push to GitLab
+        run: |
+          git remote add gitlab https://oauth2:${{ secrets.GITLAB_SYNC_TOKEN }}@gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
+          git push --force --prune gitlab +refs/heads/*:refs/heads/* +refs/tags/*:refs/tags/*

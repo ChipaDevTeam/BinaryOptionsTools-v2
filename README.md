@@ -23,6 +23,14 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 
 ---
 
+## Repositories
+
+This project is mirrored and synchronized across both GitLab and GitHub:
+- **GitLab (Primary)**: [https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
+- **GitHub (Mirror)**: [https://github.com/ChipaDevTeam/BinaryOptionsTools-v2](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2)
+
+---
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -127,7 +135,11 @@ graph TD
 #### Option A: Install from Source (Recommended)
 
 ```bash
-git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
+# Clone from GitHub
+git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git
+# Or clone from GitLab
+# git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
+
 cd BinaryOptionsTools-v2/python
 git fetch --tags
 git checkout "$(git tag -l --sort=-v:refname | head -n 1)"
@@ -141,11 +153,10 @@ uv pip install .
 Requires `git`, a C toolchain, and a Rust toolchain.
 
 ```bash
-git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
-cd BinaryOptionsTools-v2/python
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@master#subdirectory=python"
+# Install via GitHub
+uv pip install "git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git@master#subdirectory=python"
+# Or install via GitLab
+# uv pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@master#subdirectory=python"
 ```
 
 ### Rust
@@ -154,9 +165,11 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-binary_options_tools = { git = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git" }
+# Using GitHub
+binary_options_tools = { git = "https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git" }
+# Or using GitLab
+# binary_options_tools = { git = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git" }
 ```
-
 ---
 ## Quick Start
 

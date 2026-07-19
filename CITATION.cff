@@ -23,7 +23,7 @@ keywords:
   - "websocket"
   - "automated trading"
   - "financial technology"
-version: "0.2.9"
+version: "0.2.13"
 identifiers:
   - type: url
     value: "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"

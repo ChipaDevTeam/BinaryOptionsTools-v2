@@ -1,6 +1,6 @@
 [package]
 name = "BinaryOptionsToolsV2"
-version = "0.2.12"
+version = "0.2.13"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 description = "Python bindings for binary-options-tools. High-performance library for PocketOption trading automation with async/sync support, real-time data streaming, and WebSocket API access."
@@ -21,7 +21,7 @@ test = false
 pyo3 = { version = "0.29.0", features = ["abi3-py310"] }
 pyo3-async-runtimes = { version = "0.29.0", features = ["tokio-runtime"] }
 
-binary_options_tools = { path = "../binary_options_tools", version = "0.2.12" }
+binary_options_tools = { path = "../binary_options_tools", version = "0.2.13" }
 
 thiserror = { workspace = true }
 serde = { workspace = true }

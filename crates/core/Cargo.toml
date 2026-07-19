@@ -1,6 +1,6 @@
 [package]
 name = "binary-options-tools-core"
-version = "0.2.12"
+version = "0.2.13"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 repository = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"
@@ -32,4 +32,4 @@ tokio = { workspace = true, features = [
 tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["json"] }
-binary-options-tools-core-macros = { path = "macros", version = "0.2.12" }
+binary-options-tools-core-macros = { path = "macros", version = "0.2.13" }

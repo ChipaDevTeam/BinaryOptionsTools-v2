@@ -36,8 +36,8 @@ dynamic = ["version"]
 test = [
     "pytest",
     "pytest-asyncio",
+    "pytest-timeout",
 ]
-
 [project.urls]
 Homepage = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/"
 Documentation = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html"

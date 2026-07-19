@@ -21,7 +21,11 @@ Python bindings for BinaryOptionsTools - A powerful library for automated binary
 ### Option A: Install from Source (Recommended)
 
 ```bash
-git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
+# Clone from GitHub
+git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git
+# Or clone from GitLab
+# git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
+
 cd BinaryOptionsTools-v2/python
 git fetch --tags
 git checkout "$(git tag -l --sort=-v:refname | head -n 1)"
@@ -37,7 +41,10 @@ Requires `git`, a C toolchain, and a Rust toolchain.
 ```bash
 uv venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@master#subdirectory=python"
+# Install via GitHub
+uv pip install "git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git@master#subdirectory=python"
+# Or install via GitLab
+# uv pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@master#subdirectory=python"
 ```
 
 ## Supported OS
