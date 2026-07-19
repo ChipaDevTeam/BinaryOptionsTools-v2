@@ -19,7 +19,7 @@ import asyncio
 import os
 import sys
 from unittest.mock import MagicMock, patch
-
+import requests
 import pytest
 
 _source = os.path.join(os.path.dirname(__file__), "../../../python")

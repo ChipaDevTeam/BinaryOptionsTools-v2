@@ -59,7 +59,6 @@ class TestDemoConnection:
         print(f"  is_demo: {is_demo}")
         assert isinstance(is_demo, bool), "Expected boolean from is_demo()"
 
-
     @pytest.mark.asyncio
     async def test_balance(self, api):
         """Test getting balance."""
@@ -94,7 +93,9 @@ class TestDemoConnection:
         assert len(candles) > 0, "Expected at least one compiled candle"
         first = candles[0]
         print(f"  First compiled candle: {first}")
-        assert "timestamp" in first or "time" in first, "Expected timestamp/time in compiled candle"
+        assert "timestamp" in first or "time" in first, (
+            "Expected timestamp/time in compiled candle"
+        )
         for key in ["open", "high", "low", "close"]:
             assert key in first, f"Expected key '{key}' in compiled candle"
 
@@ -127,7 +128,6 @@ class TestDemoConnection:
             for stream in streams:
                 if hasattr(stream, "cancel"):
                     stream.cancel()
-
 
 
 if __name__ == "__main__":

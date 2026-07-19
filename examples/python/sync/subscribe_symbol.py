@@ -1,4 +1,3 @@
-
 from BinaryOptionsToolsV2.pocketoption import PocketOption
 
 

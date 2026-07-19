@@ -41,6 +41,7 @@ class AsyncRawSubscription:
     async def __anext__(self):
         return await anext(self.subscription)
 
+
 class RawHandler:
     """
     Handler for advanced raw WebSocket message operations.
@@ -1146,7 +1147,6 @@ class PocketOptionAsync:
     def is_ssid_valid(self) -> bool:
         """Returns whether the SSID passed basic format validation during init."""
         return self._ssid_valid
-
 
     async def disconnect(self) -> None:
         """

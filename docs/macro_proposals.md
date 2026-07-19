@@ -308,7 +308,7 @@ impl OpenOrderSuccess {
 pub struct OpenOrderRequest { pub asset: String, pub amount: Decimal }
 impl std::fmt::Display for OpenOrderRequest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "42[\"openOrder\",{{\"asset\":\"{}\",\"amount\":{}}}]", self.asset, self.amount)
+        write!(f, "42[\"openOrder\",{}\"asset\":\"{}\",\"amount\":{}{}]", '{', self.asset, self.amount, '}')
     }
 }
 ```
