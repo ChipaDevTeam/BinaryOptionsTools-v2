@@ -130,13 +130,12 @@ impl<S: AppState> Router<S> {
             }
         }
 
-        // Route to the first matching API module
+        // Route to all matching API modules
         for (rule, sender) in &self.module_rules {
             if rule.call(&message) {
                 if sender.send(message.clone()).await.is_err() {
                     error!(target: "Router", "A module has shut down and its channel is closed.");
                 }
-                break;
             }
         }
         Ok(())

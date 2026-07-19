@@ -743,7 +743,10 @@ class PocketOptionAsync:
                 await reader_task
             except asyncio.CancelledError:
                 pass
-            await self.unsubscribe(asset)
+            try:
+                await self.unsubscribe(asset)
+            except Exception:
+                pass
 
     async def balance(self) -> float:
         """
@@ -755,6 +758,11 @@ class PocketOptionAsync:
         Note:
             Updates in real-time as trades are completed
         """
+        for _ in range(100):
+            bal = await self.client.balance()
+            if bal >= 0.0:
+                return bal
+            await asyncio.sleep(0.1)
         return await self.client.balance()
 
     async def opened_deals(self) -> List[str]:

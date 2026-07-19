@@ -15,7 +15,7 @@ async def main(ssid: str):
         asset="EURUSD_otc", amount=1.0, time=300, check_win=False
     )
     print(buy_id, sell_id)
-    # This is the same as setting checkw_win to true on the api.buy and api.sell functions
+    # This is the same as setting check_winwin to true on the api.buy and api.sell functions
     buy_data = await api.check_win(buy_id)
     print(f"Buy trade result: {buy_data['result']}\nBuy trade data: {buy_data}")
     sell_data = await api.check_win(sell_id)
