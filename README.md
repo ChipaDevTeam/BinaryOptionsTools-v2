@@ -26,8 +26,8 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 ## Repositories
 
 This project is mirrored and synchronized across both GitLab and GitHub:
-- **GitLab (Primary)**: [https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
-- **GitHub (Mirror)**: [https://github.com/ChipaDevTeam/BinaryOptionsTools-v2](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2)
+- **GitLab**: [https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
+- **GitHub**: [https://github.com/ChipaDevTeam/BinaryOptionsTools-v2](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2)
 
 ---
 
