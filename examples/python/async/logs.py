@@ -10,8 +10,9 @@ async def main(ssid: str):
     start_logs(
         path=".", level="DEBUG", terminal=True
     )  # If false then the logs will only be written to the log files
-    # The api automatically detects if the 'ssid' is for real or demo account
+    # The api should automatically detect if the 'ssid' is for real or demo account
     api = PocketOptionAsync(ssid)
+    await asyncio.sleep(5)
     (buy_id, _) = await api.buy(
         asset="EURUSD_otc", amount=1.0, time=300, check_win=False
     )
@@ -19,7 +20,7 @@ async def main(ssid: str):
         asset="EURUSD_otc", amount=1.0, time=300, check_win=False
     )
     print(buy_id, sell_id)
-    # This is the same as setting checkw_win to true on the api.buy and api.sell functions
+    # This is the same as setting check_win to true on the api.buy and api.sell functions
     buy_data = await api.check_win(buy_id)
     sell_data = await api.check_win(sell_id)
     print(f"Buy trade result: {buy_data['result']}\nBuy trade data: {buy_data}")

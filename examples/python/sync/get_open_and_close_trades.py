@@ -10,7 +10,7 @@ def main(ssid: str):
     time.sleep(5)  # Wait for connection to establish
     _ = api.buy(asset="EURUSD_otc", amount=1.0, time=60, check_win=False)
     _ = api.sell(asset="EURUSD_otc", amount=1.0, time=60, check_win=False)
-    # This is the same as setting checkw_win to true on the api.buy and api.sell functions
+    # This is the same as setting check_winwin to true on the api.buy and api.sell functions
     opened_deals = api.opened_deals()
     time.sleep(62)  # Wait for the trades to complete
     closed_deals = api.closed_deals()

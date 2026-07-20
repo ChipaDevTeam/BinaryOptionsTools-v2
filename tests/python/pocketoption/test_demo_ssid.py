@@ -83,6 +83,18 @@ class TestDemoConnection:
         assert len(candles) > 0, "Expected at least one candle"
         first = candles[0]
         print(f"  First candle: {first}")
+    @pytest.mark.asyncio
+    async def test_get_candles_live(self, api):
+        """Test streaming live candles using get_candles_live."""
+        from contextlib import aclosing
+        generator = api.get_candles_live("EURUSD_otc", period=60, hours=1.0, max_rows=10)
+        async with aclosing(generator) as stream:
+            async for closed, forming in stream:
+                assert isinstance(closed, list), "Expected list of closed candles"
+                assert len(closed) > 0, "Expected at least one closed candle"
+                assert forming is None or isinstance(forming, dict), "Expected forming candle to be dict or None"
+                print(f"  get_candles_live closed count: {len(closed)}, forming: {forming}")
+                break
 
     @pytest.mark.asyncio
     async def test_compile_candles(self, api):

@@ -7,9 +7,10 @@ from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 async def main(ssid: str):
     # The api automatically detects if the 'ssid' is for real or demo account
     api = PocketOptionAsync(ssid)
+    await asyncio.sleep(5)
     _ = await api.buy(asset="EURUSD_otc", amount=1.0, time=60, check_win=False)
     _ = await api.sell(asset="EURUSD_otc", amount=1.0, time=60, check_win=False)
-    # This is the same as setting checkw_win to true on the api.buy and api.sell functions
+    # This is the same as setting check_win to true on the api.buy and api.sell functions
     opened_deals = await api.opened_deals()
     print(
         f"Opened deals: {opened_deals}\nNumber of opened deals: {len(opened_deals)} (should be at least 2)"
