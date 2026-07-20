@@ -18,7 +18,7 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 | Support Channel          | Link                                                                           |
 | :----------------------- | :----------------------------------------------------------------------------- |
 | **PayPal**               | [Support ChipaDevTeam](https://www.paypal.me/ChipaCL)                          |
-| **PocketOption (Six)**   | [Join via Six's Affiliate Link](https://u3.shortink.io/smart/IqeAmBtFTrEWbh)   |
+| **PocketOption (Six)**   | [Join via Six's Affiliate Link](https://u3.shortink.io/main?utm_campaign=821725&utm_source=affiliate&utm_medium=sr&a=IqeAmBtFTrEWbh&al=1610247&ac=api&cid=909909&code=DLN960)   |
 | **PocketOption (Chipa)** | [Join via Chipa's Affiliate Link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) |
 
 ---
