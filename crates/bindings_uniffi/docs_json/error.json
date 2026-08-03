@@ -1,0 +1,5 @@
+{
+  "UniError": {
+    "default": "Unified error type returned by all PocketOption binding methods. Wraps connection, timeout, validation and platform errors from the underlying Rust client."
+  }
+}

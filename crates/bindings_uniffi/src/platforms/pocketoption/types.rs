@@ -1,5 +1,5 @@
 use binary_options_tools::pocketoption::{
-    candle::Candle as OriginalCandle,
+    candle::{Candle as OriginalCandle, HistoryPoint as OriginalHistoryPoint},
     types::{
         Action as OriginalAction, Asset as OriginalAsset, AssetType as OriginalAssetType,
         CandleLength as OriginalCandleLength, Deal as OriginalDeal,
@@ -230,4 +230,24 @@ impl From<OriginalCandle> for Candle {
 pub struct Tick {
     pub timestamp: i64,
     pub price: f64,
+}
+
+/// A single merged chart point (raw tick or synthetic candle point) as
+/// returned by `PocketOption::history_points`.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct HistoryPoint {
+    pub asset: String,
+    /// Point timestamp in seconds (may be fractional).
+    pub time: f64,
+    pub price: f64,
+}
+
+impl From<OriginalHistoryPoint> for HistoryPoint {
+    fn from(point: OriginalHistoryPoint) -> Self {
+        Self {
+            asset: point.asset,
+            time: point.time,
+            price: point.price,
+        }
+    }
 }

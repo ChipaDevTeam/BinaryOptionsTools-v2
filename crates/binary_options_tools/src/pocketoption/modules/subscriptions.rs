@@ -24,7 +24,8 @@ use tracing::warn;
 use uuid::Uuid;
 
 use crate::pocketoption::candle::{
-    compile_candles_from_ticks, BaseCandle, HistoryItem, SubscriptionType,
+    compile_candles_from_ticks, merge_history_ohlc, merge_history_points, BaseCandle, CandleItem,
+    HistoryItem, HistoryPoint, SubscriptionType,
 };
 use crate::pocketoption::error::PocketError;
 use crate::pocketoption::types::{MultiPatternRule, StreamData as RawCandle, SubscriptionEvent};
@@ -94,6 +95,7 @@ fn get_command_id(resp: &CommandResponse) -> Option<Uuid> {
         CommandResponse::UnsubscriptionFailed { command_id, .. } => Some(*command_id),
         CommandResponse::SubscriptionCount { command_id, .. } => Some(*command_id),
         CommandResponse::HistoryFailed { command_id, .. } => Some(*command_id),
+        CommandResponse::ChartStreamSuccess { command_id, .. } => Some(*command_id),
         CommandResponse::Shutdown { command_id } => Some(*command_id),
     }
 }
@@ -152,6 +154,10 @@ pub enum Command {
     Subscribe {
         asset: String,
         sub_type: SubscriptionType,
+        /// Whether to send the `subfor` frame after `changeSymbol`.
+        /// `true` is the normal subscription behavior; `false` only switches
+        /// the chart symbol, relying on the passive `updateStream` feed.
+        subfor: bool,
         command_id: Uuid,
     },
     /// Unsubscribe from an asset's stream
@@ -170,6 +176,14 @@ pub enum Command {
     },
     /// Requests the number of active subscriptions
     SubscriptionCount { command_id: Uuid },
+    /// Open a lazy chart stream: a single `changeSymbol` request whose
+    /// history bootstrap is emitted first, followed by matching live rows.
+    SubscribeWithHistory {
+        asset: String,
+        period: u32,
+        mode: HistoryStreamMode,
+        command_id: Uuid,
+    },
 }
 
 /// Response enum for subscription commands
@@ -206,8 +220,99 @@ pub enum CommandResponse {
         command_id: Uuid,
         error: Box<PocketError>,
     },
+    /// Successful lazy chart stream creation with its event receiver
+    ChartStreamSuccess {
+        command_id: Uuid,
+        stream_receiver: AsyncReceiver<PocketResult<HistoryStreamEvent>>,
+    },
     /// The module has stopped and cannot fulfill the request.
     Shutdown { command_id: Uuid },
+}
+
+/// Selects what a lazy chart stream (see [`Command::SubscribeWithHistory`])
+/// emits for its history bootstrap and live continuation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HistoryStreamMode {
+    /// Emit raw merged history points and then raw live price points.
+    Points,
+    /// Emit closed OHLC candles, aggregating live rows into `period`-sized candles.
+    Ohlc,
+}
+
+/// A single event emitted by a lazy chart stream.
+#[derive(Clone, Debug, Serialize)]
+#[serde(untagged)]
+pub enum HistoryStreamEvent {
+    Point(HistoryPoint),
+    Candle(Candle),
+}
+
+/// Consumer side of a lazy chart stream created via
+/// [`SubscriptionsHandle::subscribe_with_history_mode`].
+pub struct HistoryStream {
+    receiver: AsyncReceiver<PocketResult<HistoryStreamEvent>>,
+}
+
+impl HistoryStream {
+    /// Receives the next event from the stream.
+    pub async fn receive(&mut self) -> PocketResult<HistoryStreamEvent> {
+        self.receiver.recv().await.map_err(CoreError::from)?
+    }
+
+    /// Converts this receiver into a `futures` [`Stream`](futures_util::Stream).
+    pub fn to_stream(
+        self,
+    ) -> impl futures_util::Stream<Item = PocketResult<HistoryStreamEvent>> + 'static {
+        Box::pin(unfold(self, |mut stream| async move {
+            let result = stream.receive().await;
+            Some((result, stream))
+        }))
+    }
+}
+
+/// A chart stream that sent `changeSymbol` and is waiting for the
+/// history bootstrap (`updateHistory*`) to arrive.
+struct PendingChartStream {
+    asset: String,
+    period: u32,
+    mode: HistoryStreamMode,
+    sender: AsyncSender<PocketResult<HistoryStreamEvent>>,
+}
+
+/// A chart stream whose history bootstrap has been emitted and which is now
+/// forwarding matching live `updateStream` rows.
+struct ActiveChartStream {
+    asset: String,
+    mode: HistoryStreamMode,
+    /// Timestamp of the newest emitted data; older live rows are dropped so
+    /// the history bootstrap and live continuation never overlap.
+    edge_time: f64,
+    sender: AsyncSender<PocketResult<HistoryStreamEvent>>,
+    /// Aggregator that folds live price rows into `period`-sized candles
+    /// when the stream runs in [`HistoryStreamMode::Ohlc`].
+    live_ohlc: SubscriptionType,
+}
+
+/// Payload of an `updateHistory*` frame as needed by chart streams.
+///
+/// Unlike [`History`], candles are parsed as [`CandleItem`] (with volume)
+/// because the merge helpers in [`crate::pocketoption::candle`] require it.
+#[derive(Deserialize)]
+struct ChartHistoryResponse {
+    asset: String,
+    period: u32,
+    #[serde(default)]
+    history: Option<Vec<HistoryItem>>,
+    #[serde(default)]
+    candles: Option<Vec<CandleItem>>,
+}
+
+/// One `[asset, timestamp, price]` row from an `updateStream` frame.
+#[derive(Clone)]
+struct StreamRow {
+    asset: String,
+    timestamp: f64,
+    price: Decimal,
 }
 
 /// Represents the data sent through the subscription stream.
@@ -242,7 +347,9 @@ impl ReconnectCallback<State> for SubscriptionCallback {
                     let ws_sender = ws_sender.clone();
                     let symbol_clone = symbol.clone();
                     futures.push(async move {
-                        send_subscribe_message(&ws_sender, &symbol_clone, period).await
+                        // Reconnection restores full subscriptions, so the
+                        // `subfor` frame is always sent here.
+                        send_subscribe_message(&ws_sender, &symbol_clone, period, true).await
                     });
                 }
             }
@@ -269,11 +376,14 @@ pub struct SubscriptionsHandle {
 impl SubscriptionsHandle {
     /// Subscribe to an asset's real-time data stream.
     ///
+    /// Sends both `changeSymbol` and `subfor` (the standard subscription
+    /// handshake). Use [`Self::subscribe_sub`] to control the `subfor` frame.
+    ///
     /// # Arguments
     /// * `asset` - The asset symbol to subscribe to
     ///
     /// # Returns
-    /// * `PocketResult<(Uuid, AsyncReceiver<StreamData>)>` - Subscription ID and data receiver
+    /// * `PocketResult<SubscriptionStream>` - The subscription stream
     ///
     /// # Errors
     /// * Returns error if maximum subscriptions reached
@@ -283,12 +393,34 @@ impl SubscriptionsHandle {
         asset: String,
         sub_type: SubscriptionType,
     ) -> PocketResult<SubscriptionStream> {
+        self.subscribe_sub(asset, sub_type, true).await
+    }
+
+    /// Subscribe to an asset's real-time data stream, controlling whether the
+    /// `subfor` frame is sent after `changeSymbol`.
+    ///
+    /// Passing `subfor = false` only switches the chart symbol on the server,
+    /// which still produces `updateStream` rows but does not register a full
+    /// server-side subscription. Passing `true` behaves exactly like
+    /// [`Self::subscribe`].
+    ///
+    /// # Arguments
+    /// * `asset` - The asset symbol to subscribe to
+    /// * `sub_type` - The candle aggregation strategy for the stream
+    /// * `subfor` - Whether to send the `subfor` frame (normal behavior: `true`)
+    pub async fn subscribe_sub(
+        &self,
+        asset: String,
+        sub_type: SubscriptionType,
+        subfor: bool,
+    ) -> PocketResult<SubscriptionStream> {
         let id = Uuid::new_v4();
         let receiver = self.router.register(id).await;
         self.sender
             .send(Command::Subscribe {
                 asset: asset.clone(),
                 sub_type: sub_type.clone(),
+                subfor,
                 command_id: id,
             })
             .await
@@ -410,6 +542,65 @@ impl SubscriptionsHandle {
         }
     }
 
+    /// Opens an early/lazy chart stream with one `changeSymbol` request.
+    ///
+    /// The stream first emits the history bootstrap (points or closed OHLC
+    /// candles, depending on `mode`) and then continues with matching live
+    /// `updateStream` rows for the same asset. This intentionally does not
+    /// send `subfor` and does not alter the normal subscribe/unsubscribe
+    /// lifecycle.
+    ///
+    /// # Arguments
+    /// * `asset` - The asset symbol
+    /// * `period` - Candle period in seconds (also sent to the server)
+    /// * `mode` - Whether to emit raw points or aggregated OHLC candles
+    ///
+    /// # Returns
+    /// * `PocketResult<HistoryStream>` - The event stream
+    pub async fn subscribe_with_history_mode(
+        &self,
+        asset: String,
+        period: u32,
+        mode: HistoryStreamMode,
+    ) -> PocketResult<HistoryStream> {
+        let id = Uuid::new_v4();
+        let receiver = self.router.register(id).await;
+        self.sender
+            .send(Command::SubscribeWithHistory {
+                asset: asset.clone(),
+                period,
+                mode,
+                command_id: id,
+            })
+            .await
+            .map_err(CoreError::from)?;
+        match tokio::time::timeout(SUBSCRIBE_TIMEOUT, receiver)
+            .await
+            .map_err(|_| {
+                PocketError::General(format!(
+                    "Chart stream request timed out after {:?} waiting for server response for asset: {}",
+                    SUBSCRIBE_TIMEOUT, asset
+                ))
+            })?
+            .map_err(|_| PocketError::ModuleStopped {
+                module_name: "SubscriptionsApiModule".to_string(),
+                context: "Response router channel closed".to_string(),
+            })? {
+            CommandResponse::ChartStreamSuccess {
+                stream_receiver, ..
+            } => Ok(HistoryStream {
+                receiver: stream_receiver,
+            }),
+            CommandResponse::SubscriptionFailed { error, .. } => Err(*error),
+            CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
+                module_name: "SubscriptionsApiModule".to_string(),
+                context: "SubscriptionsApiModule stopped during request".to_string(),
+            }),
+            _ => Err(PocketError::General(
+                "Unexpected response to subscribe with history command".into(),
+            )),
+        }
+    }
 
     /// Gets the history for an asset with its period
     ///
@@ -466,6 +657,10 @@ pub struct SubscriptionsApiModule {
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
+    /// Lazy chart streams waiting for their history bootstrap.
+    pending_chart_streams: Vec<PendingChartStream>,
+    /// Lazy chart streams currently forwarding live rows.
+    active_chart_streams: Vec<ActiveChartStream>,
 }
 
 #[async_trait]
@@ -488,6 +683,8 @@ impl ApiModule<State> for SubscriptionsApiModule {
             command_responder,
             message_receiver,
             to_ws_sender,
+            pending_chart_streams: Vec::new(),
+            active_chart_streams: Vec::new(),
         }
     }
 
@@ -517,6 +714,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                         Command::Subscribe {
                             asset,
                             sub_type,
+                            subfor,
                             command_id,
                         } => {
 
@@ -535,7 +733,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                 continue;
                             }
 
-                            if let Err(e) = self.send_subscribe_message(&asset, period).await {
+                            if let Err(e) = self.send_subscribe_message(&asset, period, subfor).await {
                                 let _ = self.remove_subscription(&asset, Some(subscription_id)).await;
                                 if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionFailed {
                                     command_id,
@@ -600,7 +798,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                 }).await {
                                     warn!(target: "SubscriptionsApiModule", "Failed to send HistoryFailed (duplicate) response: {}", e);
                                 }
-                            } else if let Err(e) = self.send_subscribe_message(&asset, period).await {
+                            } else if let Err(e) = self.send_subscribe_message(&asset, period, true).await {
                                 if let Err(e) = self.command_responder.send(CommandResponse::HistoryFailed {
                                     command_id,
                                     error: Box::new(e.into()),
@@ -610,6 +808,9 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             } else {
                                 self.state.histories.write().await.push((asset, period, command_id));
                             }
+                        }
+                        Command::SubscribeWithHistory { asset, period, mode, command_id } => {
+                            self.start_chart_stream(asset, period, mode, command_id).await;
                         }
                     }
                 },
@@ -621,6 +822,10 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             return Ok(());
                         }
                     };
+
+                    // Lazy chart streams inspect the raw frame first; this is
+                    // a no-op unless a chart stream is pending or active.
+                    self.handle_chart_stream_message(msg.as_ref()).await;
 
                     let response = match msg.as_ref() {
                         Message::Binary(data) => match serde_json::from_slice::<ServerResponse>(data) {
@@ -772,7 +977,6 @@ impl SubscriptionsApiModule {
         }
     }
 
-
     /// Add a new subscription.
     async fn add_subscription(
         &mut self,
@@ -781,7 +985,6 @@ impl SubscriptionsApiModule {
         stream_sender: AsyncSender<SubscriptionEvent>,
         subscription_id: Uuid,
     ) -> PocketResult<()> {
-
         let mut subscriptions = self.state.active_subscriptions.write().await;
         let entry = subscriptions.entry(asset).or_insert_with(Vec::new);
         entry.push((stream_sender, sub_type, subscription_id));
@@ -835,8 +1038,13 @@ impl SubscriptionsApiModule {
         Ok(removed_at_least_one)
     }
 
-    async fn send_subscribe_message(&self, asset: &str, period: u32) -> CoreResult<()> {
-        send_subscribe_message(&self.to_ws_sender, asset, period).await
+    async fn send_subscribe_message(
+        &self,
+        asset: &str,
+        period: u32,
+        subfor: bool,
+    ) -> CoreResult<()> {
+        send_subscribe_message(&self.to_ws_sender, asset, period, subfor).await
     }
 
     async fn forward_data_to_stream(
@@ -864,6 +1072,270 @@ impl SubscriptionsApiModule {
             let _ = stream_sender.send(update.clone()).await;
         }
         Ok(())
+    }
+
+    // ---------------------------------------------------------------------
+    // Lazy chart streams (single `changeSymbol`, history bootstrap + live)
+    // ---------------------------------------------------------------------
+
+    /// Sends the single `changeSymbol` request for a lazy chart stream and
+    /// registers it as pending until the history bootstrap arrives.
+    ///
+    /// Unlike regular subscriptions this deliberately does not send `subfor`,
+    /// mirroring how Pocket Option's own chart loads its edge data.
+    async fn start_chart_stream(
+        &mut self,
+        asset: String,
+        period: u32,
+        mode: HistoryStreamMode,
+        command_id: Uuid,
+    ) {
+        let (stream_sender, stream_receiver) = bounded_async(MAX_CHANNEL_CAPACITY);
+
+        if let Err(error) = self.send_change_symbol_only(&asset, period).await {
+            if let Err(e) = self
+                .command_responder
+                .send(CommandResponse::SubscriptionFailed {
+                    command_id,
+                    error: Box::new(error.into()),
+                })
+                .await
+            {
+                warn!(target: "SubscriptionsApiModule", "Failed to send chart stream failure response: {}", e);
+            }
+            return;
+        }
+
+        self.pending_chart_streams.push(PendingChartStream {
+            asset,
+            period,
+            mode,
+            sender: stream_sender,
+        });
+        if let Err(e) = self
+            .command_responder
+            .send(CommandResponse::ChartStreamSuccess {
+                command_id,
+                stream_receiver,
+            })
+            .await
+        {
+            warn!(target: "SubscriptionsApiModule", "Failed to send ChartStreamSuccess response: {}", e);
+        }
+    }
+
+    /// Sends only the `changeSymbol` frame (no `subfor`).
+    async fn send_change_symbol_only(&self, asset: &str, period: u32) -> CoreResult<()> {
+        send_subscribe_message(&self.to_ws_sender, asset, period, false).await
+    }
+
+    /// Routes one raw WebSocket frame to the lazy chart streams.
+    async fn handle_chart_stream_message(&mut self, msg: &Message) {
+        // Fast path: nothing to do unless a chart stream exists.
+        if self.pending_chart_streams.is_empty() && self.active_chart_streams.is_empty() {
+            return;
+        }
+
+        if let Some(history) = parse_chart_history_response(msg) {
+            self.handle_chart_history(history).await;
+            return;
+        }
+
+        for row in parse_stream_rows(msg) {
+            self.handle_chart_stream_row(row).await;
+        }
+    }
+
+    /// Emits the history bootstrap for the matching pending chart stream and
+    /// promotes it to active so live rows start flowing.
+    async fn handle_chart_history(&mut self, history: ChartHistoryResponse) {
+        let Some(index) = self
+            .pending_chart_streams
+            .iter()
+            .position(|pending| pending.asset == history.asset && pending.period == history.period)
+        else {
+            return;
+        };
+        let pending = self.pending_chart_streams.remove(index);
+
+        let points = merge_history_points(
+            &history.asset,
+            history.period,
+            history.history.as_deref(),
+            history.candles.as_deref(),
+        );
+        // Track the newest history timestamp so live rows that overlap the
+        // bootstrap are filtered out.
+        let edge_time = points
+            .iter()
+            .map(|point| point.time)
+            .filter(|time| time.is_finite())
+            .reduce(f64::max)
+            .unwrap_or(f64::NEG_INFINITY);
+
+        match pending.mode {
+            HistoryStreamMode::Points => {
+                for point in points {
+                    if pending
+                        .sender
+                        .send(Ok(HistoryStreamEvent::Point(point)))
+                        .await
+                        .is_err()
+                    {
+                        // Consumer dropped the stream; abandon it silently.
+                        return;
+                    }
+                }
+            }
+            HistoryStreamMode::Ohlc => {
+                let candles = merge_history_ohlc(
+                    &history.asset,
+                    history.period,
+                    history.history.as_deref(),
+                    history.candles.as_deref(),
+                );
+                for candle in candles {
+                    if pending
+                        .sender
+                        .send(Ok(HistoryStreamEvent::Candle(candle)))
+                        .await
+                        .is_err()
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+
+        self.active_chart_streams.push(ActiveChartStream {
+            asset: pending.asset,
+            mode: pending.mode,
+            edge_time,
+            sender: pending.sender,
+            live_ohlc: SubscriptionType::time(Duration::from_secs(history.period as u64)),
+        });
+    }
+
+    /// Forwards one live `updateStream` row to every matching active chart
+    /// stream, converting it according to the stream's mode.
+    async fn handle_chart_stream_row(&mut self, row: StreamRow) {
+        for active in &mut self.active_chart_streams {
+            if row.asset != active.asset || row.timestamp <= active.edge_time {
+                continue;
+            }
+
+            let event = match active.mode {
+                HistoryStreamMode::Points => match row.price.to_f64() {
+                    Some(price) => Ok(Some(HistoryStreamEvent::Point(HistoryPoint {
+                        asset: active.asset.clone(),
+                        time: row.timestamp,
+                        price,
+                    }))),
+                    None => Err(PocketError::General(format!(
+                        "Failed to convert live price {} for {} at {}",
+                        row.price, row.asset, row.timestamp
+                    ))),
+                },
+                HistoryStreamMode::Ohlc => match row.price.to_f64() {
+                    Some(price) => active
+                        .live_ohlc
+                        .update(&BaseCandle::from((row.timestamp.floor() as i64, price)))
+                        .and_then(|maybe_base| {
+                            maybe_base
+                                .map(|base| {
+                                    Candle::try_from((base, active.asset.clone()))
+                                        .map(HistoryStreamEvent::Candle)
+                                        .map_err(|err| PocketError::General(err.to_string()))
+                                })
+                                .transpose()
+                        }),
+                    None => Err(PocketError::General(format!(
+                        "Failed to convert live price {} for {} at {}",
+                        row.price, row.asset, row.timestamp
+                    ))),
+                },
+            };
+
+            active.edge_time = row.timestamp;
+            match event {
+                Ok(Some(event)) => {
+                    let _ = active.sender.send(Ok(event)).await;
+                }
+                // Ohlc mode is still aggregating the current candle.
+                Ok(None) => {}
+                Err(err) => {
+                    let _ = active.sender.send(Err(err)).await;
+                }
+            }
+        }
+    }
+}
+
+/// Parses an `updateHistory*` frame (plain JSON or Socket.IO event) into a
+/// [`ChartHistoryResponse`], returning `None` for any other message.
+fn parse_chart_history_response(msg: &Message) -> Option<ChartHistoryResponse> {
+    let value = message_json_value(msg)?;
+    if value.get("asset").is_some() && value.get("period").is_some() {
+        return serde_json::from_value(value).ok();
+    }
+    let arr = value.as_array()?;
+    let event = arr.first()?.as_str()?;
+    if !event.starts_with("updateHistory") {
+        return None;
+    }
+    serde_json::from_value(arr.get(1)?.clone()).ok()
+}
+
+/// Extracts every `[asset, timestamp, price]` row from an `updateStream`
+/// frame (or a bare row array), skipping anything that doesn't match.
+fn parse_stream_rows(msg: &Message) -> Vec<StreamRow> {
+    let Some(value) = message_json_value(msg) else {
+        return Vec::new();
+    };
+
+    let rows = if let Some(arr) = value.as_array() {
+        if arr.first().and_then(|item| item.as_str()) == Some("updateStream") {
+            arr.get(1).and_then(|item| item.as_array()).cloned()
+        } else {
+            Some(arr.clone())
+        }
+    } else {
+        None
+    };
+
+    rows.unwrap_or_default()
+        .into_iter()
+        .filter_map(parse_stream_row)
+        .collect()
+}
+
+fn parse_stream_row(value: serde_json::Value) -> Option<StreamRow> {
+    let row = value.as_array()?;
+    let asset = row.first()?.as_str()?.to_string();
+    let timestamp = row.get(1)?.as_f64()?;
+    let price = Decimal::from_f64_retain(row.get(2)?.as_f64()?)?;
+    Some(StreamRow {
+        asset,
+        timestamp,
+        price,
+    })
+}
+
+/// Extracts the JSON payload from a text or binary frame, tolerating the
+/// Socket.IO `42` prefix in front of the JSON array.
+fn message_json_value(msg: &Message) -> Option<serde_json::Value> {
+    match msg {
+        Message::Text(text) => {
+            let trimmed = text.trim();
+            if trimmed.starts_with('{') || trimmed.starts_with('[') {
+                serde_json::from_str(trimmed).ok()
+            } else {
+                text.find('[')
+                    .and_then(|start| serde_json::from_str(&text[start..]).ok())
+            }
+        }
+        Message::Binary(data) => serde_json::from_slice(data).ok(),
+        _ => None,
     }
 }
 
@@ -1012,6 +1484,7 @@ async fn send_subscribe_message(
     ws_sender: &AsyncSender<Message>,
     asset: &str,
     period: u32,
+    subfor: bool
 ) -> CoreResult<()> {
     ws_sender
         .send(Message::text(
@@ -1023,10 +1496,12 @@ async fn send_subscribe_message(
         ))
         .await
         .map_err(CoreError::from)?;
-    ws_sender
-        .send(Message::text(format!("42[\"subfor\",\"{asset}\"]")))
-        .await
-        .map_err(CoreError::from)?;
+    if subfor {
+        ws_sender
+            .send(Message::text(format!("42[\"subfor\",\"{asset}\"]")))
+            .await
+            .map_err(CoreError::from)?;
+    }
     Ok(())
 }
 
@@ -1039,6 +1514,268 @@ impl Drop for SubscriptionStream {
                 command_id: Uuid::nil(),
             };
             let _ = sender.as_sync().try_send(drop_command);
+        }
+    }
+}
+
+#[cfg(test)]
+mod chart_stream_tests {
+    use super::*;
+    use crate::pocketoption::ssid::Ssid;
+    use crate::pocketoption::state::StateBuilder;
+    use binary_options_tools_core::reimports::{bounded_async, Message};
+    use binary_options_tools_core::traits::ApiModule;
+    use futures_util::StreamExt;
+    use std::{sync::Arc, time::Duration};
+    use tokio::time::timeout;
+
+    fn test_state() -> Arc<crate::pocketoption::state::State> {
+        let dummy_ssid =
+            r#"42["auth",{"session":"dummy_session","isDemo":1,"uid":123,"platform":2}]"#;
+        let ssid = Ssid::parse(dummy_ssid).expect("dummy SSID parses");
+        Arc::new(
+            StateBuilder::default()
+                .ssid(ssid)
+                .build()
+                .expect("state builds"),
+        )
+    }
+
+    async fn spawn_module() -> (
+        SubscriptionsHandle,
+        binary_options_tools_core::reimports::AsyncSender<Arc<Message>>,
+        binary_options_tools_core::reimports::AsyncReceiver<Message>,
+    ) {
+        let (cmd_tx, cmd_rx) = bounded_async(10);
+        let (resp_tx, resp_rx) = bounded_async(10);
+        let (msg_tx, msg_rx) = bounded_async(10);
+        let (ws_tx, ws_rx) = bounded_async(10);
+        let (runner_tx, _runner_rx) = bounded_async(1);
+        let mut module =
+            SubscriptionsApiModule::new(test_state(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
+        tokio::spawn(async move {
+            let _ = module.run().await;
+        });
+        (
+            SubscriptionsApiModule::create_handle(cmd_tx, resp_rx),
+            msg_tx,
+            ws_rx,
+        )
+    }
+
+    async fn assert_only_change_symbol(
+        ws_rx: &binary_options_tools_core::reimports::AsyncReceiver<Message>,
+        asset: &str,
+        period: u32,
+    ) {
+        let ws_msg = ws_rx.recv().await.expect("changeSymbol is sent");
+        match ws_msg {
+            Message::Text(text) => assert_eq!(
+                text,
+                format!(r#"42["changeSymbol",{{"asset":"{asset}","period":{period}}}]"#)
+            ),
+            _ => panic!("expected text websocket message"),
+        }
+        let extra = timeout(Duration::from_millis(50), ws_rx.recv()).await;
+        assert!(
+            extra.is_err(),
+            "must not send subscribeSymbol, subfor, or any second subscribe frame"
+        );
+    }
+
+    async fn assert_no_event(
+        stream: &mut futures_util::stream::BoxStream<'_, PocketResult<HistoryStreamEvent>>,
+    ) {
+        let result = timeout(Duration::from_millis(50), stream.next()).await;
+        assert!(
+            result.is_err(),
+            "stale or wrong-asset data must not produce an event"
+        );
+    }
+
+    #[tokio::test]
+    async fn subscribe_with_history_points_sends_one_change_symbol_and_filters_live_rows() {
+        let (handle, msg_tx, ws_rx) = spawn_module().await;
+        let asset = "EURUSD_otc";
+        let period = 5;
+
+        let mut stream = handle
+            .subscribe_with_history_mode(asset.to_string(), period, HistoryStreamMode::Points)
+            .await
+            .expect("subscription starts")
+            .to_stream()
+            .boxed();
+
+        assert_only_change_symbol(&ws_rx, asset, period).await;
+
+        msg_tx
+            .send(Arc::new(Message::Text(
+                r#"42["updateHistoryNewFast",{"asset":"EURUSD_otc","period":5,"history":[[100,1.10],[105,1.20]]}]"#
+                    .to_string()
+                    .into(),
+            )))
+            .await
+            .expect("history delivered");
+
+        match stream.next().await.expect("first event").expect("ok event") {
+            HistoryStreamEvent::Point(point) => {
+                assert_eq!(point.asset, asset);
+                assert_eq!(point.time, 100.0);
+                assert_eq!(point.price, 1.10);
+            }
+            event => panic!("expected point, got {event:?}"),
+        }
+        match stream
+            .next()
+            .await
+            .expect("second event")
+            .expect("ok event")
+        {
+            HistoryStreamEvent::Point(point) => {
+                assert_eq!(point.asset, asset);
+                assert_eq!(point.time, 105.0);
+                assert_eq!(point.price, 1.20);
+            }
+            event => panic!("expected point, got {event:?}"),
+        }
+
+        msg_tx
+            .send(Arc::new(Message::Text(
+                r#"42["updateStream",[["EURUSD_otc",105,1.30]]]"#.to_string().into(),
+            )))
+            .await
+            .expect("stale live delivered");
+        assert_no_event(&mut stream).await;
+
+        msg_tx
+            .send(Arc::new(Message::Text(
+                r#"42["updateStream",[["GBPUSD_otc",106,1.40]]]"#.to_string().into(),
+            )))
+            .await
+            .expect("wrong asset live delivered");
+        assert_no_event(&mut stream).await;
+
+        msg_tx
+            .send(Arc::new(Message::Text(
+                r#"42["updateStream",[["EURUSD_otc",106,1.50]]]"#.to_string().into(),
+            )))
+            .await
+            .expect("matching live delivered");
+        match stream.next().await.expect("live event").expect("ok event") {
+            HistoryStreamEvent::Point(point) => {
+                assert_eq!(point.asset, asset);
+                assert_eq!(point.time, 106.0);
+                assert_eq!(point.price, 1.50);
+            }
+            event => panic!("expected live point, got {event:?}"),
+        }
+
+        msg_tx
+            .send(Arc::new(Message::Text(
+                r#"42["updateStream",[["EURUSD_otc",106.5,1.60]]]"#.to_string().into(),
+            )))
+            .await
+            .expect("fractional live delivered");
+        match timeout(Duration::from_secs(1), stream.next())
+            .await
+            .expect("fractional live event")
+            .expect("stream item")
+            .expect("ok event")
+        {
+            HistoryStreamEvent::Point(point) => {
+                assert_eq!(point.asset, asset);
+                assert_eq!(point.time, 106.5);
+                assert_eq!(point.price, 1.60);
+            }
+            event => panic!("expected fractional live point, got {event:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn subscribe_with_history_ohlc_bootstraps_candles_and_uses_subscription_time_update_for_live_rows(
+    ) {
+        let (handle, msg_tx, ws_rx) = spawn_module().await;
+        let asset = "EURUSD_otc";
+        let period = 2;
+
+        let mut stream = handle
+            .subscribe_with_history_mode(asset.to_string(), period, HistoryStreamMode::Ohlc)
+            .await
+            .expect("subscription starts")
+            .to_stream()
+            .boxed();
+
+        assert_only_change_symbol(&ws_rx, asset, period).await;
+
+        msg_tx
+            .send(Arc::new(Message::Text(
+                r#"42["updateHistoryNew",{"asset":"EURUSD_otc","period":2,"history":[[100,1.0],[101,1.2],[102,1.3],[103,1.1],[104,1.4]]}]"#
+                    .to_string()
+                    .into(),
+            )))
+            .await
+            .expect("history delivered");
+
+        match stream
+            .next()
+            .await
+            .expect("first candle")
+            .expect("ok event")
+        {
+            HistoryStreamEvent::Candle(candle) => {
+                assert_eq!(candle.symbol, asset);
+                assert_eq!(candle.timestamp, 100);
+                assert_eq!(candle.open.to_f64().unwrap(), 1.0);
+                assert_eq!(candle.close.to_f64().unwrap(), 1.2);
+            }
+            event => panic!("expected candle, got {event:?}"),
+        }
+        match stream
+            .next()
+            .await
+            .expect("second candle")
+            .expect("ok event")
+        {
+            HistoryStreamEvent::Candle(candle) => {
+                assert_eq!(candle.symbol, asset);
+                assert_eq!(candle.timestamp, 102);
+                assert_eq!(candle.open.to_f64().unwrap(), 1.3);
+                assert_eq!(candle.close.to_f64().unwrap(), 1.1);
+            }
+            event => panic!("expected candle, got {event:?}"),
+        }
+
+        msg_tx
+            .send(Arc::new(Message::Text(
+                r#"42["updateStream",[["EURUSD_otc",104,1.8],["GBPUSD_otc",105,1.9]]]"#
+                    .to_string()
+                    .into(),
+            )))
+            .await
+            .expect("ignored live delivered");
+        assert_no_event(&mut stream).await;
+
+        for (timestamp, price) in [(105, 2.0), (106, 2.2), (107, 1.9)] {
+            msg_tx
+                .send(Arc::new(Message::Text(
+                    format!(r#"42["updateStream",[["EURUSD_otc",{timestamp},{price}]]]"#).into(),
+                )))
+                .await
+                .expect("matching live delivered");
+        }
+
+        match stream.next().await.expect("live candle").expect("ok event") {
+            HistoryStreamEvent::Candle(candle) => {
+                assert_eq!(candle.symbol, asset);
+                // SubscriptionType::Time preserves the start of the
+                // aggregation window (first live tick at t=105).
+                assert_eq!(candle.timestamp, 105);
+                assert_eq!(candle.open.to_f64().unwrap(), 2.0);
+                assert_eq!(candle.high.to_f64().unwrap(), 2.2);
+                assert_eq!(candle.low.to_f64().unwrap(), 1.9);
+                assert_eq!(candle.close.to_f64().unwrap(), 1.9);
+            }
+            event => panic!("expected live candle, got {event:?}"),
         }
     }
 }

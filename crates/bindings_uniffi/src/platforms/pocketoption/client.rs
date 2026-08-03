@@ -15,7 +15,7 @@ use binary_options_tools::error::BinaryOptionsError;
 use super::{
     raw_handler::RawHandler,
     stream::SubscriptionStream,
-    types::{Action, Asset, Candle, Deal, PendingOrder, Tick},
+    types::{Action, Asset, Candle, Deal, HistoryPoint, PendingOrder, Tick},
     validator::Validator,
 };
 
@@ -235,17 +235,24 @@ impl PocketOption {
         name = "subscribe",
         path = "crates/bindings_uniffi/docs_json/pocket_option.json"
     )]
-    #[uniffi::method]
+    /// Subscribes to time-aligned candles for an asset.
+    ///
+    /// `subfor` controls whether the `subfor` frame is sent after
+    /// `changeSymbol` (default `true`, the standard subscription). Passing
+    /// `false` only switches the chart symbol, relying on the passive
+    /// `updateStream` feed.
+    #[uniffi::method(default(subfor = true))]
     pub async fn subscribe(
         &self,
         asset: String,
         duration_secs: u64,
+        subfor: bool,
     ) -> Result<Arc<SubscriptionStream>, UniError> {
         let sub_type = SubscriptionType::time_aligned(StdDuration::from_secs(duration_secs))
             .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
         let original_stream = self
             .inner
-            .subscribe(asset, sub_type)
+            .subscribe_sub(asset, sub_type, subfor)
             .await
             .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?;
         Ok(SubscriptionStream::from_original(original_stream))
@@ -314,6 +321,48 @@ impl PocketOption {
         let candles = self
             .inner
             .candles(asset, period)
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?
+            .into_iter()
+            .map(Candle::from)
+            .collect();
+        Ok(candles)
+    }
+
+    /// Returns Pocket-style merged history points for an asset and period.
+    ///
+    /// The result combines raw tick history with synthetic points expanded
+    /// from the server's OHLC candles - the same point stream Pocket Option
+    /// builds for its own chart edge.
+    #[uniffi::method]
+    pub async fn history_points(
+        &self,
+        asset: String,
+        period: u32,
+    ) -> Result<Vec<HistoryPoint>, UniError> {
+        let points = self
+            .inner
+            .history_points(asset, period)
+            .await
+            .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?
+            .into_iter()
+            .map(HistoryPoint::from)
+            .collect();
+        Ok(points)
+    }
+
+    /// Returns closed OHLC candles from Pocket Option's merged history flow.
+    ///
+    /// The newest (still developing) candle is intentionally excluded.
+    #[uniffi::method]
+    pub async fn history_ohlc(
+        &self,
+        asset: String,
+        period: u32,
+    ) -> Result<Vec<Candle>, UniError> {
+        let candles = self
+            .inner
+            .history_ohlc(asset, period)
             .await
             .map_err(|e| UniError::from(BinaryOptionsError::from(e)))?
             .into_iter()

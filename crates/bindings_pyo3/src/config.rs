@@ -99,7 +99,6 @@ impl PyConfig {
         Ok(())
     }
 
-
     #[getter]
     fn proxy(&self) -> Option<String> {
         self.inner.proxy.clone()

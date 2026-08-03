@@ -416,7 +416,9 @@ impl Asset {
             return Err(PocketError::InvalidAsset("Asset is not active".into()));
         }
         if time == 0 {
-            return Err(PocketError::InvalidAsset("Time must be a positive value".into()));
+            return Err(PocketError::InvalidAsset(
+                "Time must be a positive value".into(),
+            ));
         }
         Ok(())
     }

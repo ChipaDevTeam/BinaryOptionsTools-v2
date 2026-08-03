@@ -1,0 +1,17 @@
+{
+  "RawHandler": {
+    "default": "Low-level handler for sending raw WebSocket frames and receiving responses filtered by this handler's validator."
+  },
+  "send_text": {
+    "default": "Sends a raw text frame over the WebSocket connection."
+  },
+  "send_binary": {
+    "default": "Sends a raw binary frame over the WebSocket connection."
+  },
+  "send_and_wait": {
+    "default": "Sends a raw text frame and waits for the next incoming message that matches this handler's validator, returning it as a string."
+  },
+  "wait_next": {
+    "default": "Waits for the next incoming message that matches this handler's validator, returning it as a string."
+  }
+}

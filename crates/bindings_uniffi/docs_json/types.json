@@ -1,0 +1,23 @@
+{
+  "Action": {
+    "default": "Trade direction: Call bets the price will rise, Put bets it will fall."
+  },
+  "AssetType": {
+    "default": "Category of a trading asset: stock, currency, commodity, cryptocurrency or index."
+  },
+  "CandleLength": {
+    "default": "A candle duration (in seconds) allowed for an asset."
+  },
+  "Asset": {
+    "default": "A tradable asset with its symbol, payout percentage, activity status and allowed candle durations."
+  },
+  "Deal": {
+    "default": "A trade (open or closed) with its prices, timestamps, direction and profit information."
+  },
+  "PendingOrder": {
+    "default": "A pending order waiting for its trigger time/price, including the ticket used to cancel it."
+  },
+  "Candle": {
+    "default": "An OHLC candle: symbol, timestamp, open, high, low, close and optional volume."
+  }
+}

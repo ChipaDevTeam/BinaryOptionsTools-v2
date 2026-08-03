@@ -1,0 +1,26 @@
+{
+  "PocketOption": {
+    "default": "High-level client for the Pocket Option trading platform. Provides methods for trading, balance retrieval, historical data, real-time subscriptions and connection management over a managed WebSocket connection."
+  },
+  "new_with_url": {
+    "default": "Creates a new PocketOption client that connects to a specific WebSocket server URL instead of the platform default."
+  },
+  "trade": {
+    "default": "Places a trade on the given asset. `action` selects Call (price up) or Put (price down), `time` is the expiry in seconds and `amount` the stake. Returns the created Deal."
+  },
+  "result": {
+    "default": "Waits for the final result of a trade by its UUID string and returns the settled Deal, including profit."
+  },
+  "open_pending_order": {
+    "default": "Opens a pending order that triggers at a given time or price. `command` selects the direction (0 = Call, 1 = Put) and `min_payout` filters by minimum payout percentage."
+  },
+  "subscribe": {
+    "default": "Subscribes to real-time time-aligned candles for an asset. `duration_secs` sets the candle duration; `subfor` (default true) controls whether the standard `subfor` subscription frame is sent after `changeSymbol`."
+  },
+  "candles": {
+    "default": "Retrieves historical OHLC candle data for an asset. Variants allow selecting period, offset and starting time."
+  },
+  "create_raw_handler": {
+    "default": "Creates a raw message handler bound to a validator, for sending custom frames and receiving matching responses. An optional keep-alive message is re-sent after every reconnect."
+  }
+}

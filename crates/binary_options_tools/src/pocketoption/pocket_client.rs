@@ -21,7 +21,7 @@ use crate::pocketoption::types::Outgoing;
 use crate::{
     error::BinaryOptionsError,
     pocketoption::{
-        candle::{compile_candles_from_tuples, Candle, SubscriptionType},
+        candle::{compile_candles_from_tuples, Candle, HistoryPoint, SubscriptionType},
         connect::PocketConnect,
         error::{PocketError, PocketResult},
         modules::{
@@ -34,7 +34,9 @@ use crate::{
             pending_trades::PendingTradesApiModule,
             raw::{RawApiModule, RawHandle as InnerRawHandle, RawHandler as InnerRawHandler},
             server_time::ServerTimeModule,
-            subscriptions::{SubscriptionStream, SubscriptionsApiModule},
+            subscriptions::{
+                HistoryStreamEvent, HistoryStreamMode, SubscriptionStream, SubscriptionsApiModule,
+            },
             trades::TradesApiModule,
         },
         ssid::Ssid,
@@ -124,13 +126,15 @@ impl PocketOption {
             .with_module::<HistoricalDataApiModule>()
             .with_module::<RawApiModule>()
             .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)))
-            .with_lightweight_handler(|msg, state, _| Box::pin(async move {
-                let subs = state.raw_subscribers.read().await;
-                for sub in subs.iter() {
-                    let _ = sub.send(msg.clone()).await;
-                }
-                Ok(())
-            }))
+            .with_lightweight_handler(|msg, state, _| {
+                Box::pin(async move {
+                    let subs = state.raw_subscribers.read().await;
+                    for sub in subs.iter() {
+                        let _ = sub.send(msg.clone()).await;
+                    }
+                    Ok(())
+                })
+            })
             .on_reconnect(Box::new(TradeReconciliationCallback))
     }
     async fn require_handle<M: ApiModule<State>>(
@@ -226,8 +230,7 @@ impl PocketOption {
         }
 
         // Pass all URLs as fallbacks
-        builder = builder
-            .urls(config.urls.iter().map(|u| u.to_string()).collect());
+        builder = builder.urls(config.urls.iter().map(|u| u.to_string()).collect());
 
         let state = builder.build()?;
         let client_builder =
@@ -326,7 +329,6 @@ impl PocketOption {
     pub fn is_connected(&self) -> bool {
         self.client.is_connected()
     }
-
 
     /// Subscribes to an asset's stream and prepends historical data.
     ///
@@ -720,10 +722,34 @@ impl PocketOption {
     }
 
     /// Subscribes to a specific asset's updates.
+    ///
+    /// This sends the standard `changeSymbol` + `subfor` handshake. Use
+    /// [`Self::subscribe_sub`] if you need to skip the `subfor` frame.
     pub async fn subscribe(
         &self,
         asset: impl ToString,
         sub_type: SubscriptionType,
+    ) -> PocketResult<SubscriptionStream> {
+        self.subscribe_sub(asset, sub_type, true).await
+    }
+
+    /// Subscribes to a specific asset's updates, controlling whether the
+    /// `subfor` frame is sent after `changeSymbol`.
+    ///
+    /// Passing `subfor = false` only switches the chart symbol on the server;
+    /// price rows still arrive via the passive `updateStream` feed but no full
+    /// server-side subscription is registered. Passing `true` behaves exactly
+    /// like [`Self::subscribe`].
+    ///
+    /// # Arguments
+    /// * `asset` - The asset symbol to subscribe to.
+    /// * `sub_type` - The candle aggregation strategy for the stream.
+    /// * `subfor` - Whether to send the `subfor` frame (normal behavior: `true`).
+    pub async fn subscribe_sub(
+        &self,
+        asset: impl ToString,
+        sub_type: SubscriptionType,
+        subfor: bool,
     ) -> PocketResult<SubscriptionStream> {
         if !self.is_connected() {
             return Err(PocketError::General(
@@ -739,7 +765,9 @@ impl PocketOption {
             .ok_or_else(|| BinaryOptionsError::General("Assets not found".into()))?;
 
         if assets.get(&asset.to_string()).is_some() {
-            handle.subscribe(asset.to_string(), sub_type).await
+            handle
+                .subscribe_sub(asset.to_string(), sub_type, subfor)
+                .await
         } else {
             Err(PocketError::InvalidAsset(asset.to_string()))
         }
@@ -766,6 +794,66 @@ impl PocketOption {
         } else {
             Err(PocketError::InvalidAsset(asset.to_string()))
         }
+    }
+
+    /// Opens an early/lazy chart stream with one `changeSymbol` request.
+    ///
+    /// The stream emits the selected history bootstrap (`points` or `ohlc`) and
+    /// then continues with matching `updateStream` rows for the same asset. This
+    /// helper intentionally does not alter the normal subscribe/unsubscribe
+    /// lifecycle.
+    pub async fn subscribe_with_history_mode(
+        &self,
+        asset: impl Into<String>,
+        period: u32,
+        mode: HistoryStreamMode,
+    ) -> PocketResult<impl futures_util::Stream<Item = PocketResult<HistoryStreamEvent>> + 'static>
+    {
+        let handle = self
+            .require_handle::<SubscriptionsApiModule>("SubscriptionsApiModule")
+            .await?;
+        handle
+            .subscribe_with_history_mode(asset.into(), period, mode)
+            .await
+            .map(|stream| stream.to_stream())
+    }
+
+    /// Gets Pocket-style merged history points for a specific asset and period.
+    pub async fn history_points(
+        &self,
+        asset: impl ToString,
+        period: u32,
+    ) -> PocketResult<Vec<HistoryPoint>> {
+        let handle = self
+            .require_handle::<HistoricalDataApiModule>("HistoricalDataApiModule")
+            .await?;
+        let asset_str = asset.to_string();
+
+        if let Some(assets) = self.assets().await {
+            if assets.get(&asset_str).is_none() {
+                return Err(PocketError::InvalidAsset(asset_str));
+            }
+        }
+        handle.history_points(asset_str, period).await
+    }
+
+    /// Gets closed OHLC candles from Pocket Option's merged history flow.
+    pub async fn history_ohlc(
+        &self,
+        asset: impl ToString,
+        period: u32,
+    ) -> PocketResult<Vec<Candle>> {
+        let handle = self
+            .require_handle::<HistoricalDataApiModule>("HistoricalDataApiModule")
+            .await?;
+        let asset_str = asset.to_string();
+
+        if let Some(assets) = self.assets().await {
+            if assets.get(&asset_str).is_none() {
+                return Err(PocketError::InvalidAsset(asset_str));
+            }
+        }
+        handle.history_ohlc(asset_str, period).await
     }
 
     /// Gets historical candle data for a specific asset.
@@ -993,7 +1081,11 @@ impl PocketOption {
     /// Shuts down the client and stops the runner.
     pub async fn shutdown_owned(self) -> PocketResult<()> {
         self._runner.abort();
-        self.client.clone().shutdown().await.map_err(PocketError::from)
+        self.client
+            .clone()
+            .shutdown()
+            .await
+            .map_err(PocketError::from)
     }
 
     pub async fn new_testing_wrapper(ssid: impl ToString) -> PocketResult<TestingWrapper<State>> {
@@ -1023,10 +1115,16 @@ impl PocketOption {
     }
 
     /// Subscribes to a stream of all incoming WebSocket messages verbatim.
-    pub async fn subscribe_raw(&self) -> PocketResult<impl futures_util::Stream<Item = Arc<binary_options_tools_core::reimports::Message>> + 'static> {
-        let (tx, rx) = binary_options_tools_core::reimports::bounded_async::<Arc<binary_options_tools_core::reimports::Message>>(1000);
+    pub async fn subscribe_raw(
+        &self,
+    ) -> PocketResult<
+        impl futures_util::Stream<Item = Arc<binary_options_tools_core::reimports::Message>> + 'static,
+    > {
+        let (tx, rx) = binary_options_tools_core::reimports::bounded_async::<
+            Arc<binary_options_tools_core::reimports::Message>,
+        >(1000);
         self.client.state.raw_subscribers.write().await.push(tx);
-        
+
         let stream = futures_util::stream::unfold(rx, |rx| async move {
             match rx.recv().await {
                 Ok(msg) => Some((msg, rx)),

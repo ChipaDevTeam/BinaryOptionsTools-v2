@@ -4,8 +4,7 @@ use std::sync::Arc;
 use binary_options_tools_core::connector::{ConnectorError, ConnectorResult};
 use binary_options_tools_core::error::{CoreError, CoreResult};
 use binary_options_tools_core::reimports::{
-    generate_key, MaybeTlsStream, Request,
-    WebSocketStream,
+    generate_key, MaybeTlsStream, Request, WebSocketStream,
 };
 use std::time::Duration as StdDuration;
 
@@ -14,14 +13,13 @@ use crate::pocketoption::{
     state::State,
 };
 use crate::utils::init_crypto_provider;
-use serde_json::Value;
-use tokio::net::TcpStream;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio_tungstenite::client_async_with_config;
 use rustls::pki_types::ServerName;
+use serde_json::Value;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+use tokio_tungstenite::client_async_with_config;
 
 use url::Url;
-
 
 const IP_PROVIDERS: &[&str] = &[
     "https://i.pn/json/",
@@ -198,15 +196,21 @@ where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     if let Some((_user, _pass)) = &auth {
-        stream.write_all(&[0x05, 0x02, 0x00, 0x02]).await
+        stream
+            .write_all(&[0x05, 0x02, 0x00, 0x02])
+            .await
             .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting send failed: {e}")))?;
     } else {
-        stream.write_all(&[0x05, 0x01, 0x00]).await
+        stream
+            .write_all(&[0x05, 0x01, 0x00])
+            .await
             .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting send failed: {e}")))?;
     }
 
     let mut resp = [0u8; 2];
-    stream.read_exact(&mut resp).await
+    stream
+        .read_exact(&mut resp)
+        .await
         .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting read failed: {e}")))?;
 
     if resp[0] != 0x05 {
@@ -217,7 +221,7 @@ where
         if let Some((user, pass)) = &auth {
             let user_bytes = user.as_bytes();
             let pass_bytes = pass.as_bytes();
-            
+
             let mut auth_req = Vec::new();
             auth_req.push(0x01);
             auth_req.push(user_bytes.len() as u8);
@@ -225,21 +229,31 @@ where
             auth_req.push(pass_bytes.len() as u8);
             auth_req.extend_from_slice(pass_bytes);
 
-            stream.write_all(&auth_req).await
+            stream
+                .write_all(&auth_req)
+                .await
                 .map_err(|e| ConnectorError::Custom(format!("SOCKS5 auth failed: {e}")))?;
 
             let mut auth_resp = [0u8; 2];
-            stream.read_exact(&mut auth_resp).await
+            stream
+                .read_exact(&mut auth_resp)
+                .await
                 .map_err(|e| ConnectorError::Custom(format!("SOCKS5 auth read failed: {e}")))?;
 
             if auth_resp[1] != 0x00 {
-                return Err(ConnectorError::Custom("SOCKS5 authentication failed".into()));
+                return Err(ConnectorError::Custom(
+                    "SOCKS5 authentication failed".into(),
+                ));
             }
         } else {
-            return Err(ConnectorError::Custom("SOCKS5 proxy requested auth but no credentials provided".into()));
+            return Err(ConnectorError::Custom(
+                "SOCKS5 proxy requested auth but no credentials provided".into(),
+            ));
         }
     } else if resp[1] != 0x00 {
-        return Err(ConnectorError::Custom("SOCKS5 authentication method rejected".into()));
+        return Err(ConnectorError::Custom(
+            "SOCKS5 authentication method rejected".into(),
+        ));
     }
 
     let host_bytes = target_host.as_bytes();
@@ -248,34 +262,48 @@ where
     req.extend_from_slice(host_bytes);
     req.extend_from_slice(&target_port.to_be_bytes());
 
-    stream.write_all(&req).await
+    stream
+        .write_all(&req)
+        .await
         .map_err(|e| ConnectorError::Custom(format!("SOCKS5 connect request failed: {e}")))?;
 
     let mut resp_hdr = [0u8; 4];
-    stream.read_exact(&mut resp_hdr).await
+    stream
+        .read_exact(&mut resp_hdr)
+        .await
         .map_err(|e| ConnectorError::Custom(format!("SOCKS5 connect response read failed: {e}")))?;
 
     if resp_hdr[1] != 0x00 {
-        return Err(ConnectorError::Custom(format!("SOCKS5 connect request failed with error code: {}", resp_hdr[1])));
+        return Err(ConnectorError::Custom(format!(
+            "SOCKS5 connect request failed with error code: {}",
+            resp_hdr[1]
+        )));
     }
 
     match resp_hdr[3] {
         0x01 => {
             let mut addr = [0u8; 4 + 2];
-            stream.read_exact(&mut addr).await
+            stream
+                .read_exact(&mut addr)
+                .await
                 .map_err(|e| ConnectorError::Custom(format!("SOCKS5 address read failed: {e}")))?;
         }
         0x03 => {
             let mut len_buf = [0u8; 1];
-            stream.read_exact(&mut len_buf).await
-                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 domain len read failed: {e}")))?;
+            stream.read_exact(&mut len_buf).await.map_err(|e| {
+                ConnectorError::Custom(format!("SOCKS5 domain len read failed: {e}"))
+            })?;
             let mut domain_and_port = vec![0u8; len_buf[0] as usize + 2];
-            stream.read_exact(&mut domain_and_port).await
+            stream
+                .read_exact(&mut domain_and_port)
+                .await
                 .map_err(|e| ConnectorError::Custom(format!("SOCKS5 domain read failed: {e}")))?;
         }
         0x04 => {
             let mut addr = [0u8; 16 + 2];
-            stream.read_exact(&mut addr).await
+            stream
+                .read_exact(&mut addr)
+                .await
                 .map_err(|e| ConnectorError::Custom(format!("SOCKS5 address read failed: {e}")))?;
         }
         _ => return Err(ConnectorError::Custom("Unsupported address type".into())),
@@ -293,7 +321,9 @@ async fn http_connect_handshake<S>(
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
-    let mut req_str = format!("CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n");
+    let mut req_str = format!(
+        "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n"
+    );
     if let Some((user, pass)) = &auth {
         let creds = format!("{user}:{pass}");
         let encoded = base64_encode(creds.as_bytes());
@@ -301,27 +331,38 @@ where
     }
     req_str.push_str("\r\n");
 
-    stream.write_all(req_str.as_bytes()).await
+    stream
+        .write_all(req_str.as_bytes())
+        .await
         .map_err(|e| ConnectorError::Custom(format!("HTTP proxy CONNECT failed: {e}")))?;
 
     let mut header_buf = Vec::new();
     let mut temp = [0u8; 1];
     loop {
-        stream.read_exact(&mut temp).await
+        stream
+            .read_exact(&mut temp)
+            .await
             .map_err(|e| ConnectorError::Custom(format!("HTTP proxy read failed: {e}")))?;
         header_buf.push(temp[0]);
         if header_buf.ends_with(b"\r\n\r\n") {
             break;
         }
         if header_buf.len() > 8192 {
-            return Err(ConnectorError::Custom("HTTP proxy response header too large".into()));
+            return Err(ConnectorError::Custom(
+                "HTTP proxy response header too large".into(),
+            ));
         }
     }
 
     let headers_text = String::from_utf8_lossy(&header_buf);
-    let first_line = headers_text.lines().next().ok_or_else(|| ConnectorError::Custom("Empty HTTP proxy response".into()))?;
+    let first_line = headers_text
+        .lines()
+        .next()
+        .ok_or_else(|| ConnectorError::Custom("Empty HTTP proxy response".into()))?;
     if !first_line.contains(" 200 ") {
-        return Err(ConnectorError::Custom(format!("HTTP proxy CONNECT rejected: {first_line}")));
+        return Err(ConnectorError::Custom(format!(
+            "HTTP proxy CONNECT rejected: {first_line}"
+        )));
     }
 
     Ok(())
@@ -343,7 +384,9 @@ fn get_tls_config(
     if let Some(custom_suites) = tls_cipher_suites {
         cipher_suites.retain(|cs| {
             let name = format!("{:?}", cs.suite()).to_uppercase();
-            custom_suites.iter().any(|c| name.contains(&c.to_uppercase()))
+            custom_suites
+                .iter()
+                .any(|c| name.contains(&c.to_uppercase()))
         });
     } else {
         use rand::seq::SliceRandom;
@@ -356,11 +399,12 @@ fn get_tls_config(
         ..provider
     };
 
-    let mut tls_config = rustls::ClientConfig::builder_with_provider(std::sync::Arc::new(custom_provider))
-        .with_safe_default_protocol_versions()
-        .map_err(|e| CoreError::Connection(ConnectorError::Tls(e.to_string())))?
-        .with_root_certificates(root_store)
-        .with_no_client_auth();
+    let mut tls_config =
+        rustls::ClientConfig::builder_with_provider(std::sync::Arc::new(custom_provider))
+            .with_safe_default_protocol_versions()
+            .map_err(|e| CoreError::Connection(ConnectorError::Tls(e.to_string())))?
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
 
     if let Some(alpn) = tls_alpn {
         tls_config.alpn_protocols = alpn.iter().map(|s| s.as_bytes().to_vec()).collect();
@@ -388,7 +432,12 @@ pub async fn try_connect(
     let target_port = t_url.port().unwrap_or(match t_url.scheme() {
         "wss" => 443,
         "ws" => 80,
-        _ => return Err(ConnectorError::Custom(format!("Unsupported scheme: {}", t_url.scheme()))),
+        _ => {
+            return Err(ConnectorError::Custom(format!(
+                "Unsupported scheme: {}",
+                t_url.scheme()
+            )))
+        }
     });
 
     let socket = if let Some(proxy_str) = &state.proxy {
@@ -401,7 +450,12 @@ pub async fn try_connect(
             "https" => 443,
             "http" => 80,
             "socks5" | "socks5h" => 1080,
-            _ => return Err(ConnectorError::Custom(format!("Unsupported proxy scheme: {}", proxy_url.scheme()))),
+            _ => {
+                return Err(ConnectorError::Custom(format!(
+                    "Unsupported proxy scheme: {}",
+                    proxy_url.scheme()
+                )))
+            }
         });
 
         let mut tcp = tokio::time::timeout(
@@ -410,12 +464,18 @@ pub async fn try_connect(
         )
         .await
         .map_err(|_| ConnectorError::Timeout)?
-        .map_err(|e| ConnectorError::Custom(format!("Failed to connect to proxy {proxy_host}:{proxy_port}: {e}")))?;
+        .map_err(|e| {
+            ConnectorError::Custom(format!(
+                "Failed to connect to proxy {proxy_host}:{proxy_port}: {e}"
+            ))
+        })?;
 
         let auth = parse_auth(&proxy_url);
         if proxy_url.scheme() == "https" {
             let proxy_tls_config = get_tls_config(&state.tls_cipher_suites, &state.tls_alpn)
-                .map_err(|e| ConnectorError::Custom(format!("Failed to build proxy TLS config: {e}")))?;
+                .map_err(|e| {
+                    ConnectorError::Custom(format!("Failed to build proxy TLS config: {e}"))
+                })?;
             let proxy_connector = tokio_rustls::TlsConnector::from(Arc::new(proxy_tls_config));
             let server_name = ServerName::try_from(proxy_host)
                 .map_err(|e| ConnectorError::Custom(format!("Invalid proxy server name: {e}")))?
@@ -437,7 +497,10 @@ pub async fn try_connect(
             socks5_handshake(&mut tcp, target_host, target_port, auth).await?;
             MaybeTlsStream::Plain(tcp)
         } else {
-            return Err(ConnectorError::Custom(format!("Unsupported proxy scheme: {}", proxy_url.scheme())));
+            return Err(ConnectorError::Custom(format!(
+                "Unsupported proxy scheme: {}",
+                proxy_url.scheme()
+            )));
         }
     } else {
         let tcp = tokio::time::timeout(
@@ -446,7 +509,11 @@ pub async fn try_connect(
         )
         .await
         .map_err(|_| ConnectorError::Timeout)?
-        .map_err(|e| ConnectorError::Custom(format!("Failed to connect to {target_host}:{target_port}: {e}")))?;
+        .map_err(|e| {
+            ConnectorError::Custom(format!(
+                "Failed to connect to {target_host}:{target_port}: {e}"
+            ))
+        })?;
         MaybeTlsStream::Plain(tcp)
     };
 
@@ -459,17 +526,17 @@ pub async fn try_connect(
             .to_owned();
 
         let tls_stream = match socket {
-            MaybeTlsStream::Plain(tcp) => {
-                tokio::time::timeout(
-                    per_url_connect_timeout(),
-                    connector.connect(server_name, tcp),
-                )
-                .await
-                .map_err(|_| ConnectorError::Timeout)?
-                .map_err(|e| ConnectorError::Custom(format!("TLS handshake failed: {e}")))?
-            }
+            MaybeTlsStream::Plain(tcp) => tokio::time::timeout(
+                per_url_connect_timeout(),
+                connector.connect(server_name, tcp),
+            )
+            .await
+            .map_err(|_| ConnectorError::Timeout)?
+            .map_err(|e| ConnectorError::Custom(format!("TLS handshake failed: {e}")))?,
             MaybeTlsStream::Rustls(_) => {
-                return Err(ConnectorError::Custom("Chained TLS streams are not supported".into()));
+                return Err(ConnectorError::Custom(
+                    "Chained TLS streams are not supported".into(),
+                ));
             }
             _ => {
                 return Err(ConnectorError::Custom("Unsupported stream type".into()));
@@ -480,8 +547,14 @@ pub async fn try_connect(
         socket
     };
 
-    let user_agent = state.user_agent.clone().unwrap_or_else(|| state.ssid.user_agent());
-    let origin = state.origin.clone().unwrap_or_else(|| "https://pocketoption.com".to_string());
+    let user_agent = state
+        .user_agent
+        .clone()
+        .unwrap_or_else(|| state.ssid.user_agent());
+    let origin = state
+        .origin
+        .clone()
+        .unwrap_or_else(|| "https://pocketoption.com".to_string());
 
     let mut request_builder = Request::builder()
         .uri(t_url.to_string())

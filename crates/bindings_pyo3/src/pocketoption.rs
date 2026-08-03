@@ -5,6 +5,9 @@ use std::time::Duration;
 
 use binary_options_tools::pocketoption::candle::{Candle, SubscriptionType};
 use binary_options_tools::pocketoption::error::PocketResult;
+use binary_options_tools::pocketoption::modules::subscriptions::{
+    HistoryStreamEvent, HistoryStreamMode,
+};
 use binary_options_tools::pocketoption::pocket_client::PocketOption;
 use binary_options_tools::utils::f64_to_decimal;
 use binary_options_tools::validator::Validator as CrateValidator;
@@ -14,6 +17,8 @@ use futures_util::StreamExt;
 use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python};
 use pyo3_async_runtimes::tokio::future_into_py;
 use rust_decimal::prelude::ToPrimitive;
+use serde::Serialize;
+use serde_json::Value;
 use uuid::Uuid;
 
 use crate::config::PyConfig;
@@ -64,6 +69,18 @@ async fn send_raw_message_and_wait(
     Ok(arc_message_to_string(&response))
 }
 
+/// Parses the user-facing history stream mode string into the crate enum.
+fn parse_history_stream_mode(mode: &str) -> PyResult<HistoryStreamMode> {
+    match mode {
+        "points" => Ok(HistoryStreamMode::Points),
+        "ohlc" => Ok(HistoryStreamMode::Ohlc),
+        other => Err(BinaryErrorPy::InvalidParameter(format!(
+            "Invalid history stream mode '{other}'. Expected 'points' or 'ohlc'"
+        ))
+        .into()),
+    }
+}
+
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RawPocketOption {
@@ -73,6 +90,26 @@ pub struct RawPocketOption {
 #[pyclass]
 pub struct StreamIterator {
     stream: Arc<Mutex<Fuse<BoxStream<'static, PocketResult<Candle>>>>>,
+}
+
+/// A single raw price point emitted by `subscribe_points`.
+#[derive(Clone, Debug, Serialize)]
+pub struct StreamPoint {
+    pub asset: String,
+    pub time: f64,
+    pub price: f64,
+}
+
+/// Async/sync iterator over raw `(asset, time, price)` points.
+#[pyclass]
+pub struct PointStreamIterator {
+    stream: Arc<Mutex<Fuse<BoxStream<'static, PocketResult<StreamPoint>>>>>,
+}
+
+/// Async/sync iterator over lazy chart stream events (points or candles).
+#[pyclass]
+pub struct HistoryStreamIterator {
+    stream: Arc<Mutex<Fuse<BoxStream<'static, PocketResult<HistoryStreamEvent>>>>>,
 }
 
 #[pyclass]
@@ -206,7 +243,6 @@ impl RawPocketOption {
     pub fn is_connected(&self) -> bool {
         self.client.is_connected()
     }
-
 
     pub fn buy<'py>(
         &self,
@@ -562,6 +598,55 @@ impl RawPocketOption {
         })
     }
 
+    /// Gets Pocket-style merged history points for a specific asset and period.
+    ///
+    /// Returns the same point stream Pocket Option builds for its chart edge
+    /// (raw ticks plus synthetic points expanded from server candles),
+    /// serialized as a JSON list of `{asset, time, price}` objects.
+    pub fn history_points<'py>(
+        &self,
+        py: Python<'py>,
+        asset: String,
+        period: u32,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let res = client
+                .history_points(asset, period)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| {
+                serde_json::to_string(&res)
+                    .map_err(BinaryErrorPy::from)?
+                    .into_py_any(py)
+            })
+        })
+    }
+
+    /// Gets closed OHLC candles from Pocket Option's merged history flow.
+    ///
+    /// The newest (still developing) candle is excluded. Returns a JSON list
+    /// of candle objects.
+    pub fn history_ohlc<'py>(
+        &self,
+        py: Python<'py>,
+        asset: String,
+        period: u32,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let res = client
+                .history_ohlc(asset, period)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| {
+                serde_json::to_string(&res)
+                    .map_err(BinaryErrorPy::from)?
+                    .into_py_any(py)
+            })
+        })
+    }
+
     /// Compiles custom candlesticks from raw tick history.
     ///
     /// This method fetches raw tick data for the asset over the specified
@@ -622,10 +707,7 @@ impl RawPocketOption {
     pub fn subscribe_raw<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
-            let raw_stream = client
-                .subscribe_raw()
-                .await
-                .map_err(BinaryErrorPy::from)?;
+            let raw_stream = client.subscribe_raw().await.map_err(BinaryErrorPy::from)?;
 
             let boxed_stream = async_stream::stream! {
                 tokio::pin!(raw_stream);
@@ -641,15 +723,23 @@ impl RawPocketOption {
         })
     }
 
+    /// Subscribes to an asset's stream of raw price updates.
+    ///
+    /// Args:
+    ///     symbol (str): Asset symbol to subscribe to.
+    ///     subfor (bool): Whether to send the `subfor` frame after
+    ///         `changeSymbol` (default True, the standard subscription).
+    #[pyo3(signature = (symbol, subfor = true))]
     pub fn subscribe_symbol<'py>(
         &self,
         py: Python<'py>,
         symbol: String,
+        subfor: bool,
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
             let subscription = client
-                .subscribe(symbol, SubscriptionType::none())
+                .subscribe_sub(symbol, SubscriptionType::none(), subfor)
                 .await
                 .map_err(BinaryErrorPy::from)?;
 
@@ -660,16 +750,24 @@ impl RawPocketOption {
         })
     }
 
+    /// Subscribes to an asset, aggregating every `chunk_size` updates into one candle.
+    ///
+    /// Args:
+    ///     symbol (str): Asset symbol to subscribe to.
+    ///     chunk_size (int): Number of updates aggregated per candle.
+    ///     subfor (bool): Whether to send the `subfor` frame (default True).
+    #[pyo3(signature = (symbol, chunk_size, subfor = true))]
     pub fn subscribe_symbol_chunked<'py>(
         &self,
         py: Python<'py>,
         symbol: String,
         chunk_size: usize,
+        subfor: bool,
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
             let subscription = client
-                .subscribe(symbol, SubscriptionType::chunk(chunk_size))
+                .subscribe_sub(symbol, SubscriptionType::chunk(chunk_size), subfor)
                 .await
                 .map_err(BinaryErrorPy::from)?;
 
@@ -680,16 +778,24 @@ impl RawPocketOption {
         })
     }
 
+    /// Subscribes to an asset, aggregating updates into candles of `time` duration.
+    ///
+    /// Args:
+    ///     symbol (str): Asset symbol to subscribe to.
+    ///     time (timedelta): Candle duration.
+    ///     subfor (bool): Whether to send the `subfor` frame (default True).
+    #[pyo3(signature = (symbol, time, subfor = true))]
     pub fn subscribe_symbol_timed<'py>(
         &self,
         py: Python<'py>,
         symbol: String,
         time: Duration,
+        subfor: bool,
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
             let subscription = client
-                .subscribe(symbol, SubscriptionType::time(time))
+                .subscribe_sub(symbol, SubscriptionType::time(time), subfor)
                 .await
                 .map_err(BinaryErrorPy::from)?;
 
@@ -700,18 +806,27 @@ impl RawPocketOption {
         })
     }
 
+    /// Subscribes to an asset with candles aligned to UTC time boundaries.
+    ///
+    /// Args:
+    ///     symbol (str): Asset symbol to subscribe to.
+    ///     time (timedelta): Candle duration (must divide 24h evenly).
+    ///     subfor (bool): Whether to send the `subfor` frame (default True).
+    #[pyo3(signature = (symbol, time, subfor = true))]
     pub fn subscribe_symbol_time_aligned<'py>(
         &self,
         py: Python<'py>,
         symbol: String,
         time: Duration,
+        subfor: bool,
     ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
             let subscription = client
-                .subscribe(
+                .subscribe_sub(
                     symbol,
                     SubscriptionType::time_aligned(time).map_err(BinaryErrorPy::from)?,
+                    subfor,
                 )
                 .await
                 .map_err(BinaryErrorPy::from)?;
@@ -720,6 +835,85 @@ impl RawPocketOption {
             let stream = Arc::new(Mutex::new(boxed_stream));
 
             Python::attach(|py| StreamIterator { stream }.into_py_any(py))
+        })
+    }
+
+    /// Subscribes to raw `(asset, time, price)` points using a raw handler.
+    ///
+    /// Uses `subscribeSymbol` with a keep-alive so the point feed survives
+    /// reconnections. Returns a `PointStreamIterator`.
+    pub fn subscribe_points<'py>(
+        &self,
+        py: Python<'py>,
+        symbol: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let message = format!("42[\"subscribeSymbol\",\"{symbol}\"]");
+            let keep_alive =
+                binary_options_tools::pocketoption::modules::raw::Outgoing::Text(message.clone());
+            let handler = client
+                .create_raw_handler(Validator::Contains(symbol.clone()), Some(keep_alive))
+                .await
+                .map_err(BinaryErrorPy::from)?;
+
+            handler
+                .send_text(message)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+
+            let receiver = handler.subscribe();
+            let asset = symbol.clone();
+            let boxed_stream = async_stream::stream! {
+                // Keep the handler alive for as long as the stream exists so
+                // its keep-alive message continues to be sent on reconnects.
+                let _handler = handler;
+
+                while let Ok(msg) = receiver.recv().await {
+                    let msg_str = message_to_string(msg.as_ref());
+
+                    for point in parse_stream_points(&asset, &msg_str) {
+                        yield Ok(point);
+                    }
+                }
+            }
+            .boxed()
+            .fuse();
+            let stream = Arc::new(Mutex::new(boxed_stream));
+
+            Python::attach(|py| PointStreamIterator { stream }.into_py_any(py))
+        })
+    }
+
+    /// Opens an early/lazy chart stream with one `changeSymbol` request.
+    ///
+    /// The stream first yields the history bootstrap and then matching live
+    /// rows for the same asset. Returns a `HistoryStreamIterator`.
+    ///
+    /// Args:
+    ///     symbol (str): Asset symbol.
+    ///     period (int): Candle period in seconds.
+    ///     mode (str): "points" for raw points or "ohlc" for closed candles.
+    #[pyo3(signature = (symbol, period, mode = "points".to_string()))]
+    pub fn subscribe_with_history_mode<'py>(
+        &self,
+        py: Python<'py>,
+        symbol: String,
+        period: u32,
+        mode: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        let mode = parse_history_stream_mode(&mode)?;
+        future_into_py(py, async move {
+            let stream = client
+                .subscribe_with_history_mode(symbol, period, mode)
+                .await
+                .map_err(BinaryErrorPy::from)?
+                .boxed()
+                .fuse();
+            let stream = Arc::new(Mutex::new(stream));
+
+            Python::attach(|py| HistoryStreamIterator { stream }.into_py_any(py))
         })
     }
 
@@ -1007,6 +1201,62 @@ impl StreamIterator {
 }
 
 #[pymethods]
+impl PointStreamIterator {
+    fn __aiter__(slf: Py<Self>) -> Py<Self> {
+        slf
+    }
+
+    fn __iter__(slf: Py<Self>) -> Py<Self> {
+        slf
+    }
+
+    fn __anext__<'py>(&'py mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let stream = self.stream.clone();
+        future_into_py(py, async move {
+            let res = next_stream(stream, false).await;
+            res.map(|res| serde_json::to_string(&res).unwrap_or_default())
+        })
+    }
+
+    fn __next__<'py>(&'py self, py: Python<'py>) -> PyResult<String> {
+        let runtime = get_runtime(py)?;
+        let stream = self.stream.clone();
+        runtime.block_on(async move {
+            let res = next_stream(stream, true).await;
+            res.map(|res| serde_json::to_string(&res).unwrap_or_default())
+        })
+    }
+}
+
+#[pymethods]
+impl HistoryStreamIterator {
+    fn __aiter__(slf: Py<Self>) -> Py<Self> {
+        slf
+    }
+
+    fn __iter__(slf: Py<Self>) -> Py<Self> {
+        slf
+    }
+
+    fn __anext__<'py>(&'py mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let stream = self.stream.clone();
+        future_into_py(py, async move {
+            let res = next_stream(stream, false).await;
+            res.map(|res| serde_json::to_string(&res).unwrap_or_default())
+        })
+    }
+
+    fn __next__<'py>(&'py self, py: Python<'py>) -> PyResult<String> {
+        let runtime = get_runtime(py)?;
+        let stream = self.stream.clone();
+        runtime.block_on(async move {
+            let res = next_stream(stream, true).await;
+            res.map(|res| serde_json::to_string(&res).unwrap_or_default())
+        })
+    }
+}
+
+#[pymethods]
 impl RawStreamIterator {
     fn __aiter__(slf: Py<Self>) -> Py<Self> {
         slf
@@ -1032,6 +1282,32 @@ impl RawStreamIterator {
             res
         })
     }
+}
+
+/// Extracts every `(asset, time, price)` row for `asset` from an
+/// `updateStream`-style JSON array payload. Non-matching rows and
+/// non-array payloads are ignored.
+fn parse_stream_points(asset: &str, payload: &str) -> Vec<StreamPoint> {
+    let Ok(Value::Array(rows)) = serde_json::from_str::<Value>(payload) else {
+        return Vec::new();
+    };
+
+    rows.into_iter()
+        .filter_map(|row| {
+            let row = row.as_array()?;
+            let row_asset = row.first()?.as_str()?;
+
+            if row_asset != asset {
+                return None;
+            }
+
+            Some(StreamPoint {
+                asset: row_asset.to_string(),
+                time: row.get(1)?.as_f64()?,
+                price: row.get(2)?.as_f64()?,
+            })
+        })
+        .collect()
 }
 
 #[pymethods]
@@ -1150,5 +1426,53 @@ impl RawHandler {
 
         let stream = Arc::new(Mutex::new(boxed_stream));
         RawStreamIterator { stream }.into_bound_py_any(py)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_history_stream_mode, parse_stream_points, HistoryStreamMode};
+    use pyo3::Python;
+
+    #[test]
+    fn parses_update_stream_points_for_requested_asset() {
+        let points = parse_stream_points(
+            "EURUSD_otc",
+            r#"[["EURUSD_otc",1780724177.526,1.19234],["GBPUSD_otc",1780724177.700,1.31000]]"#,
+        );
+
+        assert_eq!(points.len(), 1);
+        assert_eq!(points[0].asset, "EURUSD_otc");
+        assert_eq!(points[0].time, 1780724177.526);
+        assert_eq!(points[0].price, 1.19234);
+    }
+
+    #[test]
+    fn ignores_non_point_payloads() {
+        assert!(parse_stream_points(
+            "EURUSD_otc",
+            r#"451-["updateStream",{"_placeholder":true,"num":0}]"#,
+        )
+        .is_empty());
+        assert!(parse_stream_points("EURUSD_otc", r#"{"asset":"EURUSD_otc"}"#).is_empty());
+    }
+
+    #[test]
+    fn subscribe_with_history_mode_accepts_points_and_ohlc_modes() {
+        assert_eq!(
+            parse_history_stream_mode("points").unwrap(),
+            HistoryStreamMode::Points
+        );
+        assert_eq!(
+            parse_history_stream_mode("ohlc").unwrap(),
+            HistoryStreamMode::Ohlc
+        );
+    }
+
+    #[test]
+    fn subscribe_with_history_mode_rejects_unknown_mode() {
+        Python::initialize();
+        let error = parse_history_stream_mode("ticks").unwrap_err().to_string();
+        assert!(error.contains("Expected 'points' or 'ohlc'"));
     }
 }

@@ -1,0 +1,8 @@
+{
+  "SubscriptionStream": {
+    "default": "Stream of real-time candles for a subscribed asset. Call `next` repeatedly to receive candles as they complete."
+  },
+  "next": {
+    "default": "Waits for and returns the next candle from the subscription stream."
+  }
+}

@@ -539,6 +539,37 @@ class PocketOption:
         """
         return self._run(self._client.history(asset, period))
 
+    def history_points(self, asset: str, period: int) -> List[Dict]:
+        """Get Pocket-style merged chart points for an asset and period.
+
+        The result combines raw tick history with synthetic points expanded
+        from the server's OHLC candles - the same point stream Pocket Option
+        builds for its own chart edge.
+
+        Args:
+            asset: The trading asset name.
+            period: The candle period in seconds.
+
+        Returns:
+            A list of point dictionaries with 'asset', 'time' and 'price'.
+        """
+        return self._run(self._client.history_points(asset, period))
+
+    def history_ohlc(self, asset: str, period: int) -> List[Dict]:
+        """Get closed OHLC candles from Pocket-style merged chart history.
+
+        The newest (still developing) candle is intentionally excluded, so
+        every candle returned is finalized.
+
+        Args:
+            asset: The trading asset name.
+            period: The candle period in seconds.
+
+        Returns:
+            A list of closed candle dictionaries with OHLC data.
+        """
+        return self._run(self._client.history_ohlc(asset, period))
+
     def compile_candles(self, asset: str, custom_period: int, lookback_period: int) -> List[Dict]:
         """Compile candles from raw data with a custom aggregation period.
 
@@ -560,66 +591,110 @@ class PocketOption:
         """Subscribe to all incoming WebSocket messages verbatim."""
         return SyncRawSubscription(self._run(self._client.subscribe_raw()))
 
-    def subscribe_symbol(self, asset: str) -> SyncSubscription:
+    def subscribe_symbol(self, asset: str, subfor: bool = True) -> SyncSubscription:
         """Subscribe to real-time price updates for a symbol.
 
         Args:
             asset: The trading asset name to subscribe to.
+            subfor: Whether to send the `subfor` frame after `changeSymbol`
+                (default True, the standard subscription). Set False to only
+                switch the chart symbol and rely on the passive updateStream feed.
 
         Returns:
             A SyncSubscription for iterating over price updates.
         """
 
         async def _sub():
-            return await self._client.client.subscribe_symbol(asset)
+            return await self._client.client.subscribe_symbol(asset, subfor)
 
         return SyncSubscription(self._run(_sub()))
 
-    def subscribe_symbol_chunked(self, asset: str, chunk_size: int) -> SyncSubscription:
+    def subscribe_symbol_chunked(self, asset: str, chunk_size: int, subfor: bool = True) -> SyncSubscription:
         """Subscribe to real-time price updates with chunked delivery.
 
         Args:
             asset: The trading asset name to subscribe to.
             chunk_size: The number of updates per chunk.
+            subfor: Whether to send the `subfor` frame (default True).
 
         Returns:
             A SyncSubscription for iterating over batched price updates.
         """
 
         async def _sub():
-            return await self._client.client.subscribe_symbol_chunked(asset, chunk_size)
+            return await self._client.client.subscribe_symbol_chunked(asset, chunk_size, subfor)
 
         return SyncSubscription(self._run(_sub()))
 
-    def subscribe_symbol_timed(self, asset: str, time: timedelta) -> SyncSubscription:
+    def subscribe_symbol_timed(self, asset: str, time: timedelta, subfor: bool = True) -> SyncSubscription:
         """Subscribe to periodic real-time price updates.
 
         Args:
             asset: The trading asset name to subscribe to.
             time: The interval between updates.
+            subfor: Whether to send the `subfor` frame (default True).
 
         Returns:
             A SyncSubscription for iterating over timed price updates.
         """
 
         async def _sub():
-            return await self._client.client.subscribe_symbol_timed(asset, time)
+            return await self._client.client.subscribe_symbol_timed(asset, time, subfor)
 
         return SyncSubscription(self._run(_sub()))
 
-    def subscribe_symbol_time_aligned(self, asset: str, time: timedelta) -> SyncSubscription:
+    def subscribe_symbol_time_aligned(self, asset: str, time: timedelta, subfor: bool = True) -> SyncSubscription:
         """Subscribe to time-aligned periodic price updates.
 
         Args:
             asset: The trading asset name to subscribe to.
             time: The interval between updates, aligned to the clock.
+            subfor: Whether to send the `subfor` frame (default True).
 
         Returns:
             A SyncSubscription for iterating over time-aligned price updates.
         """
 
         async def _sub():
-            return await self._client.client.subscribe_symbol_time_aligned(asset, time)
+            return await self._client.client.subscribe_symbol_time_aligned(asset, time, subfor)
+
+        return SyncSubscription(self._run(_sub()))
+
+    def subscribe_points(self, asset: str) -> SyncSubscription:
+        """Subscribe to raw Pocket `updateStream` price points for an asset.
+
+        Uses a raw handler with a keep-alive so the point feed survives
+        reconnections. Yields `{asset, time, price}` dictionaries.
+
+        Args:
+            asset: The trading asset name to subscribe to.
+
+        Returns:
+            A SyncSubscription for iterating over raw price points.
+        """
+
+        async def _sub():
+            return await self._client.client.subscribe_points(asset)
+
+        return SyncSubscription(self._run(_sub()))
+
+    def subscribe_with_history_mode(self, asset: str, period: int, mode: str = "points") -> SyncSubscription:
+        """Subscribe to chart history followed by matching live updateStream rows.
+
+        Opens a lazy chart stream with a single `changeSymbol` request: the
+        history bootstrap is yielded first, then live rows for the same asset.
+
+        Args:
+            asset: The trading asset name to subscribe to.
+            period: The candle period in seconds.
+            mode: "points" for raw points or "ohlc" for closed candles.
+
+        Returns:
+            A SyncSubscription for iterating over history and live events.
+        """
+
+        async def _sub():
+            return await self._client.client.subscribe_with_history_mode(asset, period, mode)
 
         return SyncSubscription(self._run(_sub()))
 

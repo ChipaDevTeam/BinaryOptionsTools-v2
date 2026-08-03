@@ -8,5 +8,5 @@
 *.dylib
 *.so
 
-# Generated JSON docs (regenerate with docs:build)
-/docs_json/
+# NOTE: docs_json/ is intentionally tracked: the uniffi_doc proc macro reads
+# these files at compile time, so the crate cannot build without them.

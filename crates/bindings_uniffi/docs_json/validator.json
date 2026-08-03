@@ -1,0 +1,32 @@
+{
+  "Validator": {
+    "default": "Message filter used by raw handlers to decide which incoming WebSocket frames match. Validators can be combined with `all`, `any` and `ne`."
+  },
+  "new": {
+    "default": "Creates a validator that matches every message."
+  },
+  "regex": {
+    "default": "Creates a validator that matches messages against a regular expression."
+  },
+  "contains": {
+    "default": "Creates a validator that matches messages containing the given substring."
+  },
+  "starts_with": {
+    "default": "Creates a validator that matches messages starting with the given prefix."
+  },
+  "ends_with": {
+    "default": "Creates a validator that matches messages ending with the given suffix."
+  },
+  "ne": {
+    "default": "Creates a validator that matches messages the given validator does NOT match."
+  },
+  "all": {
+    "default": "Creates a validator that matches only when every given validator matches."
+  },
+  "any": {
+    "default": "Creates a validator that matches when at least one of the given validators matches."
+  },
+  "check": {
+    "default": "Returns true if the given message matches this validator."
+  }
+}

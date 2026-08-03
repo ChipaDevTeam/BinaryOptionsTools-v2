@@ -16,7 +16,10 @@ use error::{
 };
 use framework::{PyBot, PyContext, PyStrategy, PyVirtualMarket};
 use logs::{start_tracing, LogBuilder, Logger, StreamLogsIterator, StreamLogsLayer};
-use pocketoption::{RawHandle, RawHandler, RawPocketOption, RawStreamIterator, StreamIterator};
+use pocketoption::{
+    HistoryStreamIterator, PointStreamIterator, RawHandle, RawHandler, RawPocketOption,
+    RawStreamIterator, StreamIterator,
+};
 use pyo3::prelude::*;
 use validator::RawValidator;
 
@@ -31,6 +34,8 @@ fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Logger>()?;
     m.add_class::<LogBuilder>()?;
     m.add_class::<StreamIterator>()?;
+    m.add_class::<PointStreamIterator>()?;
+    m.add_class::<HistoryStreamIterator>()?;
     m.add_class::<RawStreamIterator>()?;
     m.add_class::<RawValidator>()?;
     m.add_class::<RawHandle>()?;
@@ -74,7 +79,8 @@ mod tests {
 
     #[test]
     fn test_py_config_defaults() {
+        // Mirrors binary_options_tools::config::Config::default().
         let config = PyConfig::default();
-        assert_eq!(config.inner.max_allowed_loops, 0);
+        assert_eq!(config.inner.max_allowed_loops, 100);
     }
 }

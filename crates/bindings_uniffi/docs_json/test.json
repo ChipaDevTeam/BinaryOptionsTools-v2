@@ -1,0 +1,5 @@
+{
+  "test": {
+    "default": "Test documentation entry used by the bo2_macros unit tests."
+  }
+}

@@ -1,7 +1,4 @@
-use crate::{
-    pocketoption::utils::try_connect,
-    pocketoption::state::State,
-};
+use crate::{pocketoption::state::State, pocketoption::utils::try_connect};
 use binary_options_tools_core::{
     connector::{Connector, ConnectorError, ConnectorResult},
     reimports::{MaybeTlsStream, WebSocketStream},
@@ -139,7 +136,12 @@ mod tests {
         let ssid = Ssid::parse(
             r#"42["auth",{"sessionToken":"test","uid":0,"platform":2,"currentUrl":"demo","isFastHistory":false,"isOptimized":true}]"#
         ).unwrap();
-        let state = Arc::new(crate::pocketoption::state::StateBuilder::default().ssid(ssid).build().unwrap());
+        let state = Arc::new(
+            crate::pocketoption::state::StateBuilder::default()
+                .ssid(ssid)
+                .build()
+                .unwrap(),
+        );
         let result = rt.block_on(async { connector.connect_multiple(vec![], state).await });
         assert!(result.is_err());
     }
