@@ -35,6 +35,12 @@ ENV CC_aarch64_linux_android=aarch64-linux-android21-clang \
     CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=aarch64-linux-android21-clang \
     BINDGEN_EXTRA_CLANG_ARGS_aarch64_linux_android="--sysroot=$NDK_TOOLCHAIN/sysroot"
 
+# The NDK has no libpython; provide an empty stub so `-lpython3` resolves.
+# Symbols are provided at runtime by the Python embedded in the Android app.
+RUN mkdir -p /opt/python-stub && \
+    echo "" | aarch64-linux-android21-clang -shared -nostdlib -x c - -o /opt/python-stub/libpython3.so
+ENV RUSTFLAGS="-L /opt/python-stub -C link-arg=-Wl,--allow-shlib-undefined"
+
 WORKDIR /app
 COPY . .
 
