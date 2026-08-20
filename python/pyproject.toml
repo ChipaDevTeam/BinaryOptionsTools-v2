@@ -37,6 +37,7 @@ test = [
     "pytest",
     "pytest-asyncio",
     "pytest-timeout",
+    "python-dotenv",
 ]
 [project.urls]
 Homepage = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/"

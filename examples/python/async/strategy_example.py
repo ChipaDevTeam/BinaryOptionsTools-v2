@@ -40,7 +40,7 @@ class MyRSIStrategy(PyStrategy):
 
 
 async def main():
-    start_tracing("info")
+    start_tracing(".", "info", True, [])
 
     ssid = os.getenv("POCKET_OPTION_SSID")
     if not ssid:
@@ -49,7 +49,7 @@ async def main():
 
     print("Connecting to PocketOption...")
     client = await RawPocketOption.create(ssid)
-
+    await asyncio.sleep(5)
     strategy = MyRSIStrategy()
     bot = PyBot(client, strategy)
 

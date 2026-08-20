@@ -80,6 +80,7 @@ async def main():
         return
 
     client = await RawPocketOption.create(ssid)
+    await asyncio.sleep(5)
     strategy = DashboardStrategy()
     bot = PyBot(client, strategy)
     bot.add_asset("EURUSD_otc", 60)
@@ -96,7 +97,9 @@ async def main():
         layout["footer"].update(Panel("Press Ctrl+C to exit"))
 
         # Start bot in background
-        bot_task = asyncio.create_task(bot.run())
+        async def run_bot():
+            await bot.run()
+        bot_task = asyncio.create_task(run_bot())
 
         try:
             while True:

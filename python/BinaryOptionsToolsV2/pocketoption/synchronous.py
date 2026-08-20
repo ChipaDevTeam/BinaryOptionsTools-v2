@@ -25,19 +25,6 @@ class SyncSubscription:
         return json.loads(next(self.subscription))
 
 
-class SyncRawSubscription:
-    def __init__(self, subscription):
-        self.subscription = subscription
-
-    def __iter__(self):
-        return self
-
-    def __aiter__(self):
-        return self.subscription
-
-    def __next__(self):
-        return next(self.subscription)
-
 
 class SyncCandleLiveIterator:
     """Synchronous iterator for live candle updates."""
@@ -304,7 +291,7 @@ class PocketOption:
         Args:
             asset: The trading asset name.
             period: The candle period in seconds.
-            offset: The offset from the current time in seconds.
+            offset: The number of periods to look back.
 
         Returns:
             A list of candle dictionaries.
@@ -322,8 +309,10 @@ class PocketOption:
             DeprecationWarning,
             stacklevel=2,
         )
-        hours = max(0.1, offset / 3600.0)
-        iterator = self.get_candles_live(asset, period, hours=hours)
+        # offset = number of periods back, period = candle timeframe in seconds
+        lookback_seconds = offset * period
+        hours = max(0.1, lookback_seconds / 3600.0)
+        iterator = self.get_candles_live(asset, period, hours=hours, max_rows=offset)
         closed, forming = next(iterator)
         return closed
 
@@ -371,7 +360,10 @@ class PocketOption:
             DeprecationWarning,
             stacklevel=2,
         )
-        iterator = self.get_candles_live(asset, period, hours=2.0)
+        # period = candle timeframe in seconds, default 2 hours lookback
+        lookback_seconds = 2 * 3600
+        hours = max(0.1, lookback_seconds / 3600.0)
+        iterator = self.get_candles_live(asset, period, hours=hours)
         closed, forming = next(iterator)
         return closed
 

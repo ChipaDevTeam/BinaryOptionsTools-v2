@@ -5,7 +5,7 @@ import sys
 import time
 import warnings
 from collections import deque
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union, AsyncGenerator
 
 from ..config import Config
@@ -492,8 +492,8 @@ class PocketOptionAsync:
 
         Args:
             asset (str): Trading asset (e.g., "EURUSD_otc")
-            period (int): Historical period in seconds to fetch
-            offset (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
+            period (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
+            offset (int): Number of periods to look back (e.g., 200 for 200 candles)
 
         Returns:
             List[Dict]: List of candles, each containing:
@@ -518,8 +518,11 @@ class PocketOptionAsync:
             DeprecationWarning,
             stacklevel=2,
         )
-        hours = max(0.1, offset / 3600.0)
-        gen = self.get_candles_live(asset, period, hours=hours)
+        # offset = number of periods back, period = candle timeframe in seconds
+        # Convert to hours for get_candles_live: offset * period seconds = total lookback seconds
+        lookback_seconds = offset * period
+        hours = max(0.1, lookback_seconds / 3600.0)
+        gen = self.get_candles_live(asset, period, hours=hours, max_rows=offset)
         closed, forming = await anext(gen)
         return closed
 
@@ -743,7 +746,9 @@ class PocketOptionAsync:
                 await reader_task
             except asyncio.CancelledError:
                 pass
-            await self.unsubscribe(asset)
+            # Do NOT call self.unsubscribe(asset) here - it removes ALL subscriptions for the asset.
+            # The temporary subscription created by subscribe_symbol() will be cleaned up
+            # when the stream variable goes out of scope (its Drop sends Unsubscribe for that specific ID).
 
     async def balance(self) -> float:
         """
@@ -755,6 +760,11 @@ class PocketOptionAsync:
         Note:
             Updates in real-time as trades are completed
         """
+        for _ in range(100):
+            bal = await self.client.balance()
+            if bal >= 0.0:
+                return bal
+            await asyncio.sleep(0.1)
         return await self.client.balance()
 
     async def opened_deals(self) -> List[str]:
