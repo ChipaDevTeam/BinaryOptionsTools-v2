@@ -1,0 +1,9 @@
+# Test dependencies
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-timeout>=2.1.0
+
+# Documentation dependencies
+mkdocs-material>=9.5.0
+pymdown-extensions>=10.7.0
+mkdocstrings[python]>=0.24.0
