@@ -9,9 +9,8 @@ RUN yum install -y cmake clang || (apt-get update && apt-get install -y cmake cl
 WORKDIR /io
 COPY . .
 
-RUN maturin build --release --strip \
-    -m python/pyproject.toml \
-    -o /io/dist
+WORKDIR /io/python
+RUN maturin build --release --strip -o /io/dist
 
 # Export stage: contains only the built wheel(s)
 FROM scratch AS export

@@ -38,9 +38,9 @@ ENV CC_aarch64_linux_android=aarch64-linux-android21-clang \
 WORKDIR /app
 COPY . .
 
+WORKDIR /app/python
 RUN maturin build --release --strip \
     --target aarch64-linux-android \
-    -m python/pyproject.toml \
     -o /app/dist
 
 # Export stage: contains only the built wheel(s)
