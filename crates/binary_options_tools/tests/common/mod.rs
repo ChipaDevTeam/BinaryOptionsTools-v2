@@ -1,4 +1,3 @@
-#![allow(unused_imports, dead_code, unused_variables)]
 use binary_options_tools_core::{
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, RunnerCommand},
@@ -9,14 +8,14 @@ use std::sync::Arc;
 use tokio::time::timeout;
 use uuid::Uuid;
 
-use crate::pocketoption::{
+use binary_options_tools::pocketoption::{
     error::{PocketError, PocketResult},
     ssid::{Real, SessionData, Ssid as PocketSsid},
     state::{State, StateBuilder, TradeState},
     types::{Action, Deal, FailOpenOrder, OpenOrder, RequestId},
 };
 
-use crate::pocketoption::modules::trades::{
+use binary_options_tools::pocketoption::modules::trades::{
     Command, CommandResponse, TradesApiModule, TradesHandle,
 };
 

@@ -87,7 +87,7 @@ Key Features of PocketOptionAsync
  - **Market Data**:
    - `get_candles_live()`: Streams real-time gap-free candles (closed and currently forming) with historical backfill.
    - `candles()` / `get_candles()`: (Deprecated) Fetches historical candles (delegates to `get_candles_live`).
-   - `history()`: Retrieves recent data for a specific asset (delegates to `candles()`).
+   - `history()`: Retrieves recent historical data for a specific asset through the dedicated history endpoint.
    - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
 - **Account Management**:
   - `balance()`: Returns the current account balance.
@@ -161,7 +161,7 @@ Key Features of PocketOption
  - **Market Data**:
    - `get_candles_live()`: Streams real-time gap-free candles (closed and currently forming) with historical backfill.
    - `candles()` / `get_candles()`: (Deprecated) Fetches historical candles (delegates to `get_candles_live`).
-   - `history()`: Retrieves recent data for a specific asset (delegates to `candles()`).
+   - `history()`: Retrieves recent historical data for a specific asset through the dedicated history endpoint.
    - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
 - **Account Management**:
   - `balance()`: Retrieves account balance.

@@ -522,7 +522,7 @@ class PocketOptionAsync:
         # Convert to hours for get_candles_live: offset * period seconds = total lookback seconds
         lookback_seconds = offset * period
         hours = max(0.1, lookback_seconds / 3600.0)
-        gen = self.get_candles_live(asset, period, hours=hours)
+        gen = self.get_candles_live(asset, period, hours=hours, max_rows=offset)
         closed, forming = await anext(gen)
         return closed
 

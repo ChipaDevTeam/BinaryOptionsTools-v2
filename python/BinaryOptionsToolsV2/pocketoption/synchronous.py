@@ -312,7 +312,7 @@ class PocketOption:
         # offset = number of periods back, period = candle timeframe in seconds
         lookback_seconds = offset * period
         hours = max(0.1, lookback_seconds / 3600.0)
-        iterator = self.get_candles_live(asset, period, hours=hours)
+        iterator = self.get_candles_live(asset, period, hours=hours, max_rows=offset)
         closed, forming = next(iterator)
         return closed
 

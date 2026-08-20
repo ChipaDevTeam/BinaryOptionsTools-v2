@@ -49,15 +49,3 @@ pub mod raw;
 pub mod server_time;
 pub mod subscriptions;
 pub mod trades;
-
-#[cfg(test)]
-mod deals_tests;
-
-#[cfg(test)]
-mod pending_trades_tests;
-
-#[cfg(test)]
-mod resilient_parsing_tests;
-
-#[cfg(test)]
-mod trades_tests;
