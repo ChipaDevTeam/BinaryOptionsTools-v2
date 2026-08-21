@@ -77,6 +77,11 @@ pub struct State {
     pub tls_cipher_suites: Option<Vec<String>>,
     pub tls_alpn: Option<Vec<String>>,
     pub raw_subscribers: RwLock<Vec<AsyncSender<Arc<Message>>>>,
+    /// Reason the server rejected authentication, if it did (e.g. `NotAuthorized`).
+    ///
+    /// Set by the init module so that client construction can report the real cause
+    /// instead of a generic connection timeout.
+    pub auth_error: SyncRwLock<Option<String>>,
 }
 /// Builder pattern for creating State instances
 ///
@@ -193,6 +198,7 @@ impl StateBuilder {
             tls_cipher_suites: self.tls_cipher_suites,
             tls_alpn: self.tls_alpn,
             raw_subscribers: RwLock::new(Vec::new()),
+            auth_error: SyncRwLock::new(None),
         })
     }
 }
@@ -222,6 +228,18 @@ impl AppState for State {
 }
 
 impl State {
+    /// Record the reason the server rejected authentication.
+    pub fn set_auth_error(&self, reason: impl Into<String>) {
+        if let Ok(mut guard) = self.auth_error.write() {
+            *guard = Some(reason.into());
+        }
+    }
+
+    /// Return the recorded authentication rejection reason, if any.
+    pub fn auth_error(&self) -> Option<String> {
+        self.auth_error.read().ok().and_then(|g| g.clone())
+    }
+
     /// Sets the current balance.
     /// This method updates the balance in a thread-safe manner.
     ///
