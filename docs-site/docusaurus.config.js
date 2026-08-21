@@ -7,13 +7,12 @@ const config = {
   favicon: 'img/favicon.svg',
 
   // Set the production url of your site here
-  url: 'https://chipatrade.gitlab.io',
+  // Defaults to GitHub Pages; override with SITE_URL / BASE_URL for other hosts.
+  url: process.env.SITE_URL || 'https://chipadevteam.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
-  // For GitLab Pages deployment, it is often '/<projectName>/'
-  baseUrl: '/chipadevorg/BinaryOptionsTools-v2/',
+  baseUrl: process.env.BASE_URL || '/BinaryOptionsTools-v2/',
 
-  // GitLab pages deployment config.
-  organizationName: 'chipadevorg',
+  organizationName: 'chipadevteam',
   projectName: 'BinaryOptionsTools-v2',
   onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
