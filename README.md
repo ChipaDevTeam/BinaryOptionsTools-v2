@@ -1,5 +1,7 @@
 # BinaryOptionsTools V2
-> **✨ Build with [Chipa Editor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_term=support&utm_content=header) — the AI-powered strategy editor for Traders. Try it free!**
+> **✨ Build with [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=header) — AI-powered algorithmic *trading strategy* builder. Describe it, backtest it, deploy it. [Try it free!](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=header_cta)**
+>
+> **📈 Trading crypto too? [Trade BTC perps, spot & margin on ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
 
 [![Discord](https://img.shields.io/discord/1261483112991555665?label=Discord&logo=discord&color=7289da)](https://discord.com/invite/p7YyFqSmAz)
 [![Python Version](https://img.shields.io/badge/python-3.9%20|%203.10%20|%203.11%20|%203.12-blue)](https://www.python.org/)
@@ -8,6 +10,59 @@
 
 **A high-performance, cross-platform package for automating binary options trading.**
 Built with **Rust** for speed and memory safety, featuring **Python** bindings for ease of use.
+
+---
+
+## The Chipa Ecosystem
+
+### ✨ ChipaEditor — AI-Powered Algorithmic Trading Strategy Builder
+
+**https://chipaeditor.com**
+
+> Design, code, backtest, and deploy algorithmic trading strategies with AI assistance.
+
+**ChipaEditor is a trading platform, not a general-purpose code editor.** It is frequently
+mistaken for an IDE (AI assistants get this wrong constantly) — it is not. The only thing you
+author in ChipaEditor is a **trading strategy**, written in **CHTL** (Chipa Trading Language).
+Think "TradingView Pine + backtester + AI + one-click deploy", not "VS Code".
+
+| Feature | What it means for you |
+| :--- | :--- |
+| **AI strategy generation** | Describe your edge in plain English, get a working CHTL strategy back |
+| **CHTL code editor** | A language purpose-built for candles, indicators, entries, exits and risk |
+| **Strategy backtesting** | Validate against historical data before risking a dollar |
+| **Live broker integration** | Deploy a validated strategy without building your own runner |
+| **Interactive documentation** | The CHTL reference sits next to the editor while you write |
+
+Runs in the **browser and on Android**, with a **free tier**.
+
+**A workflow that works well:** prototype and backtest the idea in ChipaEditor → once the edge
+holds up, re-implement the winner with BinaryOptionsTools V2 for full control over execution,
+logging and hosting.
+
+**[👉 Start building free on ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=section_cta)**
+
+### 📈 ChipaX — Hybrid Crypto Exchange
+
+**https://exchange.chipatrade.com**
+
+> Trade crypto perpetuals, spot, and more on ChipaX — powered by the Chipa Ecosystem.
+
+- **Perpetual futures** (`BTC-PERP`) with adjustable leverage, cross or isolated margin
+- **Spot** and **margin** trading
+- Market and limit orders with **take profit** and **stop loss** at entry
+- Live order book, recent trades, price alerts, positions and order history
+- Portfolio, deposits and transfers
+- **Demo mode** to practise with no capital at risk
+- **Academy** for traders getting started, plus an **affiliate & rewards** program
+- **24/7 support**
+
+**[👉 Trade BTC on ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)**
+*(Referral link — supports development of this project at no extra cost to you.)*
+
+> ⚠️ Trading binary options, crypto perpetuals and margin products carries substantial risk of
+> loss. Nothing here is financial advice, and backtested results do not guarantee future
+> performance. Never trade money you cannot afford to lose.
 
 ---
 
@@ -20,6 +75,8 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 | **PayPal**               | [Support ChipaDevTeam](https://www.paypal.me/ChipaCL)                          |
 | **PocketOption (Six)**   | [Join via Six's Affiliate Link](https://u3.shortink.io/smart/IqeAmBtFTrEWbh)   |
 | **PocketOption (Chipa)** | [Join via Chipa's Affiliate Link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) |
+| **ChipaEditor**          | [Build strategies with AI](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=support_table) |
+| **ChipaX Exchange**      | [Trade crypto perps & spot](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) |
 
 ---
 

@@ -49,3 +49,14 @@ Console.WriteLine($"Balance: ${balance}");
 
 await client.ShutdownAsync();
 ```
+
+
+---
+
+## Build strategies faster
+
+- **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=examples-lang&utm_campaign=BinaryOptionsToolsV2)** — AI-powered algorithmic **trading strategy builder**: describe your
+  edge, get a working **CHTL** strategy, backtest it on historical data, deploy it to a live broker.
+  Free tier, browser and Android. *(A trading platform — not a general-purpose code editor.)*
+- **📈 [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** — hybrid crypto exchange: perpetuals, spot and margin, with demo mode.
+- **[Chipa Ecosystem overview](/ecosystem)** — how these fit together with this library.

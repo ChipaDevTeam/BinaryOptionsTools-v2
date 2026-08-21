@@ -5,6 +5,15 @@ slug: /overview
 
 # Documentation Overview
 
+:::tip Part of the Chipa Ecosystem
+Alongside this library, ChipaDevTeam builds
+**[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=overview&utm_campaign=BinaryOptionsToolsV2)** — an AI-powered **algorithmic trading strategy
+builder** (AI strategy generation, CHTL editor, backtesting, live broker integration; free tier) —
+and **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** — a hybrid crypto exchange for perpetuals, spot and margin.
+See the [Chipa Ecosystem overview](/ecosystem).
+:::
+
+
 BinaryOptionsTools v2 features a modern, comprehensive documentation system built with Docusaurus. This system provides a dynamic, searchable, and maintainable documentation site.
 
 ## Documentation Structure
