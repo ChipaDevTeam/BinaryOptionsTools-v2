@@ -150,3 +150,60 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--ifm-color-primary-dark);
 }
+/* ---------------------------------------------------------------
+   Chipa Ecosystem call-to-action styling (ChipaEditor / ChipaX)
+   --------------------------------------------------------------- */
+.navbar-cta-editor,
+.navbar-cta-exchange {
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem !important;
+  margin-left: 0.4rem;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.navbar-cta-editor {
+  color: #06202a !important;
+  background: linear-gradient(135deg, #22d3ee 0%, #38bdf8 100%);
+}
+
+.navbar-cta-exchange {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
+}
+
+.navbar-cta-editor:hover,
+.navbar-cta-exchange:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+/* Keep the CTAs readable but unobtrusive on small screens */
+@media (max-width: 996px) {
+  .navbar-cta-editor,
+  .navbar-cta-exchange {
+    background: none;
+    color: var(--ifm-navbar-link-color) !important;
+    padding: var(--ifm-navbar-item-padding-vertical)
+      var(--ifm-navbar-item-padding-horizontal) !important;
+    margin-left: 0;
+  }
+}
+
+/* Footer promo links */
+.footer__link-item[href*='chipaeditor.com'],
+.footer__link-item[href*='exchange.chipatrade.com'] {
+  font-weight: 600;
+}
+
+/* Announcement bar */
+div[class^='announcementBar_'] {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+div[class^='announcementBar_'] a {
+  color: inherit;
+  text-decoration: underline;
+}
