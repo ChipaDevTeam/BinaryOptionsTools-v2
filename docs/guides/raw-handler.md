@@ -1,5 +1,13 @@
 # Raw Handler & Validator Examples
 
+:::tip When you need less control, not more
+The raw handler is the deepest level of this library — for cases the high-level API cannot express.
+If what you actually want is a strategy that runs, **[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=guide-raw&utm_campaign=BinaryOptionsToolsV2)**
+handles generation, backtesting and live deployment for you. See the
+[Chipa Ecosystem](/ecosystem) for how the two fit together.
+:::
+
+
 This document shows how to use the raw handler and validator features in `BinaryOptionsToolsV2`.
 
 ## Table of Contents

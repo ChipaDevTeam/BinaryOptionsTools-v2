@@ -77,6 +77,8 @@ pages:
     - linux
   variables:
     HUSKY: "0"
+    SITE_URL: "https://chipatrade.gitlab.io"
+    BASE_URL: "/chipadevorg/BinaryOptionsTools-v2/"
   before_script:
     - cd docs-site
     - npm ci

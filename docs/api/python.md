@@ -4,6 +4,14 @@ sidebar_position: 2
 
 # BinaryOptionsToolsV2 Python API Reference
 
+:::tip Prototype before you implement
+Before writing a few hundred lines against this API, sketch the strategy in
+**[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=api-python&utm_campaign=BinaryOptionsToolsV2)** — AI drafts it in CHTL, the built-in backtester tells
+you whether the edge is real, and only then is it worth building here properly.
+[Try it free →](https://chipaeditor.com/?utm_source=docs&utm_medium=api-python&utm_campaign=BinaryOptionsToolsV2&utm_content=cta)
+:::
+
+
 Complete reference guide for all features and methods available in the BinaryOptionsToolsV2 Python library.
 
 ## Async Client

@@ -1,5 +1,14 @@
 # Python Trading Bot Guide - PyStrategy Framework
 
+:::tip Two ways to run a strategy
+This guide builds a bot in Python with PyStrategy — maximum control, your own hosting.
+**[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=guide-pystrategy&utm_campaign=BinaryOptionsToolsV2)** is the other path: describe the strategy, let
+the AI write it in **CHTL**, backtest it, and deploy to a live broker without running any
+infrastructure. Prototype there, productionise here.
+**[Try ChipaEditor free →](https://chipaeditor.com/?utm_source=docs&utm_medium=guide-pystrategy&utm_campaign=BinaryOptionsToolsV2&utm_content=cta)**
+:::
+
+
 Complete guide for building an advanced Pocket Option trading bot using the PyStrategy framework with async support.
 
 ## Table of Contents

@@ -1,5 +1,10 @@
 # BinaryOptionsToolsV2 - Python Package
 
+> **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=pyo3) — AI-powered algorithmic *trading strategy* builder: describe your edge, get working CHTL code, backtest it, deploy it. Free to start.**
+>
+> **📈 Trade crypto perps, spot & margin on [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
+
+
 [![Discord](https://img.shields.io/discord/your-discord-id?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/T3FGXcmd)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://pypi.org/project/binaryoptionstoolsv2/)
 

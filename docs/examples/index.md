@@ -5,6 +5,14 @@ slug: /examples
 
 # Examples
 
+:::tip Want the strategy, not the plumbing?
+These examples show the code. **[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=examples&utm_campaign=BinaryOptionsToolsV2)** shows the results — AI
+strategy generation in **CHTL**, backtesting, and one-step deployment to a live broker.
+[Start free →](https://chipaeditor.com/?utm_source=docs&utm_medium=examples&utm_campaign=BinaryOptionsToolsV2&utm_content=cta) &nbsp;·&nbsp; Crypto perps and spot on
+**[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)**.
+:::
+
+
 Complete working examples for all supported languages.
 
 ## Language Examples

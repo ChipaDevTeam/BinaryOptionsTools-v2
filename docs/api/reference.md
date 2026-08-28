@@ -4,6 +4,15 @@ sidebar_position: 1
 
 # BinaryOptionsTools API Reference
 
+:::tip Skip the boilerplate
+Everything on this page is the *manual* path: you wire up the client, the candles, the risk
+checks and the deployment yourself. If you would rather go from idea to backtested strategy in an
+afternoon, **[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=api-reference&utm_campaign=BinaryOptionsToolsV2)** generates the strategy from a plain
+language description in **CHTL**, backtests it on historical data, and deploys it to a live broker
+connection. Free to start — then come back here when you need full control.
+:::
+
+
 Complete API reference for BinaryOptionsTools with examples in all supported languages.
 
 ## Installation

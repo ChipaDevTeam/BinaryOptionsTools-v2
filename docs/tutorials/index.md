@@ -5,6 +5,15 @@ slug: /tutorials
 
 # Tutorials
 
+:::tip New to algorithmic trading?
+Start by proving an idea works before you automate it.
+**[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=tutorials&utm_campaign=BinaryOptionsToolsV2)** — our AI-powered strategy builder — generates a
+strategy from your description, backtests it, and deploys it, all in the browser (free tier).
+Then come back here to build the same thing with full control.
+Want crypto markets too? **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** has a demo mode to practise on.
+:::
+
+
 Step-by-step guides for getting started with BinaryOptionsTools.
 
 ## Getting Your PocketOption SSID

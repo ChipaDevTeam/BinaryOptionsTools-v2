@@ -1,0 +1,7 @@
+target/
+dist/
+node_modules/
+docs-site/
+.git/
+**/__pycache__/
+*.whl

@@ -11,6 +11,10 @@ use tracing::{debug, warn};
 
 use crate::pocketoption::state::State;
 
+/// Socket.IO event names the server emits when it refuses the auth payload.
+/// These are terminal: the server follows them with a disconnect (41).
+const AUTH_REJECTED_EVENTS: [&str; 3] = ["NotAuthorized", "notAuthorized", "auth_error"];
+
 const SID_BASE: &str = r#"0{"sid":"#;
 const SID: &str = r#"40{"sid":"#;
 
@@ -23,6 +27,32 @@ pub struct InitModule {
 
 pub struct KeepAliveModule {
     ws_sender: AsyncSender<Message>,
+}
+
+impl InitModule {
+    /// Handle an explicit authentication rejection from the server.
+    ///
+    /// Records the reason on the shared state so client construction can surface it
+    /// instead of a generic timeout, then shuts the runner down.
+    async fn reject_auth(&self, event: &str) -> CoreResult<()> {
+        let reason = format!(
+            "Server rejected the session with `{event}`. The SSID is invalid, expired,              or bound to a different IP/user agent. Generate a fresh SSID and retry."
+        );
+        tracing::error!(target: "InitModule", "{}", reason);
+
+        // Log public IP on rejection to help user identify IP mismatch issues
+        if let Ok(ip) = crate::pocketoption::utils::get_public_ip().await {
+            tracing::warn!(target: "InitModule", "Session rejected while connecting from public IP: {}", ip);
+        }
+
+        self.state.set_auth_error(reason.clone());
+
+        if let Err(e) = self.runner_command_tx.send(RunnerCommand::Shutdown).await {
+            warn!(target: "InitModule", "Failed to send shutdown command to runner: {}", e);
+        }
+
+        Err(CoreError::SsidParsing(reason))
+    }
 }
 
 #[async_trait]
@@ -68,6 +98,9 @@ impl LightweightModule<State> for InitModule {
                         Message::Close(_) => {
                             if !authenticated {
                                 tracing::error!(target: "InitModule", "Connection closed before authentication was completed. Session may be invalid.");
+                                self.state.set_auth_error(
+                                    "Connection closed before authentication completed; the session may be invalid or expired.",
+                                );
                                 let _ = self.runner_command_tx.send(RunnerCommand::Shutdown).await;
                             }
                         }
@@ -128,10 +161,9 @@ impl LightweightModule<State> for InitModule {
                             }
 
                             // If we get 41, it's a permanent rejection for this session
-                            return Err(CoreError::SsidParsing(format!(
-                                "Server rejected session (41). Raw: {}",
-                                text
-                            )));
+                            let reason = format!("Server rejected session (41). Raw: {}", text);
+                            self.state.set_auth_error(reason.clone());
+                            return Err(CoreError::SsidParsing(reason));
                         }
 
                         if text.as_str() == "2" {
@@ -139,7 +171,7 @@ impl LightweightModule<State> for InitModule {
                             continue;
                         }
 
-                        // Handle complex event messages (successauth, etc.)
+                        // Handle complex event messages (successauth, NotAuthorized, etc.)
                         let mut trigger_auth = false;
                         if let Some(start) = text.find('[') {
                             if let Ok(value) =
@@ -149,6 +181,10 @@ impl LightweightModule<State> for InitModule {
                                     let event_name = arr.first().and_then(|v| v.as_str());
                                     if event_name == Some("successauth") {
                                         trigger_auth = true;
+                                    } else if let Some(event) = event_name
+                                        .filter(|e| AUTH_REJECTED_EVENTS.contains(e))
+                                    {
+                                        return self.reject_auth(event).await;
                                     }
                                 }
                             }
@@ -243,6 +279,9 @@ impl Rule for InitRule {
                                         self.valid.store(false, Ordering::SeqCst);
                                         return true;
                                     }
+                                } else if AUTH_REJECTED_EVENTS.contains(&event_name) {
+                                    // Explicit auth rejection, must reach the module.
+                                    return true;
                                 } else {
                                     // It's an event, but not successauth.
                                     return false;
@@ -300,5 +339,28 @@ impl LightweightModule<State> for KeepAliveModule {
             debug!(target: "LightweightModule", "Routing rule for KeepAliveModule: {msg:?}");
             false
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn init_rule_routes_auth_rejections() {
+        let rule = InitRule::new();
+        for event in AUTH_REJECTED_EVENTS {
+            let msg = Message::text(format!(r#"42["{event}"]"#));
+            assert!(
+                rule.call(&msg),
+                "`{event}` must be routed to InitModule so the rejection is surfaced"
+            );
+        }
+    }
+
+    #[test]
+    fn init_rule_ignores_unrelated_events() {
+        let rule = InitRule::new();
+        assert!(!rule.call(&Message::text(r#"42["updateAssets",{}]"#)));
     }
 }
