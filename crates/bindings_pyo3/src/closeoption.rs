@@ -8,12 +8,12 @@ use crate::error::BinaryErrorPy;
 #[pyclass(name = "RawCloseOption")]
 pub struct RawCloseOption {
     inner: CloseOption,
+    runtime: tokio::runtime::Runtime,
 }
-
 #[pymethods]
 impl RawCloseOption {
     #[new]
-    #[pyo3(signature = (token, sid, public_code, hidden_code, demo, _url, _config))]
+    #[pyo3(signature = (token, sid, public_code, hidden_code, demo, _url, config))]
     fn new(
         token: String,
         sid: String,
@@ -21,13 +21,31 @@ impl RawCloseOption {
         hidden_code: String,
         demo: bool,
         _url: String,
-        _config: Option<crate::config::PyConfig>,
+        config: Option<crate::config::PyConfig>,
     ) -> PyResult<Self> {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let client = rt.block_on(async {
-            CloseOption::new(token, sid, public_code, hidden_code, demo).await
+            let mut builder = binary_options_tools::closeoption::State::builder()
+                .token(token)
+                .sid(sid)
+                .public_code(public_code)
+                .hidden_code(hidden_code)
+                .demo(demo);
+            if let Some(cfg) = config {
+                if let Some(proxy) = cfg.proxy {
+                    builder = builder.proxy(proxy);
+                }
+                if let Some(user_agent) = cfg.user_agent {
+                    builder = builder.user_agent(user_agent);
+                }
+                if let Some(origin) = cfg.origin {
+                    builder = builder.origin(origin);
+                }
+            }
+            let state = builder.build().map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            CloseOption::from_state(state).await
         }).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        Ok(Self { inner: client })
+        Ok(Self { inner: client, runtime: rt })
     }
 
     fn connect(&mut self) -> PyResult<()> {
@@ -209,12 +227,59 @@ impl RawCloseOption {
             Python::attach(|py| deal.into_py_any(py))
         })
     }
+    pub fn get_candles_live<'py>(&self, py: Python<'py>, asset: String, period: u32) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .get_candles_live(&asset, period)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| deal.into_py_any(py))
+        })
+    }
 
-    pub fn reconnect<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    pub fn subscribe_symbol<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .subscribe_symbol(&symbol)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| deal.into_py_any(py))
+        })
+    }
+
+    pub fn subscribe_raw<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .subscribe_raw()
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| deal.into_py_any(py))
+        })
+    }
+
+    pub fn raw_handler<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .raw_handler()
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| deal.into_py_any(py))
+        })
+    }
+
+    pub fn shutdown<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
         future_into_py(py, async move {
             client
-                .reconnect()
+                .shutdown()
                 .await
                 .map_err(BinaryErrorPy::from)?;
             Python::attach(|py| ().into_py_any(py))

@@ -47,7 +47,6 @@ REM Check for saved session
 set "SESSION_FILE=%USERPROFILE%\.closeoption_session.json"
 if exist "%SESSION_FILE%" (
     echo Found saved session: %SESSION_FILE%
-    type "%SESSION_FILE%"
     echo.
     echo To export:
     echo   set CLOSEOPTION_SSID=...

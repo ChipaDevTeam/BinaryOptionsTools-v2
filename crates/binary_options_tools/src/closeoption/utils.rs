@@ -119,93 +119,100 @@ where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use crate::closeoption::utils::per_url_connect_timeout;
 
-    if let Some((_user, _pass)) = &auth {
-        stream.write_all(&[0x05, 0x02, 0x00, 0x02]).await
-            .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting send failed: {e}")))?;
-    } else {
-        stream.write_all(&[0x05, 0x01, 0x00]).await
-            .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting send failed: {e}")))?;
-    }
-
-    let mut resp = [0u8; 2];
-    stream.read_exact(&mut resp).await
-        .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting read failed: {e}")))?;
-
-    if resp[0] != 0x05 {
-        return Err(ConnectorError::Custom("Invalid SOCKS5 version".into()));
-    }
-
-    if resp[1] == 0x02 {
-        if let Some((user, pass)) = &auth {
-            let user_bytes = user.as_bytes();
-            let pass_bytes = pass.as_bytes();
-
-            let mut auth_req = Vec::new();
-            auth_req.push(0x01);
-            auth_req.push(user_bytes.len() as u8);
-            auth_req.extend_from_slice(user_bytes);
-            auth_req.push(pass_bytes.len() as u8);
-            auth_req.extend_from_slice(pass_bytes);
-
-            stream.write_all(&auth_req).await
-                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 auth failed: {e}")))?;
-
-            let mut auth_resp = [0u8; 2];
-            stream.read_exact(&mut auth_resp).await
-                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 auth read failed: {e}")))?;
-
-            if auth_resp[1] != 0x00 {
-                return Err(ConnectorError::Custom("SOCKS5 authentication failed".into()));
-            }
+    let handshake = async {
+        if let Some((_user, _pass)) = &auth {
+            stream.write_all(&[0x05, 0x02, 0x00, 0x02]).await
+                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting send failed: {e}")))?;
         } else {
-            return Err(ConnectorError::Custom("SOCKS5 proxy requested auth but no credentials provided".into()));
+            stream.write_all(&[0x05, 0x01, 0x00]).await
+                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting send failed: {e}")))?;
         }
-    } else if resp[1] != 0x00 {
-        return Err(ConnectorError::Custom("SOCKS5 authentication method rejected".into()));
-    }
 
-    let host_bytes = target_host.as_bytes();
-    let mut req = Vec::new();
-    req.extend_from_slice(&[0x05, 0x01, 0x00, 0x03, host_bytes.len() as u8]);
-    req.extend_from_slice(host_bytes);
-    req.extend_from_slice(&target_port.to_be_bytes());
+        let mut resp = [0u8; 2];
+        stream.read_exact(&mut resp).await
+            .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting read failed: {e}")))?;
 
-    stream.write_all(&req).await
-        .map_err(|e| ConnectorError::Custom(format!("SOCKS5 connect request failed: {e}")))?;
-
-    let mut resp_hdr = [0u8; 4];
-    stream.read_exact(&mut resp_hdr).await
-        .map_err(|e| ConnectorError::Custom(format!("SOCKS5 connect response read failed: {e}")))?;
-
-    if resp_hdr[1] != 0x00 {
-        return Err(ConnectorError::Custom(format!("SOCKS5 connect request failed with error code: {}", resp_hdr[1])));
-    }
-
-    match resp_hdr[3] {
-        0x01 => {
-            let mut addr = [0u8; 4 + 2];
-            stream.read_exact(&mut addr).await
-                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 address read failed: {e}")))?;
+        if resp[0] != 0x05 {
+            return Err(ConnectorError::Custom("Invalid SOCKS5 version".into()));
         }
-        0x03 => {
-            let mut len_buf = [0u8; 1];
-            stream.read_exact(&mut len_buf).await
-                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 domain len read failed: {e}")))?;
-            let mut domain_and_port = vec![0u8; len_buf[0] as usize + 2];
-            stream.read_exact(&mut domain_and_port).await
-                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 domain read failed: {e}")))?;
-        }
-        0x04 => {
-            let mut addr = [0u8; 16 + 2];
-            stream.read_exact(&mut addr).await
-                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 address read failed: {e}")))?;
-        }
-        _ => return Err(ConnectorError::Custom("Unsupported address type".into())),
-    }
 
-    Ok(())
+        if resp[1] == 0x02 {
+            if let Some((user, pass)) = &auth {
+                let user_bytes = user.as_bytes();
+                let pass_bytes = pass.as_bytes();
+
+                let mut auth_req = Vec::new();
+                auth_req.push(0x01);
+                auth_req.push(user_bytes.len() as u8);
+                auth_req.extend_from_slice(user_bytes);
+                auth_req.push(pass_bytes.len() as u8);
+                auth_req.extend_from_slice(pass_bytes);
+
+                stream.write_all(&auth_req).await
+                    .map_err(|e| ConnectorError::Custom(format!("SOCKS5 auth failed: {e}")))?;
+
+                let mut auth_resp = [0u8; 2];
+                stream.read_exact(&mut auth_resp).await
+                    .map_err(|e| ConnectorError::Custom(format!("SOCKS5 auth read failed: {e}")))?;
+
+                if auth_resp[1] != 0x00 {
+                    return Err(ConnectorError::Custom("SOCKS5 authentication failed".into()));
+                }
+            } else {
+                return Err(ConnectorError::Custom("SOCKS5 proxy requested auth but no credentials provided".into()));
+            }
+        } else if resp[1] != 0x00 {
+            return Err(ConnectorError::Custom("SOCKS5 authentication method rejected".into()));
+        }
+
+        let host_bytes = target_host.as_bytes();
+        let mut req = Vec::new();
+        req.extend_from_slice(&[0x05, 0x01, 0x00, 0x03, host_bytes.len() as u8]);
+        req.extend_from_slice(host_bytes);
+        req.extend_from_slice(&target_port.to_be_bytes());
+
+        stream.write_all(&req).await
+            .map_err(|e| ConnectorError::Custom(format!("SOCKS5 connect request failed: {e}")))?;
+
+        let mut resp_hdr = [0u8; 4];
+        stream.read_exact(&mut resp_hdr).await
+            .map_err(|e| ConnectorError::Custom(format!("SOCKS5 connect response read failed: {e}")))?;
+
+        if resp_hdr[1] != 0x00 {
+            return Err(ConnectorError::Custom(format!("SOCKS5 connect request failed with error code: {}", resp_hdr[1])));
+        }
+
+        match resp_hdr[3] {
+            0x01 => {
+                let mut addr = [0u8; 4 + 2];
+                stream.read_exact(&mut addr).await
+                    .map_err(|e| ConnectorError::Custom(format!("SOCKS5 address read failed: {e}")))?;
+            }
+            0x03 => {
+                let mut len_buf = [0u8; 1];
+                stream.read_exact(&mut len_buf).await
+                    .map_err(|e| ConnectorError::Custom(format!("SOCKS5 domain len read failed: {e}")))?;
+                let mut domain_and_port = vec![0u8; len_buf[0] as usize + 2];
+                stream.read_exact(&mut domain_and_port).await
+                    .map_err(|e| ConnectorError::Custom(format!("SOCKS5 domain read failed: {e}")))?;
+            }
+            0x04 => {
+                let mut addr = [0u8; 16 + 2];
+                stream.read_exact(&mut addr).await
+                    .map_err(|e| ConnectorError::Custom(format!("SOCKS5 address read failed: {e}")))?;
+            }
+            _ => return Err(ConnectorError::Custom("Unsupported address type".into())),
+        }
+
+        Ok(())
+    };
+
+    tokio::time::timeout(per_url_connect_timeout(), handshake).await
+        .map_err(|_| ConnectorError::Timeout)?
 }
+
 
 /// HTTP CONNECT handshake for proxy
 pub async fn http_connect_handshake<S>(
@@ -218,39 +225,45 @@ where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use crate::closeoption::utils::per_url_connect_timeout;
 
-    let mut req_str = format!("CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n");
-    if let Some((user, pass)) = &auth {
-        let creds = format!("{user}:{pass}");
-        let encoded = base64_encode(creds.as_bytes());
-        req_str.push_str(&format!("Proxy-Authorization: Basic {encoded}\r\n"));
-    }
-    req_str.push_str("\r\n");
-
-    stream.write_all(req_str.as_bytes()).await
-        .map_err(|e| ConnectorError::Custom(format!("HTTP proxy CONNECT failed: {e}")))?;
-
-    let mut header_buf = Vec::new();
-    let mut temp = [0u8; 1];
-    loop {
-        stream.read_exact(&mut temp).await
-            .map_err(|e| ConnectorError::Custom(format!("HTTP proxy read failed: {e}")))?;
-        header_buf.push(temp[0]);
-        if header_buf.ends_with(b"\r\n\r\n") {
-            break;
+    let handshake = async {
+        let mut req_str = format!("CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n");
+        if let Some((user, pass)) = &auth {
+            let creds = format!("{user}:{pass}");
+            let encoded = base64_encode(creds.as_bytes());
+            req_str.push_str(&format!("Proxy-Authorization: Basic {encoded}\r\n"));
         }
-        if header_buf.len() > 8192 {
-            return Err(ConnectorError::Custom("HTTP proxy response header too large".into()));
+        req_str.push_str("\r\n");
+
+        stream.write_all(req_str.as_bytes()).await
+            .map_err(|e| ConnectorError::Custom(format!("HTTP proxy CONNECT failed: {e}")))?;
+
+        let mut header_buf = Vec::new();
+        let mut temp = [0u8; 1];
+        loop {
+            stream.read_exact(&mut temp).await
+                .map_err(|e| ConnectorError::Custom(format!("HTTP proxy read failed: {e}")))?;
+            header_buf.push(temp[0]);
+            if header_buf.ends_with(b"\r\n\r\n") {
+                break;
+            }
+            if header_buf.len() > 8192 {
+                return Err(ConnectorError::Custom("HTTP proxy response header too large".into()));
+            }
         }
-    }
 
-    let headers_text = String::from_utf8_lossy(&header_buf);
-    let first_line = headers_text.lines().next().ok_or_else(|| ConnectorError::Custom("Empty HTTP proxy response".into()))?;
-    if !first_line.contains(" 200 ") {
-        return Err(ConnectorError::Custom(format!("HTTP proxy CONNECT rejected: {first_line}")));
-    }
+        let headers_text = String::from_utf8_lossy(&header_buf);
+        let first_line = headers_text.lines().next().ok_or_else(|| ConnectorError::Custom("Empty HTTP proxy response".into()))?;
+        if !first_line.contains(" 200 ") {
+            return Err(ConnectorError::Custom(format!("HTTP proxy CONNECT rejected: {first_line}")));
+        }
 
-    Ok(())
+        Ok(())
+    };
+
+    tokio::time::timeout(per_url_connect_timeout(), handshake).await
+        .map_err(|_| ConnectorError::Timeout)?
 }
 
 /// Parse incoming WebSocket message as Socket.IO frame

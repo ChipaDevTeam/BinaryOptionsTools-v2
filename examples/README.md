@@ -95,9 +95,9 @@ Where:
 
 These values can be extracted from your browser's network requests when logged into CloseOption.
 
-## Notes
-
 - All examples support both demo and real accounts
 - Trading operations require valid credentials and sufficient balance
-- Connection timeout is 30 seconds for all operations
+- TCP/TLS connection timeout: 15 seconds
+- WebSocket handshake timeout: 10 seconds
+- Request-response timeout: 30 seconds
 - The client automatically handles keep-alive pings

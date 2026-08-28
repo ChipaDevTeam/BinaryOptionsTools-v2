@@ -210,11 +210,11 @@ def save_ssid(ssid: str, filepath: Optional[str] = None):
         "hidden_code": hidden_code,
     }
     
-    with open(filepath, 'w') as f:
+    fd = os.open(filepath, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'w') as f:
         json.dump(data, f, indent=2)
     
     print(f"SSID saved to: {filepath}")
-
 
 def print_export_instructions():
     """Print instructions for manual SSID extraction."""

@@ -105,6 +105,10 @@ impl Connector<State> for CloseConnect {
             .map_err(|e| ConnectorError::Custom(format!("Failed to connect to proxy {proxy_host}:{proxy_port}: {e}")))?;
 
             let auth = crate::closeoption::utils::parse_auth(&proxy_url);
+            // Check if credentials are provided on clear-text proxy
+            if auth.is_some() && proxy_url.scheme() != "https" {
+                return Err(ConnectorError::Custom("Credentials not allowed on clear-text proxy".into()));
+            }
             if proxy_url.scheme() == "https" {
                 let proxy_tls_config = get_tls_config(&state.tls_cipher_suites, &state.tls_alpn)
                     .map_err(|e| ConnectorError::Custom(format!("Failed to build proxy TLS config: {e}")))?;
@@ -160,8 +164,12 @@ impl Connector<State> for CloseConnect {
                     .map_err(|_| ConnectorError::Timeout)?
                     .map_err(|e| ConnectorError::Custom(format!("TLS handshake failed: {e}")))?
                 }
-                MaybeTlsStream::Rustls(_) => {
-                    return Err(ConnectorError::Custom("Chained TLS streams are not supported".into()));
+                MaybeTlsStream::Rustls(mut proxy_tls_stream) => {
+                    // HTTPS proxy: use the TLS stream as the proxy tunnel
+                    // After HTTP CONNECT, the stream is a tunnel to the target
+                    crate::closeoption::utils::http_connect_handshake(&mut proxy_tls_stream, target_host, target_port, None).await?;
+                    // Use the TLS stream directly for WebSocket (tunnel is established)
+                    proxy_tls_stream
                 }
                 _ => {
                     return Err(ConnectorError::Custom("Unsupported stream type".into()));

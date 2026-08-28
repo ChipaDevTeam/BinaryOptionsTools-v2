@@ -119,6 +119,15 @@ pub struct SocketIoFrame {
 /// Socket.IO message types (EIO=3)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SocketIoMessageType {
+    // Engine.IO packet types
+    EngineOpen = 10,
+    EngineClose = 11,
+    EnginePing = 12,
+    EnginePong = 13,
+    EngineMessage = 14,
+    EngineUpgrade = 15,
+    EngineNoop = 16,
+    // Socket.IO packet types (when Engine.IO type is Message=4)
     Connect = 0,
     Disconnect = 1,
     Event = 2,
@@ -128,7 +137,6 @@ pub enum SocketIoMessageType {
     BinaryAck = 6,
     ConnectError = 7,
 }
-
 impl SocketIoMessageType {
     pub fn from_u8(byte: u8) -> Option<Self> {
         match byte {
@@ -140,6 +148,13 @@ impl SocketIoMessageType {
             5 => Some(SocketIoMessageType::BinaryEvent),
             6 => Some(SocketIoMessageType::BinaryAck),
             7 => Some(SocketIoMessageType::ConnectError),
+            10 => Some(SocketIoMessageType::EngineOpen),
+            11 => Some(SocketIoMessageType::EngineClose),
+            12 => Some(SocketIoMessageType::EnginePing),
+            13 => Some(SocketIoMessageType::EnginePong),
+            14 => Some(SocketIoMessageType::EngineMessage),
+            15 => Some(SocketIoMessageType::EngineUpgrade),
+            16 => Some(SocketIoMessageType::EngineNoop),
             _ => None,
         }
     }
@@ -158,50 +173,90 @@ pub mod socket_io {
             return Err(CloseOptionError::Parse("Empty frame".to_string()));
         }
         
-        // Socket.IO EIO=3 frames can have combined prefixes like "42" (Engine.IO message + Socket.IO event)
-        // The first digit is Engine.IO packet type, second is Socket.IO packet type
         let chars: Vec<char> = data.chars().collect();
-        if chars.len() < 1 {
+        if chars.is_empty() {
             return Err(CloseOptionError::Parse("Empty frame".to_string()));
         }
         
-        let first_digit = chars[0].to_digit(10)
+        // First digit is Engine.IO packet type
+        let engine_type = chars[0].to_digit(10)
             .ok_or_else(|| CloseOptionError::Parse(format!("Invalid first character: {}", chars[0])))?;
         
-        // Check if it's a combined prefix (e.g., "42" = Engine.IO message + Socket.IO event)
-        // The first digit is Engine.IO packet type, second is Socket.IO packet type
-        let (socket_io_type, rest_start) = if chars.len() >= 2 {
-            if let Some(second_digit) = chars[1].to_digit(10) {
-                // Combined prefix like "42"
-                (second_digit, 2)
-            } else {
-                // Single digit prefix
-                (first_digit, 1)
+        match engine_type {
+            // Engine.IO ping (2)
+            2 => {
+                let rest = &data[1..];
+                Ok(SocketIoFrame {
+                    message_type: SocketIoMessageType::EnginePing,
+                    namespace: None,
+                    data: rest.to_string(),
+                })
             }
-        } else {
-            // Single digit only
-            (first_digit, 1)
-        };
-        
-        let msg_type = SocketIoMessageType::from_u8(socket_io_type as u8)
-            .ok_or_else(|| CloseOptionError::Parse(format!("Invalid Socket.IO message type: {}", socket_io_type)))?;
-        
-        let rest = &data[rest_start..];
-
-        // Check for namespace (starts with '/')
-        let (namespace, payload) = if rest.starts_with('/') {
-            let end = rest.find(',').or_else(|| rest.find('[')).unwrap_or(rest.len());
-            let ns = rest[1..end].to_string();
-            (Some(ns), &rest[end..])
-        } else {
-            (None, rest)
-        };
-
-        Ok(SocketIoFrame {
-            message_type: msg_type,
-            namespace,
-            data: payload.to_string(),
-        })
+            // Engine.IO pong (3)
+            3 => {
+                let rest = &data[1..];
+                Ok(SocketIoFrame {
+                    message_type: SocketIoMessageType::EnginePong,
+                    namespace: None,
+                    data: rest.to_string(),
+                })
+            }
+            // Engine.IO upgrade (5)
+            5 => {
+                Ok(SocketIoFrame {
+                    message_type: SocketIoMessageType::EngineUpgrade,
+                    namespace: None,
+                    data: String::new(),
+                })
+            }
+            // Engine.IO message (4) - contains Socket.IO packet
+            4 => {
+                let rest = &data[1..];
+                if rest.is_empty() {
+                    return Err(CloseOptionError::Parse("Empty Socket.IO payload".to_string()));
+                }
+                let socket_io_chars: Vec<char> = rest.chars().collect();
+                let socket_io_type = socket_io_chars[0].to_digit(10)
+                    .ok_or_else(|| CloseOptionError::Parse(format!("Invalid Socket.IO type character: {}", socket_io_chars[0])))?;
+                
+                let msg_type = SocketIoMessageType::from_u8(socket_io_type as u8)
+                    .ok_or_else(|| CloseOptionError::Parse(format!("Invalid Socket.IO message type: {}", socket_io_type)))?;
+                
+                let payload = &rest[1..];
+                
+                // Check for namespace (starts with '/')
+                let (namespace, payload) = if payload.starts_with('/') {
+                    let end = payload.find(',').or_else(|| payload.find('[')).unwrap_or(payload.len());
+                    let ns = payload[1..end].to_string();
+                    (Some(ns), &payload[end..])
+                } else {
+                    (None, payload)
+                };
+                
+                Ok(SocketIoFrame {
+                    message_type: msg_type,
+                    namespace,
+                    data: payload.to_string(),
+                })
+            }
+            // Engine.IO open (0), close (1), noop (6)
+            0 => Ok(SocketIoFrame {
+                message_type: SocketIoMessageType::EngineOpen,
+                namespace: None,
+                data: data[1..].to_string(),
+            }),
+            1 => Ok(SocketIoFrame {
+                message_type: SocketIoMessageType::EngineClose,
+                namespace: None,
+                data: data[1..].to_string(),
+            }),
+            6 => Ok(SocketIoFrame {
+                message_type: SocketIoMessageType::EngineNoop,
+                namespace: None,
+                data: data[1..].to_string(),
+            }),
+            _ => Err(CloseOptionError::Parse(format!("Unknown Engine.IO packet type: {}", engine_type))),
+        }
     }
 
     /// Encode a Socket.IO EIO=3 frame
@@ -247,30 +302,38 @@ mod tests {
     #[test]
     fn test_parse_probe() {
         let frame = socket_io::parse_frame("2probe").unwrap();
-        assert_eq!(frame.message_type, SocketIoMessageType::Event);
+        assert_eq!(frame.message_type, SocketIoMessageType::EnginePing);
         assert_eq!(frame.data, "probe");
     }
 
     #[test]
     fn test_parse_upgrade() {
         let frame = socket_io::parse_frame("5").unwrap();
-        assert_eq!(frame.message_type, SocketIoMessageType::BinaryEvent);
+        assert_eq!(frame.message_type, SocketIoMessageType::EngineUpgrade);
         assert_eq!(frame.data, "");
     }
 
     #[test]
     fn test_parse_ping() {
         let frame = socket_io::parse_frame("2").unwrap();
-        assert_eq!(frame.message_type, SocketIoMessageType::Event);
+        assert_eq!(frame.message_type, SocketIoMessageType::EnginePing);
         assert_eq!(frame.data, "");
     }
 
     #[test]
+    fn test_parse_pong() {
+        let frame = socket_io::parse_frame("3probe").unwrap();
+        assert_eq!(frame.message_type, SocketIoMessageType::EnginePong);
+        assert_eq!(frame.data, "probe");
+    }
+
+    #[test]
     fn test_parse_event() {
-        let frame = socket_io::parse_frame(r#"42["priceData",{"prices":{}}]"#).unwrap();
+        let frame = socket_io::parse_frame("42[\"priceData\",{\"prices\":{}}]").unwrap();
         assert_eq!(frame.message_type, SocketIoMessageType::Event);
         assert!(frame.data.contains("priceData"));
     }
+
 
     #[test]
     fn test_encode_probe() {

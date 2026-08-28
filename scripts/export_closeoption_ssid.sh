@@ -108,7 +108,6 @@ check_saved_session() {
     
     if [[ -f "$session_file" ]]; then
         echo -e "${GREEN}Found saved session: $session_file${NC}"
-        cat "$session_file"
         return 0
     fi
     return 1
@@ -206,6 +205,7 @@ main() {
             PUB=$(echo "$SSID" | cut -d'|' -f4)
             HID=$(echo "$SSID" | cut -d'|' -f5)
             
+            umask 077
             cat > "$HOME/.closeoption_session.json" << EOF
 {
   "token": "$TOKEN",
@@ -215,10 +215,10 @@ main() {
   "hidden_code": "$HID"
 }
 EOF
+            chmod 600 "$HOME/.closeoption_session.json"
             
             echo -e "${GREEN}Session saved to: $HOME/.closeoption_session.json${NC}"
         fi
     fi
-}
 
 main "$@"

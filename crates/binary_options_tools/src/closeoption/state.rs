@@ -1,14 +1,24 @@
-use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::Mutex;
+use tokio::sync::oneshot;
 use tokio::sync::RwLock;
+use kanal;
 
 use binary_options_tools_core::traits::AppState;
 
 use crate::closeoption::error::CloseOptionError;
-use crate::closeoption::types::{Asset, PriceData};
+use crate::closeoption::types::{Asset, OrderResult, PriceData, SubscriptionEvent};
 use crate::closeoption::utils::normalize_timestamp;
-
+/// Application state for CloseOption client
+///
+/// This structure holds all the shared state for the CloseOption client,
+/// including session information, connection settings, and real-time data
+/// like balance and assets.
+///
+/// # Thread Safety
+///
+/// All fields are designed to be thread-safe, allowing concurrent access
 /// Application state for CloseOption client
 ///
 /// This structure holds all the shared state for the CloseOption client,
@@ -49,6 +59,14 @@ pub struct State {
     pub tls_alpn: Option<Vec<String>>,
     /// Sec-WebSocket-Extensions
     pub sec_websocket_extensions: Option<String>,
+    /// Pending request-response channels keyed by request ID
+    pub pending_requests: Arc<Mutex<HashMap<u64, oneshot::Sender<SubscriptionEvent>>>>,
+    /// Symbol subscriptions: symbol -> sender
+    pub subscriptions: Arc<Mutex<HashMap<String, kanal::AsyncSender<SubscriptionEvent>>>>,
+    /// Raw subscriptions: all events broadcast to all senders
+    pub raw_subscriptions: Arc<Mutex<Vec<kanal::AsyncSender<SubscriptionEvent>>>>,
+    /// Order results keyed by order ID
+    pub orders: Arc<Mutex<HashMap<String, OrderResult>>>,
 }
 
 /// Builder pattern for creating State instances
@@ -164,6 +182,10 @@ impl StateBuilder {
             tls_cipher_suites: self.tls_cipher_suites,
             tls_alpn: self.tls_alpn,
             sec_websocket_extensions: self.sec_websocket_extensions,
+            pending_requests: Arc::new(Mutex::new(HashMap::new())),
+            subscriptions: Arc::new(Mutex::new(HashMap::new())),
+            raw_subscriptions: Arc::new(Mutex::new(Vec::new())),
+            orders: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 }
@@ -263,8 +285,7 @@ impl State {
         *self.server_time_offset.write().await = 0;
     }
 }
-
-#[async_trait]
+#[async_trait::async_trait]
 impl AppState for State {
     async fn clear_temporal_data(&self) {
         self.clear_temporal_data().await;

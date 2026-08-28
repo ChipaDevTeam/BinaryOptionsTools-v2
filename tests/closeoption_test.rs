@@ -96,11 +96,12 @@ async fn test_clear_temporal_data() {
 
     // Set some data
     state.update_balance(100.0).await;
-    state.update_server_time_offset(3600).await;
+    let expected_offset = chrono::Utc::now().timestamp() + 3600;
+    state.update_server_time_offset(expected_offset).await;
 
     // Verify data is set
     assert_eq!(state.get_balance().await, Some(100.0));
-    assert_eq!(state.get_server_time_offset().await, 3600);
+    assert!((state.get_server_time_offset().await - 3600).abs() < 5);
 
     // Clear temporal data
     state.clear_temporal_data().await;

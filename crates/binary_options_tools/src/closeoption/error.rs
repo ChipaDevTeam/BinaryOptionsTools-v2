@@ -44,6 +44,9 @@ pub enum CloseOptionError {
     #[error("Configuration error: {0}")]
     Configuration(String),
 
+    #[error("Unsupported operation: {0}")]
+    Unsupported(String),
+
     #[error("General error: {0}")]
     General(String),
 

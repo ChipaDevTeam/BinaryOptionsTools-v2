@@ -118,7 +118,7 @@ class CloseOption:
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
-
+        self._closed = False
     def _run_loop(self):
         asyncio.set_event_loop(self._loop)
         self._loop.run_forever()
@@ -208,11 +208,14 @@ class CloseOption:
 
     def shutdown(self) -> None:
         """Close the connection and cleanup."""
+        if self._closed:
+            return
+        self._closed = True
         if self._async_client:
             self._run(self._async_client.shutdown())
+            self._async_client = None
         if self._loop and self._loop.is_running():
             self._loop.call_soon_threadsafe(self._loop.stop)
-
     def reconnect(self) -> None:
         """Reconnect to the server."""
         return self._run(self._async_client.reconnect())

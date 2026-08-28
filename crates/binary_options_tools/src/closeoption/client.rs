@@ -1,6 +1,4 @@
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::time::Duration;
 
 use binary_options_tools_core::{
@@ -41,13 +39,21 @@ impl LightweightModule<State> for PriceDataModule {
     async fn run(&mut self) -> CoreResult<()> {
         while let Ok(msg) = self.receiver.recv().await {
             if let Ok(text) = msg.to_text() {
-                if text.contains("priceData") {
-                    if let Some(json_start) = text.find("priceData") {
-                        let json_str = &text[json_start..];
-                        if let Some(start) = json_str.find('{') {
-                            let json_part = &json_str[start..];
-                            if let Ok(price_data) = serde_json::from_str::<PriceData>(json_part) {
-                                self.state.update_assets(&price_data).await;
+                // Parse Socket.IO frames properly
+                if let Ok(frames) = crate::closeoption::utils::parse_socket_io_message(text) {
+                    for frame in frames {
+                        if frame.message_type == crate::closeoption::types::socket_io::SocketIoMessageType::Event {
+                            // Parse event name from data: ["eventName", ...]
+                            if let Ok(event_array) = serde_json::from_str::<Vec<serde_json::Value>>(&frame.data) {
+                                if let Some(event_name) = event_array.get(0).and_then(|v| v.as_str()) {
+                                    if event_name == "priceData" {
+                                        if let Some(data_value) = event_array.get(1) {
+                                            if let Ok(price_data) = serde_json::from_value::<PriceData>(data_value.clone()) {
+                                                self.state.update_assets(&price_data).await;
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -88,13 +94,24 @@ impl LightweightModule<State> for BalanceModule {
     async fn run(&mut self) -> CoreResult<()> {
         while let Ok(msg) = self.receiver.recv().await {
             if let Ok(text) = msg.to_text() {
-                if text.contains("setOrderResult") {
-                    if let Some(json_start) = text.find("setOrderResult") {
-                        let json_str = &text[json_start..];
-                        if let Some(start) = json_str.find('{') {
-                            let json_part = &json_str[start..];
-                            if let Ok(order_result) = serde_json::from_str::<OrderResult>(json_part) {
-                                self.state.update_balance(order_result.balance).await;
+                // Parse Socket.IO frames properly
+                if let Ok(frames) = crate::closeoption::utils::parse_socket_io_message(text) {
+                    for frame in frames {
+                        if frame.message_type == crate::closeoption::types::socket_io::SocketIoMessageType::Event {
+                            // Parse event name from data: ["eventName", ...]
+                            if let Ok(event_array) = serde_json::from_str::<Vec<serde_json::Value>>(&frame.data) {
+                                if let Some(event_name) = event_array.get(0).and_then(|v| v.as_str()) {
+                                    if event_name == "setOrderResult" {
+                                        if let Some(data_value) = event_array.get(1) {
+                                            if let Ok(order_result) = serde_json::from_value::<OrderResult>(data_value.clone()) {
+                                                // Store order result in state
+                                                let mut orders = self.state.orders.lock().await;
+                                                orders.insert(order_result.order_id.clone(), order_result.clone());
+                                                self.state.update_balance(order_result.balance).await;
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -173,7 +190,6 @@ impl LightweightModule<State> for KeepAliveModule {
 pub struct CloseOption {
     client: Client<State>,
     runner: Arc<JoinHandle<()>>,
-    pending_requests: Arc<Mutex<HashMap<u64, oneshot::Sender<SubscriptionEvent>>>>,
 }
 
 /// Raw handler for advanced WebSocket operations
@@ -217,7 +233,8 @@ impl CloseOption {
         let builder = ClientBuilder::new(connector, state)
             .with_lightweight_module::<PriceDataModule>()
             .with_lightweight_module::<BalanceModule>()
-            .with_lightweight_module::<KeepAliveModule>();
+            .with_lightweight_module::<KeepAliveModule>()
+            .with_lightweight_module::<ResponseRouterModule>();
 
         let (client, mut runner) = builder.build().await
             .map_err(|e| CloseOptionError::General(format!("Failed to build client: {}", e)))?;
@@ -232,7 +249,6 @@ impl CloseOption {
         Ok(Self {
             client,
             runner: Arc::new(runner_handle),
-            pending_requests: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
@@ -244,34 +260,47 @@ impl CloseOption {
     async fn send_and_wait(&self, request: Outgoing) -> Result<SubscriptionEvent, CloseOptionError> {
         let id = get_index();
         let (tx, rx) = oneshot::channel();
+        let state = self.state();
         
-        // Register pending request
+        // Register pending request in state
         {
-            let mut pending = self.pending_requests.lock().map_err(|e| CloseOptionError::General(format!("Lock poisoned: {}", e)))?;
+            let mut pending = state.pending_requests.lock().await;
             pending.insert(id, tx);
         }
         
-        let json = serde_json::to_string(&request)
+        // Serialize request with ID
+        let mut request_value = serde_json::to_value(&request)
+            .map_err(|e| CloseOptionError::General(format!("Failed to serialize: {}", e)))?;
+        if let serde_json::Value::Object(ref mut map) = request_value {
+            map.insert("id".to_string(), serde_json::Value::Number(id.into()));
+        }
+        let json = serde_json::to_string(&request_value)
             .map_err(|e| CloseOptionError::General(format!("Failed to serialize: {}", e)))?;
         
         let frame = crate::closeoption::types::socket_io::event("message", &json);
         
-        self.client.to_ws_sender.send(Message::Text(frame.into())).await
-            .map_err(|e| CloseOptionError::General(format!("Failed to send: {}", e)))?;
+        // Send with cleanup on failure
+        if let Err(e) = self.client.to_ws_sender.send(Message::Text(frame.into())).await {
+            // Clean up pending request on send failure
+            state.pending_requests.lock().await.remove(&id);
+            return Err(CloseOptionError::General(format!("Failed to send: {}", e)));
+        }
 
         // Wait for response with timeout
         match tokio::time::timeout(Duration::from_secs(30), rx).await {
             Ok(Ok(response)) => {
                 // Clean up pending request
-                self.pending_requests.lock().map_err(|e| CloseOptionError::General(format!("Lock poisoned: {}", e)))?
-                    .remove(&id);
+                state.pending_requests.lock().await.remove(&id);
                 Ok(response)
             },
-            Ok(Err(_)) => Err(CloseOptionError::General("Response channel closed".to_string())),
+            Ok(Err(_)) => {
+                // Clean up on channel error
+                state.pending_requests.lock().await.remove(&id);
+                Err(CloseOptionError::General("Response channel closed".to_string()))
+            },
             Err(_) => {
                 // Clean up on timeout
-                self.pending_requests.lock().map_err(|e| CloseOptionError::General(format!("Lock poisoned: {}", e)))?
-                    .remove(&id);
+                state.pending_requests.lock().await.remove(&id);
                 Err(CloseOptionError::Timeout {
                     task: "send_and_wait".to_string(),
                     context: "waiting for response".to_string(),
@@ -329,24 +358,12 @@ impl CloseOption {
 
     /// Check trade result
     pub async fn check_win(&self, order_id: &str) -> Result<OrderResult, CloseOptionError> {
-        let assets = self.state().get_assets().await;
-        if let Some(asset) = assets.get(order_id) {
-            Ok(OrderResult {
-                order_id: order_id.to_string(),
-                pair: asset.symbol.clone(),
-                status: "closed".to_string(),
-                amount: 0.0,
-                open_price: 0.0,
-                profit: 0.0,
-                result: "".to_string(),
-                payout: 0.0,
-                balance: 0.0,
-                close_price: 0.0,
-                close_time: 0,
-                open_time: 0,
-            })
+        let state = self.state();
+        let orders = state.orders.lock().await;
+        if let Some(order) = orders.get(order_id) {
+            Ok(order.clone())
         } else {
-            Err(CloseOptionError::General(format!("Order not found: {}", order_id)))
+            Err(CloseOptionError::DealNotFound(order_id.to_string()))
         }
     }
 
@@ -392,14 +409,16 @@ impl CloseOption {
     }
 
     /// Subscribe to price updates for a symbol
-    pub async fn subscribe_symbol(&self, _symbol: &str) -> Result<AsyncReceiver<SubscriptionEvent>, CloseOptionError> {
-        let (_tx, rx) = kanal::bounded_async::<SubscriptionEvent>(100);
+    pub async fn subscribe_symbol(&self, symbol: &str) -> Result<AsyncReceiver<SubscriptionEvent>, CloseOptionError> {
+        let (tx, rx) = kanal::bounded_async::<SubscriptionEvent>(100);
+        self.state().subscriptions.lock().await.insert(symbol.to_string(), tx);
         Ok(rx)
     }
 
     /// Subscribe to all raw messages
     pub async fn subscribe_raw(&self) -> Result<AsyncReceiver<SubscriptionEvent>, CloseOptionError> {
-        let (_tx, rx) = kanal::bounded_async::<SubscriptionEvent>(100);
+        let (tx, rx) = kanal::bounded_async::<SubscriptionEvent>(100);
+        self.state().raw_subscriptions.lock().await.push(tx);
         Ok(rx)
     }
 
@@ -446,27 +465,22 @@ impl CloseOption {
 
     /// Get payout for an asset
     pub async fn payout(&self, _asset: &str) -> Result<f64, CloseOptionError> {
-        // CloseOption doesn't expose per-asset payout in priceData
-        // Return a default payout rate (e.g., 85% for major pairs)
-        Ok(0.85)
+        Err(CloseOptionError::Unsupported("Per-asset payout not available".into()))
     }
 
     /// Get trade history
     pub async fn history(&self, _limit: u32) -> Result<Vec<OrderResult>, CloseOptionError> {
-        // History would require server-side query, return empty for now
-        Ok(vec![])
+        Err(CloseOptionError::Unsupported("Trade history not available".into()))
     }
 
     /// Get opened deals
     pub async fn opened_deals(&self) -> Result<Vec<OrderResult>, CloseOptionError> {
-        // Opened deals would require server-side query, return empty for now
-        Ok(vec![])
+        Err(CloseOptionError::Unsupported("Opened deals not available".into()))
     }
 
     /// Get closed deals
     pub async fn closed_deals(&self) -> Result<Vec<OrderResult>, CloseOptionError> {
-        // Closed deals would require server-side query, return empty for now
-        Ok(vec![])
+        Err(CloseOptionError::Unsupported("Closed deals not available".into()))
     }
 
     /// Get live candle updates
@@ -482,10 +496,89 @@ impl CloseOption {
         })
     }
 }
+/// Lightweight module for routing responses to pending requests and subscriptions
+pub struct ResponseRouterModule {
+    state: Arc<State>,
+    receiver: AsyncReceiver<Arc<Message>>,
+}
+
+impl ResponseRouterModule {
+    pub fn new(state: Arc<State>, receiver: AsyncReceiver<Arc<Message>>) -> Self {
+        Self { state, receiver }
+    }
+}
+
+#[async_trait::async_trait]
+impl LightweightModule<State> for ResponseRouterModule {
+    fn new(
+        state: Arc<State>,
+        _ws_sender: AsyncSender<Message>,
+        receiver: AsyncReceiver<Arc<Message>>,
+        _runner_command_tx: AsyncSender<RunnerCommand>,
+    ) -> Self {
+        Self::new(state, receiver)
+    }
+
+    fn rule() -> Box<dyn Rule + Send + Sync> {
+        Box::new(|msg: &Message| {
+            if let Ok(text) = msg.to_text() {
+                text.contains("priceData") || text.contains("setOrderResult") || text.contains("\"id\"")
+            } else {
+                false
+            }
+        })
+    }
+
+    async fn run(&mut self) -> CoreResult<()> {
+        while let Ok(msg) = self.receiver.recv().await {
+            if let Ok(text) = msg.to_text() {
+                // Try to parse as JSON to extract ID
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(text) {
+                    // Check if this is a response to a pending request
+                    if let Some(id) = value.get("id").and_then(|v| v.as_u64()) {
+                        let mut pending = self.state.pending_requests.lock().await;
+                        if let Some(sender) = pending.remove(&id) {
+                            // Try to deserialize as SubscriptionEvent
+                            if let Ok(event) = serde_json::from_value::<SubscriptionEvent>(value.clone()) {
+                                let _ = sender.send(event);
+                                continue;
+                            }
+                        }
+                    }
+                    
+                    // Check if this is a price data event for symbol subscriptions
+                    if let Some(event_name) = value.get("event").and_then(|v| v.as_str()) {
+                        if event_name == "priceData" {
+                            if let Ok(price_data) = serde_json::from_value::<PriceData>(value.get("data").cloned().unwrap_or_default()) {
+                                let event = SubscriptionEvent::PriceData(price_data.clone());
+                                // Route to symbol subscriptions
+                                let subscriptions = self.state.subscriptions.lock().await;
+                                for (symbol, sender) in subscriptions.iter() {
+                                    if price_data.prices.contains_key(symbol) {
+                                        let _ = sender.send(event.clone()).await;
+                                    }
+                                }
+                                drop(subscriptions);
+                                // Route to raw subscriptions
+                                let raw_subscriptions = self.state.raw_subscriptions.lock().await;
+                                for sender in raw_subscriptions.iter() {
+                                    let _ = sender.send(event.clone()).await;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
 
 impl Drop for CloseOption {
     fn drop(&mut self) {
-        self.runner.abort();
+        if Arc::strong_count(&self.runner) == 1 {
+            self.runner.abort();
+        }
     }
 }
 
