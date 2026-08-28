@@ -33,7 +33,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 uniffi = { workspace = true }
-binary_options_tools = { path = "../binary_options_tools", version = "0.2.13" }
+binary_options_tools = { path = "../binary_options_tools", version = "0.2.13", default-features = false, features = ["pocketoption"] }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

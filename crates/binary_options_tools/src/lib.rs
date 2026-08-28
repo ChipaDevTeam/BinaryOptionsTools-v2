@@ -7,8 +7,9 @@
 //!
 //! ## Modules
 //!
-//! - `pocketoption` - Integration with PocketOption platform
+//! - `closeoption` - Integration with CloseOption platform (feature: "closeoption")
 //! - `expertoptions` - Integration with ExpertOption platform  
+//! - `closeoption` - Integration with CloseOption platform
 //! - `reimports` - Common re-exports for convenience
 //! - `error` - Error handling types and utilities
 //! - `stream` - Streaming utilities including receiver streams and logging layers
@@ -26,6 +27,8 @@
 //! - Use the streaming utilities for real-time data processing
 //! - Serialize and deserialize data with the provided macros
 //! - Apply timeouts to async operations
+#[cfg(feature = "closeoption")]
+pub mod closeoption;
 pub mod config;
 pub mod error;
 pub mod expertoptions;

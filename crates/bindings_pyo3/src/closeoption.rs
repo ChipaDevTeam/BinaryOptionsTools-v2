@@ -1,0 +1,223 @@
+use binary_options_tools::closeoption::CloseOption;
+use pyo3::{pyclass, pymethods, Bound, PyAny, PyResult, Python, PyErr, IntoPyObjectExt};
+use pyo3_async_runtimes::tokio::future_into_py;
+
+use crate::error::BinaryErrorPy;
+
+/// Raw CloseOption client for Python bindings
+#[pyclass(name = "RawCloseOption")]
+pub struct RawCloseOption {
+    inner: CloseOption,
+}
+
+#[pymethods]
+impl RawCloseOption {
+    #[new]
+    #[pyo3(signature = (token, sid, public_code, hidden_code, demo, _url, _config))]
+    fn new(
+        token: String,
+        sid: String,
+        public_code: String,
+        hidden_code: String,
+        demo: bool,
+        _url: String,
+        _config: Option<crate::config::PyConfig>,
+    ) -> PyResult<Self> {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let client = rt.block_on(async {
+            CloseOption::new(token, sid, public_code, hidden_code, demo).await
+        }).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(Self { inner: client })
+    }
+
+    fn connect(&mut self) -> PyResult<()> {
+        // Already connected in new()
+        Ok(())
+    }
+
+    pub fn buy<'py>(
+        &self,
+        py: Python<'py>,
+        asset: String,
+        amount: f64,
+        time: u32,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .buy(&asset, amount, time)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| deal.into_py_any(py))
+        })
+    }
+
+    pub fn sell<'py>(
+        &self,
+        py: Python<'py>,
+        asset: String,
+        amount: f64,
+        time: u32,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .sell(&asset, amount, time)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| deal.into_py_any(py))
+        })
+    }
+
+    pub fn check_win<'py>(&self, py: Python<'py>, order_id: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .check_win(&order_id)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| deal.into_py_any(py))
+        })
+    }
+
+    pub fn balance<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .balance()
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| res.unwrap_or(0.0).into_py_any(py))
+        })
+    }
+
+    pub fn candles<'py>(&self, py: Python<'py>, asset: String, period: u32) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .get_candles(&asset, period, 100)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| deal.into_py_any(py))
+        })
+    }
+
+    pub fn get_candles<'py>(&self, py: Python<'py>, asset: String, period: u32, count: u32) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .get_candles(&asset, period, count)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| deal.into_py_any(py))
+        })
+    }
+
+    pub fn send_raw<'py>(&self, py: Python<'py>, message: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            client
+                .send_raw(&message)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| ().into_py_any(py))
+        })
+    }
+
+    pub fn active_assets<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .active_assets()
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| deal.into_py_any(py))
+        })
+    }
+
+    pub fn get_server_time<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .get_server_time()
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| res.into_py_any(py))
+        })
+    }
+
+    pub fn shutdown<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            client
+                .shutdown()
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| ().into_py_any(py))
+        })
+    }
+
+    pub fn payout<'py>(&self, py: Python<'py>, asset: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .payout(&asset)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| res.into_py_any(py))
+        })
+    }
+
+    pub fn history<'py>(&self, py: Python<'py>, limit: u32) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .history(limit)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| deal.into_py_any(py))
+        })
+    }
+
+    pub fn opened_deals<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .opened_deals()
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| deal.into_py_any(py))
+        })
+    }
+
+    pub fn closed_deals<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let res = client
+                .closed_deals()
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| deal.into_py_any(py))
+        })
+    }
+
+    pub fn reconnect<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            client
+                .reconnect()
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| ().into_py_any(py))
+        })
+    }
+}
