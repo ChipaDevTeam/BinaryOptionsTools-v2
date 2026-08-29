@@ -548,8 +548,6 @@ impl LightweightModule<State> for ResponseRouterModule {
                                                 if let Ok(event) = serde_json::from_value::<SubscriptionEvent>(value.clone()) {
                                                     let _ = sender.send(event);
                                                 }
-                                                handled = true;
-                                                continue;
                                             }
                                         }
                                     }
@@ -571,15 +569,37 @@ impl LightweightModule<State> for ResponseRouterModule {
                                             }
                                             drop(subscriptions);
                                             let mut raw_subscriptions = self.state.raw_subscriptions.lock().await;
+                                            let mut deferred: Vec<(usize, SubscriptionEvent)> = Vec::new();
                                             let mut i = 0;
                                             while i < raw_subscriptions.len() {
-                                                if raw_subscriptions[i].send(event.clone()).await.is_err() {
-                                                    raw_subscriptions.remove(i);
-                                                } else {
-                                                    i += 1;
+                                                match raw_subscriptions[i].try_send(event.clone()) {
+                                                    Ok(true) => { i += 1; }
+                                                    Ok(false) => {
+                                                        deferred.push((i, event.clone()));
+                                                        i += 1;
+                                                    }
+                                                    Err(_) => {
+                                                        raw_subscriptions.remove(i);
+                                                    }
                                                 }
                                             }
                                             drop(raw_subscriptions);
+                                            if !deferred.is_empty() {
+                                                let state = self.state.clone();
+                                                let _event = event.clone();
+                                                tokio::spawn(async move {
+                                                    let raw_subscriptions = state.raw_subscriptions.lock().await;
+                                                    let mut i = 0;
+                                                    while i < raw_subscriptions.len() && i < deferred.len() {
+                                                        let idx = deferred[i].0;
+                                                        let ev = &deferred[i].1;
+                                                        if idx < raw_subscriptions.len() {
+                                                            let _ = raw_subscriptions[idx].try_send(ev.clone());
+                                                        }
+                                                        i += 1;
+                                                    }
+                                                });
+                                            }
                                             handled = true;
                                         }
                                     }
@@ -610,9 +630,37 @@ impl LightweightModule<State> for ResponseRouterModule {
                                         }
                                     }
                                     drop(subscriptions);
-                                    let raw_subscriptions = self.state.raw_subscriptions.lock().await;
-                                    for sender in raw_subscriptions.iter() {
-                                        let _ = sender.send(event.clone()).await;
+                                    let mut raw_subscriptions = self.state.raw_subscriptions.lock().await;
+                                    let mut deferred_fallback: Vec<(usize, SubscriptionEvent)> = Vec::new();
+                                    let mut i = 0;
+                                    while i < raw_subscriptions.len() {
+                                        match raw_subscriptions[i].try_send(event.clone()) {
+                                            Ok(true) => { i += 1; }
+                                            Ok(false) => {
+                                                deferred_fallback.push((i, event.clone()));
+                                                i += 1;
+                                            }
+                                            Err(_) => {
+                                                raw_subscriptions.remove(i);
+                                            }
+                                        }
+                                    }
+                                    drop(raw_subscriptions);
+                                    if !deferred_fallback.is_empty() {
+                                        let state = self.state.clone();
+                                        let _event = event.clone();
+                                        tokio::spawn(async move {
+                                            let raw_subscriptions = state.raw_subscriptions.lock().await;
+                                            let mut i = 0;
+                                            while i < raw_subscriptions.len() && i < deferred_fallback.len() {
+                                                let idx = deferred_fallback[i].0;
+                                                let ev = &deferred_fallback[i].1;
+                                                if idx < raw_subscriptions.len() {
+                                                    let _ = raw_subscriptions[idx].try_send(ev.clone());
+                                                }
+                                                i += 1;
+                                            }
+                                        });
                                     }
                                 }
                             }

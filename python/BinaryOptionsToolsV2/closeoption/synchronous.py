@@ -9,6 +9,11 @@ from ..config import Config
 from ..validator import Validator as Validator
 from .asynchronous import CloseOptionAsync as CloseOptionAsync
 
+if sys.version_info < (3, 10):
+    async def anext(iterator):
+        """Polyfill for anext for Python < 3.10"""
+        return await iterator.__anext__()
+
 
 class SyncSubscription:
     def __init__(self, subscription, loop=None):
@@ -35,6 +40,13 @@ class SyncSubscription:
 
 
 class SyncCandleLiveIterator:
+    def __init__(self, async_gen, loop):
+        self.async_gen = async_gen
+        self.loop = loop
+
+    def __iter__(self):
+        return self
+
     def __next__(self):
         future = asyncio.run_coroutine_threadsafe(
             self._get_next(), self.loop

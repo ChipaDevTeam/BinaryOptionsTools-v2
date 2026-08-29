@@ -273,8 +273,18 @@ pub mod socket_io {
                 result.push(',');
             }
         } else {
-            // Engine.IO packet types 10-16: output as two-digit decimal
-            result.push_str(&code.to_string());
+            // Engine.IO packet types 10-16: emit single-digit wire code
+            let wire_code = match msg_type {
+                SocketIoMessageType::EngineOpen => '0',
+                SocketIoMessageType::EngineClose => '1',
+                SocketIoMessageType::EnginePing => '2',
+                SocketIoMessageType::EnginePong => '3',
+                SocketIoMessageType::EngineMessage => '4',
+                SocketIoMessageType::EngineUpgrade => '5',
+                SocketIoMessageType::EngineNoop => '6',
+                _ => unreachable!(),
+            };
+            result.push(wire_code);
         }
         result.push_str(data);
         result
@@ -365,7 +375,7 @@ mod tests {
     #[test]
     fn test_encode_engine_ping() {
         let encoded = socket_io::encode_frame(SocketIoMessageType::EnginePing, None, "probe");
-        assert_eq!(encoded, "12probe");
+        assert_eq!(encoded, "2probe");
     }
 
     #[test]

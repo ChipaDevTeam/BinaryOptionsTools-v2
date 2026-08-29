@@ -165,8 +165,13 @@ impl Connector<State> for CloseConnect {
                     .map_err(|e| ConnectorError::Custom(format!("TLS handshake failed: {e}")))?
                 }
                 MaybeTlsStream::Rustls(proxy_tls_stream) => {
-                    // HTTPS proxy: tunnel already established by http_connect_handshake at line 127
-                    // No additional TLS needed - the proxy connection is already TLS-encrypted
+                    if t_url.scheme() == "wss" {
+                        // Target TLS is required for wss, but we only have proxy TLS here.
+                        // Nested target TLS over an HTTPS-proxy CONNECT tunnel is not supported.
+                        return Err(ConnectorError::Custom(
+                            "HTTPS proxy with wss target is not supported".into(),
+                        ));
+                    }
                     proxy_tls_stream
                 }
                 _ => {

@@ -187,7 +187,7 @@ class CloseOptionAsync:
         else:
             ws_url = f"wss://www.closeoption.com:8443/socket.io/?EIO=3&transport=websocket&sid={sid}"
 
-        self._client = RawCloseOption(token, sid, public_code, hidden_code, demo, ws_url, self._config.to_dict())
+        self._client = RawCloseOption(token, sid, public_code, hidden_code, demo, ws_url, self._config.pyconfig)
         await self._client.connect()
         self._connected = True
 
