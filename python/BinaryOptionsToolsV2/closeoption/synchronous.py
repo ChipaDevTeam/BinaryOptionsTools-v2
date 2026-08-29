@@ -33,10 +33,10 @@ class SyncSubscription:
                 anext(self.subscription), self._loop
             )
             try:
-                return json.loads(future.result())
+                return future.result()
             except StopAsyncIteration:
                 raise StopIteration
-        return json.loads(next(self.subscription))
+        return next(self.subscription)
 
 
 class SyncCandleLiveIterator:
@@ -57,10 +57,7 @@ class SyncCandleLiveIterator:
             raise StopIteration
 
     async def _get_next(self):
-        try:
-            return await anext(self.async_gen)
-        except StopAsyncIteration:
-            raise StopIteration
+        return await anext(self.async_gen)
 
 
 

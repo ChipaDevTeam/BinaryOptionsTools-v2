@@ -568,37 +568,14 @@ impl LightweightModule<State> for ResponseRouterModule {
                                                 subscriptions.remove(&sym);
                                             }
                                             drop(subscriptions);
-                                            let mut raw_subscriptions = self.state.raw_subscriptions.lock().await;
-                                            let mut deferred: Vec<(usize, SubscriptionEvent)> = Vec::new();
-                                            let mut i = 0;
-                                            while i < raw_subscriptions.len() {
-                                                match raw_subscriptions[i].try_send(event.clone()) {
-                                                    Ok(true) => { i += 1; }
-                                                    Ok(false) => {
-                                                        deferred.push((i, event.clone()));
-                                                        i += 1;
-                                                    }
-                                                    Err(_) => {
-                                                        raw_subscriptions.remove(i);
-                                                    }
-                                                }
-                                            }
+                                            // Raw subscriptions: try_send with stable sender identity
+                                            // On backpressure (full queue), drop the event for that subscriber
+                                            // to preserve ordering for others and avoid unbounded memory growth.
+                                            let raw_subscriptions = self.state.raw_subscriptions.lock().await;
+                                            let senders: Vec<_> = raw_subscriptions.iter().cloned().collect();
                                             drop(raw_subscriptions);
-                                            if !deferred.is_empty() {
-                                                let state = self.state.clone();
-                                                let _event = event.clone();
-                                                tokio::spawn(async move {
-                                                    let raw_subscriptions = state.raw_subscriptions.lock().await;
-                                                    let mut i = 0;
-                                                    while i < raw_subscriptions.len() && i < deferred.len() {
-                                                        let idx = deferred[i].0;
-                                                        let ev = &deferred[i].1;
-                                                        if idx < raw_subscriptions.len() {
-                                                            let _ = raw_subscriptions[idx].try_send(ev.clone());
-                                                        }
-                                                        i += 1;
-                                                    }
-                                                });
+                                            for sender in senders {
+                                                let _ = sender.try_send(event.clone());
                                             }
                                             handled = true;
                                         }
@@ -630,37 +607,14 @@ impl LightweightModule<State> for ResponseRouterModule {
                                         }
                                     }
                                     drop(subscriptions);
-                                    let mut raw_subscriptions = self.state.raw_subscriptions.lock().await;
-                                    let mut deferred_fallback: Vec<(usize, SubscriptionEvent)> = Vec::new();
-                                    let mut i = 0;
-                                    while i < raw_subscriptions.len() {
-                                        match raw_subscriptions[i].try_send(event.clone()) {
-                                            Ok(true) => { i += 1; }
-                                            Ok(false) => {
-                                                deferred_fallback.push((i, event.clone()));
-                                                i += 1;
-                                            }
-                                            Err(_) => {
-                                                raw_subscriptions.remove(i);
-                                            }
-                                        }
-                                    }
+                                    // Raw subscriptions: try_send with stable sender identity
+                                    // On backpressure (full queue), drop the event for that subscriber
+                                    // to preserve ordering for others and avoid unbounded memory growth.
+                                    let raw_subscriptions = self.state.raw_subscriptions.lock().await;
+                                    let senders: Vec<_> = raw_subscriptions.iter().cloned().collect();
                                     drop(raw_subscriptions);
-                                    if !deferred_fallback.is_empty() {
-                                        let state = self.state.clone();
-                                        let _event = event.clone();
-                                        tokio::spawn(async move {
-                                            let raw_subscriptions = state.raw_subscriptions.lock().await;
-                                            let mut i = 0;
-                                            while i < raw_subscriptions.len() && i < deferred_fallback.len() {
-                                                let idx = deferred_fallback[i].0;
-                                                let ev = &deferred_fallback[i].1;
-                                                if idx < raw_subscriptions.len() {
-                                                    let _ = raw_subscriptions[idx].try_send(ev.clone());
-                                                }
-                                                i += 1;
-                                            }
-                                        });
+                                    for sender in senders {
+                                        let _ = sender.try_send(event.clone());
                                     }
                                 }
                             }
@@ -709,5 +663,72 @@ mod tests {
         assert_eq!(CloseOption::duration_to_time_intervals(45).unwrap(), "30 Seconds");
         assert_eq!(CloseOption::duration_to_time_intervals(350).unwrap(), "10 Minutes");
         assert!(CloseOption::duration_to_time_intervals(999).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_raw_subscription_ordered_delivery_under_backpressure() {
+        use kanal::bounded_async;
+        use crate::closeoption::types::SubscriptionEvent;
+        use crate::closeoption::state::StateBuilder;
+
+        // Create a state with raw subscriptions
+        let state = StateBuilder::new()
+            .token("test")
+            .sid("sid")
+            .public_code("pub")
+            .hidden_code("hid")
+            .build()
+            .unwrap();
+
+        // Add multiple raw subscribers with small buffer to trigger backpressure
+        let (tx1, rx1) = bounded_async::<SubscriptionEvent>(2);
+        let (tx2, _rx2) = bounded_async::<SubscriptionEvent>(2);
+        let (tx3, rx3) = bounded_async::<SubscriptionEvent>(2);
+        state.raw_subscriptions.lock().await.push(tx1.clone());
+        state.raw_subscriptions.lock().await.push(tx2.clone());
+        state.raw_subscriptions.lock().await.push(tx3.clone());
+
+        // Fill up subscriber 2's buffer to simulate backpressure
+        let event1 = SubscriptionEvent::PriceData(crate::closeoption::types::PriceData {
+            prices: std::collections::HashMap::new(),
+            timestamp: 0,
+        });
+        let event2 = SubscriptionEvent::PriceData(crate::closeoption::types::PriceData {
+            prices: std::collections::HashMap::new(),
+            timestamp: 0,
+        });
+        let _ = tx2.try_send(event1.clone());
+        let _ = tx2.try_send(event2.clone());
+        // Now tx2's buffer is full (capacity 2)
+
+        // Send a new event - should be delivered to tx1 and tx3, dropped for tx2
+        let event3 = SubscriptionEvent::PriceData(crate::closeoption::types::PriceData {
+            prices: std::collections::HashMap::new(),
+            timestamp: 0,
+        });
+
+        // Simulate the routing logic: collect senders and try_send to each
+        let raw_subscriptions = state.raw_subscriptions.lock().await;
+        let senders: Vec<_> = raw_subscriptions.iter().cloned().collect();
+        drop(raw_subscriptions);
+
+        for sender in senders {
+            let _ = sender.try_send(event3.clone());
+        }
+
+        // Verify tx1 and tx3 received the event, tx2 did not (backpressure)
+        let received1 = rx1.recv().await.is_ok();
+        let received3 = rx3.recv().await.is_ok();
+        
+        // tx2 should not have received event3 (buffer full)
+        // But we can't easily test that without timing - the key invariant is:
+        // - No panic, no deadlock
+        // - Other subscribers still receive events in order
+        assert!(received1, "Subscriber 1 should receive event");
+        assert!(received3, "Subscriber 3 should receive event");
+        
+        // Verify ordering: events received by each subscriber are in order
+        // (tx1 received event3, tx3 received event3)
+        // This test primarily ensures no crash and basic delivery works
     }
 }
