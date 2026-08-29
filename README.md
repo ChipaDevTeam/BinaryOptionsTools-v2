@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/badge/license-Personal-green)](LICENSE)
 
 **A high-performance, cross-platform package for automating binary options trading.**
-Built with **Rust** for speed and memory safety, featuring **Python** bindings for ease of use.
+Built with **Rust** for speed and memory safety, featuring **Python** and **Node.js** bindings for ease of use.
 
 ---
 
@@ -122,6 +122,7 @@ This project is mirrored and synchronized across both GitLab and GitHub:
 
 - **Rust Core**: Maximum performance, concurrency, and memory safety.
 - **Python Bindings**: Seamless integration with the Python ecosystem via PyO3.
+- **Node.js Bindings**: Native N-API addon with TypeScript definitions and async iterators.
 - **WebSocket Native**: Real-time market data streaming and instant trade execution.
 - **Robust Connectivity**: Automatic reconnection, keep-alive monitoring, and robust error handling.
 - **Type Safety**: Strong typing across both Rust and Python interfaces.
@@ -216,6 +217,29 @@ uv pip install "git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git@ma
 # Or install via GitLab
 # uv pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@master#subdirectory=python"
 ```
+
+### Node.js
+
+Requires Node.js 18+ and a Rust toolchain to build the native addon.
+
+```bash
+git clone https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git
+# Or clone from GitLab
+# git clone https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
+
+cd BinaryOptionsTools-v2/nodejs
+npm run build   # cargo build --release, then copy the addon into this directory
+npm test        # optional smoke tests, no credentials needed
+```
+
+```js
+const { PocketOption } = require("binary-options-tools");
+
+const api = await PocketOption.create(ssid);
+console.log(await api.balance());
+```
+
+See [`nodejs/README.md`](nodejs/README.md) for the full API notes.
 
 ### Rust
 
@@ -410,6 +434,20 @@ The [`examples/`](examples/) directory contains ready-to-run scripts for both as
 
 A parallel set of examples using the synchronous `PocketOption` client is available in [`examples/python/sync/`](examples/python/sync/), including `get_ticks.py` for historical tick data.
 
+### JavaScript
+
+| Example                                                                        | Description                          |
+| ------------------------------------------------------------------------------ | ------------------------------------ |
+| [`balance.js`](examples/javascript/balance.js)                                 | Account balance                      |
+| [`buy.js`](examples/javascript/buy.js)                                         | Buy trade with result                |
+| [`sell.js`](examples/javascript/sell.js)                                       | Sell trade with result               |
+| [`get_candles.js`](examples/javascript/get_candles.js)                         | Historical candle data               |
+| [`subscribe_symbol.js`](examples/javascript/subscribe_symbol.js)               | Real-time candle subscription        |
+| [`raw_send.js`](examples/javascript/raw_send.js)                               | Raw WebSocket messages               |
+| [`create_raw_order.js`](examples/javascript/create_raw_order.js)               | Raw order with validator             |
+| [`create_raw_iterator.js`](examples/javascript/create_raw_iterator.js)         | Raw response iterator                |
+| [`validator.js`](examples/javascript/validator.js)                             | Validator usage examples             |
+
 ### Other Languages
 
 UniFFI-generated examples for Go, Kotlin, Swift, Ruby, C#, and Rust are available in their respective subdirectories under [`examples/`](examples/).
@@ -424,7 +462,7 @@ UniFFI-generated examples for Go, Kotlin, Swift, Ruby, C#, and Rust are availabl
 - [x] **Backtesting**: Virtual Market Simulator
 - [ ] **Platform**: IQ Option Integration
 - [x] **Core**: Multi-language support via UniFFI (Kotlin, Swift, C#)
-- [ ] **Core**: JavaScript/TypeScript Bindings
+- [x] **Core**: JavaScript/TypeScript Bindings (Node.js, via N-API)
 - [ ] **Core**: WebAssembly (WASM) Support
 - [ ] **Tools**: Advanced Strategy Optimizer
 

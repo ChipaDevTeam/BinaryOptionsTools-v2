@@ -1,6 +1,6 @@
 # AGENTS.md — BinaryOptionsTools-v2
 
-This is a dual-language project: **Rust** core with **Python** bindings (via PyO3/maturin) and optional **UniFFI** bindings for Kotlin/Swift/C#/Go.
+This is a multi-language project: **Rust** core with **Python** bindings (via PyO3/maturin), **Node.js** bindings (via napi-rs) and optional **UniFFI** bindings for Kotlin/Swift/C#/Go.
 
 ## Project Structure
 
@@ -8,15 +8,17 @@ This is a dual-language project: **Rust** core with **Python** bindings (via PyO
   - `core/` — Low-level utilities, config, WebSocket base
   - `macros/` — Proc-macros (`Config`, `RegionImpl`, `ActionImpl`, `#[timeout]`)
   - `binary_options_tools/` — Platform implementations (PocketOption, ExpertOption), `framework` module for bots
+  - `bindings_napi/` — N-API (napi-rs) native addon for Node.js
 - `BinaryOptionsToolsV2/` — Python package (maturin/PyO3). Rust source in `rust/`, Python wrapper in `python/`
 - `BinaryOptionsToolsUni/` — UniFFI multi-language bindings
+- `nodejs/` — Node.js package wrapping the N-API addon (`npm run build`, `npm test`)
 - `tests/` — Python tests (`tests/python/`), Rust tests inline
 - `docs/` — MkDocs documentation
 - `data/` — Test fixtures and JSON data
 
 ## Product Context
 
-A high-performance, cross-platform package for automating binary options trading, built with a Rust core and high-level bindings for Python and other languages.
+A high-performance, cross-platform package for automating binary options trading, built with a Rust core and high-level bindings for Python, Node.js and other languages.
 
 ### Primary Users
 

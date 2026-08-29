@@ -1,0 +1,42 @@
+[package]
+name = "binary_options_tools_napi"
+version = "0.2.14"
+edition = "2021"
+authors = ["ChipaDevTeam"]
+description = "Node.js (N-API) bindings for binary-options-tools. Native addon exposing the PocketOption client to JavaScript and TypeScript."
+homepage = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2"
+repository = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"
+documentation = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/"
+readme = "README.md"
+keywords = ["binary-options", "pocketoption", "trading", "nodejs", "napi"]
+categories = ["api-bindings"]
+license-file = "../../LICENSE"
+
+[lib]
+name = "binary_options_tools_napi"
+crate-type = ["cdylib"]
+test = false
+
+[dependencies]
+napi = { version = "3.12.2", features = ["napi6", "async", "serde-json"] }
+napi-derive = "3.6.3"
+
+binary_options_tools = { path = "../binary_options_tools", version = "0.2.14", default-features = false, features = ["pocketoption"] }
+
+async-stream = "0.3.6"
+chrono = { workspace = true }
+futures-util = { workspace = true }
+regex = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tungstenite = { version = "0.29.0", default-features = false, features = ["rustls-tls-webpki-roots", "handshake"] }
+url = { workspace = true }
+uuid = { workspace = true }
+
+[build-dependencies]
+napi-build = "2.4.1"

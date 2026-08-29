@@ -4,6 +4,19 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [Unreleased]
+
+### Added
+
+- **Node.js Bindings**: Added `crates/bindings_napi`, an N-API (napi-rs) native addon exposing the PocketOption client, the raw WebSocket helpers, the message validators and the logging setup to JavaScript and TypeScript. The JavaScript examples and documentation previously referenced a `binary-options-tools.node` addon that did not exist anywhere in the repository, so none of them could run.
+- Added the `nodejs/` package (`index.js`, `index.d.ts`, `scripts/build.js`, smoke tests) which loads the addon, adds `Symbol.asyncIterator` support to the subscription and raw streams, and exposes `snake_case` aliases next to the idiomatic `camelCase` method names.
+- Added a `nodejs` CI job building the addon and running its tests on Linux, Windows and macOS.
+
+### Changed
+
+- Rewrote every script in `examples/javascript/` against the real API: they now take the session id from `process.argv[2]` or `POCKET_OPTION_SSID`, use the documented argument order (`buy(asset, amount, seconds)`), and shut the client down when finished.
+- Updated the JavaScript sections of the documentation (`docs/examples/javascript`, `docs/api/reference.md`, `docs/architecture/structure.md`) to match the implemented API. The previous snippets referenced an `binaryoptionstoolsv2` npm package and methods such as `getClosedDeals()` that do not exist.
+
 ## [0.2.14] - 2026-08-28
 ### Added
 - **CloseOption Support**: Added new `closeoption` module for the CloseOption binary options platform, supporting Socket.IO EIO=3 protocol on `wss://www.closeoption.com:8443`.
