@@ -485,8 +485,7 @@ impl CloseOption {
 
     /// Get live candle updates
     pub async fn get_candles_live(&self, _asset: &str, _period: u32) -> Result<AsyncReceiver<Arc<Message>>, CloseOptionError> {
-        let (_tx, rx) = kanal::bounded_async::<Arc<Message>>(100);
-        Ok(rx)
+        Err(CloseOptionError::Unsupported("Live candle support not yet implemented".into()))
     }
 
     /// Get raw handler for advanced operations
@@ -532,37 +531,89 @@ impl LightweightModule<State> for ResponseRouterModule {
     async fn run(&mut self) -> CoreResult<()> {
         while let Ok(msg) = self.receiver.recv().await {
             if let Ok(text) = msg.to_text() {
-                // Try to parse as JSON to extract ID
-                if let Ok(value) = serde_json::from_str::<serde_json::Value>(text) {
-                    // Check if this is a response to a pending request
-                    if let Some(id) = value.get("id").and_then(|v| v.as_u64()) {
-                        let mut pending = self.state.pending_requests.lock().await;
-                        if let Some(sender) = pending.remove(&id) {
-                            // Try to deserialize as SubscriptionEvent
-                            if let Ok(event) = serde_json::from_value::<SubscriptionEvent>(value.clone()) {
-                                let _ = sender.send(event);
-                                continue;
+                // Try parsing as Socket.IO frames first
+                let frames = crate::closeoption::utils::parse_socket_io_message(text)
+                    .unwrap_or_default();
+                let mut handled = false;
+                for frame in &frames {
+                    if frame.message_type == crate::closeoption::types::socket_io::SocketIoMessageType::Event {
+                        if let Ok(event_array) = serde_json::from_str::<Vec<serde_json::Value>>(&frame.data) {
+                            if let Some(event_name) = event_array.get(0).and_then(|v| v.as_str()) {
+                                if let Some(payload) = event_array.get(1) {
+                                    // Resolve pending requests by ID
+                                    if let Ok(value) = serde_json::to_value(payload) {
+                                        if let Some(id) = value.get("id").and_then(|v| v.as_u64()) {
+                                            let mut pending = self.state.pending_requests.lock().await;
+                                            if let Some(sender) = pending.remove(&id) {
+                                                if let Ok(event) = serde_json::from_value::<SubscriptionEvent>(value.clone()) {
+                                                    let _ = sender.send(event);
+                                                }
+                                                handled = true;
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                    // Route priceData events
+                                    if event_name == "priceData" {
+                                        if let Ok(price_data) = serde_json::from_value::<PriceData>(payload.clone()) {
+                                            let event = SubscriptionEvent::PriceData(price_data.clone());
+                                            let mut subscriptions = self.state.subscriptions.lock().await;
+                                            let mut failed: Vec<String> = Vec::new();
+                                            for (symbol, sender) in subscriptions.iter() {
+                                                if price_data.prices.contains_key(symbol) {
+                                                    if sender.send(event.clone()).await.is_err() {
+                                                        failed.push(symbol.clone());
+                                                    }
+                                                }
+                                            }
+                                            for sym in failed {
+                                                subscriptions.remove(&sym);
+                                            }
+                                            drop(subscriptions);
+                                            let mut raw_subscriptions = self.state.raw_subscriptions.lock().await;
+                                            let mut i = 0;
+                                            while i < raw_subscriptions.len() {
+                                                if raw_subscriptions[i].send(event.clone()).await.is_err() {
+                                                    raw_subscriptions.remove(i);
+                                                } else {
+                                                    i += 1;
+                                                }
+                                            }
+                                            drop(raw_subscriptions);
+                                            handled = true;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                    
-                    // Check if this is a price data event for symbol subscriptions
-                    if let Some(event_name) = value.get("event").and_then(|v| v.as_str()) {
-                        if event_name == "priceData" {
-                            if let Ok(price_data) = serde_json::from_value::<PriceData>(value.get("data").cloned().unwrap_or_default()) {
-                                let event = SubscriptionEvent::PriceData(price_data.clone());
-                                // Route to symbol subscriptions
-                                let subscriptions = self.state.subscriptions.lock().await;
-                                for (symbol, sender) in subscriptions.iter() {
-                                    if price_data.prices.contains_key(symbol) {
+                }
+                // Fallback: direct JSON parse for already-decoded messages
+                if !handled {
+                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(text) {
+                        if let Some(id) = value.get("id").and_then(|v| v.as_u64()) {
+                            let mut pending = self.state.pending_requests.lock().await;
+                            if let Some(sender) = pending.remove(&id) {
+                                if let Ok(event) = serde_json::from_value::<SubscriptionEvent>(value.clone()) {
+                                    let _ = sender.send(event);
+                                }
+                            }
+                        }
+                        if let Some(event_name) = value.get("event").and_then(|v| v.as_str()) {
+                            if event_name == "priceData" {
+                                if let Ok(price_data) = serde_json::from_value::<PriceData>(value.get("data").cloned().unwrap_or_default()) {
+                                    let event = SubscriptionEvent::PriceData(price_data.clone());
+                                    let subscriptions = self.state.subscriptions.lock().await;
+                                    for (symbol, sender) in subscriptions.iter() {
+                                        if price_data.prices.contains_key(symbol) {
+                                            let _ = sender.send(event.clone()).await;
+                                        }
+                                    }
+                                    drop(subscriptions);
+                                    let raw_subscriptions = self.state.raw_subscriptions.lock().await;
+                                    for sender in raw_subscriptions.iter() {
                                         let _ = sender.send(event.clone()).await;
                                     }
-                                }
-                                drop(subscriptions);
-                                // Route to raw subscriptions
-                                let raw_subscriptions = self.state.raw_subscriptions.lock().await;
-                                for sender in raw_subscriptions.iter() {
-                                    let _ = sender.send(event.clone()).await;
                                 }
                             }
                         }

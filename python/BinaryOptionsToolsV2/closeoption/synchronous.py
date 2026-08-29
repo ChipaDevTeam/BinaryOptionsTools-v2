@@ -11,8 +11,9 @@ from .asynchronous import CloseOptionAsync as CloseOptionAsync
 
 
 class SyncSubscription:
-    def __init__(self, subscription):
+    def __init__(self, subscription, loop=None):
         self.subscription = subscription
+        self._loop = loop
 
     def __iter__(self):
         return self
@@ -22,27 +23,33 @@ class SyncSubscription:
         return self.subscription
 
     def __next__(self):
+        if self._loop is not None and self._loop.is_running():
+            future = asyncio.run_coroutine_threadsafe(
+                anext(self.subscription), self._loop
+            )
+            try:
+                return json.loads(future.result())
+            except StopAsyncIteration:
+                raise StopIteration
         return json.loads(next(self.subscription))
 
 
 class SyncCandleLiveIterator:
-    """Synchronous iterator for live candle updates."""
-
-    def __init__(self, async_gen, loop):
-        self.async_gen = async_gen
-        self.loop = loop
-
-    def __iter__(self):
-        return self
-
     def __next__(self):
-        async def get_next():
-            try:
-                return await anext(self.async_gen)
-            except StopAsyncIteration:
-                raise StopIteration
+        future = asyncio.run_coroutine_threadsafe(
+            self._get_next(), self.loop
+        )
+        try:
+            return future.result()
+        except StopAsyncIteration:
+            raise StopIteration
 
-        return self.loop.run_until_complete(get_next())
+    async def _get_next(self):
+        try:
+            return await anext(self.async_gen)
+        except StopAsyncIteration:
+            raise StopIteration
+
 
 
 class RawHandlerSync:
@@ -80,6 +87,10 @@ class RawHandlerSync:
         if self._handler:
             self._run(self._handler.close())
             self._handler = None
+        if self._loop and self._loop.is_running():
+            self._loop.call_soon_threadsafe(self._loop.stop)
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=5.0)
 
     def __enter__(self):
         return self
@@ -91,13 +102,22 @@ class RawHandlerSync:
 class SyncRawSubscription:
     """Synchronous iterator for raw subscriptions."""
 
-    def __init__(self, subscription):
+    def __init__(self, subscription, loop=None):
         self.subscription = subscription
+        self._loop = loop
 
     def __iter__(self):
         return self
 
     def __next__(self):
+        if self._loop is not None and self._loop.is_running():
+            future = asyncio.run_coroutine_threadsafe(
+                anext(self.subscription), self._loop
+            )
+            try:
+                return future.result()
+            except StopAsyncIteration:
+                raise StopIteration
         return next(self.subscription)
 
 
@@ -113,7 +133,14 @@ class CloseOption:
         """
         self._ssid = ssid
         self._url = url
-        self._config = config if isinstance(config, Config) else Config(config) if config else Config()
+        if isinstance(config, Config):
+            self._config = config
+        elif isinstance(config, dict):
+            self._config = Config.from_dict(config)
+        elif isinstance(config, str):
+            self._config = Config.from_json(config)
+        else:
+            self._config = Config()
         self._async_client = CloseOptionAsync(ssid, url, self._config)
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
@@ -166,12 +193,12 @@ class CloseOption:
     def subscribe_symbol(self, symbol: str) -> SyncSubscription:
         """Subscribe to price updates for a symbol."""
         sub = self._run(self._async_client.subscribe_symbol(symbol))
-        return SyncSubscription(sub)
+        return SyncSubscription(sub, self._loop)
 
     def subscribe_raw(self) -> SyncRawSubscription:
         """Subscribe to all raw messages."""
         sub = self._run(self._async_client.subscribe_raw())
-        return SyncRawSubscription(sub)
+        return SyncRawSubscription(sub, self._loop)
 
     def send_raw(self, message: str) -> None:
         """Send a raw message."""

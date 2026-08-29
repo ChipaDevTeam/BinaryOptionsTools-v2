@@ -6,3 +6,4 @@ pub mod types;
 pub mod utils;
 
 pub use client::CloseOption;
+pub use state::State;

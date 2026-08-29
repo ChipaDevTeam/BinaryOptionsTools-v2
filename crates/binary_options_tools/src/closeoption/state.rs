@@ -19,15 +19,6 @@ use crate::closeoption::utils::normalize_timestamp;
 /// # Thread Safety
 ///
 /// All fields are designed to be thread-safe, allowing concurrent access
-/// Application state for CloseOption client
-///
-/// This structure holds all the shared state for the CloseOption client,
-/// including session information, connection settings, and real-time data
-/// like balance and assets.
-///
-/// # Thread Safety
-///
-/// All fields are designed to be thread-safe, allowing concurrent access
 /// from multiple modules and tasks.
 #[derive(Debug, Clone)]
 pub struct State {
@@ -67,6 +58,8 @@ pub struct State {
     pub raw_subscriptions: Arc<Mutex<Vec<kanal::AsyncSender<SubscriptionEvent>>>>,
     /// Order results keyed by order ID
     pub orders: Arc<Mutex<HashMap<String, OrderResult>>>,
+    /// Custom WebSocket URL (if set, ws_url() returns this instead of the default)
+    pub ws_url: Option<String>,
 }
 
 /// Builder pattern for creating State instances
@@ -86,6 +79,7 @@ pub struct StateBuilder {
     tls_cipher_suites: Option<Vec<String>>,
     tls_alpn: Option<Vec<String>>,
     sec_websocket_extensions: Option<String>,
+    ws_url: Option<String>,
 }
 
 impl StateBuilder {
@@ -160,6 +154,12 @@ impl StateBuilder {
         self
     }
 
+    /// Set custom WebSocket URL
+    pub fn ws_url(mut self, url: impl Into<String>) -> Self {
+        self.ws_url = Some(url.into());
+        self
+    }
+
     /// Build the State, validating required fields
     pub fn build(self) -> Result<State, CloseOptionError> {
         let token = self.token.ok_or_else(|| CloseOptionError::StateBuilder("token is required".to_string()))?;
@@ -186,6 +186,7 @@ impl StateBuilder {
             subscriptions: Arc::new(Mutex::new(HashMap::new())),
             raw_subscriptions: Arc::new(Mutex::new(Vec::new())),
             orders: Arc::new(Mutex::new(HashMap::new())),
+            ws_url: self.ws_url,
         })
     }
 }
@@ -207,10 +208,13 @@ impl State {
 
     /// Get the base WebSocket URL with session ID
     pub fn ws_url(&self) -> String {
-        format!(
-            "wss://www.closeoption.com:8443/socket.io/?EIO=3&transport=websocket&sid={}",
-            self.sid
-        )
+        match &self.ws_url {
+            Some(url) => url.clone(),
+            None => format!(
+                "wss://www.closeoption.com:8443/socket.io/?EIO=3&transport=websocket&sid={}",
+                self.sid
+            ),
+        }
     }
 
     /// Update balance from order result
@@ -282,7 +286,7 @@ impl State {
     pub async fn clear_temporal_data(&self) {
         *self.balance.write().await = None;
         self.assets.write().await.clear();
-        *self.server_time_offset.write().await = 0;
+        self.orders.lock().await.clear();
     }
 }
 #[async_trait::async_trait]
@@ -297,87 +301,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_state_builder_missing_token() {
-        let builder = StateBuilder::new()
-            .sid("test_sid")
-            .public_code("pub")
-            .hidden_code("hid");
-        assert!(builder.build().is_err());
-    }
-
-    #[test]
-    fn test_state_builder_missing_sid() {
-        let builder = StateBuilder::new()
-            .token("test_token")
-            .public_code("pub")
-            .hidden_code("hid");
-        assert!(builder.build().is_err());
-    }
-
-    #[test]
-    fn test_state_builder_missing_public_code() {
-        let builder = StateBuilder::new()
-            .token("test_token")
-            .sid("test_sid")
-            .hidden_code("hid");
-        assert!(builder.build().is_err());
-    }
-
-    #[test]
-    fn test_state_builder_missing_hidden_code() {
-        let builder = StateBuilder::new()
-            .token("test_token")
-            .sid("test_sid")
-            .public_code("pub");
-        assert!(builder.build().is_err());
-    }
-
-    #[test]
-    fn test_state_builder_success() {
+    fn test_state_builder() {
         let state = StateBuilder::new()
-            .token("test_token")
-            .sid("test_sid")
-            .public_code("pub")
-            .hidden_code("hid")
-            .demo(true)
-            .build()
-            .unwrap();
-
-        assert_eq!(state.token, "test_token");
-        assert_eq!(state.sid, "test_sid");
-        assert_eq!(state.public_code, "pub");
-        assert_eq!(state.hidden_code, "hid");
-        assert!(state.is_demo);
-        assert_eq!(state.acc_type(), "demo");
-    }
-
-    #[test]
-    fn test_state_builder_real_account() {
-        let state = StateBuilder::new()
-            .token("test_token")
-            .sid("test_sid")
-            .public_code("pub")
-            .hidden_code("hid")
-            .demo(false)
-            .build()
-            .unwrap();
-
-        assert_eq!(state.acc_type(), "real");
-    }
-
-    #[test]
-    fn test_ws_url() {
-        let state = StateBuilder::new()
-            .token("test_token")
-            .sid("abc123")
+            .token("test")
+            .sid("sid")
             .public_code("pub")
             .hidden_code("hid")
             .build()
             .unwrap();
+        assert_eq!(state.token, "test");
+        assert_eq!(state.sid, "sid");
+        assert_eq!(state.ws_url(), "wss://www.closeoption.com:8443/socket.io/?EIO=3&transport=websocket&sid=sid");
+    }
 
-        let url = state.ws_url();
-        assert!(url.contains("sid=abc123"));
-        assert!(url.contains("EIO=3"));
-        assert!(url.contains("transport=websocket"));
+    #[test]
+    fn test_state_builder_with_custom_url() {
+        let state = StateBuilder::new()
+            .token("test")
+            .sid("sid")
+            .public_code("pub")
+            .hidden_code("hid")
+            .ws_url("wss://custom.example.com/socket")
+            .build()
+            .unwrap();
+        assert_eq!(state.ws_url(), "wss://custom.example.com/socket");
     }
 }

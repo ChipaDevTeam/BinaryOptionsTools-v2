@@ -262,14 +262,20 @@ pub mod socket_io {
     /// Encode a Socket.IO EIO=3 frame
     pub fn encode_frame(msg_type: SocketIoMessageType, namespace: Option<&str>, data: &str) -> String {
         let mut result = String::new();
-        result.push(char::from_digit(msg_type.as_u8() as u32, 10).unwrap());
-
-        if let Some(ns) = namespace {
-            result.push('/');
-            result.push_str(ns);
-            result.push(',');
+        let code = msg_type.as_u8();
+        if code < 8 {
+            // Socket.IO packet: prepend Engine.IO Message prefix '4'
+            result.push('4');
+            result.push(char::from_digit(code as u32, 10).unwrap());
+            if let Some(ns) = namespace {
+                result.push('/');
+                result.push_str(ns);
+                result.push(',');
+            }
+        } else {
+            // Engine.IO packet types 10-16: output as two-digit decimal
+            result.push_str(&code.to_string());
         }
-
         result.push_str(data);
         result
     }
@@ -354,5 +360,17 @@ mod tests {
     fn test_encode_event() {
         let encoded = socket_io::event("priceData", r#"{"prices":{}}"#);
         assert!(encoded.starts_with("42[\"priceData\""));
+    }
+
+    #[test]
+    fn test_encode_engine_ping() {
+        let encoded = socket_io::encode_frame(SocketIoMessageType::EnginePing, None, "probe");
+        assert_eq!(encoded, "12probe");
+    }
+
+    #[test]
+    fn test_encode_socket_event() {
+        let encoded = socket_io::encode_frame(SocketIoMessageType::Event, None, r#"["priceData",{}]"#);
+        assert_eq!(encoded, r#"42["priceData",{}]"#);
     }
 }

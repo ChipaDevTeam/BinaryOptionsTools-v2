@@ -196,12 +196,16 @@ def parse_ssid(ssid: str) -> Tuple[str, str, bool, str, str]:
 def save_ssid(ssid: str, filepath: Optional[str] = None):
     """Save SSID to file for future use."""
     token, sid, demo, public_code, hidden_code = parse_ssid(ssid)
-    
+
+    if not public_code or not hidden_code:
+        print("Error: SSID must contain both public_code and hidden_code (5-part format)")
+        return
+
     if not filepath:
         filepath = os.path.expanduser("~/.closeoption_session.json")
-    
+
     os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else ".", exist_ok=True)
-    
+
     data = {
         "token": token,
         "sid": sid,
@@ -209,11 +213,11 @@ def save_ssid(ssid: str, filepath: Optional[str] = None):
         "public_code": public_code,
         "hidden_code": hidden_code,
     }
-    
+
     fd = os.open(filepath, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, 'w') as f:
         json.dump(data, f, indent=2)
-    
+
     print(f"SSID saved to: {filepath}")
 
 def print_export_instructions():

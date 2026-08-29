@@ -164,11 +164,9 @@ impl Connector<State> for CloseConnect {
                     .map_err(|_| ConnectorError::Timeout)?
                     .map_err(|e| ConnectorError::Custom(format!("TLS handshake failed: {e}")))?
                 }
-                MaybeTlsStream::Rustls(mut proxy_tls_stream) => {
-                    // HTTPS proxy: use the TLS stream as the proxy tunnel
-                    // After HTTP CONNECT, the stream is a tunnel to the target
-                    crate::closeoption::utils::http_connect_handshake(&mut proxy_tls_stream, target_host, target_port, None).await?;
-                    // Use the TLS stream directly for WebSocket (tunnel is established)
+                MaybeTlsStream::Rustls(proxy_tls_stream) => {
+                    // HTTPS proxy: tunnel already established by http_connect_handshake at line 127
+                    // No additional TLS needed - the proxy connection is already TLS-encrypted
                     proxy_tls_stream
                 }
                 _ => {

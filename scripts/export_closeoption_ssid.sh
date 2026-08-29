@@ -220,5 +220,6 @@ EOF
             echo -e "${GREEN}Session saved to: $HOME/.closeoption_session.json${NC}"
         fi
     fi
+}
 
 main "$@"
