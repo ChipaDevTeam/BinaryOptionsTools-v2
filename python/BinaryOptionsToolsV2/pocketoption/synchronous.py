@@ -529,7 +529,7 @@ class PocketOption:
         Returns:
             A list of historical trade dictionaries.
         """
-
+        return self._run(self._client.history(asset, period))
     def get_ticks(self, asset: str, lookback_seconds: int) -> List[Tuple[int, float]]:
         """Get historical tick data for an asset.
 

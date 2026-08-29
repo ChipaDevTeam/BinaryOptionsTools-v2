@@ -296,6 +296,7 @@ if __name__ == "__main__":
 async with PocketOptionAsync(ssid="...") as client:
     async for candle in await client.subscribe_symbol("EURUSD_otc"):
         print(f"Price: {candle['close']}")
+```
 #### Historical Tick Data
 
 To fetch raw historical tick data for an asset, use `get_ticks(asset, lookback_seconds)`. This method uses `loadHistoryPeriod` pagination to retrieve the specified number of seconds of tick history.
