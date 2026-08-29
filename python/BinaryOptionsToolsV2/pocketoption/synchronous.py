@@ -529,7 +529,42 @@ class PocketOption:
         Returns:
             A list of historical trade dictionaries.
         """
-        return self._run(self._client.history(asset, period))
+
+    def get_ticks(self, asset: str, lookback_seconds: int) -> List[Tuple[int, float]]:
+        """Get historical tick data for an asset.
+
+        This method fetches raw tick data using the loadHistoryPeriod WebSocket message
+        with pagination to retrieve the specified number of seconds of tick history.
+
+        Args:
+            asset: The trading asset name (e.g., "USDCHF_otc").
+            lookback_seconds: Number of seconds of tick history to fetch.
+
+        Returns:
+            A list of (timestamp, price) tuples sorted by timestamp.
+
+        Raises:
+            ConnectionError: If the client is not connected.
+            ValueError: If the asset is invalid or lookback_seconds is zero/negative.
+            TimeoutError: If tick fetch times out.
+
+        Example:
+            ```python
+            with PocketOption(ssid) as client:
+                # Get last 5 minutes of tick data
+                ticks = client.get_ticks("USDCHF_otc", 300)
+                for ts, price in ticks[:5]:
+                    print(f"{ts}: {price}")
+            ```
+
+        Note:
+            - Uses loadHistoryPeriod pagination internally (period=1 for tick data).
+            - Returns raw ticks, not aggregated candles.
+        """
+        if not isinstance(lookback_seconds, int) or lookback_seconds <= 0:
+            raise ValueError("lookback_seconds must be a positive integer")
+
+        return self._run(self._client.get_ticks(asset, lookback_seconds))
 
     def compile_candles(self, asset: str, custom_period: int, lookback_period: int) -> List[Dict]:
         """Compile candles from raw data with a custom aggregation period.

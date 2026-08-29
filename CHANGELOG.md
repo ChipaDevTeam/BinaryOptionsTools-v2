@@ -4,14 +4,13 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
 ## [0.2.14] - 2026-08-28
-
 ### Added
-
 - **CloseOption Support**: Added new `closeoption` module for the CloseOption binary options platform, supporting Socket.IO EIO=3 protocol on `wss://www.closeoption.com:8443`.
 - Added `CloseOptionAsync` and `CloseOption` Python clients mirroring the PocketOption API.
 - Added PyO3 bindings for CloseOption with full async method support.
+- **Historical Tick Data**: Added `get_ticks(asset, lookback_seconds)` method to `PocketOptionAsync`, `PocketOption` (sync), and `RawPocketOption` clients for fetching raw tick history via `loadHistoryPeriod` WebSocket message with pagination.
+- Added `get_ticks.py` examples for both async and sync Python APIs.
 
 ### Fixed
 

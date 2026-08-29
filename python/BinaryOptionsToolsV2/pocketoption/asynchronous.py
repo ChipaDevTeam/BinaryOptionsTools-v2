@@ -1188,7 +1188,42 @@ class PocketOptionAsync:
             and may have different availability or latency characteristics. For advanced
             historical data with specific time ranges, consider using `get_candles_advanced()`.
         """
-        return json.loads(await self.client.history(asset, period))
+
+    async def get_ticks(self, asset: str, lookback_seconds: int) -> List[Tuple[int, float]]:
+        """Retrieves historical tick data for an asset.
+
+        This method fetches raw tick data using the loadHistoryPeriod WebSocket message
+        with pagination to retrieve the specified number of seconds of tick history.
+
+        Args:
+            asset (str): Trading symbol (e.g., "USDCHF_otc")
+            lookback_seconds (int): Number of seconds of tick history to fetch
+
+        Returns:
+            List[Tuple[int, float]]: List of (timestamp, price) tuples sorted by timestamp
+
+        Raises:
+            ConnectionError: If the client is not connected
+            ValueError: If the asset is invalid or lookback_seconds is zero/negative
+            TimeoutError: If tick fetch times out
+
+        Example:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                # Get last 5 minutes of tick data
+                ticks = await client.get_ticks("USDCHF_otc", 300)
+                for ts, price in ticks[:5]:
+                    print(f"{ts}: {price}")
+            ```
+
+        Note:
+            - Uses loadHistoryPeriod pagination internally (period=1 for tick data)
+            - Returns raw ticks, not aggregated candles
+        """
+        if not isinstance(lookback_seconds, int) or lookback_seconds <= 0:
+            raise ValueError("lookback_seconds must be a positive integer")
+
+        return json.loads(await self.client.get_ticks(asset, lookback_seconds))
 
     async def compile_candles(self, asset: str, custom_period: int, lookback_period: int) -> List[Dict]:
         """Compiles custom candlesticks from raw tick history.

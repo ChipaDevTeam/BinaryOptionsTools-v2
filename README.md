@@ -129,6 +129,7 @@ This project is mirrored and synchronized across both GitLab and GitHub:
 ### Supported Platforms
 
 - **PocketOption** (Full Support: Quick Trading, Pending Orders, Assets, History)
+- **CloseOption** (Alpha/Beta: Account Info, Keep-Alive, WebSocket Core, Trading)
 - **ExpertOption** (Alpha/Beta: Account Info, Keep-Alive, WebSocket Core)
 - **IQ Option** (On Roadmap)
 
@@ -144,8 +145,8 @@ This project is mirrored and synchronized across both GitLab and GitHub:
 - **Portfolio**: Access active positions and closed deal history.
 
 ### Market Data & Backtesting
-
- - **Live Stream**: Subscribe to real-time price ticks (`subscribe_symbol`) or fetch historical backfill and stream gap-free live candles (`get_candles_live`).
+- **Live Stream**: Subscribe to real-time price ticks (`subscribe_symbol`) or fetch historical backfill and stream gap-free live candles (`get_candles_live`).
+- **Historical Tick Data**: Fetch raw tick history via `get_ticks(asset, lookback_seconds)` using `loadHistoryPeriod` pagination.
 - **Historical / UTC Candles**: Fetch and compile custom or standard candles directly from 1-second ticks aligned strictly to UTC boundaries, ensuring no server-side gaps or overlaps (merges).
 - **Virtual Market**: Built-in simulator for backtesting strategies without financial risk.
 - **Server Sync**: Precision timing via NTP-like synchronization.
@@ -295,6 +296,33 @@ if __name__ == "__main__":
 async with PocketOptionAsync(ssid="...") as client:
     async for candle in await client.subscribe_symbol("EURUSD_otc"):
         print(f"Price: {candle['close']}")
+#### Historical Tick Data
+
+To fetch raw historical tick data for an asset, use `get_ticks(asset, lookback_seconds)`. This method uses `loadHistoryPeriod` pagination to retrieve the specified number of seconds of tick history.
+
+**Async Example:**
+
+```python
+from BinaryOptionsToolsV2 import PocketOptionAsync
+
+async def main():
+    async with PocketOptionAsync(ssid="...") as client:
+        # Get last 5 minutes of tick data
+        ticks = await client.get_ticks("USDCHF_otc", 300)
+        for ts, price in ticks[:5]:
+            print(f"{ts}: {price}")
+```
+
+**Sync Example:**
+
+```python
+from BinaryOptionsToolsV2 import PocketOption
+
+client = PocketOption(ssid="...")
+# Get last 5 minutes of tick data
+ticks = client.get_ticks("USDCHF_otc", 300)
+for ts, price in ticks[:5]:
+    print(f"{ts}: {price}")
 ```
 
 #### Live Candle Stream (Recommended)
@@ -368,8 +396,8 @@ The [`examples/`](examples/) directory contains ready-to-run scripts for both as
 | Example                                                                | Description                     |
 | ---------------------------------------------------------------------- | ------------------------------- |
 | [`trade.py`](examples/python/async/trade.py)                           | Basic buy/sell with `check_win` |
-| [`get_balance.py`](examples/python/async/get_balance.py)               | Account balance retrieval       |
-| [`get_candles.py`](examples/python/async/get_candles.py)               | Historical candle data          |
+| [`get_candles.py`](examples/python/async/get_candles.py)                         | Historical candle data          |
+| [`get_ticks.py`](examples/python/async/get_ticks.py)                         | Historical tick data            |
 | [`subscribe_symbol.py`](examples/python/async/subscribe_symbol.py)     | Real-time candle subscription   |
 | [`strategy_example.py`](examples/python/async/strategy_example.py)     | PyBot/PyStrategy framework      |
 | [`comprehensive_demo.py`](examples/python/async/comprehensive_demo.py) | Full API walkthrough            |
@@ -379,7 +407,7 @@ The [`examples/`](examples/) directory contains ready-to-run scripts for both as
 
 ### Python Sync
 
-A parallel set of examples using the synchronous `PocketOption` client is available in [`examples/python/sync/`](examples/python/sync/).
+A parallel set of examples using the synchronous `PocketOption` client is available in [`examples/python/sync/`](examples/python/sync/), including `get_ticks.py` for historical tick data.
 
 ### Other Languages
 
