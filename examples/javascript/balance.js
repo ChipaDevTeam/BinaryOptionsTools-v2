@@ -1,18 +1,19 @@
-const { PocketOption } = require("./binary-options-tools.node");
+// Reads the account balance.
+//
+//   node balance.js "<ssid>"
+
+const { PocketOption } = require("../../nodejs");
 
 async function main(ssid) {
-  // Initialize the API client
+  // The constructor returns immediately and connects in the background;
+  // balance() waits for that connection before asking the server.
   const api = new PocketOption(ssid);
 
-  // Wait for connection to establish
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-
-  // Get balance
   const balance = await api.balance();
   console.log(`Balance: ${balance}`);
+
+  await api.shutdown();
 }
 
-// Check if ssid is provided as command line argument
-const ssid = "";
-
+const ssid = process.argv[2] || process.env.POCKET_OPTION_SSID;
 main(ssid).catch(console.error);

@@ -1,18 +1,19 @@
-const { PocketOption } = require("./binary-options-tools.node");
+// Smallest possible session: connect, read the balance, disconnect.
+//
+//   node basic.js "<ssid>"
+
+const { PocketOption } = require("../../nodejs");
 
 async function main(ssid) {
-  // Initialize the API client
-  const api = new PocketOption(ssid);
+  // create() rejects if the connection cannot be established, unlike `new`
+  // which connects in the background.
+  const api = await PocketOption.create(ssid);
 
-  // Wait for connection to establish
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  console.log(`Demo account: ${await api.isDemo()}`);
+  console.log(`Balance: ${await api.balance()}`);
 
-  // Get balance
-  const balance = await api.balance();
-  console.log(`Balance: ${balance}`);
+  await api.shutdown();
 }
 
-// Check if ssid is provided as command line argument
-const ssid = "";
-
+const ssid = process.argv[2] || process.env.POCKET_OPTION_SSID;
 main(ssid).catch(console.error);

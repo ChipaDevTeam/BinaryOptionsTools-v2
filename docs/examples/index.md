@@ -83,8 +83,11 @@ cargo run --example basic
 
 ### JavaScript
 ```bash
+# Build the native addon once
+cd nodejs && npm run build && cd ..
+
 cd examples/javascript
-node basic.js
+node basic.js "<ssid>"
 ```
 
 ### Swift

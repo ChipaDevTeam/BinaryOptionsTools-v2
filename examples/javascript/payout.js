@@ -1,20 +1,22 @@
-const { PocketOption } = require("./binary-options-tools.node");
+// Lists the payout percentage of every active asset.
+//
+//   node payout.js "<ssid>"
+
+const { PocketOption } = require("../../nodejs");
 
 async function main(ssid) {
-  // Initialize the API client
-  const api = new PocketOption(ssid);
+  const api = await PocketOption.create(ssid);
 
-  // Wait for connection to establish
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  // The asset list arrives shortly after the connection is established.
+  await api.waitForAssets(10);
 
-  // The payout method does not exist in the current API implementation
-  // Please refer to the documentation for available methods
-  console.log(
-    "The payout method is not available in the current API implementation.",
-  );
+  const payouts = await api.payout();
+  for (const [asset, payout] of Object.entries(payouts)) {
+    console.log(`${asset}: ${payout}%`);
+  }
+
+  await api.shutdown();
 }
 
-// Check if ssid is provided as command line argument
-const ssid = "";
-
+const ssid = process.argv[2] || process.env.POCKET_OPTION_SSID;
 main(ssid).catch(console.error);

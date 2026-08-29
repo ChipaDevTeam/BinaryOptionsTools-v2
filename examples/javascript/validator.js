@@ -1,51 +1,43 @@
-const { Validator } = require("./binary-options-tools.node");
+// Validators decide which raw WebSocket messages a handler keeps.
+// This example needs no connection and no ssid.
+//
+//   node validator.js
 
-// Create validator instances
+const { Validator } = require("../../nodejs");
+
 const none = new Validator();
 const regex = Validator.regex("([A-Z])\\w+");
 const start = Validator.startsWith("Hello");
 const end = Validator.endsWith("Bye");
 const contains = Validator.contains("World");
-const rnot = Validator.ne(contains);
+const negated = Validator.ne(contains);
 
-// Modified for better testing - smaller groups with predictable outcomes
-const rall = Validator.all([regex, start]); // Will need both capital letter and "Hello" at start
-const rany = Validator.any([contains, end]); // Will need either "World" or end with "Bye"
+// Needs both a capitalised word and a "Hello" prefix.
+const all = Validator.all([regex, start]);
+// Needs either "World" anywhere or a "Bye" suffix.
+const any = Validator.any([contains, end]);
 
-// Testing each validator
 console.log(`None validator: ${none.check("hello")} (Expected: true)`);
 
 console.log(`Regex validator: ${regex.check("Hello")} (Expected: true)`);
 console.log(`Regex validator: ${regex.check("hello")} (Expected: false)`);
 
-console.log(
-  `Starts_with validator: ${start.check("Hello World")} (Expected: true)`,
-);
-console.log(
-  `Starts_with validator: ${start.check("hi World")} (Expected: false)`,
-);
+console.log(`Starts_with validator: ${start.check("Hello World")} (Expected: true)`);
+console.log(`Starts_with validator: ${start.check("hi World")} (Expected: false)`);
 
 console.log(`Ends_with validator: ${end.check("Hello Bye")} (Expected: true)`);
-console.log(
-  `Ends_with validator: ${end.check("Hello there")} (Expected: false)`,
-);
+console.log(`Ends_with validator: ${end.check("Hello there")} (Expected: false)`);
 
-console.log(
-  `Contains validator: ${contains.check("Hello World")} (Expected: true)`,
-);
-console.log(
-  `Contains validator: ${contains.check("Hello there")} (Expected: false)`,
-);
+console.log(`Contains validator: ${contains.check("Hello World")} (Expected: true)`);
+console.log(`Contains validator: ${contains.check("Hello there")} (Expected: false)`);
 
-console.log(`Not validator: ${rnot.check("Hello World")} (Expected: false)`);
-console.log(`Not validator: ${rnot.check("Hello there")} (Expected: true)`);
+console.log(`Not validator: ${negated.check("Hello World")} (Expected: false)`);
+console.log(`Not validator: ${negated.check("Hello there")} (Expected: true)`);
 
-// Testing the all validator
-console.log(`All validator: ${rall.check("Hello World")} (Expected: true)`); // Starts with "Hello" and has capital
-console.log(`All validator: ${rall.check("hello World")} (Expected: false)`); // No capital at start
-console.log(`All validator: ${rall.check("Hey there")} (Expected: false)`); // Has capital but doesn't start with "Hello"
+console.log(`All validator: ${all.check("Hello World")} (Expected: true)`);
+console.log(`All validator: ${all.check("hello World")} (Expected: false)`);
+console.log(`All validator: ${all.check("Hey there")} (Expected: false)`);
 
-// Testing the any validator
-console.log(`Any validator: ${rany.check("Hello World")} (Expected: true)`); // Contains "World"
-console.log(`Any validator: ${rany.check("Hello Bye")} (Expected: true)`); // Ends with "Bye"
-console.log(`Any validator: ${rany.check("Hello there")} (Expected: false)`); // Neither contains "World" nor ends with "Bye"
+console.log(`Any validator: ${any.check("Hello World")} (Expected: true)`);
+console.log(`Any validator: ${any.check("Hello Bye")} (Expected: true)`);
+console.log(`Any validator: ${any.check("Hello there")} (Expected: false)`);
