@@ -1188,7 +1188,7 @@ class PocketOptionAsync:
             and may have different availability or latency characteristics. For advanced
             historical data with specific time ranges, consider using `get_candles_advanced()`.
         """
-
+        return json.loads(await self.client.history(asset, period))
     async def get_ticks(self, asset: str, lookback_seconds: int) -> List[Tuple[int, float]]:
         """Retrieves historical tick data for an asset.
 
@@ -1223,7 +1223,7 @@ class PocketOptionAsync:
         if not isinstance(lookback_seconds, int) or lookback_seconds <= 0:
             raise ValueError("lookback_seconds must be a positive integer")
 
-        return json.loads(await self.client.get_ticks(asset, lookback_seconds))
+        return [tuple(tick) for tick in json.loads(await self.client.get_ticks(asset, lookback_seconds))]
 
     async def compile_candles(self, asset: str, custom_period: int, lookback_period: int) -> List[Dict]:
         """Compiles custom candlesticks from raw tick history.
