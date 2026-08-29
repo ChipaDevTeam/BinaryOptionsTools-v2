@@ -1,20 +1,24 @@
-const { PocketOption } = require("./binary-options-tools.node");
-const { Validator } = require("./binary-options-tools.node");
+// Iterates over every raw response matching a validator.
+//
+//   node create_raw_iterator.js "<ssid>"
+
+const { PocketOption, Validator } = require("../../nodejs");
 
 async function main(ssid) {
-  // Initialize the API client
-  const api = new PocketOption(ssid);
+  const api = await PocketOption.create(ssid);
 
-  // Wait for connection to establish
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  const validator = Validator.contains('"signals"');
 
-  // The createRawIterator method does not exist in the current API implementation
-  // Please refer to the documentation for available methods
-  console.log(
-    "The createRawIterator method is not available in the current API implementation.",
-  );
+  // Sends the message, then yields matching responses for 10 seconds.
+  const stream = await api.createRawIterator('42["signals/subscribe"]', validator, 10_000);
+
+  for await (const message of stream) {
+    console.log(`Received: ${message}`);
+  }
+
+  console.log("Iterator finished");
+  await api.shutdown();
 }
 
-const ssid = "";
-
+const ssid = process.argv[2] || process.env.POCKET_OPTION_SSID;
 main(ssid).catch(console.error);

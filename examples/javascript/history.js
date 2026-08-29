@@ -1,31 +1,27 @@
-const { PocketOption } = require("./binary-options-tools.node");
+// Fetches candle history and formats the timestamps.
+//
+//   node history.js "<ssid>"
+
+const { PocketOption } = require("../../nodejs");
 
 async function main(ssid) {
-  // Initialize the API client
-  const api = new PocketOption(ssid);
+  const api = await PocketOption.create(ssid);
 
-  // Wait for connection to establish
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-
-  // Get candles history
   const candles = await api.history("EURUSD_otc", 3600);
-  console.log("Raw Candles:", candles);
+  console.log(`Raw candles: ${candles.length}`);
 
-  // If you want to use something similar to pandas in JavaScript,
-  // you could use libraries like 'dataframe-js' or process the raw data
-  const formattedCandles = candles.map((candle) => ({
-    time: new Date(candle.time).toISOString(),
+  const formatted = candles.map((candle) => ({
+    time: new Date(candle.time * 1000).toISOString(),
     open: candle.open,
     high: candle.high,
     low: candle.low,
     close: candle.close,
-    volume: candle.volume,
   }));
 
-  console.log("Formatted Candles:", formattedCandles);
+  console.log("Formatted candles:", formatted.slice(0, 5));
+
+  await api.shutdown();
 }
 
-// Check if ssid is provided as command line argument
-const ssid = "";
-
+const ssid = process.argv[2] || process.env.POCKET_OPTION_SSID;
 main(ssid).catch(console.error);

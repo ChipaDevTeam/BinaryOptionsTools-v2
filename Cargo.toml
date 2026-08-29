@@ -5,6 +5,7 @@ members = [
     "crates/core", "crates/core/macros/",
     "crates/macros",
     "crates/binary_options_tools",
+    "crates/bindings_napi",
     "crates/bindings_pyo3",
     "crates/bindings_uniffi",
     "crates/bindings_uniffi/bo2_macros",

@@ -25,8 +25,12 @@ pip install binaryoptionstoolsv2
 
 ### JavaScript/TypeScript
 
+The Node.js bindings are built from source; Node.js 18+ and a Rust toolchain
+are required.
+
 ```bash
-npm install binaryoptionstoolsv2
+cd nodejs
+npm run build
 ```
 
 ### Rust
@@ -114,11 +118,11 @@ client.shutdown()
 #### JavaScript
 
 ```javascript
-const { PocketOption } = require('binaryoptionstoolsv2');
+const { PocketOption } = require('binary-options-tools');
 
 async function main() {
+    // The constructor connects in the background; every method awaits it.
     const client = new PocketOption("your_ssid");
-    await new Promise(resolve => setTimeout(resolve, 2000));
 
     const balance = await client.balance();
     console.log(`Balance: $${balance}`);
@@ -167,10 +171,10 @@ print(f"Amount: ${trade.amount}")
 
 ```javascript
 // Place a $1 call trade on EURUSD_otc for 60 seconds
-const trade = await client.buy("EURUSD_otc", 60, 1.0);
-console.log(`Trade ID: ${trade.id}`);
-console.log(`Asset: ${trade.asset}`);
-console.log(`Amount: $${trade.amount}`);
+const [tradeId, deal] = await client.buy("EURUSD_otc", 1.0, 60);
+console.log(`Trade ID: ${tradeId}`);
+console.log(`Asset: ${deal.asset}`);
+console.log(`Amount: $${deal.amount}`);
 ```
 
 #### Rust
@@ -197,8 +201,8 @@ print(f"Trade ID: {trade.id}")
 
 ```javascript
 // Place a $1 put trade on EURUSD_otc for 60 seconds
-const trade = await client.sell("EURUSD_otc", 60, 1.0);
-console.log(`Trade ID: ${trade.id}`);
+const [tradeId] = await client.sell("EURUSD_otc", 1.0, 60);
+console.log(`Trade ID: ${tradeId}`);
 ```
 
 #### Rust
@@ -223,8 +227,8 @@ print(f"Profit: ${result.profit}")
 #### JavaScript
 
 ```javascript
-// Check if a trade won or lost
-const result = await client.result(trade.id);
+// Waits for the trade to settle, then reports it
+const result = await client.result(tradeId);
 console.log(`Result: ${result.profit > 0 ? 'WIN' : 'LOSS'}`);
 console.log(`Profit: $${result.profit}`);
 ```
@@ -278,7 +282,7 @@ print(f"Account type: {account_type}")
 #### JavaScript
 
 ```javascript
-const isDemo = client.isDemo();
+const isDemo = await client.isDemo();
 const accountType = isDemo ? "Demo" : "Real";
 console.log(`Account type: ${accountType}`);
 ```
@@ -305,11 +309,12 @@ for deal in open_deals:
 #### JavaScript
 
 ```javascript
-const openDeals = await client.getOpenedDeals();
-console.log(`Open trades: ${openDeals.length}`);
-openDeals.forEach(deal => {
+// Running deals, keyed by deal id
+const openDeals = await client.openedDeals();
+console.log(`Open trades: ${Object.keys(openDeals).length}`);
+for (const deal of Object.values(openDeals)) {
     console.log(`  ${deal.asset}: $${deal.amount} (${deal.action})`);
-});
+}
 ```
 
 #### Rust
@@ -337,12 +342,13 @@ for deal in closed_deals:
 #### JavaScript
 
 ```javascript
-const closedDeals = await client.getClosedDeals();
-console.log(`Closed trades: ${closedDeals.length}`);
-closedDeals.forEach(deal => {
+// Settled deals, keyed by deal id
+const closedDeals = await client.closedDeals();
+console.log(`Closed trades: ${Object.keys(closedDeals).length}`);
+for (const deal of Object.values(closedDeals)) {
     const result = deal.profit > 0 ? "WIN" : "LOSS";
     console.log(`  ${deal.asset}: ${result} ($${deal.profit.toFixed(2)})`);
-});
+}
 ```
 
 #### Rust
@@ -377,8 +383,8 @@ for candle in candles[:5]:  # Show first 5
 #### JavaScript
 
 ```javascript
-// Get last 100 candles with 60-second period
-const candles = await client.getCandles("EURUSD_otc", 60, 100);
+// 60-second candles, looking back one hour
+const candles = await client.getCandles("EURUSD_otc", 60, 3600);
 console.log(`Retrieved ${candles.length} candles`);
 candles.slice(0, 5).forEach(candle => {
     console.log(`  Time: ${candle.time}, Close: ${candle.close}`);
@@ -560,17 +566,15 @@ except Exception as e:
 ### JavaScript
 
 ```javascript
-const { PocketOption, PocketError } = require('binaryoptionstoolsv2');
+const { PocketOption } = require('binary-options-tools');
 
 try {
     const client = new PocketOption("invalid_ssid");
     const balance = await client.balance();
 } catch (e) {
-    if (e instanceof PocketError) {
-        console.log(`Error: ${e.message}`);
-    } else {
-        console.log(`Unexpected error: ${e.message}`);
-    }
+    // The message is prefixed with the error kind, e.g.
+    // "PocketOptionError: ..." or "TimeoutError: ...".
+    console.log(`Error: ${e.message}`);
 }
 ```
 
@@ -596,11 +600,14 @@ match PocketOption::new("invalid_ssid").await {
 
 ### 1. Always Wait for Initialization
 
-All languages should wait 2 seconds after creating the client:
+Wait 2 seconds after creating the client:
 
 - **Python**: `await asyncio.sleep(2)`
-- **JavaScript**: `await new Promise(resolve => setTimeout(resolve, 2000))`
 - **Rust**: `tokio::time::sleep(Duration::from_secs(2)).await`
+
+JavaScript is the exception: every method already awaits the pending
+connection, so no sleep is needed. Use `await PocketOption.create(ssid)` when
+a failed connection should reject up front.
 
 ### 2. Always Shutdown Gracefully
 
