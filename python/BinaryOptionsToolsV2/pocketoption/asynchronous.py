@@ -597,7 +597,7 @@ class PocketOptionAsync:
         def merge_candles(*groups: List[Dict]) -> List[Dict]:
             res: Dict[int, Dict] = {}
             for group in groups:
-                for candle in group:
+                for candle in group or []:
                     res[extract_time(candle)] = candle
             return [res[ts] for ts in sorted(res)]
 
