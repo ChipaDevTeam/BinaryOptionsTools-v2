@@ -29,6 +29,7 @@ const { PocketOption, Validator } = lib;
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";
 const AUTH_TOKEN = process.env.AUTH_TOKEN || null;
+const ALLOW_NO_AUTH = process.env.ALLOW_NO_AUTH === "1";
 const ALLOW_TRADING = process.env.ALLOW_TRADING === "1";
 const SESSION_TTL_MS = Number(process.env.SESSION_TTL_MS || 30 * 60 * 1000);
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -375,6 +376,19 @@ const server = http.createServer(async (req, res) => {
 
   fail(res, 404, "NotFound", `No route for ${req.method} ${pathname}.`);
 });
+
+/**
+ * A session opened through this server can read an account and, with trading
+ * on, spend from it. Reachable from off the machine and with nothing in front
+ * of it, that is anyone's session to drive — so refuse rather than serve it.
+ */
+const LOOPBACK = ["127.0.0.1", "::1", "localhost"];
+if (!LOOPBACK.includes(HOST) && !AUTH_TOKEN && !ALLOW_NO_AUTH) {
+  console.error(`Refusing to listen on ${HOST} without AUTH_TOKEN.`);
+  console.error("Anyone who can reach this port could drive any session opened on it.");
+  console.error("Set AUTH_TOKEN=<a long random string>, or ALLOW_NO_AUTH=1 if the network is genuinely trusted.");
+  process.exit(1);
+}
 
 server.listen(PORT, HOST, () => {
   console.log(`binary-options-tools API on http://${HOST}:${PORT}`);
