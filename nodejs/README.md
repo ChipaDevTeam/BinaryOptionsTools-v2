@@ -79,6 +79,60 @@ const { startLogs } = require("binary-options-tools");
 startLogs({ path: ".", level: "DEBUG", terminal: true });
 ```
 
+## Checking it from a phone
+
+The addon only loads inside Node, so a browser cannot call it directly. `server/`
+is a small dependency-free HTTP wrapper that holds the clients, plus a page that
+drives them — run it on a machine on your network and open it from your phone.
+
+```bash
+cd nodejs
+npm run build          # once, to compile the addon
+HOST=0.0.0.0 npm run serve
+# then open http://<that-machine's-ip>:8787 on your phone
+```
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PORT` | `8787` | port to listen on |
+| `HOST` | `127.0.0.1` | bind address; use `0.0.0.0` to reach it from another device |
+| `AUTH_TOKEN` | unset | when set, every `/api` call needs `?token=…` or an `X-Auth-Token` header |
+| `ALLOW_TRADING` | unset | set to `1` to enable the order endpoint; without it trading is refused |
+| `SESSION_TTL_MS` | `1800000` | idle time before a session is dropped and its client shut down |
+
+The validator and introspection endpoints need no account. Everything under
+`/api/session/:id` needs an ssid, which is posted once, held in the server's
+memory, and never sent back to the browser.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/health` | addon path and size, Node version, whether trading is on |
+| `GET /api/surface` | every class and method the addon exports |
+| `POST /api/validator` | build a validator from JSON and run it against a message |
+| `POST /api/session` | connect with an ssid, returns a session id |
+| `GET /api/session/:id/balance` | account balance |
+| `GET /api/session/:id/payout` | payout percentage per active asset |
+| `GET /api/session/:id/candles` | `?asset=&period=` |
+| `GET /api/session/:id/ticks` | `?asset=&seconds=` |
+| `GET /api/session/:id/deals` | open and settled deals |
+| `GET /api/session/:id/stream` | server-sent events, one per candle |
+| `POST /api/session/:id/trade` | place an order — refused unless `ALLOW_TRADING=1` |
+| `GET /api/session/:id/result/:dealId` | wait for a trade to settle |
+| `DELETE /api/session/:id` | shut the client down |
+
+Validators are described as JSON and nest:
+
+```json
+{ "validator": { "type": "all", "of": [
+    { "type": "contains", "value": "\"status\":\"success\"" },
+    { "type": "not", "of": { "type": "contains", "value": "error" } }
+  ] },
+  "message": "..." }
+```
+
+Bind to `0.0.0.0` only on a network you trust, and set `AUTH_TOKEN` when you do:
+anyone who can reach the port can use any session you have open on it.
+
 ## API notes
 
 - Every method has both a `camelCase` and a `snake_case` spelling

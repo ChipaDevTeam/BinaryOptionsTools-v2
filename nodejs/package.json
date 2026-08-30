@@ -25,11 +25,13 @@
     "index.js",
     "index.d.ts",
     "binary-options-tools.node",
+    "server",
     "README.md"
   ],
   "scripts": {
     "build": "node scripts/build.js --release",
     "build:debug": "node scripts/build.js",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test \"test/*.test.js\"",
+    "serve": "node server/server.js"
   }
 }
