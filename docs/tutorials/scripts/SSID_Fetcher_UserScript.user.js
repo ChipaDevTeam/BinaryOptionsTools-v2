@@ -4,7 +4,7 @@
 // @match       *://pocketoption.com/*
 // @match       *://*.pocketoption.com/*
 // @grant       none
-// @version     1.3
+// @version     1.1
 // @author      Six
 // @description Intercepts auth SSID from PocketOption
 // ==/UserScript==
