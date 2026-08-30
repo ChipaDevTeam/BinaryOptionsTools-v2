@@ -163,9 +163,11 @@ finishes. The `url` the API also returns is a vanity hostname with no
 certificate until one is created on the server, so it is not the address to use.
 
 `.github/workflows/console-image.yml` does all of this on a push to `master`:
-builds the image, publishes it to GHCR, smoke-tests it (health, a validator
-round-trip, and a 401 without the token), then deploys when `CHIPA_API_KEY` is
-set. Two things need doing once before it works end to end:
+builds the image, smoke-tests the running container (health, a validator
+round-trip through the native matcher, and a 401 without the token), publishes
+it to GHCR, then deploys when `CHIPA_API_KEY` is set. On a pull request it
+builds and smoke-tests without publishing, so a broken Dockerfile is caught
+before it lands. Two things need doing once before it works end to end:
 
 - **Make the GHCR package public.** ChipaCloud Run pulls anonymously, so a
   private package fails with `status: "ERROR"`. Packages → binary-options-console
