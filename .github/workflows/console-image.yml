@@ -1,0 +1,137 @@
+name: Console image
+
+# Builds the bindings console image and publishes it to GHCR. When a
+# CHIPA_API_KEY secret is present the freshly pushed image is then deployed to
+# ChipaCloud Run; without it the workflow stops after the push.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "crates/**"
+      - "nodejs/**"
+      - ".github/workflows/console-image.yml"
+  # On a pull request the image is built and smoke-tested but not published,
+  # so a broken Dockerfile is caught before it reaches master.
+  pull_request:
+    paths:
+      - "crates/**"
+      - "nodejs/**"
+      - ".github/workflows/console-image.yml"
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Deploy to ChipaCloud Run after pushing the image"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/binary-options-console
+
+jobs:
+  image:
+    name: Build and publish
+    runs-on: ubuntu-24.04
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Work out the tags
+        id: meta
+        run: |
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          name="ghcr.io/$owner/binary-options-console"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "image=$name:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Built into the local daemon first so the smoke test runs against the
+      # exact image that would be published.
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: nodejs/server/Dockerfile
+          load: true
+          tags: ${{ steps.meta.outputs.image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the image
+        run: |
+          docker run -d --name console -p 8080:8080 \
+            -e AUTH_TOKEN=ci-smoke-test \
+            "${{ steps.meta.outputs.image }}"
+          for i in $(seq 1 30); do
+            if curl -sf "http://127.0.0.1:8080/api/health?token=ci-smoke-test" > health.json; then break; fi
+            sleep 2
+          done
+          docker logs console
+          cat health.json
+          grep -q '"ok":true' health.json
+          curl -sf -X POST "http://127.0.0.1:8080/api/validator?token=ci-smoke-test" \
+            -H 'content-type: application/json' \
+            -d '{"validator":{"type":"contains","value":"World"},"message":"Hello World"}' \
+            | grep -q '"matches":true'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/health)" = "401"
+          docker rm -f console
+
+      # Only once the image has proved it starts and serves.
+      - name: Publish
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: nodejs/server/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}
+            ${{ steps.meta.outputs.name }}:latest
+          cache-from: type=gha
+
+  deploy:
+    name: Deploy to ChipaCloud Run
+    needs: image
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Deploy
+        env:
+          CHIPA_KEY: ${{ secrets.CHIPA_API_KEY }}
+          CHIPA_API: ${{ vars.CHIPA_API_URL }}
+          SERVICE_NAME: ${{ vars.CHIPA_SERVICE_NAME }}
+          AUTH_TOKEN: ${{ secrets.CONSOLE_AUTH_TOKEN }}
+          IMAGE: ${{ needs.image.outputs.image }}
+        run: |
+          if [ -z "$CHIPA_KEY" ]; then
+            echo "No CHIPA_API_KEY secret is set, so there is nothing to deploy to." >> "$GITHUB_STEP_SUMMARY"
+            echo "The image was published as $IMAGE." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          bash nodejs/server/deploy.sh | tee deploy.out
+          {
+            echo "### Console deployed"
+            echo
+            echo '```'
+            cat deploy.out
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

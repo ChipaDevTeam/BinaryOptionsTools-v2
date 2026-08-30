@@ -133,6 +133,65 @@ Validators are described as JSON and nest:
 Bind to `0.0.0.0` only on a network you trust, and set `AUTH_TOKEN` when you do:
 anyone who can reach the port can use any session you have open on it.
 
+## Deploying it
+
+`server/Dockerfile` builds the addon and the console into one image. Build from
+the repository root — the Rust crates and the package both have to be in the
+context:
+
+```bash
+docker build -f nodejs/server/Dockerfile -t binary-options-console .
+docker run --rm -p 8080:8080 -e AUTH_TOKEN=$(openssl rand -hex 24) binary-options-console
+```
+
+The image sets `HOST=0.0.0.0` and `PORT=8080`; a container that binds loopback
+is only reachable from inside itself, which looks exactly like a broken deploy.
+
+`server/deploy.sh` ships it to [ChipaCloud Run](https://cloud.chipatrade.com).
+It creates the service the first time and replaces the image on every run after,
+so the same command covers a first deploy and a new build:
+
+```bash
+export CHIPA_KEY=cc_xxxxxxxxxxxx          # IAM → Create API key, Cloud Run → Write
+export IMAGE=ghcr.io/chipadevteam/binary-options-console:<tag>
+export AUTH_TOKEN=$(openssl rand -hex 24)
+./server/deploy.sh
+```
+
+It prints the service id and the `proxy_url`, which works as soon as the deploy
+finishes. The `url` the API also returns is a vanity hostname with no
+certificate until one is created on the server, so it is not the address to use.
+
+`.github/workflows/console-image.yml` does all of this on a push to `master`:
+builds the image, smoke-tests the running container (health, a validator
+round-trip through the native matcher, and a 401 without the token), publishes
+it to GHCR, then deploys when `CHIPA_API_KEY` is set. On a pull request it
+builds and smoke-tests without publishing, so a broken Dockerfile is caught
+before it lands. Two things need doing once before it works end to end:
+
+- **Make the GHCR package public.** ChipaCloud Run pulls anonymously, so a
+  private package fails with `status: "ERROR"`. Packages → binary-options-console
+  → Package settings → Change visibility.
+- **Add the secrets.** `CHIPA_API_KEY` and `CONSOLE_AUTH_TOKEN` as repository
+  secrets; optionally `CHIPA_API_URL` and `CHIPA_SERVICE_NAME` as variables.
+
+### Before you put it on a public URL
+
+A session opened through the console can read the account behind it, and with
+trading on, spend from it. The server refuses to start on a non-loopback
+interface unless `AUTH_TOKEN` is set (`ALLOW_NO_AUTH=1` overrides that for a
+network you genuinely trust), and `deploy.sh` refuses to deploy without one for
+the same reason.
+
+Two limits of the platform matter here. Its `env_vars` are stored in plain text
+and readable by anyone who can read the service, so `AUTH_TOKEN` is a shared
+secret rather than a strong one — rotate it by redeploying. And there is no
+persistent disk, so a redeploy drops every open session; people using the
+console will need to reconnect.
+
+Leave `ALLOW_TRADING` unset unless you specifically want the deployed console
+placing real orders.
+
 ## API notes
 
 - Every method has both a `camelCase` and a `snake_case` spelling
