@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bindings console</title>
+<style>
+  :root {
+    --ground: #EEF1F5; --surface: #FFFFFF; --surface-sub: #F7F9FB;
+    --line: #D3DAE3; --line-soft: #E3E8EE;
+    --text: #141B26; --text-dim: #5A6675; --text-faint: #808C9C;
+    --brass: #9A6A12; --brass-soft: #F0E3C8;
+    --pass: #226B55; --pass-soft: #DCEDE7;
+    --fail: #A83E25; --fail-soft: #F6E1DA;
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D131C; --surface: #151D29; --surface-sub: #1A2331;
+      --line: #2A3546; --line-soft: #212C3B;
+      --text: #E6EBF2; --text-dim: #9AA6B6; --text-faint: #77848F;
+      --brass: #DFAA4E; --brass-soft: #2A2317;
+      --pass: #52B694; --pass-soft: #16302A;
+      --fail: #E4805F; --fail-soft: #34201B;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--text);
+    font-family: var(--body); font-size: 16px; line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+  .shell { max-width: 44rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; display: flex; flex-direction: column; gap: 1.5rem; }
+  .eyebrow { font-family: var(--mono); font-size: .68rem; letter-spacing: .16em; text-transform: uppercase; color: var(--brass); margin: 0; }
+  h1 { font-family: var(--display); font-size: 1.85rem; line-height: 1.1; letter-spacing: -.02em; margin: .35rem 0 0; }
+  h2 { font-family: var(--display); font-size: 1.05rem; margin: 0 0 .15rem; }
+  .hint { color: var(--text-dim); font-size: .85rem; margin: 0; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 1rem; display: flex; flex-direction: column; gap: .8rem; }
+  .row { display: flex; gap: .5rem; flex-wrap: wrap; }
+  .row > * { flex: 1 1 auto; }
+  label { font-family: var(--mono); font-size: .66rem; letter-spacing: .12em; text-transform: uppercase; color: var(--text-faint); display: block; margin-bottom: .3rem; }
+  input, select, textarea {
+    width: 100%; font-family: var(--mono); font-size: .9rem; color: var(--text);
+    background: var(--surface-sub); border: 1px solid var(--line); border-radius: 7px;
+    padding: .55rem .65rem;
+  }
+  input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
+  button {
+    font-family: var(--body); font-size: .88rem; font-weight: 500; color: var(--text);
+    background: var(--surface-sub); border: 1px solid var(--line); border-radius: 7px;
+    padding: .55rem .85rem; cursor: pointer; flex: 0 1 auto;
+  }
+  button:hover:not(:disabled) { border-color: var(--brass); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--brass-soft); border-color: var(--brass); color: var(--brass); font-weight: 600; }
+  button.danger { color: var(--fail); border-color: var(--fail); background: var(--fail-soft); }
+  .chip { display: inline-flex; align-items: center; gap: .35rem; font-family: var(--mono); font-size: .66rem; letter-spacing: .06em; text-transform: uppercase; padding: .18rem .5rem; border-radius: 999px; }
+  .chip .dot { width: .4rem; height: .4rem; border-radius: 50%; background: currentColor; }
+  .chip--ok { color: var(--pass); background: var(--pass-soft); }
+  .chip--bad { color: var(--fail); background: var(--fail-soft); }
+  .chip--idle { color: var(--text-faint); background: var(--surface-sub); }
+  .facts { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .6rem; }
+  .fact-k { font-family: var(--mono); font-size: .62rem; letter-spacing: .12em; text-transform: uppercase; color: var(--text-faint); margin: 0; }
+  .fact-v { font-family: var(--mono); font-size: .82rem; margin: .1rem 0 0; overflow-wrap: anywhere; }
+  pre {
+    margin: 0; background: var(--surface-sub); border: 1px solid var(--line-soft); border-radius: 8px;
+    padding: .7rem .8rem; overflow-x: auto; font-family: var(--mono); font-size: .76rem;
+    line-height: 1.6; max-height: 22rem; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .out-head { display: flex; align-items: center; gap: .5rem; }
+  .out-head .path { font-family: var(--mono); font-size: .74rem; color: var(--text-dim); overflow-wrap: anywhere; flex: 1; }
+  .hidden { display: none !important; }
+  .warn { border-left: 2px solid var(--fail); background: var(--fail-soft); color: var(--fail); padding: .6rem .75rem; border-radius: 0 6px 6px 0; font-size: .84rem; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header>
+    <p class="eyebrow">Local console</p>
+    <h1>PocketOption bindings</h1>
+    <p class="hint">This page talks to the Node process next to it, which is the only thing that can load the native addon.</p>
+  </header>
+
+  <section class="card">
+    <div class="out-head">
+      <h2>Server</h2>
+      <span class="chip chip--idle" id="health-chip"><span class="dot"></span>checking</span>
+    </div>
+    <div class="facts" id="health-facts"></div>
+  </section>
+
+  <section class="card">
+    <h2>Validators</h2>
+    <p class="hint">Runs the native matcher. No account needed.</p>
+    <div class="row">
+      <div style="flex:1 1 9rem">
+        <label for="v-type">Kind</label>
+        <select id="v-type">
+          <option value="contains">contains</option>
+          <option value="startsWith">startsWith</option>
+          <option value="endsWith">endsWith</option>
+          <option value="regex">regex</option>
+          <option value="none">none (matches all)</option>
+        </select>
+      </div>
+      <div style="flex:2 1 10rem">
+        <label for="v-value">Pattern</label>
+        <input id="v-value" value="World" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+    </div>
+    <div>
+      <label for="v-msg">Message to test</label>
+      <input id="v-msg" value="Hello World" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div class="row">
+      <button class="primary" id="v-run">Check</button>
+      <label style="display:flex;align-items:center;gap:.4rem;margin:0;text-transform:none;letter-spacing:0;font-family:var(--body);font-size:.85rem;color:var(--text-dim)">
+        <input type="checkbox" id="v-negate" style="width:auto"> negate
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="out-head">
+      <h2>Session</h2>
+      <span class="chip chip--idle" id="sess-chip"><span class="dot"></span>none</span>
+    </div>
+    <p class="hint">Your ssid is sent to the local server and held in its memory. It is never stored and never sent back.</p>
+    <div>
+      <label for="ssid">PocketOption ssid</label>
+      <textarea id="ssid" rows="3" placeholder='42["auth",{"session":"...","isDemo":1,...}]' autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+    </div>
+    <div class="row">
+      <button class="primary" id="connect">Connect</button>
+      <button id="disconnect" disabled>Disconnect</button>
+    </div>
+  </section>
+
+  <section class="card" id="actions">
+    <h2>Calls</h2>
+    <div class="row">
+      <button data-call="balance" disabled>Balance</button>
+      <button data-call="payout" disabled>Payouts</button>
+      <button data-call="deals" disabled>Deals</button>
+    </div>
+    <div class="row">
+      <div style="flex:2 1 9rem">
+        <label for="asset">Asset</label>
+        <input id="asset" value="EURUSD_otc" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div style="flex:1 1 5rem">
+        <label for="period">Period (s)</label>
+        <input id="period" type="number" value="60" inputmode="numeric">
+      </div>
+    </div>
+    <div class="row">
+      <button data-call="candles" disabled>Candles</button>
+      <button data-call="ticks" disabled>Ticks</button>
+      <button id="stream" disabled>Stream</button>
+    </div>
+  </section>
+
+  <section class="card hidden" id="trade-card">
+    <h2>Place a trade</h2>
+    <p class="warn">Trading is enabled on this server. Orders placed here are real.</p>
+    <div class="row">
+      <div style="flex:1 1 5rem">
+        <label for="t-amount">Amount</label>
+        <input id="t-amount" type="number" value="1" inputmode="decimal">
+      </div>
+      <div style="flex:1 1 5rem">
+        <label for="t-seconds">Expiry (s)</label>
+        <input id="t-seconds" type="number" value="60" inputmode="numeric">
+      </div>
+    </div>
+    <div class="row">
+      <button data-trade="buy" disabled>Buy</button>
+      <button data-trade="sell" disabled>Sell</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="out-head">
+      <h2>Response</h2>
+      <span class="path" id="out-path">—</span>
+      <span class="chip chip--idle" id="out-chip"><span class="dot"></span>idle</span>
+    </div>
+    <pre id="out">Nothing yet.</pre>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  var token = new URLSearchParams(location.search).get("token");
+  var sessionId = null;
+  var events = null;
+  var streamRows = [];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var out = $("out"), outPath = $("out-path"), outChip = $("out-chip");
+
+  function api(path) { return "/api" + path + (token ? (path.indexOf("?") === -1 ? "?" : "&") + "token=" + encodeURIComponent(token) : ""); }
+
+  function setChip(el, kind, text) {
+    el.className = "chip chip--" + kind;
+    el.innerHTML = '<span class="dot"></span>' + text;
+  }
+
+  function show(path, kind, body) {
+    outPath.textContent = path;
+    setChip(outChip, kind, kind === "ok" ? "ok" : kind === "bad" ? "error" : "…");
+    out.textContent = typeof body === "string" ? body : JSON.stringify(body, null, 2);
+  }
+
+  async function call(method, path, body) {
+    show(method + " " + path, "idle", "Waiting…");
+    try {
+      var res = await fetch(api(path), {
+        method: method,
+        headers: body ? { "content-type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined
+      });
+      var data = await res.json();
+      show(method + " " + path, res.ok ? "ok" : "bad", data);
+      return res.ok ? data : null;
+    } catch (error) {
+      show(method + " " + path, "bad", String(error));
+      return null;
+    }
+  }
+
+  function setConnected(on) {
+    document.querySelectorAll("[data-call],[data-trade],#stream").forEach(function (b) { b.disabled = !on; });
+    $("disconnect").disabled = !on;
+    $("connect").disabled = on;
+    setChip($("sess-chip"), on ? "ok" : "idle", on ? "connected" : "none");
+  }
+
+  // --- health -------------------------------------------------------------
+  fetch(api("/health")).then(function (r) { return r.json(); }).then(function (h) {
+    setChip($("health-chip"), "ok", "addon loaded");
+    var mb = h.addon && h.addon.bytes ? (h.addon.bytes / 1048576).toFixed(2) + " MB" : "not found";
+    var facts = [["Node", h.node], ["Host", h.platform], ["Addon", mb], ["Trading", h.tradingEnabled ? "enabled" : "off"]];
+    $("health-facts").innerHTML = facts.map(function (f) {
+      return '<div><p class="fact-k">' + f[0] + '</p><p class="fact-v">' + f[1] + "</p></div>";
+    }).join("");
+    if (h.tradingEnabled) $("trade-card").classList.remove("hidden");
+  }).catch(function () {
+    setChip($("health-chip"), "bad", "unreachable");
+  });
+
+  // --- validators ---------------------------------------------------------
+  $("v-run").addEventListener("click", function () {
+    var type = $("v-type").value;
+    var spec = type === "none" ? { type: "none" } : { type: type, value: $("v-value").value };
+    if ($("v-negate").checked) spec = { type: "not", of: spec };
+    call("POST", "/validator", { validator: spec, message: $("v-msg").value });
+  });
+
+  // --- session ------------------------------------------------------------
+  $("connect").addEventListener("click", async function () {
+    var ssid = $("ssid").value.trim();
+    if (!ssid) { show("POST /session", "bad", "Paste your ssid first."); return; }
+    $("connect").disabled = true;
+    var data = await call("POST", "/session", { ssid: ssid });
+    if (data && data.id) { sessionId = data.id; setConnected(true); }
+    else { $("connect").disabled = false; }
+  });
+
+  $("disconnect").addEventListener("click", async function () {
+    if (events) { events.close(); events = null; }
+    if (sessionId) await call("DELETE", "/session/" + sessionId);
+    sessionId = null;
+    setConnected(false);
+  });
+
+  document.querySelectorAll("[data-call]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      if (!sessionId) return;
+      var kind = button.getAttribute("data-call");
+      var query = "";
+      if (kind === "candles") query = "?asset=" + encodeURIComponent($("asset").value) + "&period=" + Number($("period").value);
+      if (kind === "ticks") query = "?asset=" + encodeURIComponent($("asset").value) + "&seconds=300";
+      call("GET", "/session/" + sessionId + "/" + kind + query);
+    });
+  });
+
+  // --- live stream --------------------------------------------------------
+  $("stream").addEventListener("click", function () {
+    if (events) {
+      events.close(); events = null;
+      $("stream").textContent = "Stream";
+      return;
+    }
+    if (!sessionId) return;
+    var asset = $("asset").value;
+    var path = "/session/" + sessionId + "/stream?asset=" + encodeURIComponent(asset) + "&seconds=" + Number($("period").value);
+    streamRows = [];
+    show("GET " + path, "idle", "Subscribing…");
+    events = new EventSource(api(path));
+    $("stream").textContent = "Stop";
+    events.addEventListener("open", function () { show("GET " + path, "ok", "Subscribed. Waiting for candles…"); });
+    events.addEventListener("error", function (e) {
+      show("GET " + path, "bad", e.data || "Stream closed.");
+      if (events) { events.close(); events = null; }
+      $("stream").textContent = "Stream";
+    });
+    events.onmessage = function (e) {
+      streamRows.unshift(e.data);
+      if (streamRows.length > 40) streamRows.pop();
+      show("GET " + path, "ok", streamRows.join("\n"));
+    };
+  });
+
+  // --- trading ------------------------------------------------------------
+  document.querySelectorAll("[data-trade]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      if (!sessionId) return;
+      call("POST", "/session/" + sessionId + "/trade", {
+        direction: button.getAttribute("data-trade"),
+        asset: $("asset").value,
+        amount: Number($("t-amount").value),
+        seconds: Number($("t-seconds").value)
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>
