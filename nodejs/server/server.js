@@ -49,11 +49,23 @@ setInterval(() => {
 
 // --- helpers --------------------------------------------------------------
 
-/** The addon prefixes messages with the error kind; split it back out. */
+/** Builds an error whose text is meant for whoever called the API. */
+const apiError = (name, message) => new Error(`${name}: ${message}`);
+
+/**
+ * Decides what a caller is allowed to see about a failure.
+ *
+ * The addon prefixes its messages with the error kind, and `apiError` follows
+ * the same shape, so a prefixed message is one we wrote on purpose and can
+ * hand back. Anything else is an internal fault: it goes to the server log,
+ * and the caller gets a generic reply rather than our stack or file paths.
+ */
 function describeError(error) {
   const message = String((error && error.message) || error);
   const match = /^([A-Za-z]+Error): (.*)$/s.exec(message);
-  return match ? { name: match[1], message: match[2] } : { name: "Error", message };
+  if (match) return { name: match[1], message: match[2] };
+  console.error("[unhandled]", error);
+  return { name: "InternalError", message: "Something went wrong on the server. Check its log." };
 }
 
 function send(res, status, body, headers) {
@@ -73,11 +85,15 @@ async function readJson(req) {
   let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 1_000_000) throw new Error("request body too large");
+    if (size > 1_000_000) throw apiError("InvalidParameterError", "The request body is too large.");
     chunks.push(chunk);
   }
   if (!chunks.length) return {};
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    throw apiError("InvalidParameterError", "The request body is not valid JSON.");
+  }
 }
 
 function requireSession(res, id) {
@@ -97,7 +113,9 @@ function requireSession(res, id) {
  *   {"type":"not","of": ...spec }
  */
 function buildValidator(spec) {
-  if (!spec || typeof spec !== "object") throw new Error("a validator spec must be an object");
+  if (!spec || typeof spec !== "object") {
+    throw apiError("InvalidParameterError", "A validator spec must be an object.");
+  }
   switch (spec.type) {
     case "none":
       return new Validator();
@@ -116,7 +134,10 @@ function buildValidator(spec) {
     case "any":
       return Validator.any((spec.of || []).map(buildValidator));
     default:
-      throw new Error(`unknown validator type: ${JSON.stringify(spec.type)}`);
+      throw apiError(
+        "InvalidParameterError",
+        `Unknown validator type ${JSON.stringify(spec.type)}. Use none, regex, contains, startsWith, endsWith, not, all or any.`,
+      );
   }
 }
 
