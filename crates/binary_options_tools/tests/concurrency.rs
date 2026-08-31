@@ -5,29 +5,14 @@ use std::sync::Arc;
 use tokio::time::{timeout, Duration};
 use uuid::Uuid;
 
-use binary_options_tools::pocketoption::modules::trades::{
-    Command, CommandResponse, TradesApiModule, TradesHandle,
-};
-use binary_options_tools::pocketoption::{
-    error::{PocketError, PocketResult},
-    ssid::{Real, SessionData, Ssid as PocketSsid},
-    state::{State, StateBuilder, TradeState},
-    types::{Deal, FailOpenOrder, OpenOrder, RequestId},
-};
-use binary_options_tools_core::{
-    reimports::{AsyncReceiver, AsyncSender},
-    traits::{ApiModule, RunnerCommand},
-};
-use kanal::bounded_async;
-use chrono::Utc;
-use rust_decimal::Decimal;
+use binary_options_tools_core::traits::ApiModule;
 
 mod common {
     include!("common/mod.rs");
 }
 
 use common::{
-    create_mock_state, create_test_deal, create_test_fail, create_test_setup, TestSetup,
+    create_test_deal, create_test_fail, create_test_setup,
 };
 #[tokio::test]
 async fn test_concurrent_identical_trades_hammer() {

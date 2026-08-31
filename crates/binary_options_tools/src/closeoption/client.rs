@@ -16,7 +16,7 @@ use tracing::{debug, warn};
 use crate::closeoption::connect::CloseConnect;
 use crate::closeoption::error::CloseOptionError;
 use crate::closeoption::state::State;
-use crate::closeoption::types::{Asset, Candle, OrderResult, Outgoing, SubscriptionEvent, SetOrderRequest, Get30MinRequest, PriceData};
+use crate::closeoption::types::{Asset, Candle, Get30MinResult, OrderResult, Outgoing, SubscriptionEvent, SetOrderRequest, Get30MinRequest, PriceData};
 use crate::closeoption::utils::get_index;
 
 /// Lightweight module for handling price data
@@ -38,6 +38,7 @@ impl LightweightModule<State> for PriceDataModule {
 
     async fn run(&mut self) -> CoreResult<()> {
         while let Ok(msg) = self.receiver.recv().await {
+            debug!(target: "Router", msg_type = %msg, "received raw message");
             if let Ok(text) = msg.to_text() {
                 // Parse Socket.IO frames properly
                 if let Ok(frames) = crate::closeoption::utils::parse_socket_io_message(text) {
@@ -266,6 +267,7 @@ impl CloseOption {
         {
             let mut pending = state.pending_requests.lock().await;
             pending.insert(id, tx);
+            debug!(target: "Router", request_id = id, event = request.event_name(), "registered pending request");
         }
         
         // Serialize request with ID
@@ -277,7 +279,8 @@ impl CloseOption {
         let json = serde_json::to_string(&request_value)
             .map_err(|e| CloseOptionError::General(format!("Failed to serialize: {}", e)))?;
         
-        let frame = crate::closeoption::types::socket_io::event("message", &json);
+        let frame = crate::closeoption::types::socket_io::event(request.event_name(), &json);
+        debug!(target: "Router", request_id = id, frame = %frame, "sending request frame");
         
         // Send with cleanup on failure
         if let Err(e) = self.client.to_ws_sender.send(Message::Text(frame.into())).await {
@@ -300,6 +303,8 @@ impl CloseOption {
             },
             Err(_) => {
                 // Clean up on timeout
+                let pending_count = state.pending_requests.lock().await.len();
+                debug!(target: "Router", request_id = id, pending_count, "send_and_wait timeout");
                 state.pending_requests.lock().await.remove(&id);
                 Err(CloseOptionError::Timeout {
                     task: "send_and_wait".to_string(),
@@ -397,9 +402,15 @@ impl CloseOption {
         };
 
         match self.send_and_wait(Outgoing::Get30Min(request)).await? {
-            SubscriptionEvent::Get30MinResult(result) => Ok(result.candles),
+            SubscriptionEvent::Get30MinResult(result) => Ok(result.price),
             _ => Err(CloseOptionError::General("Unexpected response type".to_string())),
         }
+    }
+
+
+    /// Get ticks/candles for an asset (alias for get_candles with 30min period)
+    pub async fn get_ticks(&self, asset: &str) -> Result<Vec<Candle>, CloseOptionError> {
+        self.get_candles(asset, 30, 0).await
     }
 
     /// Get active assets
@@ -521,7 +532,7 @@ impl LightweightModule<State> for ResponseRouterModule {
     fn rule() -> Box<dyn Rule + Send + Sync> {
         Box::new(|msg: &Message| {
             if let Ok(text) = msg.to_text() {
-                text.contains("priceData") || text.contains("setOrderResult") || text.contains("\"id\"")
+                text.contains("priceData") || text.contains("setOrderResult") || text.contains("get30MinResult") || text.contains("\"id\"")
             } else {
                 false
             }
@@ -534,11 +545,13 @@ impl LightweightModule<State> for ResponseRouterModule {
                 // Try parsing as Socket.IO frames first
                 let frames = crate::closeoption::utils::parse_socket_io_message(text)
                     .unwrap_or_default();
+                debug!(target: "Router", frames_count = frames.len(), raw_text = %text, "parsed socket.io frames");
                 let mut handled = false;
                 for frame in &frames {
                     if frame.message_type == crate::closeoption::types::socket_io::SocketIoMessageType::Event {
                         if let Ok(event_array) = serde_json::from_str::<Vec<serde_json::Value>>(&frame.data) {
                             if let Some(event_name) = event_array.get(0).and_then(|v| v.as_str()) {
+                                debug!(target: "Router", event_name, "parsed event from frame");
                                 if let Some(payload) = event_array.get(1) {
                                     // Resolve pending requests by ID
                                     if let Ok(value) = serde_json::to_value(payload) {
@@ -551,6 +564,36 @@ impl LightweightModule<State> for ResponseRouterModule {
                                             }
                                         }
                                     }
+                                    // Route get30MinResult events
+                                    if event_name == "get30MinResult" {
+                                        debug!(target: "Router", event_name, "get30MinResult handler start");
+                                        debug!(target: "Router", payload_type = %payload, "attempting Get30MinResult deserialization");
+                                        if let Ok(price_data) = serde_json::from_value::<Get30MinResult>(payload.clone()) {
+                                            let event = SubscriptionEvent::Get30MinResult(price_data);
+                                            let mut pending = self.state.pending_requests.lock().await;
+                                            if let Some(id) = pending.keys().next().copied() {
+                                                debug!(target: "Router", id, "removing pending request");
+                                                if let Some(sender) = pending.remove(&id) {
+                                                    let _ = sender.send(event);
+                                                debug!(target: "Router", "sent get30MinResult event to pending request");
+                                                }
+                                            }
+                                        } else if let Ok(error_data) = serde_json::from_value::<serde_json::Value>(payload.clone()) {
+                                            debug!(target: "Router", "Get30MinResult deserialization failed, checking for error");
+                                            let head = error_data.get("head").and_then(|v| v.as_str()).unwrap_or("Unknown error").to_string();
+                                            let code = error_data.get("code").and_then(|v| v.as_str()).unwrap_or("UNKNOWN").to_string();
+                                            let pair = error_data.get("pair").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
+                                            let api_error = CloseOptionError::ApiError { head, code, pair };
+                                            let mut pending = self.state.pending_requests.lock().await;
+                                            if let Some(id) = pending.keys().next().copied() {
+                                                if let Some(sender) = pending.remove(&id) {
+                                                    let _ = sender.send(SubscriptionEvent::Error(api_error.to_string()));
+                                                }
+                                            }
+                                        }
+                                        handled = true;
+                                    }
+
                                     // Route priceData events
                                     if event_name == "priceData" {
                                         if let Ok(price_data) = serde_json::from_value::<PriceData>(payload.clone()) {

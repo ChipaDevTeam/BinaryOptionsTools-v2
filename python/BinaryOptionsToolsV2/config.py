@@ -24,7 +24,7 @@ class Config:
     max_allowed_loops: int = 100
     sleep_interval: int = 100
     reconnect_time: int = 5
-    connection_initialization_timeout_secs: int = 60
+    connection_initialization_timeout_secs: int = 120
     timeout_secs: int = 30
     urls: List[str] = field(default_factory=list)
     proxy: str = None

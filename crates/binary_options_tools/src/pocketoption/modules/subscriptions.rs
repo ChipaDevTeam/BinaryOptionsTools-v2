@@ -54,7 +54,7 @@ impl ResponseRouter {
                 if let Some(id) = get_command_id(&resp) {
                     let mut pending = router_clone.pending.lock().await;
                     if let Some(tx) = pending.remove(&id) {
-                        if let Err(_) = tx.send(resp) {
+                        if tx.send(resp).is_err() {
                             tracing::trace!(target: "ResponseRouter", "Failed to route response: receiver dropped");
                         }
                     }
@@ -62,7 +62,7 @@ impl ResponseRouter {
             }
             let mut pending = router_clone.pending.lock().await;
             for (id, tx) in pending.drain() {
-                if let Err(_) = tx.send(CommandResponse::Shutdown { command_id: id }) {
+                if tx.send(CommandResponse::Shutdown { command_id: id }).is_err() {
                     tracing::trace!(target: "ResponseRouter", "Failed to send shutdown notification: receiver dropped");
                 }
             }

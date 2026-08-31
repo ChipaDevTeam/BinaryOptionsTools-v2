@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use super::error::CloseOptionError;
 use std::collections::HashMap;
 
 /// Asset information from CloseOption
@@ -29,6 +30,7 @@ pub struct PriceData {
 /// Candle data point
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Candle {
+    #[serde(alias = "timeStamp")]
     pub timestamp: i64,
     pub value: f64,
 }
@@ -37,6 +39,7 @@ pub struct Candle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Get30MinRequest {
+    #[serde(rename = "_token")]
     pub token: String,
     pub ps_type: String,
     pub public_code: String,
@@ -84,28 +87,42 @@ pub struct OrderResult {
 
 /// Historical candles result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Get30MinResult {
-    pub candles: Vec<Candle>,
-    pub pair: String,
+    pub price: Vec<Candle>,
 }
 
 /// Outgoing message types
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "event", rename_all = "camelCase")]
+#[serde(untagged)]
 pub enum Outgoing {
     Get30Min(Get30MinRequest),
     SetOrder(SetOrderRequest),
     Ping,
 }
 
+impl Outgoing {
+    pub fn event_name(&self) -> &'static str {
+        match self {
+            Outgoing::Get30Min(_) => "get30Min",
+            Outgoing::SetOrder(_) => "setOrder",
+            Outgoing::Ping => "ping",
+        }
+    }
+
+    pub fn as_value(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
+    }
+}
+
+
 /// Incoming subscription events
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "event", rename_all = "camelCase")]
+#[serde(untagged)]
 pub enum SubscriptionEvent {
     PriceData(PriceData),
     Get30MinResult(Get30MinResult),
     SetOrderResult(OrderResult),
+    Error(String),
 }
 
 /// Raw Socket.IO message frame

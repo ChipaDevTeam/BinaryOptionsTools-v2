@@ -55,13 +55,15 @@ fn test_exponential_backoff_calculation() {
     assert_eq!(delay10, 300);
 
     // Attempt 15 (exponent capped at 10): same as attempt 10
+    #[allow(clippy::unnecessary_min_or_max)]
     let delay15 = base_delay
         .saturating_mul(2u64.saturating_pow(15u32.min(10)))
         .min(300);
     assert_eq!(delay15, 300);
 }
 
-#[test]
+
+#[allow(dead_code, clippy::unnecessary_min_or_max)]
 fn test_exponential_backoff_with_large_base_delay() {
     // Ensure large base delays don't cause overflow due to saturating_mul
     let base_delay: u64 = 100;

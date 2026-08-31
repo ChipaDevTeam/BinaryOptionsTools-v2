@@ -2,27 +2,19 @@
 mod tests {
 use binary_options_tools::pocketoption::{
     modules::pending_trades::{
-        CancelServerResponse, Command, CommandResponse, PendingTradesApiModule,
-        PendingTradesHandle, ServerResponse,
+        CancelServerResponse, Command, CommandResponse, PendingTradesApiModule, ServerResponse,
     },
-    ssid::{Demo, Ssid},
     state::State,
-    types::{FailOpenOrder, OpenPendingOrder, PendingOrder, ServerTimeState},
+    types::{FailOpenOrder, OpenPendingOrder, PendingOrder},
 };
 use binary_options_tools::pocketoption::error::PocketError;
 use binary_options_tools_core::{
-    reimports::{AsyncReceiver, AsyncSender, Message},
+    reimports::Message,
     traits::{ApiModule, RunnerCommand},
 };
-use kanal::bounded_async;
 use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
-use std::any::Any;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
-use tokio::{select, time::timeout};
-use tracing::warn;
 use uuid::Uuid;
 // ============== Mock Helpers ==============
 
@@ -62,12 +54,13 @@ fn create_mock_state() -> Arc<State> {
         raw_keep_alive: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
         urls: Vec::new(),
         proxy: None,
-        user_agent: None,
         origin: None,
+        user_agent: None,
         sec_websocket_extensions: None,
         tls_cipher_suites: None,
         tls_alpn: None,
         raw_subscribers: tokio::sync::RwLock::new(Vec::new()),
+        auth_error: std::sync::RwLock::new(None),
     })
 }
 
@@ -120,14 +113,14 @@ fn create_text_message(data: &serde_json::Value) -> Message {
 
 #[tokio::test]
 async fn test_open_pending_order_success_integrated() {
-    use tokio::select;
+    
     let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
     let (resp_tx, resp_rx) = kanal::bounded_async(10);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
+    let (ws_tx, ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
 
-    let mut ws_rx_clone = ws_rx.clone();
+    let ws_rx_clone = ws_rx.clone();
     tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
@@ -141,7 +134,7 @@ async fn test_open_pending_order_success_integrated() {
         runner_tx,
     );
 
-    let mut module_task = tokio::spawn(async move {
+    let module_task = tokio::spawn(async move {
         module.run().await.ok();
     });
 
@@ -205,10 +198,10 @@ async fn test_open_pending_order_failure() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
     let (resp_tx, resp_rx) = kanal::bounded_async(10);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
+    let (ws_tx, ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
 
-    let mut ws_rx_clone = ws_rx.clone();
+    let ws_rx_clone = ws_rx.clone();
     tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
@@ -222,7 +215,7 @@ async fn test_open_pending_order_failure() {
         runner_tx,
     );
 
-    let mut module_task = tokio::spawn(async move {
+    let module_task = tokio::spawn(async move {
         module.run().await.ok();
     });
 
@@ -281,12 +274,12 @@ async fn test_open_pending_order_mismatch_retry() {
 
     let pending_order = create_test_pending_order(Uuid::new_v4());
     let resp_tx_for_module = resp_tx.clone();
-    let mut module_task = tokio::spawn(async move {
+    let module_task = tokio::spawn(async move {
         use binary_options_tools::pocketoption::modules::pending_trades::PendingTradesApiModule;
-        let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-        let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
+        let (_msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
+        let (ws_tx, ws_rx) = kanal::bounded_async(10);
         let (runner_tx, _) = kanal::bounded_async(10);
-        let mut ws_rx_clone = ws_rx.clone();
+        let ws_rx_clone = ws_rx.clone();
         tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
         let state = create_mock_state();
         let mut module = PendingTradesApiModule::new(
@@ -363,7 +356,7 @@ async fn test_open_pending_order_mismatch_retry() {
 
 #[tokio::test]
 async fn test_open_pending_order_mismatch_max_retries_exceeded() {
-    let (cmd_tx, cmd_rx) = kanal::bounded_async::<Command>(10);
+    let (_cmd_tx, _cmd_rx) = kanal::bounded_async::<Command>(10);
     let (resp_tx, resp_rx) = kanal::bounded_async(10);
 
     // No module needed — test that mismatched req_ids do not match
@@ -398,7 +391,7 @@ async fn test_open_pending_order_mismatch_max_retries_exceeded() {
 async fn test_open_pending_order_channel_error_sender_closed() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async::<Command>(1);
     let (resp_tx, resp_rx) = kanal::bounded_async(10);
-    let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
+    let (_msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, _) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
 
@@ -443,10 +436,10 @@ async fn test_open_pending_order_with_socket_io_framing() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
     let (resp_tx, resp_rx) = kanal::bounded_async(10);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
+    let (ws_tx, ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
 
-    let mut ws_rx_clone = ws_rx.clone();
+    let ws_rx_clone = ws_rx.clone();
     tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
@@ -518,12 +511,12 @@ async fn test_open_pending_order_with_socket_io_framing() {
 async fn test_run_routes_command_to_websocket() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
     let (resp_tx, _) = kanal::bounded_async(10);
-    let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
+    let (_msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
+    let (ws_tx, ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
 
     // Drain ws_rx in background using a clone to prevent blocking
-    let mut ws_rx_clone = ws_rx.clone();
+    let ws_rx_clone = ws_rx.clone();
     tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
@@ -578,7 +571,7 @@ async fn test_run_routes_command_to_websocket() {
 
 #[tokio::test]
 async fn test_run_handles_binary_success_response() {
-    let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
+    let (_cmd_tx, cmd_rx) = kanal::bounded_async(10);
     let (resp_tx, _) = kanal::bounded_async(10);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, _) = kanal::bounded_async(10);
@@ -615,11 +608,11 @@ async fn test_run_handles_socket_io_text_success() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
     let (resp_tx, resp_rx) = kanal::bounded_async(10);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
+    let (ws_tx, ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
 
     // Drain ws_rx in background using a clone to prevent blocking
-    let mut ws_rx_clone = ws_rx.clone();
+    let ws_rx_clone = ws_rx.clone();
     tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
@@ -686,11 +679,11 @@ async fn test_run_handles_failure_response() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
     let (resp_tx, resp_rx) = kanal::bounded_async(10);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
+    let (ws_tx, ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
 
     // Drain ws_rx in background using a clone to prevent blocking
-    let mut ws_rx_clone = ws_rx.clone();
+    let ws_rx_clone = ws_rx.clone();
     tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
@@ -751,7 +744,7 @@ async fn test_run_handles_failure_response() {
 
 #[tokio::test]
 async fn test_run_handles_deserialization_error() {
-    let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
+    let (_cmd_tx, cmd_rx) = kanal::bounded_async(10);
     let (resp_tx, _) = kanal::bounded_async(10);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, _) = kanal::bounded_async(10);
@@ -779,7 +772,7 @@ async fn test_run_handles_deserialization_error() {
 
 #[tokio::test]
 async fn test_run_success_without_pending_request() {
-    let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
+    let (_cmd_tx, cmd_rx) = kanal::bounded_async(10);
     let (resp_tx, resp_rx) = kanal::bounded_async(10);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
     let (ws_tx, _) = kanal::bounded_async(10);
@@ -821,11 +814,11 @@ async fn test_run_success_without_pending_request() {
 fn test_new_creates_module() {
     let state = create_mock_state();
     let (cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx) = {
-        let (a, b) = kanal::bounded_async::<Command>(1);
-        let (c, d) = kanal::bounded_async::<CommandResponse>(1);
-        let (e, f) = kanal::bounded_async::<Arc<Message>>(1);
-        let (g, h) = kanal::bounded_async::<Message>(1);
-        let (i, j) = kanal::bounded_async::<RunnerCommand>(1);
+        let (_a, b) = kanal::bounded_async::<Command>(1);
+        let (c, _d) = kanal::bounded_async::<CommandResponse>(1);
+        let (_e, f) = kanal::bounded_async::<Arc<Message>>(1);
+        let (g, _h) = kanal::bounded_async::<Message>(1);
+        let (i, _j) = kanal::bounded_async::<RunnerCommand>(1);
         (b, c, f, g, i) // cmd_rx=b, resp_tx=c (sender), msg_rx=f, ws_tx=g (sender), runner_tx=i (sender)
     };
 
@@ -841,8 +834,8 @@ fn test_new_creates_module() {
 
 #[test]
 fn test_create_handle_returns_valid_handle() {
-    let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
-    let (resp_tx, resp_rx) = kanal::bounded_async(10);
+    let (cmd_tx, _cmd_rx) = kanal::bounded_async(10);
+    let (_resp_tx, resp_rx) = kanal::bounded_async(10);
 
     let handle = PendingTradesApiModule::create_handle(cmd_tx, resp_rx);
     let _handle2 = handle.clone();
@@ -863,10 +856,10 @@ async fn test_cancel_pending_order_success() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
     let (resp_tx, resp_rx) = kanal::bounded_async(10);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
+    let (ws_tx, ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
 
-    let mut ws_rx_clone = ws_rx.clone();
+    let ws_rx_clone = ws_rx.clone();
     tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
@@ -936,10 +929,10 @@ async fn test_cancel_pending_order_failure() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
     let (resp_tx, resp_rx) = kanal::bounded_async(10);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
+    let (ws_tx, ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
 
-    let mut ws_rx_clone = ws_rx.clone();
+    let ws_rx_clone = ws_rx.clone();
     tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
@@ -1007,10 +1000,10 @@ async fn test_cancel_pending_orders_batch_success() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
     let (resp_tx, resp_rx) = kanal::bounded_async(10);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
+    let (ws_tx, ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
 
-    let mut ws_rx_clone = ws_rx.clone();
+    let ws_rx_clone = ws_rx.clone();
     tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
@@ -1082,10 +1075,10 @@ async fn test_cancel_pending_orders_batch_partial_success() {
     let (cmd_tx, cmd_rx) = kanal::bounded_async(10);
     let (resp_tx, resp_rx) = kanal::bounded_async(10);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
-    let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
+    let (ws_tx, ws_rx) = kanal::bounded_async(10);
     let (runner_tx, _) = kanal::bounded_async(10);
 
-    let mut ws_rx_clone = ws_rx.clone();
+    let ws_rx_clone = ws_rx.clone();
     tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
 
     let state = create_mock_state();
@@ -1099,7 +1092,7 @@ async fn test_cancel_pending_orders_batch_partial_success() {
         runner_tx,
     );
 
-    let module_task = tokio::spawn(async move {
+    let _module_task = tokio::spawn(async move {
         module.run().await.ok();
     });
 

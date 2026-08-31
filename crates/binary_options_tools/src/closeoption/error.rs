@@ -65,8 +65,12 @@ pub enum CloseOptionError {
     #[error("Parse error: {0}")]
     Parse(String),
 
-    #[error("Missing required field: {0}")]
-    MissingField(String),
+    #[error("CloseOption API error: {head} (code: {code}, pair: {pair})")]
+    ApiError {
+        head: String,
+        code: String,
+        pair: String,
+    },
 }
 
 pub type CloseOptionResult<T> = Result<T, CloseOptionError>;

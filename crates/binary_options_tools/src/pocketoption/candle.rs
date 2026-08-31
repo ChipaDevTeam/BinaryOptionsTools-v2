@@ -406,6 +406,7 @@ impl Candle {
     ///
     /// # Returns
     /// New Candle instance with specified values
+    #[allow(clippy::too_many_arguments)]
     pub fn new_with_closed_status(
         symbol: String,
         timestamp: i64,

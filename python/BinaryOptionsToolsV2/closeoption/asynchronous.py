@@ -187,8 +187,9 @@ class CloseOptionAsync:
         else:
             ws_url = f"wss://www.closeoption.com:8443/socket.io/?EIO=3&transport=websocket&sid={sid}"
 
+        logger.info("CloseOption: connecting to WebSocket")
         self._client = RawCloseOption(token, sid, public_code, hidden_code, demo, ws_url, self._config.pyconfig)
-        await self._client.connect()
+        logger.info("CloseOption: WebSocket connection established")
         self._connected = True
 
     async def _ensure_connected(self):
@@ -230,6 +231,12 @@ class CloseOptionAsync:
         await self._ensure_connected()
         result = await self._client.get_candles(asset, period, count)
         return json.loads(result)
+    async def get_ticks(self, asset: str) -> List[dict]:
+        """Get tick series for an asset."""
+        await self._ensure_connected()
+        result = await self._client.get_ticks(asset)
+        return json.loads(result)
+
 
     async def get_candles_live(self, asset: str, period: int) -> AsyncGenerator[dict, None]:
         """Get live candle updates."""

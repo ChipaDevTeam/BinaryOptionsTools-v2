@@ -161,10 +161,14 @@ class CloseOption:
 
     def _run(self, coro):
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
-        return future.result()
+        try:
+            return future.result(timeout=self._config.connection_initialization_timeout_secs)
+        except TimeoutError as exc:
+            raise TimeoutError("CloseOption sync operation timed out") from exc
 
     def __enter__(self):
-        self._run(self._async_client.connect())
+        print("CloseOption: connecting...")
+        print("CloseOption: connected")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -193,6 +197,10 @@ class CloseOption:
     def get_candles(self, asset: str, period: int, count: int = 100) -> List[dict]:
         """Get historical candles with count."""
         return self._run(self._async_client.get_candles(asset, period, count))
+    def get_ticks(self, asset: str) -> List[dict]:
+        """Get tick series for an asset."""
+        return self._run(self._async_client.get_ticks(asset))
+
 
     def get_candles_live(self, asset: str, period: int) -> SyncCandleLiveIterator:
         """Get live candle updates."""

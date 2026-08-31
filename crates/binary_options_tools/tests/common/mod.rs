@@ -2,17 +2,14 @@ use binary_options_tools_core::{
     reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{ApiModule, RunnerCommand},
 };
-use chrono::Utc;
 use rust_decimal::Decimal;
 use std::sync::Arc;
-use tokio::time::timeout;
 use uuid::Uuid;
 
 use binary_options_tools::pocketoption::{
-    error::{PocketError, PocketResult},
     ssid::{Real, SessionData, Ssid as PocketSsid},
-    state::{State, StateBuilder, TradeState},
-    types::{Action, Deal, FailOpenOrder, OpenOrder, RequestId},
+    state::{State, StateBuilder},
+    types::{Deal, FailOpenOrder, RequestId},
 };
 
 use binary_options_tools::pocketoption::modules::trades::{
@@ -131,12 +128,12 @@ async fn setup_module_with_msg_tx() -> (
 
 // Let's create a more flexible setup that returns all necessary channels
 pub struct TestSetup {
-    pub state: Arc<State>,
     pub handle: TradesHandle,
-    pub cmd_tx: AsyncSender<Command>,
     pub msg_tx: AsyncSender<Arc<Message>>,
-    pub ws_tx: AsyncSender<Message>,
     pub ws_rx: AsyncReceiver<Message>,
+    _state: Arc<State>,
+    _cmd_tx: AsyncSender<Command>,
+    _ws_tx: AsyncSender<Message>,
 }
 
 pub async fn create_test_setup() -> TestSetup {
@@ -146,7 +143,7 @@ pub async fn create_test_setup() -> TestSetup {
     let (cmd_resp_tx, cmd_resp_rx) = kanal::bounded_async::<CommandResponse>(100);
     let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(100);
     let (ws_tx, ws_rx) = kanal::bounded_async::<Message>(100);
-    let (runner_tx, runner_rx) = kanal::bounded_async::<RunnerCommand>(1);
+    let (runner_tx, _runner_rx) = kanal::bounded_async::<RunnerCommand>(1);
 
     let mut module = TradesApiModule::new(
         state.clone(),
@@ -164,11 +161,11 @@ pub async fn create_test_setup() -> TestSetup {
     });
 
     TestSetup {
-        state,
+        _state: state,
         handle,
-        cmd_tx,
+        _cmd_tx: cmd_tx,
         msg_tx,
-        ws_tx,
+        _ws_tx: ws_tx,
         ws_rx,
     }
 }

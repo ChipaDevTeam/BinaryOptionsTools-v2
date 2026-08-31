@@ -14,12 +14,73 @@ use url::Url;
 use crate::closeoption::state::State;
 use crate::closeoption::utils::{generate_key, get_tls_config, init_crypto_provider, per_url_connect_timeout};
 
-const ORIGIN: &str = "https://closeoption.com";
+const ORIGIN: &str = "https://www.closeoption.com";
 
 #[derive(Clone)]
 pub struct CloseConnect;
 
 impl CloseConnect {
+    /// Perform Socket.IO HTTP long-polling handshake and return the session ID.
+    async fn socket_io_polling_handshake(
+        &self,
+        state: &State,
+        target_host: &str,
+        target_port: u16,
+    ) -> ConnectorResult<String> {
+        let polling_url = format!(
+            "https://{}:{}/socket.io/?EIO=3&transport=polling",
+            target_host,
+            target_port
+        );
+
+        info!(target: "CloseConnect", "Socket.IO polling handshake: {}", polling_url);
+
+        let client = reqwest::Client::builder()
+            .user_agent(
+                state
+                    .user_agent
+                    .clone()
+                    .unwrap_or_else(|| "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36".to_string()),
+            )
+            .build()
+            .map_err(|e| ConnectorError::Custom(format!("Failed to build HTTP client: {e}")))?;
+
+        let response = tokio::time::timeout(
+            std::time::Duration::from_secs(20),
+            client
+                .get(polling_url)
+                .header("Host", target_host)
+                .header("Origin", state.origin.clone().unwrap_or_else(|| ORIGIN.to_string()))
+                .send(),
+        )
+        .await
+        .map_err(|_| ConnectorError::Timeout)?
+        .map_err(|e| ConnectorError::Custom(e.to_string()))?;
+
+        if response.status() != http::StatusCode::OK {
+            return Err(ConnectorError::Custom(format!(
+                "Socket.IO polling handshake failed: HTTP {}",
+                response.status()
+            )));
+        }
+
+        let text = tokio::time::timeout(
+            std::time::Duration::from_secs(20),
+            response.text(),
+        )
+        .await
+        .map_err(|_| ConnectorError::Timeout)?
+        .map_err(|e| ConnectorError::Custom(e.to_string()))?;
+
+        let sid = text
+            .split_once(':')
+            .and_then(|(_, rest)| rest.strip_prefix("0{\"sid\":\""))
+            .and_then(|rest| rest.split("\",").next())
+            .ok_or_else(|| ConnectorError::Custom(format!("Invalid polling response: {}", text)))?
+            .to_string();
+        Ok(sid)
+    }
+
     /// Perform Socket.IO EIO=3 handshake
     async fn socket_io_handshake(
         ws: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
@@ -187,8 +248,17 @@ impl Connector<State> for CloseConnect {
             .user_agent
             .clone()
             .unwrap_or_else(|| "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36".to_string());
+        let ws_sid = self.socket_io_polling_handshake(&state, target_host, target_port).await?;
+        let ws_url = format!(
+            "wss://{}:{}/socket.io/?EIO=3&transport=websocket&sid={}",
+            target_host,
+            target_port,
+            ws_sid
+        );
+        let ws_t_url = Url::parse(&ws_url).map_err(|e| ConnectorError::UrlParsing(e.to_string()))?;
+
         let mut request_builder = Request::builder()
-            .uri(t_url.to_string())
+            .uri(ws_t_url.to_string())
             .header("Host", target_host)
             .header("Origin", state.origin.clone().unwrap_or_else(|| ORIGIN.to_string()))
             .header("User-Agent", _user_agent.clone())
@@ -196,6 +266,10 @@ impl Connector<State> for CloseConnect {
             .header("Connection", "upgrade")
             .header("Sec-Websocket-Key", generate_key())
             .header("Sec-Websocket-Version", "13");
+
+        if !state.token.is_empty() {
+            request_builder = request_builder.header("Authorization", format!("Bearer {}", state.token));
+        }
 
         if let Some(ext) = &state.sec_websocket_extensions {
             request_builder = request_builder.header("Sec-WebSocket-Extensions", ext);

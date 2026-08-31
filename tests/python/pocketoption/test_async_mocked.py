@@ -595,7 +595,7 @@ class TestCandles:
             )
         )
         gen = async_client.get_candles_live("EURUSD_otc", period=60, hours=0.1, max_rows=10)
-        closed, forming = await anext(gen)
+        closed, forming = await gen.__anext__()
         assert isinstance(closed, list)
         assert len(closed) > 0
     @pytest.mark.asyncio
@@ -613,7 +613,7 @@ class TestCandles:
             )
         )
         gen = async_client.get_candles_live("EURUSD_otc", period=60, hours=0.1, max_rows=10)
-        closed, forming = await anext(gen)
+        closed, forming = await gen.__anext__()
         assert isinstance(closed, list)
         assert isinstance(forming, (dict, type(None)))
 

@@ -3,7 +3,7 @@ use url::Url;
 
 use binary_options_tools_core::connector::{ConnectorError, ConnectorResult};
 use crate::closeoption::error::CloseOptionError;
-use crate::closeoption::types::socket_io::{parse_frame, SocketIoFrame};
+use crate::closeoption::types::socket_io::{parse_frame, SocketIoFrame, SocketIoMessageType};
 
 /// Threshold for distinguishing millisecond timestamps from second timestamps.
 /// 1_000_000_000_000.0 (~year 33658 in seconds) is far beyond any valid second-based
@@ -268,18 +268,12 @@ where
 
 /// Parse incoming WebSocket message as Socket.IO frame
 pub fn parse_socket_io_message(text: &str) -> Result<Vec<SocketIoFrame>, CloseOptionError> {
-    let mut frames = Vec::new();
-
-    // Socket.IO can send multiple frames concatenated
-    let mut remaining = text;
-    while !remaining.is_empty() {
-        let frame = parse_frame(remaining)?;
-        let frame_len = 1 + frame.namespace.as_ref().map(|n| n.len() + 2).unwrap_or(0) + frame.data.len();
-        frames.push(frame);
-        remaining = &remaining[frame_len..];
+    if text.is_empty() {
+        return Ok(Vec::new());
     }
 
-    Ok(frames)
+    let frame = parse_frame(text)?;
+    Ok(vec![frame])
 }
 
 #[cfg(test)]
@@ -319,5 +313,38 @@ mod tests {
     fn test_generate_key_length() {
         let key = generate_key();
         assert_eq!(key.len(), 24); // 16 bytes base64 = 24 chars
+    }
+
+    #[test]
+    fn test_parse_socket_io_message_single_event() {
+        let text = r#"42["get30MinResult",{"price":[{"timeStamp":1788140332,"value":1.15919}]}]"#;
+        let frames = parse_socket_io_message(text).unwrap();
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0].message_type, SocketIoMessageType::Event);
+        assert_eq!(frames[0].data, r#"["get30MinResult",{"price":[{"timeStamp":1788140332,"value":1.15919}]}]"#);
+    }
+
+    #[test]
+    fn test_parse_socket_io_message_ping_pong() {
+        let text = "23";
+        let frames = parse_socket_io_message(text).unwrap();
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0].message_type, SocketIoMessageType::EnginePing);
+        assert_eq!(frames[0].data, "3");
+    }
+
+
+    #[test]
+    fn test_parse_socket_io_message_multiple_frames() {
+        let text = r#"42["priceData",{}]"#;
+        let frames = parse_socket_io_message(text).unwrap();
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0].message_type, SocketIoMessageType::Event);
+    }
+
+    #[test]
+    fn test_parse_socket_io_message_empty() {
+        let frames = parse_socket_io_message("").unwrap();
+        assert!(frames.is_empty());
     }
 }
