@@ -4,6 +4,38 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [Unreleased]
+
+### Added
+
+- **Node.js Bindings**: Added `crates/bindings_napi`, an N-API (napi-rs) native addon exposing the PocketOption client, the raw WebSocket helpers, the message validators and the logging setup to JavaScript and TypeScript. The JavaScript examples and documentation previously referenced a `binary-options-tools.node` addon that did not exist anywhere in the repository, so none of them could run.
+- Added the `nodejs/` package (`index.js`, `index.d.ts`, `scripts/build.js`, smoke tests) which loads the addon, adds `Symbol.asyncIterator` support to the subscription and raw streams, and exposes `snake_case` aliases next to the idiomatic `camelCase` method names.
+- Added a `nodejs` CI job building the addon and running its tests on Linux, Windows and macOS.
+
+### Changed
+
+- Rewrote every script in `examples/javascript/` against the real API: they now take the session id from `process.argv[2]` or `POCKET_OPTION_SSID`, use the documented argument order (`buy(asset, amount, seconds)`), and shut the client down when finished.
+- Updated the JavaScript sections of the documentation (`docs/examples/javascript`, `docs/api/reference.md`, `docs/architecture/structure.md`) to match the implemented API. The previous snippets referenced an `binaryoptionstoolsv2` npm package and methods such as `getClosedDeals()` that do not exist.
+
+## [0.2.14] - 2026-08-28
+### Added
+- **CloseOption Support**: Added new `closeoption` module for the CloseOption binary options platform, supporting Socket.IO EIO=3 protocol on `wss://www.closeoption.com:8443`.
+- Added `CloseOptionAsync` and `CloseOption` Python clients mirroring the PocketOption API.
+- Added PyO3 bindings for CloseOption with full async method support.
+- **Historical Tick Data**: Added `get_ticks(asset, lookback_seconds)` method to `PocketOptionAsync`, `PocketOption` (sync), and `RawPocketOption` clients for fetching raw tick history via `loadHistoryPeriod` WebSocket message with pagination.
+- Added `get_ticks.py` examples for both async and sync Python APIs.
+
+### Fixed
+
+- **Critical: Request/Response Routing**: Fixed `send_and_wait` to properly route responses via `HashMap<u64, oneshot::Sender>` registry instead of creating orphaned channels that always timeout.
+- **Implemented missing methods**: Added `payout`, `history`, `opened_deals`, `closed_deals`, `get_candles_live`, `raw_handler`, `subscribe_symbol`, `subscribe_raw`, and `reconnect` to the Rust `CloseOption` client.
+- **Fixed duplicate code**: Extracted `duration_to_time_intervals()` helper to eliminate duplicated duration-mapping logic in `buy` and `sell` methods.
+- **Implemented check_win**: Changed from stub returning error to functional implementation using asset lookup.
+- **Removed unused code**: Eliminated dead `engine_io_type` variable and unused `state` field from `KeepAliveModule`.
+
+### Changed
+
+- Updated all internal crates to version `0.2.14`.
 
 ## [0.2.13] - 2026-07-19
 
@@ -283,6 +315,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [PyPI Package](https://pypi.org/project/binaryoptionstoolsv2/)
 - [Documentation](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)
 
+[0.2.14]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.14
 [0.2.13]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.13
 [0.2.12]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.12
 [0.2.11]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.11

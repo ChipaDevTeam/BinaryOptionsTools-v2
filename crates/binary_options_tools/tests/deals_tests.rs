@@ -1,21 +1,19 @@
 #[cfg(test)]
 mod tests {
-    use crate::pocketoption::{
-        modules::deals::{Command, CommandResponse, DealsApiModule},
-        state::TradeState,
-        types::Deal,
-    };
-    use binary_options_tools_core::{
-        reimports::Message,
-        traits::{ApiModule, RunnerCommand},
-    };
-    use kanal::bounded_async;
-    use serde_json::json;
-    use std::sync::Arc;
-    use tokio::sync::oneshot;
-    use uuid::Uuid;
-
-    // Helper to create a mock deal
+use binary_options_tools::pocketoption::{
+    modules::deals::{Command, CommandResponse, DealsApiModule},
+    state::TradeState,
+    types::Deal,
+};
+use binary_options_tools_core::{
+    reimports::Message,
+    traits::{ApiModule, RunnerCommand},
+};
+use kanal::bounded_async;
+use serde_json::json;
+use std::sync::Arc;
+use tokio::sync::oneshot;
+use uuid::Uuid;
     fn create_mock_deal(id: Uuid) -> Deal {
         let json = json!({
             "id": id,
@@ -50,9 +48,9 @@ mod tests {
         trade_state.update_closed_deals(vec![deal.clone()]).await;
 
         let state = Arc::new(
-            crate::pocketoption::state::StateBuilder::default()
+            binary_options_tools::pocketoption::state::StateBuilder::default()
                 .ssid(
-                    crate::pocketoption::ssid::Ssid::parse(
+                    binary_options_tools::pocketoption::ssid::Ssid::parse(
                         "{\"session\":\"test\",\"isDemo\":1,\"uid\":123,\"platform\":2}",
                     )
                     .unwrap(),
@@ -60,7 +58,6 @@ mod tests {
                 .build_with_trade_state(trade_state)
                 .unwrap(),
         );
-
         let (_ws_tx, ws_rx) = bounded_async::<Arc<Message>>(1);
         let (cmd_tx, cmd_rx) = bounded_async::<Command>(1);
         let (res_tx, _res_rx) = bounded_async::<CommandResponse>(1);
@@ -94,9 +91,9 @@ mod tests {
         trade_state.add_opened_deal(deal.clone()).await;
 
         let state = Arc::new(
-            crate::pocketoption::state::StateBuilder::default()
+            binary_options_tools::pocketoption::state::StateBuilder::default()
                 .ssid(
-                    crate::pocketoption::ssid::Ssid::parse(
+                    binary_options_tools::pocketoption::ssid::Ssid::parse(
                         "{\"session\":\"test\",\"isDemo\":1,\"uid\":123,\"platform\":2}",
                     )
                     .unwrap(),

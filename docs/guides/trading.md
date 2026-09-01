@@ -1,5 +1,16 @@
 # Trading Guide - BinaryOptionsToolsUni
 
+:::tip Build and backtest strategies visually
+This guide teaches the strategy patterns. **[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=guide-trading&utm_campaign=BinaryOptionsToolsV2)** lets you
+*run* them: describe an edge in plain language, get a working **CHTL** strategy, backtest it over
+historical data, and deploy it to a live broker — no infrastructure to maintain. Free tier, browser
+and Android. **[Start building →](https://chipaeditor.com/?utm_source=docs&utm_medium=guide-trading&utm_campaign=BinaryOptionsToolsV2&utm_content=cta)**
+
+Applying these same ideas to crypto? **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** offers perpetuals, spot and margin with a
+demo mode to practise risk-free.
+:::
+
+
 Complete guide to trading binary options using BinaryOptionsToolsUni across all supported languages.
 
 ## Table of Contents

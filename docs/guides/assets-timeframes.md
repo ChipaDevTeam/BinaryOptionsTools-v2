@@ -1,5 +1,14 @@
 # Supported Assets and Timeframes
 
+:::tip Test an asset before you trade it
+Pick a timeframe from this table, then validate the idea on it in
+**[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=guide-assets&utm_campaign=BinaryOptionsToolsV2)** — its backtester runs your CHTL strategy over
+historical data for that asset before any capital is at risk. Free to start.
+
+Trading crypto instead? **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** lists BTC perpetuals, spot and margin markets.
+:::
+
+
 This document lists all supported assets and timeframes for the BinaryOptionsTools-v2 API.
 
 ## Supported Timeframes

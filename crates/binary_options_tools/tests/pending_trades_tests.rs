@@ -1,40 +1,36 @@
-#![allow(unused_imports, unused_mut, unused_variables, dead_code)]
-use std::any::Any;
-use std::sync::Arc;
-use std::time::Duration;
-
+#[cfg(test)]
+mod tests {
+use binary_options_tools::pocketoption::{
+    modules::pending_trades::{
+        CancelServerResponse, Command, CommandResponse, PendingTradesApiModule,
+        PendingTradesHandle, ServerResponse,
+    },
+    ssid::{Demo, Ssid},
+    state::State,
+    types::{FailOpenOrder, OpenPendingOrder, PendingOrder, ServerTimeState},
+};
+use binary_options_tools::pocketoption::error::PocketError;
 use binary_options_tools_core::{
-    error::CoreError,
     reimports::{AsyncReceiver, AsyncSender, Message},
-    traits::{ApiModule, Rule, RunnerCommand},
+    traits::{ApiModule, RunnerCommand},
 };
 use kanal::bounded_async;
 use rust_decimal::Decimal;
-use tokio::{
-    sync::Mutex,
-    time::{timeout, Instant},
-};
+use serde::{Deserialize, Serialize};
+use std::any::Any;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::Mutex;
+use tokio::{select, time::timeout};
+use tracing::warn;
 use uuid::Uuid;
-
-use crate::pocketoption::modules::pending_trades::ServerResponse;
-use crate::pocketoption::{
-    error::{PocketError, PocketResult},
-    state::{State, TradeState},
-    types::{FailOpenOrder, MultiPatternRule, OpenPendingOrder, PendingOrder},
-};
-
-use crate::pocketoption::modules::pending_trades::{
-    Command, CommandResponse, PendingTradesApiModule, PendingTradesHandle,
-};
-
-use crate::pocketoption::modules::pending_trades::CancelServerResponse;
-
 // ============== Mock Helpers ==============
 
 /// Creates a minimal mock State with only the fields needed for testing
 fn create_mock_state() -> Arc<State> {
-    use crate::pocketoption::ssid::{Demo, Ssid};
-    use crate::pocketoption::types::ServerTimeState;
+    use binary_options_tools::pocketoption::ssid::{Demo, Ssid};
+    use binary_options_tools::pocketoption::types::ServerTimeState;
+    use binary_options_tools::pocketoption::state::TradeState;
     use std::collections::HashMap;
     // Construct a Demo SSID directly
     let demo_ssid = Ssid::Demo(Demo {
@@ -285,9 +281,8 @@ async fn test_open_pending_order_mismatch_retry() {
 
     let pending_order = create_test_pending_order(Uuid::new_v4());
     let resp_tx_for_module = resp_tx.clone();
-
     let mut module_task = tokio::spawn(async move {
-        use crate::pocketoption::modules::pending_trades::PendingTradesApiModule;
+        use binary_options_tools::pocketoption::modules::pending_trades::PendingTradesApiModule;
         let (msg_tx, msg_rx) = kanal::bounded_async::<Arc<Message>>(1);
         let (ws_tx, mut ws_rx) = kanal::bounded_async(10);
         let (runner_tx, _) = kanal::bounded_async(10);
@@ -1153,6 +1148,5 @@ async fn test_cancel_pending_orders_batch_partial_success() {
     .unwrap();
 
     assert_eq!(received.len(), 1);
-
-    module_task.abort();
+    }
 }

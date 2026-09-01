@@ -1,82 +1,49 @@
-const { PocketOption } = require("./binary-options-tools.node");
-const { Validator } = require("./binary-options-tools.node");
+// Sends raw messages and waits for the responses a validator accepts.
+//
+//   node create_raw_order.js "<ssid>"
+
+const { PocketOption, Validator } = require("../../nodejs");
 
 async function main(ssid) {
-  // Initialize the API client
-  const api = new PocketOption(ssid);
+  const api = await PocketOption.create(ssid);
 
-  // Wait for connection to establish
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-
-  // Basic raw order example
+  // A handler keeps every message its validator accepts, so responses that
+  // arrive before send_and_wait returns are not lost.
   try {
-    // Create a validator for successful responses
-    const basicValidator = Validator.contains('"status":"success"');
-
-    // Create a raw handler with the validator
-    const rawHandler = await api.create_raw_handler(basicValidator, null);
-
-    // Send a message using the raw handler
-    const basicResponse = await rawHandler.send_and_wait(
-      '42["signals/subscribe"]',
-    );
-    console.log(`Basic raw order response: ${basicResponse}`);
+    const validator = Validator.contains('"status":"success"');
+    const handler = await api.createRawHandler(validator);
+    const response = await handler.sendAndWait('42["signals/subscribe"]');
+    console.log(`Basic raw order response: ${response}`);
   } catch (error) {
-    console.log(`Basic raw order failed: ${error}`);
+    console.log(`Basic raw order failed: ${error.message}`);
   }
 
-  // Raw order with timeout example
+  // Validators take patterns as strings, including regular expressions.
   try {
-    // Create a validator for signal data
-    const timeoutValidator = Validator.regex(
-      /{\"type\":\"signal\",\"data\":.*}/,
-    );
-
-    // Create a raw handler with the validator
-    const rawHandler = await api.create_raw_handler(timeoutValidator, null);
-
-    // Send a message with timeout
-    const timeoutResponse = await rawHandler.send_and_wait_with_timeout(
-      '42["signals/load"]',
-      5000, // 5 seconds
-    );
-    console.log(`Raw order with timeout response: ${timeoutResponse}`);
+    const validator = Validator.regex('\\{"type":"signal","data":.*\\}');
+    const handler = await api.createRawHandler(validator);
+    const response = await handler.sendAndWaitWithTimeout('42["signals/load"]', 5000);
+    console.log(`Raw order with timeout response: ${response}`);
   } catch (error) {
-    if (error.name === "TimeoutError") {
-      console.log("Order timed out after 5 seconds");
-    } else {
-      console.log(`Order with timeout failed: ${error}`);
-    }
+    // Timeouts are reported as `TimeoutError: ...`.
+    console.log(`Order with timeout failed: ${error.message}`);
   }
 
-  // Raw order with keep-alive message example
+  // The second argument is a keep-alive message, re-sent after a reconnect.
   try {
-    // Create a validator for trade completion
-    const keepAliveValidator = Validator.all([
+    const validator = Validator.all([
       Validator.contains('"type":"trade"'),
       Validator.contains('"status":"completed"'),
     ]);
-
-    // Create a keep-alive message
-    const keepAliveMessage = '42["ping"]';
-
-    // Create a raw handler with the validator and keep-alive message
-    const rawHandler = await api.create_raw_handler(
-      keepAliveValidator,
-      keepAliveMessage,
-    );
-
-    // Send a message using the raw handler
-    const keepAliveResponse = await rawHandler.send_and_wait(
-      '42["trade/subscribe"]',
-    );
-    console.log(`Raw order with keep-alive response: ${keepAliveResponse}`);
+    const handler = await api.createRawHandler(validator, '42["ping"]');
+    const response = await handler.sendAndWait('42["trade/subscribe"]');
+    console.log(`Raw order with keep-alive response: ${response}`);
   } catch (error) {
-    console.log(`Order with keep-alive failed: ${error}`);
+    console.log(`Order with keep-alive failed: ${error.message}`);
   }
+
+  await api.shutdown();
 }
 
-// Check if ssid is provided as command line argument
-const ssid = "";
-
+const ssid = process.argv[2] || process.env.POCKET_OPTION_SSID;
 main(ssid).catch(console.error);

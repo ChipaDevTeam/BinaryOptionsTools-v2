@@ -147,6 +147,41 @@ impl PocketOption {
             .ok_or_else(|| PocketError::ModuleNotFound(module_name.to_string()))
     }
 
+    /// Waits for the connection to be established, failing fast when the server
+    /// explicitly rejects the session instead of waiting out the whole timeout.
+    ///
+    /// Returns a `NotAuthorized` error carrying the server's reason when auth was
+    /// refused, so callers see the real cause rather than a generic timeout.
+    async fn await_connected(client: &Client<State>, timeout: Duration) -> PocketResult<()> {
+        const POLL_INTERVAL: Duration = Duration::from_millis(100);
+
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+
+            match tokio::time::timeout(remaining.min(POLL_INTERVAL), client.wait_connected()).await {
+                Ok(_) => return Ok(()),
+                Err(_) => {
+                    if let Some(reason) = client.state.auth_error() {
+                        return Err(PocketError::NotAuthorized(reason));
+                    }
+                }
+            }
+        }
+
+        // One last check: the rejection may have landed as the timeout expired.
+        if let Some(reason) = client.state.auth_error() {
+            return Err(PocketError::NotAuthorized(reason));
+        }
+
+        Err(PocketError::General(
+            "Connection initialization timed out".into(),
+        ))
+    }
+
     fn builder(ssid: impl ToString) -> PocketResult<ClientBuilder<State>> {
         let state = StateBuilder::default().ssid(Ssid::parse(ssid)?).build()?;
         Ok(Self::configure_common_modules(ClientBuilder::new(
@@ -198,14 +233,7 @@ impl PocketOption {
 
         let _runner = tokio::spawn(async move { runner.run().await });
 
-        match tokio::time::timeout(Duration::from_secs(30), client.wait_connected()).await {
-            Ok(_) => {}
-            Err(_) => {
-                return Err(PocketError::General(
-                    "Connection initialization timed out".into(),
-                ));
-            }
-        }
+        Self::await_connected(&client, Duration::from_secs(30)).await?;
 
         Ok(Self {
             client,
@@ -245,19 +273,7 @@ impl PocketOption {
 
         let _runner = tokio::spawn(async move { runner.run().await });
 
-        match tokio::time::timeout(
-            config.connection_initialization_timeout,
-            client.wait_connected(),
-        )
-        .await
-        {
-            Ok(_) => {}
-            Err(_) => {
-                return Err(PocketError::General(
-                    "Connection initialization timed out".into(),
-                ));
-            }
-        }
+        Self::await_connected(&client, config.connection_initialization_timeout).await?;
 
         Ok(Self {
             client,

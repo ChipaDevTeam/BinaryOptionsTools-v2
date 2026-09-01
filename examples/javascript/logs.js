@@ -1,43 +1,28 @@
-const { PocketOption, startLogs } = require("./binary-options-tools.node");
+// Writes the library logs to disk and to the terminal while trading.
+//
+//   node logs.js "<ssid>"
+
+const { PocketOption, startLogs } = require("../../nodejs");
 
 async function main(ssid) {
-  // Start logs
-  startLogs({
-    path: ".",
-    level: "DEBUG",
-    terminal: true, // If false then the logs will only be written to the log files
-  });
+  // Creates logs.log and error.log in the given directory. Set terminal to
+  // false to only write the files.
+  startLogs({ path: ".", level: "DEBUG", terminal: true });
 
-  // Initialize the API client
-  const api = new PocketOption(ssid);
+  const api = await PocketOption.create(ssid);
 
-  // Place buy and sell orders
-  const [buyId, buyData] = await api.buy({
-    asset: "EURUSD_otc",
-    amount: 1.0,
-    time: 300,
-    checkWin: false,
-  });
-
-  const [sellId, sellData] = await api.sell({
-    asset: "EURUSD_otc",
-    amount: 1.0,
-    time: 300,
-    checkWin: false,
-  });
-
+  const [buyId] = await api.buy("EURUSD_otc", 1.0, 300);
+  const [sellId] = await api.sell("EURUSD_otc", 1.0, 300);
   console.log(buyId, sellId);
 
-  // Check wins (same as setting checkWin to true in the buy/sell calls)
   const buyResult = await api.result(buyId);
   const sellResult = await api.result(sellId);
 
-  console.log("Buy trade result:", buyResult.result);
-  console.log("Buy trade data:", buyResult);
-  console.log("Sell trade result:", sellResult.result);
-  console.log("Sell trade data:", sellResult);
+  console.log("Buy trade profit:", buyResult.profit);
+  console.log("Sell trade profit:", sellResult.profit);
+
+  await api.shutdown();
 }
 
-// Check if ssid is provided as command line argument
-const ssid = "";
+const ssid = process.argv[2] || process.env.POCKET_OPTION_SSID;
 main(ssid).catch(console.error);

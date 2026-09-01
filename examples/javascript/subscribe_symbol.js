@@ -1,19 +1,26 @@
-const { PocketOption } = require("./binary-options-tools.node");
+// Streams real-time candles for a symbol.
+//
+//   node subscribe_symbol.js "<ssid>"
+
+const { PocketOption } = require("../../nodejs");
 
 async function main(ssid) {
-  // Initialize the API client
-  const api = new PocketOption(ssid);
+  const api = await PocketOption.create(ssid);
 
-  // Wait for connection to establish
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-
-  // Subscribe to real-time candle data for a symbol
-  const subscription = await api.subscribe("EURUSD_otc", 60);
+  // Without the second argument every update is yielded as it arrives; with
+  // it the updates are aggregated into candles of that many seconds.
+  const stream = await api.subscribe("EURUSD_otc", 60);
   console.log("Listening for real-time candles...");
-  console.log("Subscription created successfully!");
+
+  let received = 0;
+  for await (const candle of stream) {
+    console.log(candle);
+    if (++received >= 5) break;
+  }
+
+  await api.unsubscribe("EURUSD_otc");
+  await api.shutdown();
 }
 
-// Check if ssid is provided as command line argument
-const ssid = "";
-
+const ssid = process.argv[2] || process.env.POCKET_OPTION_SSID;
 main(ssid).catch(console.error);

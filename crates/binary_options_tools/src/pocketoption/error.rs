@@ -39,6 +39,10 @@ pub enum PocketError {
     #[error("Invalid period: {0}")]
     InvalidPeriod(u32),
 
+    /// The server explicitly rejected the session during authentication.
+    #[error("Authentication rejected: {0}")]
+    NotAuthorized(String),
+
     #[error("Module not found: {0}")]
     ModuleNotFound(String),
 

@@ -7,13 +7,12 @@ const config = {
   favicon: 'img/favicon.svg',
 
   // Set the production url of your site here
-  url: 'https://chipatrade.gitlab.io',
+  // Defaults to GitHub Pages; override with SITE_URL / BASE_URL for other hosts.
+  url: process.env.SITE_URL || 'https://chipadevteam.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
-  // For GitLab Pages deployment, it is often '/<projectName>/'
-  baseUrl: '/chipadevorg/BinaryOptionsTools-v2/',
+  baseUrl: process.env.BASE_URL || '/BinaryOptionsTools-v2/',
 
-  // GitLab pages deployment config.
-  organizationName: 'chipadevorg',
+  organizationName: 'chipadevteam',
   projectName: 'BinaryOptionsTools-v2',
   onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
@@ -50,6 +49,14 @@ const config = {
     ({
       // Replace with your project's social card
       image: 'img/binary-options-social-card.jpg',
+      announcementBar: {
+        id: 'chipa_ecosystem_2026_01',
+        content:
+          '✨ <b><a target="_blank" rel="noopener" href="https://chipaeditor.com/?utm_source=docs&utm_medium=announcement&utm_campaign=BinaryOptionsToolsV2">ChipaEditor</a></b> — build, backtest &amp; deploy AI-assisted trading strategies in CHTL, free. &nbsp;|&nbsp; 📈 Trade crypto perps &amp; spot on <b><a target="_blank" rel="noopener" href="https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS">ChipaX</a></b>.',
+        backgroundColor: '#22d3ee',
+        textColor: '#06202a',
+        isCloseable: true,
+      },
       navbar: {
         title: 'BinaryOptionsTools V2',
         logo: {
@@ -72,6 +79,23 @@ const config = {
             to: '/examples',
             label: 'Examples',
             position: 'left',
+          },
+          {
+            to: '/ecosystem',
+            label: 'Chipa Ecosystem',
+            position: 'left',
+          },
+          {
+            href: 'https://chipaeditor.com/?utm_source=docs&utm_medium=navbar&utm_campaign=BinaryOptionsToolsV2',
+            label: '✨ ChipaEditor',
+            position: 'right',
+            className: 'navbar-cta-editor',
+          },
+          {
+            href: 'https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS',
+            label: '📈 Trade on ChipaX',
+            position: 'right',
+            className: 'navbar-cta-exchange',
           },
           {
             href: 'https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2',
@@ -113,9 +137,29 @@ const config = {
                 href: 'https://discord.gg/p7YyFqSmAz',
               },
               {
-                label: 'GitHub Issues',
                 label: 'GitLab Issues',
                 href: 'https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues',
+              },
+            ],
+          },
+          {
+            title: 'Chipa Ecosystem',
+            items: [
+              {
+                label: 'ChipaEditor — AI Strategy Builder',
+                href: 'https://chipaeditor.com/?utm_source=docs&utm_medium=footer&utm_campaign=BinaryOptionsToolsV2',
+              },
+              {
+                label: 'ChipaX — Crypto Exchange',
+                href: 'https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS',
+              },
+              {
+                label: 'Ecosystem Overview',
+                to: '/ecosystem',
+              },
+              {
+                label: 'ChipaTrade',
+                href: 'https://chipatrade.com',
               },
             ],
           },
@@ -123,7 +167,6 @@ const config = {
             title: 'More',
             items: [
               {
-                label: 'GitHub',
                 label: 'GitLab',
                 href: 'https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2',
               },
@@ -138,7 +181,7 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} ChipaDevTeam. Built with Docusaurus.`,
+        copyright: `Copyright © ${new Date().getFullYear()} ChipaDevTeam. Build strategies with <a href="https://chipaeditor.com/?utm_source=docs&utm_medium=footer&utm_campaign=BinaryOptionsToolsV2&utm_content=copyright">ChipaEditor</a> · Trade on <a href="https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS">ChipaX</a>. Built with Docusaurus.`,
       },
       prism: {
         theme: prismThemes.github,

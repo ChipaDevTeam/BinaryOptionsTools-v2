@@ -89,12 +89,15 @@ class TestDemoConnection:
         from contextlib import aclosing
         generator = api.get_candles_live("EURUSD_otc", period=60, hours=1.0, max_rows=10)
         async with aclosing(generator) as stream:
-            async for closed, forming in stream:
-                assert isinstance(closed, list), "Expected list of closed candles"
-                assert len(closed) > 0, "Expected at least one closed candle"
-                assert forming is None or isinstance(forming, dict), "Expected forming candle to be dict or None"
-                print(f"  get_candles_live closed count: {len(closed)}, forming: {forming}")
-                break
+            try:
+                closed, forming = await asyncio.wait_for(stream.__anext__(), timeout=20)
+            except asyncio.TimeoutError:
+                pytest.fail("Timed out waiting for first get_candles_live item")
+                return
+            assert isinstance(closed, list), "Expected list of closed candles"
+            assert len(closed) > 0, "Expected at least one closed candle"
+            assert forming is None or isinstance(forming, dict), "Expected forming candle to be dict or None"
+            print(f"  get_candles_live closed count: {len(closed)}, forming: {forming}")
 
     @pytest.mark.asyncio
     async def test_compile_candles(self, api):

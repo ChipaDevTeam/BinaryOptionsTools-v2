@@ -5,7 +5,7 @@ import sys
 import time
 import warnings
 from collections import deque
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union, AsyncGenerator
 
 from ..config import Config
@@ -492,8 +492,8 @@ class PocketOptionAsync:
 
         Args:
             asset (str): Trading asset (e.g., "EURUSD_otc")
-            period (int): Historical period in seconds to fetch
-            offset (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
+            period (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
+            offset (int): Number of periods to look back (e.g., 200 for 200 candles)
 
         Returns:
             List[Dict]: List of candles, each containing:
@@ -518,8 +518,11 @@ class PocketOptionAsync:
             DeprecationWarning,
             stacklevel=2,
         )
-        hours = max(0.1, offset / 3600.0)
-        gen = self.get_candles_live(asset, period, hours=hours)
+        # offset = number of periods back, period = candle timeframe in seconds
+        # Convert to hours for get_candles_live: offset * period seconds = total lookback seconds
+        lookback_seconds = offset * period
+        hours = max(0.1, lookback_seconds / 3600.0)
+        gen = self.get_candles_live(asset, period, hours=hours, max_rows=offset)
         closed, forming = await anext(gen)
         return closed
 
@@ -594,7 +597,7 @@ class PocketOptionAsync:
         def merge_candles(*groups: List[Dict]) -> List[Dict]:
             res: Dict[int, Dict] = {}
             for group in groups:
-                for candle in group:
+                for candle in group or []:
                     res[extract_time(candle)] = candle
             return [res[ts] for ts in sorted(res)]
 
@@ -743,10 +746,9 @@ class PocketOptionAsync:
                 await reader_task
             except asyncio.CancelledError:
                 pass
-            try:
-                await self.unsubscribe(asset)
-            except Exception:
-                pass
+            # Do NOT call self.unsubscribe(asset) here - it removes ALL subscriptions for the asset.
+            # The temporary subscription created by subscribe_symbol() will be cleaned up
+            # when the stream variable goes out of scope (its Drop sends Unsubscribe for that specific ID).
 
     async def balance(self) -> float:
         """
@@ -1187,6 +1189,41 @@ class PocketOptionAsync:
             historical data with specific time ranges, consider using `get_candles_advanced()`.
         """
         return json.loads(await self.client.history(asset, period))
+    async def get_ticks(self, asset: str, lookback_seconds: int) -> List[Tuple[int, float]]:
+        """Retrieves historical tick data for an asset.
+
+        This method fetches raw tick data using the loadHistoryPeriod WebSocket message
+        with pagination to retrieve the specified number of seconds of tick history.
+
+        Args:
+            asset (str): Trading symbol (e.g., "USDCHF_otc")
+            lookback_seconds (int): Number of seconds of tick history to fetch
+
+        Returns:
+            List[Tuple[int, float]]: List of (timestamp, price) tuples sorted by timestamp
+
+        Raises:
+            ConnectionError: If the client is not connected
+            ValueError: If the asset is invalid or lookback_seconds is zero/negative
+            TimeoutError: If tick fetch times out
+
+        Example:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                # Get last 5 minutes of tick data
+                ticks = await client.get_ticks("USDCHF_otc", 300)
+                for ts, price in ticks[:5]:
+                    print(f"{ts}: {price}")
+            ```
+
+        Note:
+            - Uses loadHistoryPeriod pagination internally (period=1 for tick data)
+            - Returns raw ticks, not aggregated candles
+        """
+        if not isinstance(lookback_seconds, int) or lookback_seconds <= 0:
+            raise ValueError("lookback_seconds must be a positive integer")
+
+        return [tuple(tick) for tick in json.loads(await self.client.get_ticks(asset, lookback_seconds))]
 
     async def history_points(self, asset: str, period: int) -> List[Dict]:
         """Returns Pocket-style merged chart points for an asset and period.

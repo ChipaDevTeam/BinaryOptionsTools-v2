@@ -15,6 +15,11 @@ const sidebars = {
       label: 'Overview',
     },
     {
+      type: 'doc',
+      id: 'ecosystem',
+      label: '✨ Chipa Ecosystem',
+    },
+    {
       type: 'category',
       label: 'API Reference',
       items: [
@@ -50,6 +55,7 @@ const sidebars = {
         'guides/trading',
         'guides/raw-handler',
         'guides/assets-timeframes',
+        'guides/candle-history-limits',
         'guides/python-pystrategy-trading-bot',
       ],
     },
@@ -108,6 +114,23 @@ const sidebars = {
         'project/deployment',
         'project/breaking-changes-0.2.6',
         'project/raw-handler-summary',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Chipa Ecosystem',
+      items: [
+        'ecosystem',
+        {
+          type: 'link',
+          label: '✨ ChipaEditor — Strategy Builder',
+          href: 'https://chipaeditor.com/?utm_source=docs&utm_medium=sidebar&utm_campaign=BinaryOptionsToolsV2',
+        },
+        {
+          type: 'link',
+          label: '📈 ChipaX — Crypto Exchange',
+          href: 'https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS',
+        },
       ],
     },
   ],

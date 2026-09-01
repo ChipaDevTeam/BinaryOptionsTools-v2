@@ -1,4 +1,4 @@
-use binary_options_tools::{error::BinaryOptionsError, pocketoption::error::PocketError};
+use binary_options_tools::{closeoption::error::CloseOptionError, error::BinaryOptionsError, pocketoption::error::PocketError};
 use pyo3::{exceptions::PyValueError, PyErr};
 use thiserror::Error;
 use uuid::Uuid;
@@ -9,6 +9,8 @@ pub enum BinaryErrorPy {
     BinaryOptionsError(Box<BinaryOptionsError>),
     #[error("PocketOptionError, {0}")]
     PocketOptionError(Box<PocketError>),
+    #[error("CloseOptionError, {0}")]
+    CloseOptionError(Box<CloseOptionError>),
 
     #[error("Uninitialized, {0}")]
     Uninitialized(String),
@@ -78,5 +80,11 @@ impl From<BinaryOptionsError> for BinaryErrorPy {
 impl From<PocketError> for BinaryErrorPy {
     fn from(value: PocketError) -> Self {
         BinaryErrorPy::PocketOptionError(Box::new(value))
+    }
+}
+
+impl From<CloseOptionError> for BinaryErrorPy {
+    fn from(value: CloseOptionError) -> Self {
+        BinaryErrorPy::CloseOptionError(Box::new(value))
     }
 }

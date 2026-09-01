@@ -1,5 +1,10 @@
 # BinaryOptionsToolsV2 - Python Package
 
+> **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=python) — AI-powered algorithmic *trading strategy* builder: describe your edge, get working CHTL code, backtest it, deploy it. Free to start.**
+>
+> **📈 Trade crypto perps, spot & margin on [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
+
+
 [![Discord](https://img.shields.io/discord/your-discord-id?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/T3FGXcmd)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://pypi.org/project/binaryoptionstoolsv2/)
 
@@ -87,7 +92,7 @@ Key Features of PocketOptionAsync
  - **Market Data**:
    - `get_candles_live()`: Streams real-time gap-free candles (closed and currently forming) with historical backfill.
    - `candles()` / `get_candles()`: (Deprecated) Fetches historical candles (delegates to `get_candles_live`).
-   - `history()`: Retrieves recent data for a specific asset (delegates to `candles()`).
+   - `history()`: Retrieves recent historical data for a specific asset through the dedicated history endpoint.
    - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
 - **Account Management**:
   - `balance()`: Returns the current account balance.
@@ -161,7 +166,7 @@ Key Features of PocketOption
  - **Market Data**:
    - `get_candles_live()`: Streams real-time gap-free candles (closed and currently forming) with historical backfill.
    - `candles()` / `get_candles()`: (Deprecated) Fetches historical candles (delegates to `get_candles_live`).
-   - `history()`: Retrieves recent data for a specific asset (delegates to `candles()`).
+   - `history()`: Retrieves recent historical data for a specific asset through the dedicated history endpoint.
    - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
 - **Account Management**:
   - `balance()`: Retrieves account balance.

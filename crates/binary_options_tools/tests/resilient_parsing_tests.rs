@@ -1,14 +1,13 @@
 #[cfg(test)]
 mod tests {
-    use crate::pocketoption::modules::balance::BalanceModule;
-    use crate::pocketoption::modules::deals::DealsApiModule;
-    use crate::pocketoption::ssid::Ssid;
-    use crate::pocketoption::state::StateBuilder;
+    use binary_options_tools::pocketoption::modules::balance::BalanceModule;
+    use binary_options_tools::pocketoption::modules::deals::DealsApiModule;
+    use binary_options_tools::pocketoption::ssid::Ssid;
+    use binary_options_tools::pocketoption::state::StateBuilder;
     use binary_options_tools_core::reimports::{bounded_async, Message};
     use binary_options_tools_core::traits::{ApiModule, LightweightModule};
     use rust_decimal_macros::dec;
     use std::sync::Arc;
-
     #[tokio::test]
     async fn test_balance_module_resilient_parsing() {
         let dummy_ssid = r#"42["auth",{"session":"dummy","isDemo":1,"uid":123,"platform":2}]"#;

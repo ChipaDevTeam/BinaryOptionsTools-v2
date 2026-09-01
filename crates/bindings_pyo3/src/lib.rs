@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
 mod config;
+mod closeoption;
 mod error;
 mod framework;
 mod logs;
@@ -9,6 +10,7 @@ mod runtime;
 mod stream;
 mod validator;
 
+use closeoption::RawCloseOption;
 use config::PyConfig;
 use error::{
     InvalidParameterError, NotAllowedError, PocketOptionError, TradeNotFoundError,
@@ -31,6 +33,7 @@ fn BinaryOptionsTools(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<StreamLogsIterator>()?;
     m.add_class::<StreamLogsLayer>()?;
     m.add_class::<RawPocketOption>()?;
+    m.add_class::<RawCloseOption>()?;
     m.add_class::<Logger>()?;
     m.add_class::<LogBuilder>()?;
     m.add_class::<StreamIterator>()?;

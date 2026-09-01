@@ -1,33 +1,28 @@
-const { PocketOption } = require("./binary-options-tools.node");
+// Places a put trade and reports the balance before and after it settles.
+//
+//   node sell.js "<ssid>"
+
+const { PocketOption } = require("../../nodejs");
 
 async function main(ssid) {
-  // Initialize the API client
-  const api = new PocketOption(ssid);
+  const api = await PocketOption.create(ssid);
 
-  // Wait for connection to establish
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-
-  // Get balance before trade
   const balanceBefore = await api.balance();
   console.log(`Balance before trade: $${balanceBefore.toFixed(2)}`);
 
-  // Place a sell trade
-  const [orderId, deal] = await api.sell("EURUSD_otc", 1.0, 60);
+  const [dealId, deal] = await api.sell("EURUSD_otc", 1.0, 60);
   console.log(`\nTrade placed successfully!`);
-  console.log(`Deal ID: ${orderId}`);
-  console.log(`Deal data:`, deal);
+  console.log(`Deal ID: ${dealId}`);
+  console.log("Deal data:", deal);
 
-  // Wait for trade to complete
-  console.log("\nWaiting for trade to complete (65 seconds)...");
-  await new Promise((resolve) => setTimeout(resolve, 65000));
+  const settled = await api.result(dealId);
+  console.log(`\nProfit: $${settled.profit}`);
 
-  // Get balance after trade
   const balanceAfter = await api.balance();
-  console.log(`\nBalance after trade: $${balanceAfter.toFixed(2)}`);
-  console.log(`Profit/Loss: $${(balanceAfter - balanceBefore).toFixed(2)}`);
+  console.log(`Balance after trade: $${balanceAfter.toFixed(2)}`);
+
+  await api.shutdown();
 }
 
-// Check if ssid is provided as command line argument
-const ssid = "";
-
+const ssid = process.argv[2] || process.env.POCKET_OPTION_SSID;
 main(ssid).catch(console.error);

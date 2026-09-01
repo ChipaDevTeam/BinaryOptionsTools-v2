@@ -598,6 +598,25 @@ class TestCandles:
         closed, forming = await anext(gen)
         assert isinstance(closed, list)
         assert len(closed) > 0
+    @pytest.mark.asyncio
+    async def test_get_candles_live_none_history_source(self, async_client, mock_raw_pocketoption):
+        """Test get_candles_live tolerates None from one history source."""
+        mock_raw_pocketoption.compile_candles = AsyncMock(
+            return_value=json.dumps(
+                [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
+            )
+        )
+        mock_raw_pocketoption.history = AsyncMock(return_value=None)
+        mock_raw_pocketoption.get_candles_advanced = AsyncMock(
+            return_value=json.dumps(
+                [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
+            )
+        )
+        gen = async_client.get_candles_live("EURUSD_otc", period=60, hours=0.1, max_rows=10)
+        closed, forming = await anext(gen)
+        assert isinstance(closed, list)
+        assert isinstance(forming, (dict, type(None)))
+
 class TestBalance:
     """Tests for balance method."""
 

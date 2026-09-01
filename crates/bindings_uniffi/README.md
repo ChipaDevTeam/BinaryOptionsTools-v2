@@ -1,5 +1,10 @@
 # BinaryOptionsToolsUni
 
+> **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=uniffi) — AI-powered algorithmic *trading strategy* builder: describe your edge, get working CHTL code, backtest it, deploy it. Free to start.**
+>
+> **📈 Trade crypto perps, spot & margin on [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
+
+
 Cross-platform library for binary options trading automation using UniFFI. Provides native bindings for multiple programming languages from a single Rust codebase.
 
 ## 🌍 Supported Languages

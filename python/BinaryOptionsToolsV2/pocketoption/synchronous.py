@@ -25,19 +25,6 @@ class SyncSubscription:
         return json.loads(next(self.subscription))
 
 
-class SyncRawSubscription:
-    def __init__(self, subscription):
-        self.subscription = subscription
-
-    def __iter__(self):
-        return self
-
-    def __aiter__(self):
-        return self.subscription
-
-    def __next__(self):
-        return next(self.subscription)
-
 
 class SyncCandleLiveIterator:
     """Synchronous iterator for live candle updates."""
@@ -304,7 +291,7 @@ class PocketOption:
         Args:
             asset: The trading asset name.
             period: The candle period in seconds.
-            offset: The offset from the current time in seconds.
+            offset: The number of periods to look back.
 
         Returns:
             A list of candle dictionaries.
@@ -322,8 +309,10 @@ class PocketOption:
             DeprecationWarning,
             stacklevel=2,
         )
-        hours = max(0.1, offset / 3600.0)
-        iterator = self.get_candles_live(asset, period, hours=hours)
+        # offset = number of periods back, period = candle timeframe in seconds
+        lookback_seconds = offset * period
+        hours = max(0.1, lookback_seconds / 3600.0)
+        iterator = self.get_candles_live(asset, period, hours=hours, max_rows=offset)
         closed, forming = next(iterator)
         return closed
 
@@ -371,7 +360,10 @@ class PocketOption:
             DeprecationWarning,
             stacklevel=2,
         )
-        iterator = self.get_candles_live(asset, period, hours=2.0)
+        # period = candle timeframe in seconds, default 2 hours lookback
+        lookback_seconds = 2 * 3600
+        hours = max(0.1, lookback_seconds / 3600.0)
+        iterator = self.get_candles_live(asset, period, hours=hours)
         closed, forming = next(iterator)
         return closed
 
@@ -538,6 +530,41 @@ class PocketOption:
             A list of historical trade dictionaries.
         """
         return self._run(self._client.history(asset, period))
+    def get_ticks(self, asset: str, lookback_seconds: int) -> List[Tuple[int, float]]:
+        """Get historical tick data for an asset.
+
+        This method fetches raw tick data using the loadHistoryPeriod WebSocket message
+        with pagination to retrieve the specified number of seconds of tick history.
+
+        Args:
+            asset: The trading asset name (e.g., "USDCHF_otc").
+            lookback_seconds: Number of seconds of tick history to fetch.
+
+        Returns:
+            A list of (timestamp, price) tuples sorted by timestamp.
+
+        Raises:
+            ConnectionError: If the client is not connected.
+            ValueError: If the asset is invalid or lookback_seconds is zero/negative.
+            TimeoutError: If tick fetch times out.
+
+        Example:
+            ```python
+            with PocketOption(ssid) as client:
+                # Get last 5 minutes of tick data
+                ticks = client.get_ticks("USDCHF_otc", 300)
+                for ts, price in ticks[:5]:
+                    print(f"{ts}: {price}")
+            ```
+
+        Note:
+            - Uses loadHistoryPeriod pagination internally (period=1 for tick data).
+            - Returns raw ticks, not aggregated candles.
+        """
+        if not isinstance(lookback_seconds, int) or lookback_seconds <= 0:
+            raise ValueError("lookback_seconds must be a positive integer")
+
+        return self._run(self._client.get_ticks(asset, lookback_seconds))
 
     def history_points(self, asset: str, period: int) -> List[Dict]:
         """Get Pocket-style merged chart points for an asset and period.
