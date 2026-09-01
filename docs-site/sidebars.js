@@ -55,6 +55,7 @@ const sidebars = {
         'guides/trading',
         'guides/raw-handler',
         'guides/assets-timeframes',
+        'guides/candle-history-limits',
         'guides/python-pystrategy-trading-bot',
       ],
     },
