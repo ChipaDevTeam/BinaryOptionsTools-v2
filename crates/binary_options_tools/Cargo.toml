@@ -1,6 +1,6 @@
 [package]
 name = "binary_options_tools"
-version = "0.2.13"
+version = "0.2.14"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 description = "High-level library for binary options trading automation. Supports PocketOption and ExpertOption with real-time data streaming, WebSocket API access, and automated trading strategies."
@@ -11,7 +11,11 @@ documentation = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2"
 readme = "Readme.md"
 keywords = ["binary-options", "pocketoption", "trading", "expertoption", "automation"]
 categories = ["api-bindings", "asynchronous"]
-include = ["src/**/*", "data/**/*", "Cargo.toml", "Readme.md", "LICENSE"]
+[features]
+default = ["pocketoption", "expertoption", "closeoption"]
+pocketoption = []
+expertoption = []
+closeoption = []
 
 [dependencies]
 anyhow = { workspace = true }
@@ -30,16 +34,19 @@ uuid = { workspace = true }
 binary-options-tools-core = { path = "../core", version = "0.2.13" }
 binary-options-tools-macros = { path = "../macros", version = "0.2.13" }
 rand = { workspace = true }
+regex = { workspace = true }
+kanal = { workspace = true }
 tracing = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
 ryu = "1.0"
 thiserror = { workspace = true }
-regex = { workspace = true }
-rustls = { version = "0.23.41", default-features = false, features = ["ring"] }
-rustls-native-certs = "0.8.4"
-php_serde = "0.6.0"
-tokio-rustls = "0.26.4"
+base64 = { workspace = true }
+http = { workspace = true }
+ rustls = { version = "0.23.43", default-features = false, features = ["ring"] }
+ rustls-native-certs = "0.8.4"
+ php_serde = "0.6.0"
+ tokio-rustls = "0.26.4"
 
 [dev-dependencies]
 futures-util = { workspace = true }

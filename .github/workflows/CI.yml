@@ -174,6 +174,37 @@ jobs:
           name: wheels-sdist
           path: python/dist
 
+  # --- 4b. NODE.JS ADDON ---
+  nodejs:
+    name: Node.js addon (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    env:
+      RUSTC_WRAPPER: "" # sccache is not set up on every runner in this matrix
+      SCCACHE_GHA_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Build the native addon
+        run: npm run build
+        working-directory: nodejs
+      - name: Run the smoke tests
+        run: npm test
+        working-directory: nodejs
+      - name: Upload the addon
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: nodejs-addon-${{ matrix.os }}
+          path: nodejs/binary-options-tools.node
+
   # --- 5. AUTOMATED RELEASE ---
   release:
     name: Release

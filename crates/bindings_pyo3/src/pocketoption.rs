@@ -562,6 +562,37 @@ impl RawPocketOption {
         })
     }
 
+    /// Gets historical tick data for a specific asset.
+    ///
+    /// This method fetches raw tick data using the loadHistoryPeriod WebSocket message
+    /// with pagination to retrieve the specified number of seconds of tick history.
+    ///
+    /// Args:
+    ///     asset (str): Trading symbol (e.g., "USDCHF_otc")
+    ///     lookback_seconds (int): Number of seconds of tick history to fetch
+    ///
+    /// Returns:
+    ///     List[Tuple[int, float]]: List of (timestamp, price) tuples sorted by timestamp
+    pub fn get_ticks<'py>(
+        &self,
+        py: Python<'py>,
+        asset: String,
+        lookback_seconds: u32,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move {
+            let res = client
+                .ticks(asset, lookback_seconds)
+                .await
+                .map_err(BinaryErrorPy::from)?;
+            Python::attach(|py| {
+                serde_json::to_string(&res)
+                    .map_err(BinaryErrorPy::from)?
+                    .into_py_any(py)
+            })
+        })
+    }
+
     /// Compiles custom candlesticks from raw tick history.
     ///
     /// This method fetches raw tick data for the asset over the specified
