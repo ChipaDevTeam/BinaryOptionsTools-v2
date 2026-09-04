@@ -1,0 +1,37 @@
+{
+  "name": "binary-options-tools",
+  "version": "0.2.14",
+  "description": "Node.js bindings for BinaryOptionsToolsV2 — PocketOption trading automation with real-time data streaming and raw WebSocket access.",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "SEE LICENSE IN ../LICENSE",
+  "author": "ChipaDevTeam",
+  "homepage": "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2",
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"
+  },
+  "keywords": [
+    "binary-options",
+    "pocketoption",
+    "trading",
+    "napi",
+    "websocket"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "binary-options-tools.node",
+    "server",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.js --release",
+    "build:debug": "node scripts/build.js",
+    "test": "node --test \"test/*.test.js\"",
+    "serve": "node server/server.js"
+  }
+}

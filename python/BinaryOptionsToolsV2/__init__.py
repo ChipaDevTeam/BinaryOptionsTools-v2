@@ -11,6 +11,12 @@ from .pocketoption import (
     Validator as Validator,
     __all__ as __pocket_all__,
 )
+from .closeoption import (
+    CloseOptionAsync as CloseOptionAsync,
+    CloseOption as CloseOption,
+    RawHandler as CloseRawHandler,
+    __all__ as __close_all__,
+)
 
 # Import the Rust module and re-export its attributes
 _rust_module = None
@@ -46,15 +52,14 @@ _rust_exported_names = [
     "StreamLogsIterator",
     "StreamLogsLayer",
     "StreamIterator",
-    "RawStreamIterator",
-    "start_tracing",
 ]
 __rust_all__ = [n for n in _rust_exported_names if n in globals()]
 
 __all__ = list(
     set(
         __pocket_all__
-        + ["tracing", "validator", "PocketOptionAsync", "PocketOption", "RawHandler", "Validator"]
+        + __close_all__
+        + ["tracing", "validator", "PocketOptionAsync", "PocketOption", "CloseOptionAsync", "CloseOption", "RawHandler", "Validator"]
         + __rust_all__
     )
 )

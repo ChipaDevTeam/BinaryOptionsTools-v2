@@ -1,19 +1,21 @@
-const { PocketOption } = require("./binary-options-tools.node");
+// Opens a trade and waits for its result.
+//
+//   node check_win.js "<ssid>"
+
+const { PocketOption } = require("../../nodejs");
 
 async function main(ssid) {
-  // Initialize the API client
-  const api = new PocketOption(ssid);
+  const api = await PocketOption.create(ssid);
 
-  // Wait for connection to establish
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  const [dealId] = await api.buy("EURUSD_otc", 10, 60);
+  console.log(`Waiting for deal ${dealId} to settle...`);
 
-  const [orderId, details] = await api.buy("EURUSD_otc", 10, 60);
-  const results = await api.result(orderId);
-  // Get balance
-  console.log(`Balance: ${results.profit}`);
+  const deal = await api.result(dealId);
+  console.log(`Profit: ${deal.profit}`);
+  console.log(deal.profit > 0 ? "Won" : "Lost");
+
+  await api.shutdown();
 }
 
-// Check if ssid is provided as command line argument
-const ssid = "";
-
+const ssid = process.argv[2] || process.env.POCKET_OPTION_SSID;
 main(ssid).catch(console.error);

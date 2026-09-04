@@ -16,9 +16,11 @@ BinaryOptionsTools-v2/
 │   ├── core/                     # Core framework (client, runner, router, modules)
 │   ├── bindings_uniffi/          # UniFFI bindings for multi-language support
 │   ├── bindings_pyo3/            # PyO3 Python bindings
+│   ├── bindings_napi/            # N-API (napi-rs) Node.js bindings
 │   └── macros/                   # Procedural macros for rule system
 ├── python/
 │   └── BinaryOptionsToolsV2/     # Python package
+├── nodejs/                       # Node.js package wrapping the N-API addon
 ├── examples/
 │   ├── python/                   # Python examples (async & sync)
 │   ├── rust/                     # Rust examples
@@ -181,11 +183,12 @@ See [Data Flow](/architecture/dataflow) for detailed diagrams.
 - **Rust**: Cargo workspace with multiple crates
 - **Python**: PyO3 + maturin for native bindings
 - **UniFFI**: Generates bindings for Kotlin, Swift, Go, Ruby, C#
-- **JavaScript**: wasm-bindgen or napi-rs for Node.js native module
+- **Node.js**: napi-rs native addon (`crates/bindings_napi`), packaged in `nodejs/`
 
 ## Testing
 
 - Unit tests in each crate (`#[cfg(test)]`)
 - Integration tests in `tests/` directory
 - Python tests in `tests/python/`
+- Node.js smoke tests in `nodejs/test/` (`npm test`)
 - Examples serve as functional tests
