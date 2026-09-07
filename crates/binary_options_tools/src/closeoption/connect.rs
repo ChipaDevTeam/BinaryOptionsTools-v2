@@ -30,56 +30,17 @@ impl CloseConnect {
         state: &State,
         target_url: &Url,
     ) -> ConnectorResult<String> {
-        // Preserve scheme/host/port/path from the target URL instead of hardcoding https.
-        let http_scheme = if target_url.scheme() == "ws" {
-            "http"
-        } else {
-            "https"
-        };
-        let path = {
-            let p = target_url.path();
-            if p.is_empty() || p == "/" {
-                "/socket.io/".to_string()
-            } else {
-                p.to_string()
-            }
-        };
+        // Mutate the parsed target URL into the Socket.IO polling URL: switch to
+        // the http(s) scheme, default the path, and replace only the Socket.IO
+        // query fields so non-Socket.IO query parameters survive into the request.
+        let polling_url = build_polling_url(target_url)?;
         let host = target_url.host_str().unwrap_or_default();
-        let port = target_url.port().map(|p| p.to_string()).unwrap_or_else(|| {
-            if http_scheme == "http" {
-                "80".to_string()
-            } else {
-                "443".to_string()
-            }
-        });
-        let polling_url = format!(
-            "{}://{}:{}{}?EIO=3&transport=polling",
-            http_scheme, host, port, path
-        );
 
         info!(target: "CloseConnect", "Socket.IO polling handshake: {}", polling_url);
 
-        let mut client_builder =
-            reqwest::Client::builder().user_agent(state.user_agent.clone().unwrap_or_else(|| {
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36".to_string()
-            }));
-        // Route the polling handshake through the configured proxy, mirroring the WebSocket path.
-        if let Some(proxy_str) = &state.proxy {
-            let proxy_url = Url::parse(proxy_str)
-                .map_err(|e| ConnectorError::Custom(format!("Invalid proxy URL: {e}")))?;
-            // Reject credentials on clear-text proxies, mirroring the WebSocket path.
-            if parse_auth(&proxy_url).is_some() && proxy_url.scheme() != "https" {
-                return Err(ConnectorError::Custom(
-                    "Credentials not allowed on clear-text proxy".into(),
-                ));
-            }
-            let proxy = reqwest::Proxy::all(proxy_str)
-                .map_err(|e| ConnectorError::Custom(format!("Invalid proxy URL: {e}")))?;
-            client_builder = client_builder.proxy(proxy);
-        }
-        let client = client_builder
-            .build()
-            .map_err(|e| ConnectorError::Custom(format!("Failed to build HTTP client: {e}")))?;
+        // Route the polling handshake through the configured proxy, mirroring the
+        // WebSocket path (credentials on clear-text proxies are rejected).
+        let client = build_polling_http_client(state)?;
 
         let response = tokio::time::timeout(
             std::time::Duration::from_secs(20),
@@ -162,6 +123,104 @@ impl CloseConnect {
         info!("Socket.IO EIO=3 handshake complete");
         Ok(())
     }
+}
+
+/// Build the Socket.IO long-polling handshake URL from the parsed target URL.
+///
+/// The scheme is switched to http(s), the path defaults to `/socket.io/`, and
+/// only the Socket.IO query fields are replaced, so any other query parameters
+/// on the target URL are preserved in the polling request.
+fn build_polling_url(target_url: &Url) -> ConnectorResult<Url> {
+    let http_scheme = if target_url.scheme() == "ws" {
+        "http"
+    } else {
+        "https"
+    };
+    let mut url = target_url.clone();
+    url.set_scheme(http_scheme).map_err(|_| {
+        ConnectorError::Custom(format!("Cannot switch target scheme to {http_scheme}"))
+    })?;
+    if url.path().is_empty() || url.path() == "/" {
+        url.set_path("/socket.io/");
+    }
+    if url.port().is_none() {
+        let default_port = if http_scheme == "http" { 80 } else { 443 };
+        let _ = url.set_port(Some(default_port));
+    }
+    set_engine_io_params(&mut url, "polling", None);
+    Ok(url)
+}
+
+/// Build the WebSocket upgrade URL from the parsed target URL.
+///
+/// Scheme, host, port and path are taken from `target_url` (the path defaults
+/// to `/socket.io/`), any non-Socket.IO query parameters are preserved, and the
+/// Socket.IO fields are replaced for the websocket transport with `sid`.
+fn build_upgrade_url(target_url: &Url, sid: &str) -> Url {
+    let mut url = target_url.clone();
+    if url.path().is_empty() || url.path() == "/" {
+        url.set_path("/socket.io/");
+    }
+    if url.port().is_none() {
+        let default_port = if url.scheme() == "ws" { 80 } else { 443 };
+        let _ = url.set_port(Some(default_port));
+    }
+    set_engine_io_params(&mut url, "websocket", Some(sid));
+    url
+}
+
+/// Replace the Socket.IO query parameters (EIO, transport and, when given, sid)
+/// on `url`, preserving every other query parameter.
+fn set_engine_io_params(url: &mut Url, transport: &str, sid: Option<&str>) {
+    let keep: Vec<(String, String)> = url
+        .query_pairs()
+        .filter(|(key, _)| key != "EIO" && key != "transport" && key != "sid")
+        .map(|(key, value)| (key.into_owned(), value.into_owned()))
+        .collect();
+    let mut query = url.query_pairs_mut();
+    query.clear();
+    for (key, value) in &keep {
+        query.append_pair(key, value);
+    }
+    query.append_pair("EIO", "3");
+    query.append_pair("transport", transport);
+    if let Some(sid) = sid {
+        query.append_pair("sid", sid);
+    }
+}
+
+/// Reject credentials (including password-only credentials) on clear-text
+/// proxies, mirroring the WebSocket path. HTTPS proxies may carry credentials.
+fn validate_clear_text_proxy(proxy_url: &Url) -> ConnectorResult<()> {
+    if proxy_url.scheme() != "https"
+        && (parse_auth(proxy_url).is_some() || proxy_url.password().is_some())
+    {
+        return Err(ConnectorError::Custom(
+            "Credentials not allowed on clear-text proxy".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Build the HTTP client used by the Socket.IO polling handshake, applying the
+/// configured user agent and, when a proxy is configured, routing through it.
+fn build_polling_http_client(state: &State) -> ConnectorResult<reqwest::Client> {
+    let mut client_builder =
+        reqwest::Client::builder().user_agent(state.user_agent.clone().unwrap_or_else(|| {
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36".to_string()
+        }));
+    if let Some(proxy_str) = &state.proxy {
+        let proxy_url = Url::parse(proxy_str)
+            .map_err(|e| ConnectorError::Custom(format!("Invalid proxy URL: {e}")))?;
+        // Reject credentials on clear-text proxies, mirroring the WebSocket path.
+        validate_clear_text_proxy(&proxy_url)?;
+        let proxy = reqwest::Proxy::all(proxy_str)
+            .map_err(|e| ConnectorError::Custom(format!("Invalid proxy URL: {e}")))?;
+        client_builder = client_builder.proxy(proxy);
+    }
+    client_builder
+        .build()
+        .map_err(|e| ConnectorError::Custom(format!("Failed to build HTTP client: {e}")))
 }
 
 #[async_trait::async_trait]
@@ -337,22 +396,10 @@ impl Connector<State> for CloseConnect {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36".to_string()
         });
         let ws_sid = self.socket_io_polling_handshake(&state, &t_url).await?;
-        // Build the WebSocket URL from the parsed target URL so scheme/path match the target.
-        let ws_scheme = if t_url.scheme() == "ws" { "ws" } else { "wss" };
-        let ws_path = {
-            let p = t_url.path();
-            if p.is_empty() || p == "/" {
-                "/socket.io/".to_string()
-            } else {
-                p.to_string()
-            }
-        };
-        let ws_url = format!(
-            "{}://{}:{}{}?EIO=3&transport=websocket&sid={}",
-            ws_scheme, target_host, target_port, ws_path, ws_sid
-        );
-        let ws_t_url =
-            Url::parse(&ws_url).map_err(|e| ConnectorError::UrlParsing(e.to_string()))?;
+        // Build the WebSocket upgrade URL by mutating the parsed target URL so
+        // scheme/host/port/path and any non-Socket.IO query parameters are kept;
+        // only the Socket.IO fields are replaced for the websocket transport.
+        let ws_t_url = build_upgrade_url(&t_url, &ws_sid);
 
         let mut request_builder = Request::builder()
             .uri(ws_t_url.to_string())
@@ -433,5 +480,86 @@ mod tests {
         assert!(url.contains("EIO=3"));
         assert!(url.contains("transport=websocket"));
         assert!(url.contains("sid=test_sid_123"));
+    }
+    #[test]
+    fn test_socket_io_urls_preserve_custom_query_parameters() {
+        // A custom State::ws_url() may carry its own query parameters; both the
+        // polling handshake URL and the WebSocket upgrade URL must keep them
+        // while replacing only the Socket.IO fields (EIO, transport, sid).
+        let state = StateBuilder::new()
+            .token("test_token")
+            .sid("test_sid_123")
+            .public_code("pub")
+            .hidden_code("hid")
+            .ws_url(
+                "wss://www.closeoption.com:8443/socket.io/?EIO=3&transport=websocket&sid=test_sid_123&custom_token=abc123&foo=bar",
+            )
+            .build()
+            .unwrap();
+        let t_url = Url::parse(&state.ws_url()).unwrap();
+
+        let polling = build_polling_url(&t_url).unwrap();
+        assert_eq!(polling.scheme(), "https");
+        assert_eq!(polling.port(), Some(8443));
+        let polling_pairs: Vec<(String, String)> = polling
+            .query_pairs()
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .collect();
+        assert!(polling_pairs.contains(&("custom_token".into(), "abc123".into())));
+        assert!(polling_pairs.contains(&("foo".into(), "bar".into())));
+        assert!(polling_pairs.contains(&("EIO".into(), "3".into())));
+        assert!(polling_pairs.contains(&("transport".into(), "polling".into())));
+        assert!(!polling_pairs.iter().any(|(k, _)| k == "sid"));
+
+        let upgrade = build_upgrade_url(&t_url, "fresh_sid_456");
+        assert_eq!(upgrade.scheme(), "wss");
+        assert_eq!(upgrade.port(), Some(8443));
+        let upgrade_pairs: Vec<(String, String)> = upgrade
+            .query_pairs()
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .collect();
+        assert!(upgrade_pairs.contains(&("custom_token".into(), "abc123".into())));
+        assert!(upgrade_pairs.contains(&("foo".into(), "bar".into())));
+        assert!(upgrade_pairs.contains(&("EIO".into(), "3".into())));
+        assert!(upgrade_pairs.contains(&("transport".into(), "websocket".into())));
+        assert!(upgrade_pairs.contains(&("sid".into(), "fresh_sid_456".into())));
+        // Socket.IO fields appear exactly once after the replacement.
+        assert_eq!(upgrade_pairs.iter().filter(|(k, _)| k == "EIO").count(), 1);
+        assert_eq!(upgrade_pairs.iter().filter(|(k, _)| k == "sid").count(), 1);
+    }
+
+    #[test]
+    fn test_polling_proxy_accepts_socks_urls() {
+        // Regression: the polling handshake routes through reqwest, which only
+        // accepts socks5/socks5h proxy URLs when the "socks" feature is enabled
+        // on the reqwest dependency. Building the polling HTTP client exercises
+        // that path without opening a connection. Like connect(), the crypto
+        // provider must be installed before the client is built.
+        init_crypto_provider();
+        let state = StateBuilder::new()
+            .token("test_token")
+            .sid("test_sid_123")
+            .public_code("pub")
+            .hidden_code("hid")
+            .proxy("socks5h://127.0.0.1:1080")
+            .build()
+            .unwrap();
+        let client = build_polling_http_client(&state)
+            .expect("socks5h proxy must be accepted by the polling client");
+        drop(client);
+    }
+
+    #[test]
+    fn test_polling_proxy_rejects_clear_text_credentials() {
+        // Full and password-only credentials are rejected on clear-text proxies.
+        let with_credentials = Url::parse("http://user:pass@127.0.0.1:8080").unwrap();
+        assert!(validate_clear_text_proxy(&with_credentials).is_err());
+        // parse_auth() ignores password-only userinfo, so the explicit password
+        // check is required to catch it.
+        let password_only = Url::parse("http://:secret@127.0.0.1:8080").unwrap();
+        assert!(validate_clear_text_proxy(&password_only).is_err());
+        // HTTPS proxies may still carry credentials.
+        let https = Url::parse("https://user:pass@proxy.example.com").unwrap();
+        assert!(validate_clear_text_proxy(&https).is_ok());
     }
 }

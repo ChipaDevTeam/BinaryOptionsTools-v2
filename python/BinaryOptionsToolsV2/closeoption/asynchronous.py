@@ -157,6 +157,11 @@ class CloseOptionAsync:
         self._raw_handler = None
         self._connected = False
 
+    @property
+    def is_connected(self) -> bool:
+        """Whether the connection to CloseOption has been established."""
+        return self._connected
+
     async def __aenter__(self):
         await self.connect()
         return self

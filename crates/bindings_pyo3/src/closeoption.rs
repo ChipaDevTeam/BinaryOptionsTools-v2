@@ -38,6 +38,11 @@ impl RawCloseOption {
             if !url.is_empty() {
                 builder = builder.ws_url(url);
             }
+            // Capture the timeout before `config` is consumed by the destructuring below.
+            let connection_timeout = config
+                .as_ref()
+                .map(|cfg| cfg.inner.connection_initialization_timeout)
+                .unwrap_or(Duration::from_secs(CONNECTION_TIMEOUT_SECS));
             if let Some(cfg) = config {
                 if let Some(proxy) = cfg.inner.proxy {
                     builder = builder.proxy(proxy);
@@ -54,11 +59,7 @@ impl RawCloseOption {
                 Ok(s) => s,
                 Err(e) => return Err(e),
             };
-            let timeout = config
-                .as_ref()
-                .map(|cfg| cfg.inner.connection_initialization_timeout)
-                .unwrap_or(Duration::from_secs(CONNECTION_TIMEOUT_SECS));
-            let client = tokio::time::timeout(timeout, CloseOption::from_state(state))
+            let client = tokio::time::timeout(connection_timeout, CloseOption::from_state(state))
                 .await
                 .map_err(|_| BinaryErrorPy::NotAllowed("Connection timeout".into()))?
                 .map_err(BinaryErrorPy::from)?;
