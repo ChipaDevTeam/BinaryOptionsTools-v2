@@ -28,7 +28,7 @@ def main(ssid: str):
         print("Last 5 ticks:")
         for ts, price in ticks[-5:]:
             print(f"  {ts}: {price}")
-        
+
         # Convert to pandas DataFrame for easier viewing
         df = pd.DataFrame(ticks, columns=["timestamp", "price"])
         print(f"\nDataFrame:\n{df}")

@@ -134,6 +134,7 @@ class MockRawClient:
         return json.dumps(
             [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
         )
+
     async def subscribe_symbol(self, asset):
         async def subscription():
             yield json.dumps({"symbol": asset, "price": 1.11})
@@ -594,12 +595,17 @@ class TestCandles:
                 [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
             )
         )
-        gen = async_client.get_candles_live("EURUSD_otc", period=60, hours=0.1, max_rows=10)
-        closed, forming = await anext(gen)
+        gen = async_client.get_candles_live(
+            "EURUSD_otc", period=60, hours=0.1, max_rows=10
+        )
+        closed, _forming = await gen.__anext__()
         assert isinstance(closed, list)
         assert len(closed) > 0
+
     @pytest.mark.asyncio
-    async def test_get_candles_live_none_history_source(self, async_client, mock_raw_pocketoption):
+    async def test_get_candles_live_none_history_source(
+        self, async_client, mock_raw_pocketoption
+    ):
         """Test get_candles_live tolerates None from one history source."""
         mock_raw_pocketoption.compile_candles = AsyncMock(
             return_value=json.dumps(
@@ -612,10 +618,13 @@ class TestCandles:
                 [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
             )
         )
-        gen = async_client.get_candles_live("EURUSD_otc", period=60, hours=0.1, max_rows=10)
-        closed, forming = await anext(gen)
+        gen = async_client.get_candles_live(
+            "EURUSD_otc", period=60, hours=0.1, max_rows=10
+        )
+        closed, forming = await gen.__anext__()
         assert isinstance(closed, list)
         assert isinstance(forming, (dict, type(None)))
+
 
 class TestBalance:
     """Tests for balance method."""

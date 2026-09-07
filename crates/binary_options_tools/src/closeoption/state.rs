@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tokio::sync::oneshot;
-use tokio::sync::RwLock;
 use kanal;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
+use tokio::sync::oneshot;
+use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 use binary_options_tools_core::traits::AppState;
 
@@ -50,8 +50,8 @@ pub struct State {
     pub tls_alpn: Option<Vec<String>>,
     /// Sec-WebSocket-Extensions
     pub sec_websocket_extensions: Option<String>,
-    /// Pending request-response channels keyed by request ID
-    pub pending_requests: Arc<Mutex<HashMap<u64, oneshot::Sender<SubscriptionEvent>>>>,
+    /// Pending request-response channels keyed by request ID (ordered for FIFO fallback)
+    pub pending_requests: Arc<Mutex<BTreeMap<u64, oneshot::Sender<SubscriptionEvent>>>>,
     /// Symbol subscriptions: symbol -> sender
     pub subscriptions: Arc<Mutex<HashMap<String, kanal::AsyncSender<SubscriptionEvent>>>>,
     /// Raw subscriptions: all events broadcast to all senders
@@ -162,10 +162,18 @@ impl StateBuilder {
 
     /// Build the State, validating required fields
     pub fn build(self) -> Result<State, CloseOptionError> {
-        let token = self.token.ok_or_else(|| CloseOptionError::StateBuilder("token is required".to_string()))?;
-        let sid = self.sid.ok_or_else(|| CloseOptionError::StateBuilder("sid is required".to_string()))?;
-        let public_code = self.public_code.ok_or_else(|| CloseOptionError::StateBuilder("public_code is required".to_string()))?;
-        let hidden_code = self.hidden_code.ok_or_else(|| CloseOptionError::StateBuilder("hidden_code is required".to_string()))?;
+        let token = self
+            .token
+            .ok_or_else(|| CloseOptionError::StateBuilder("token is required".to_string()))?;
+        let sid = self
+            .sid
+            .ok_or_else(|| CloseOptionError::StateBuilder("sid is required".to_string()))?;
+        let public_code = self
+            .public_code
+            .ok_or_else(|| CloseOptionError::StateBuilder("public_code is required".to_string()))?;
+        let hidden_code = self
+            .hidden_code
+            .ok_or_else(|| CloseOptionError::StateBuilder("hidden_code is required".to_string()))?;
 
         Ok(State {
             token,
@@ -182,7 +190,7 @@ impl StateBuilder {
             tls_cipher_suites: self.tls_cipher_suites,
             tls_alpn: self.tls_alpn,
             sec_websocket_extensions: self.sec_websocket_extensions,
-            pending_requests: Arc::new(Mutex::new(HashMap::new())),
+            pending_requests: Arc::new(Mutex::new(BTreeMap::new())),
             subscriptions: Arc::new(Mutex::new(HashMap::new())),
             raw_subscriptions: Arc::new(Mutex::new(Vec::new())),
             orders: Arc::new(Mutex::new(HashMap::new())),
@@ -287,6 +295,7 @@ impl State {
         *self.balance.write().await = None;
         self.assets.write().await.clear();
         self.orders.lock().await.clear();
+        *self.server_time_offset.write().await = 0;
     }
 }
 #[async_trait::async_trait]
@@ -311,7 +320,10 @@ mod tests {
             .unwrap();
         assert_eq!(state.token, "test");
         assert_eq!(state.sid, "sid");
-        assert_eq!(state.ws_url(), "wss://www.closeoption.com:8443/socket.io/?EIO=3&transport=websocket&sid=sid");
+        assert_eq!(
+            state.ws_url(),
+            "wss://www.closeoption.com:8443/socket.io/?EIO=3&transport=websocket&sid=sid"
+        );
     }
 
     #[test]

@@ -20,6 +20,13 @@
 - **Role**: developer
 - **Contributions**: Python bindings, API design, testing infrastructure
 
+### Six
+
+- **GitLab**: [@six](https://gitlab.chipatrade.com/six)
+- **Role**: developer
+- **Contributions**: Python bindings, API design, testing infrastructure
+
+
 ## Contributors
 
 We welcome contributions from the community! This project wouldn't be possible without the help of many contributors.
@@ -71,4 +78,4 @@ Want to see your name here? Contribute to the project! All contributors who subm
 
 **Note**: This file will be updated as new contributors join the project. If you've contributed and don't see your name, please open an issue or pull request!
 
-Last updated: 2026-01-XX
+Last updated: 2026-09-04

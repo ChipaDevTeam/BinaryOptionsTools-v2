@@ -5,18 +5,21 @@ use binary_options_tools_core::{
     builder::ClientBuilder,
     client::Client,
     error::CoreResult,
-    reimports::{AsyncSender, AsyncReceiver, Message},
+    reimports::{AsyncReceiver, AsyncSender, Message},
     traits::{LightweightModule, Rule, RunnerCommand},
 };
 use kanal;
-use tokio::task::JoinHandle;
 use tokio::sync::oneshot;
+use tokio::task::JoinHandle;
 use tracing::{debug, warn};
 
 use crate::closeoption::connect::CloseConnect;
 use crate::closeoption::error::CloseOptionError;
 use crate::closeoption::state::State;
-use crate::closeoption::types::{Asset, Candle, OrderResult, Outgoing, SubscriptionEvent, SetOrderRequest, Get30MinRequest, PriceData};
+use crate::closeoption::types::{
+    Asset, Candle, Get30MinRequest, Get30MinResult, OrderResult, Outgoing, PriceData,
+    SetOrderRequest, SubscriptionEvent,
+};
 use crate::closeoption::utils::get_index;
 
 /// Lightweight module for handling price data
@@ -38,17 +41,28 @@ impl LightweightModule<State> for PriceDataModule {
 
     async fn run(&mut self) -> CoreResult<()> {
         while let Ok(msg) = self.receiver.recv().await {
+            debug!(target: "Router", "received raw message");
             if let Ok(text) = msg.to_text() {
                 // Parse Socket.IO frames properly
                 if let Ok(frames) = crate::closeoption::utils::parse_socket_io_message(text) {
                     for frame in frames {
-                        if frame.message_type == crate::closeoption::types::socket_io::SocketIoMessageType::Event {
+                        if frame.message_type
+                            == crate::closeoption::types::socket_io::SocketIoMessageType::Event
+                        {
                             // Parse event name from data: ["eventName", ...]
-                            if let Ok(event_array) = serde_json::from_str::<Vec<serde_json::Value>>(&frame.data) {
-                                if let Some(event_name) = event_array.get(0).and_then(|v| v.as_str()) {
+                            if let Ok(event_array) =
+                                serde_json::from_str::<Vec<serde_json::Value>>(&frame.data)
+                            {
+                                if let Some(event_name) =
+                                    event_array.get(0).and_then(|v| v.as_str())
+                                {
                                     if event_name == "priceData" {
                                         if let Some(data_value) = event_array.get(1) {
-                                            if let Ok(price_data) = serde_json::from_value::<PriceData>(data_value.clone()) {
+                                            if let Ok(price_data) =
+                                                serde_json::from_value::<PriceData>(
+                                                    data_value.clone(),
+                                                )
+                                            {
                                                 self.state.update_assets(&price_data).await;
                                             }
                                         }
@@ -97,17 +111,32 @@ impl LightweightModule<State> for BalanceModule {
                 // Parse Socket.IO frames properly
                 if let Ok(frames) = crate::closeoption::utils::parse_socket_io_message(text) {
                     for frame in frames {
-                        if frame.message_type == crate::closeoption::types::socket_io::SocketIoMessageType::Event {
+                        if frame.message_type
+                            == crate::closeoption::types::socket_io::SocketIoMessageType::Event
+                        {
                             // Parse event name from data: ["eventName", ...]
-                            if let Ok(event_array) = serde_json::from_str::<Vec<serde_json::Value>>(&frame.data) {
-                                if let Some(event_name) = event_array.get(0).and_then(|v| v.as_str()) {
+                            if let Ok(event_array) =
+                                serde_json::from_str::<Vec<serde_json::Value>>(&frame.data)
+                            {
+                                if let Some(event_name) =
+                                    event_array.get(0).and_then(|v| v.as_str())
+                                {
                                     if event_name == "setOrderResult" {
                                         if let Some(data_value) = event_array.get(1) {
-                                            if let Ok(order_result) = serde_json::from_value::<OrderResult>(data_value.clone()) {
+                                            if let Ok(order_result) =
+                                                serde_json::from_value::<OrderResult>(
+                                                    data_value.clone(),
+                                                )
+                                            {
                                                 // Store order result in state
                                                 let mut orders = self.state.orders.lock().await;
-                                                orders.insert(order_result.order_id.clone(), order_result.clone());
-                                                self.state.update_balance(order_result.balance).await;
+                                                orders.insert(
+                                                    order_result.order_id.clone(),
+                                                    order_result.clone(),
+                                                );
+                                                self.state
+                                                    .update_balance(order_result.balance)
+                                                    .await;
                                             }
                                         }
                                     }
@@ -201,7 +230,9 @@ impl RawHandler {
     /// Send a raw message
     pub async fn send(&self, message: &str) -> Result<(), CloseOptionError> {
         let frame = crate::closeoption::types::socket_io::event("raw", message);
-        self.sender.send(Message::Text(frame.into())).await
+        self.sender
+            .send(Message::Text(frame.into()))
+            .await
             .map_err(|e| CloseOptionError::General(format!("Failed to send raw: {}", e)))?;
         Ok(())
     }
@@ -236,7 +267,9 @@ impl CloseOption {
             .with_lightweight_module::<KeepAliveModule>()
             .with_lightweight_module::<ResponseRouterModule>();
 
-        let (client, mut runner) = builder.build().await
+        let (client, mut runner) = builder
+            .build()
+            .await
             .map_err(|e| CloseOptionError::General(format!("Failed to build client: {}", e)))?;
 
         let runner_handle = tokio::spawn(async move {
@@ -257,17 +290,21 @@ impl CloseOption {
         self.client.state.clone()
     }
 
-    async fn send_and_wait(&self, request: Outgoing) -> Result<SubscriptionEvent, CloseOptionError> {
+    async fn send_and_wait(
+        &self,
+        request: Outgoing,
+    ) -> Result<SubscriptionEvent, CloseOptionError> {
         let id = get_index();
         let (tx, rx) = oneshot::channel();
         let state = self.state();
-        
+
         // Register pending request in state
         {
             let mut pending = state.pending_requests.lock().await;
             pending.insert(id, tx);
+            debug!(target: "Router", request_id = id, event = request.event_name(), "registered pending request");
         }
-        
+
         // Serialize request with ID
         let mut request_value = serde_json::to_value(&request)
             .map_err(|e| CloseOptionError::General(format!("Failed to serialize: {}", e)))?;
@@ -276,11 +313,17 @@ impl CloseOption {
         }
         let json = serde_json::to_string(&request_value)
             .map_err(|e| CloseOptionError::General(format!("Failed to serialize: {}", e)))?;
-        
-        let frame = crate::closeoption::types::socket_io::event("message", &json);
-        
+
+        let frame = crate::closeoption::types::socket_io::event(request.event_name(), &json);
+        debug!(target: "Router", request_id = id, "sending request frame");
+
         // Send with cleanup on failure
-        if let Err(e) = self.client.to_ws_sender.send(Message::Text(frame.into())).await {
+        if let Err(e) = self
+            .client
+            .to_ws_sender
+            .send(Message::Text(frame.into()))
+            .await
+        {
             // Clean up pending request on send failure
             state.pending_requests.lock().await.remove(&id);
             return Err(CloseOptionError::General(format!("Failed to send: {}", e)));
@@ -292,14 +335,18 @@ impl CloseOption {
                 // Clean up pending request
                 state.pending_requests.lock().await.remove(&id);
                 Ok(response)
-            },
+            }
             Ok(Err(_)) => {
                 // Clean up on channel error
                 state.pending_requests.lock().await.remove(&id);
-                Err(CloseOptionError::General("Response channel closed".to_string()))
-            },
+                Err(CloseOptionError::General(
+                    "Response channel closed".to_string(),
+                ))
+            }
             Err(_) => {
                 // Clean up on timeout
+                let pending_count = state.pending_requests.lock().await.len();
+                debug!(target: "Router", request_id = id, pending_count, "send_and_wait timeout");
                 state.pending_requests.lock().await.remove(&id);
                 Err(CloseOptionError::Timeout {
                     task: "send_and_wait".to_string(),
@@ -311,7 +358,12 @@ impl CloseOption {
     }
 
     /// Place a BUY (CALL) order
-    pub async fn buy(&self, asset: &str, amount: f64, duration: u32) -> Result<OrderResult, CloseOptionError> {
+    pub async fn buy(
+        &self,
+        asset: &str,
+        amount: f64,
+        duration: u32,
+    ) -> Result<OrderResult, CloseOptionError> {
         let time_intervals = Self::duration_to_time_intervals(duration)?;
         let acc_type = self.state().acc_type().to_string();
 
@@ -329,12 +381,19 @@ impl CloseOption {
 
         match self.send_and_wait(Outgoing::SetOrder(request)).await? {
             SubscriptionEvent::SetOrderResult(result) => Ok(result),
-            _ => Err(CloseOptionError::General("Unexpected response type".to_string())),
+            _ => Err(CloseOptionError::General(
+                "Unexpected response type".to_string(),
+            )),
         }
     }
 
     /// Place a SELL (PUT) order
-    pub async fn sell(&self, asset: &str, amount: f64, duration: u32) -> Result<OrderResult, CloseOptionError> {
+    pub async fn sell(
+        &self,
+        asset: &str,
+        amount: f64,
+        duration: u32,
+    ) -> Result<OrderResult, CloseOptionError> {
         let time_intervals = Self::duration_to_time_intervals(duration)?;
         let acc_type = self.state().acc_type().to_string();
 
@@ -352,7 +411,9 @@ impl CloseOption {
 
         match self.send_and_wait(Outgoing::SetOrder(request)).await? {
             SubscriptionEvent::SetOrderResult(result) => Ok(result),
-            _ => Err(CloseOptionError::General("Unexpected response type".to_string())),
+            _ => Err(CloseOptionError::General(
+                "Unexpected response type".to_string(),
+            )),
         }
     }
 
@@ -373,7 +434,12 @@ impl CloseOption {
     }
 
     /// Get historical candles
-    pub async fn get_candles(&self, asset: &str, period: u32, _count: u32) -> Result<Vec<Candle>, CloseOptionError> {
+    pub async fn get_candles(
+        &self,
+        asset: &str,
+        period: u32,
+        _count: u32,
+    ) -> Result<Vec<Candle>, CloseOptionError> {
         let ps_type = match period {
             30 => "30min",
             60 => "1min",
@@ -382,7 +448,8 @@ impl CloseOption {
             1800 => "30min",
             3600 => "1hour",
             _ => return Err(CloseOptionError::InvalidPeriod(period)),
-        }.to_string();
+        }
+        .to_string();
 
         let acc_type = self.state().acc_type().to_string();
 
@@ -397,9 +464,16 @@ impl CloseOption {
         };
 
         match self.send_and_wait(Outgoing::Get30Min(request)).await? {
-            SubscriptionEvent::Get30MinResult(result) => Ok(result.candles),
-            _ => Err(CloseOptionError::General("Unexpected response type".to_string())),
+            SubscriptionEvent::Get30MinResult(result) => Ok(result.price),
+            _ => Err(CloseOptionError::General(
+                "Unexpected response type".to_string(),
+            )),
         }
+    }
+
+    /// Get ticks/candles for an asset (alias for get_candles with 30min period)
+    pub async fn get_ticks(&self, asset: &str) -> Result<Vec<Candle>, CloseOptionError> {
+        self.get_candles(asset, 30, 0).await
     }
 
     /// Get active assets
@@ -409,14 +483,23 @@ impl CloseOption {
     }
 
     /// Subscribe to price updates for a symbol
-    pub async fn subscribe_symbol(&self, symbol: &str) -> Result<AsyncReceiver<SubscriptionEvent>, CloseOptionError> {
+    pub async fn subscribe_symbol(
+        &self,
+        symbol: &str,
+    ) -> Result<AsyncReceiver<SubscriptionEvent>, CloseOptionError> {
         let (tx, rx) = kanal::bounded_async::<SubscriptionEvent>(100);
-        self.state().subscriptions.lock().await.insert(symbol.to_string(), tx);
+        self.state()
+            .subscriptions
+            .lock()
+            .await
+            .insert(symbol.to_string(), tx);
         Ok(rx)
     }
 
     /// Subscribe to all raw messages
-    pub async fn subscribe_raw(&self) -> Result<AsyncReceiver<SubscriptionEvent>, CloseOptionError> {
+    pub async fn subscribe_raw(
+        &self,
+    ) -> Result<AsyncReceiver<SubscriptionEvent>, CloseOptionError> {
         let (tx, rx) = kanal::bounded_async::<SubscriptionEvent>(100);
         self.state().raw_subscriptions.lock().await.push(tx);
         Ok(rx)
@@ -425,7 +508,10 @@ impl CloseOption {
     /// Send raw message
     pub async fn send_raw(&self, message: &str) -> Result<(), CloseOptionError> {
         let frame = crate::closeoption::types::socket_io::event("raw", message);
-        self.client.to_ws_sender.send(Message::Text(frame.into())).await
+        self.client
+            .to_ws_sender
+            .send(Message::Text(frame.into()))
+            .await
             .map_err(|e| CloseOptionError::General(format!("Failed to send raw: {}", e)))?;
         Ok(())
     }
@@ -437,14 +523,18 @@ impl CloseOption {
 
     /// Shutdown the client
     pub async fn shutdown(self) -> Result<(), CloseOptionError> {
-        self.client.shutdown_ref().await
+        self.client
+            .shutdown_ref()
+            .await
             .map_err(|e| CloseOptionError::General(format!("Failed to shutdown: {}", e)))?;
         Ok(())
     }
 
     /// Reconnect
     pub async fn reconnect(&self) -> Result<(), CloseOptionError> {
-        self.client.reconnect().await
+        self.client
+            .reconnect()
+            .await
             .map_err(|e| CloseOptionError::General(format!("Failed to reconnect: {}", e)))?;
         Ok(())
     }
@@ -459,33 +549,50 @@ impl CloseOption {
             600 => Ok("10 Minutes".to_string()),
             d if d <= 60 => Ok("30 Seconds".to_string()),
             d if d <= 600 => Ok("10 Minutes".to_string()),
-            d => Err(CloseOptionError::General(format!("Unsupported trade duration: {} seconds", d))),
+            d => Err(CloseOptionError::General(format!(
+                "Unsupported trade duration: {} seconds",
+                d
+            ))),
         }
     }
 
     /// Get payout for an asset
     pub async fn payout(&self, _asset: &str) -> Result<f64, CloseOptionError> {
-        Err(CloseOptionError::Unsupported("Per-asset payout not available".into()))
+        Err(CloseOptionError::Unsupported(
+            "Per-asset payout not available".into(),
+        ))
     }
 
     /// Get trade history
     pub async fn history(&self, _limit: u32) -> Result<Vec<OrderResult>, CloseOptionError> {
-        Err(CloseOptionError::Unsupported("Trade history not available".into()))
+        Err(CloseOptionError::Unsupported(
+            "Trade history not available".into(),
+        ))
     }
 
     /// Get opened deals
     pub async fn opened_deals(&self) -> Result<Vec<OrderResult>, CloseOptionError> {
-        Err(CloseOptionError::Unsupported("Opened deals not available".into()))
+        Err(CloseOptionError::Unsupported(
+            "Opened deals not available".into(),
+        ))
     }
 
     /// Get closed deals
     pub async fn closed_deals(&self) -> Result<Vec<OrderResult>, CloseOptionError> {
-        Err(CloseOptionError::Unsupported("Closed deals not available".into()))
+        Err(CloseOptionError::Unsupported(
+            "Closed deals not available".into(),
+        ))
     }
 
     /// Get live candle updates
-    pub async fn get_candles_live(&self, _asset: &str, _period: u32) -> Result<AsyncReceiver<Arc<Message>>, CloseOptionError> {
-        Err(CloseOptionError::Unsupported("Live candle support not yet implemented".into()))
+    pub async fn get_candles_live(
+        &self,
+        _asset: &str,
+        _period: u32,
+    ) -> Result<AsyncReceiver<Arc<Message>>, CloseOptionError> {
+        Err(CloseOptionError::Unsupported(
+            "Live candle support not yet implemented".into(),
+        ))
     }
 
     /// Get raw handler for advanced operations
@@ -521,7 +628,10 @@ impl LightweightModule<State> for ResponseRouterModule {
     fn rule() -> Box<dyn Rule + Send + Sync> {
         Box::new(|msg: &Message| {
             if let Ok(text) = msg.to_text() {
-                text.contains("priceData") || text.contains("setOrderResult") || text.contains("\"id\"")
+                text.contains("priceData")
+                    || text.contains("setOrderResult")
+                    || text.contains("get30MinResult")
+                    || text.contains("\"id\"")
             } else {
                 false
             }
@@ -532,30 +642,114 @@ impl LightweightModule<State> for ResponseRouterModule {
         while let Ok(msg) = self.receiver.recv().await {
             if let Ok(text) = msg.to_text() {
                 // Try parsing as Socket.IO frames first
-                let frames = crate::closeoption::utils::parse_socket_io_message(text)
-                    .unwrap_or_default();
+                let frames =
+                    crate::closeoption::utils::parse_socket_io_message(text).unwrap_or_default();
+                debug!(target: "Router", frames_count = frames.len(), "parsed socket.io frames");
                 let mut handled = false;
                 for frame in &frames {
-                    if frame.message_type == crate::closeoption::types::socket_io::SocketIoMessageType::Event {
-                        if let Ok(event_array) = serde_json::from_str::<Vec<serde_json::Value>>(&frame.data) {
+                    if frame.message_type
+                        == crate::closeoption::types::socket_io::SocketIoMessageType::Event
+                    {
+                        if let Ok(event_array) =
+                            serde_json::from_str::<Vec<serde_json::Value>>(&frame.data)
+                        {
                             if let Some(event_name) = event_array.get(0).and_then(|v| v.as_str()) {
+                                debug!(target: "Router", event_name, "parsed event from frame");
                                 if let Some(payload) = event_array.get(1) {
                                     // Resolve pending requests by ID
                                     if let Ok(value) = serde_json::to_value(payload) {
                                         if let Some(id) = value.get("id").and_then(|v| v.as_u64()) {
-                                            let mut pending = self.state.pending_requests.lock().await;
+                                            let mut pending =
+                                                self.state.pending_requests.lock().await;
                                             if let Some(sender) = pending.remove(&id) {
-                                                if let Ok(event) = serde_json::from_value::<SubscriptionEvent>(value.clone()) {
+                                                if let Ok(event) =
+                                                    serde_json::from_value::<SubscriptionEvent>(
+                                                        value.clone(),
+                                                    )
+                                                {
                                                     let _ = sender.send(event);
                                                 }
                                             }
                                         }
                                     }
+                                    // Route get30MinResult events
+                                    if event_name == "get30MinResult" {
+                                        debug!(target: "Router", event_name, "get30MinResult handler start");
+                                        debug!(target: "Router", payload_type = %payload, "attempting Get30MinResult deserialization");
+                                        if let Ok(price_data) =
+                                            serde_json::from_value::<Get30MinResult>(
+                                                payload.clone(),
+                                            )
+                                        {
+                                            let event =
+                                                SubscriptionEvent::Get30MinResult(price_data);
+                                            let mut pending =
+                                                self.state.pending_requests.lock().await;
+                                            // Correlate by the payload's request id when present; the id-based
+                                            // block above already consumed a matching entry, so remove(&id)
+                                            // returns None in that case and we never steal another waiter's
+                                            // slot. Fall back to an arbitrary pending entry only for id-less
+                                            // payloads.
+                                            let id = payload
+                                                .get("id")
+                                                .and_then(|v| v.as_u64())
+                                                .or_else(|| pending.keys().next().copied());
+                                            if let Some(id) = id {
+                                                debug!(target: "Router", id, "removing pending request");
+                                                if let Some(sender) = pending.remove(&id) {
+                                                    let _ = sender.send(event);
+                                                    debug!(target: "Router", "sent get30MinResult event to pending request");
+                                                }
+                                            }
+                                        } else if let Ok(error_data) =
+                                            serde_json::from_value::<serde_json::Value>(
+                                                payload.clone(),
+                                            )
+                                        {
+                                            debug!(target: "Router", "Get30MinResult deserialization failed, checking for error");
+                                            let head = error_data
+                                                .get("head")
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("Unknown error")
+                                                .to_string();
+                                            let code = error_data
+                                                .get("code")
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("UNKNOWN")
+                                                .to_string();
+                                            let pair = error_data
+                                                .get("pair")
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("unknown")
+                                                .to_string();
+                                            let api_error =
+                                                CloseOptionError::ApiError { head, code, pair };
+                                            let mut pending =
+                                                self.state.pending_requests.lock().await;
+                                            let id = payload
+                                                .get("id")
+                                                .and_then(|v| v.as_u64())
+                                                .or_else(|| pending.keys().next().copied());
+                                            if let Some(id) = id {
+                                                if let Some(sender) = pending.remove(&id) {
+                                                    let _ = sender.send(SubscriptionEvent::Error(
+                                                        api_error.to_string(),
+                                                    ));
+                                                }
+                                            }
+                                        }
+                                        handled = true;
+                                    }
+
                                     // Route priceData events
                                     if event_name == "priceData" {
-                                        if let Ok(price_data) = serde_json::from_value::<PriceData>(payload.clone()) {
-                                            let event = SubscriptionEvent::PriceData(price_data.clone());
-                                            let mut subscriptions = self.state.subscriptions.lock().await;
+                                        if let Ok(price_data) =
+                                            serde_json::from_value::<PriceData>(payload.clone())
+                                        {
+                                            let event =
+                                                SubscriptionEvent::PriceData(price_data.clone());
+                                            let mut subscriptions =
+                                                self.state.subscriptions.lock().await;
                                             let mut failed: Vec<String> = Vec::new();
                                             for (symbol, sender) in subscriptions.iter() {
                                                 if price_data.prices.contains_key(symbol) {
@@ -571,8 +765,10 @@ impl LightweightModule<State> for ResponseRouterModule {
                                             // Raw subscriptions: try_send with stable sender identity
                                             // On backpressure (full queue), drop the event for that subscriber
                                             // to preserve ordering for others and avoid unbounded memory growth.
-                                            let raw_subscriptions = self.state.raw_subscriptions.lock().await;
-                                            let senders: Vec<_> = raw_subscriptions.iter().cloned().collect();
+                                            let raw_subscriptions =
+                                                self.state.raw_subscriptions.lock().await;
+                                            let senders: Vec<_> =
+                                                raw_subscriptions.iter().cloned().collect();
                                             drop(raw_subscriptions);
                                             for sender in senders {
                                                 let _ = sender.try_send(event.clone());
@@ -591,14 +787,18 @@ impl LightweightModule<State> for ResponseRouterModule {
                         if let Some(id) = value.get("id").and_then(|v| v.as_u64()) {
                             let mut pending = self.state.pending_requests.lock().await;
                             if let Some(sender) = pending.remove(&id) {
-                                if let Ok(event) = serde_json::from_value::<SubscriptionEvent>(value.clone()) {
+                                if let Ok(event) =
+                                    serde_json::from_value::<SubscriptionEvent>(value.clone())
+                                {
                                     let _ = sender.send(event);
                                 }
                             }
                         }
                         if let Some(event_name) = value.get("event").and_then(|v| v.as_str()) {
                             if event_name == "priceData" {
-                                if let Ok(price_data) = serde_json::from_value::<PriceData>(value.get("data").cloned().unwrap_or_default()) {
+                                if let Ok(price_data) = serde_json::from_value::<PriceData>(
+                                    value.get("data").cloned().unwrap_or_default(),
+                                ) {
                                     let event = SubscriptionEvent::PriceData(price_data.clone());
                                     let subscriptions = self.state.subscriptions.lock().await;
                                     for (symbol, sender) in subscriptions.iter() {
@@ -610,8 +810,10 @@ impl LightweightModule<State> for ResponseRouterModule {
                                     // Raw subscriptions: try_send with stable sender identity
                                     // On backpressure (full queue), drop the event for that subscriber
                                     // to preserve ordering for others and avoid unbounded memory growth.
-                                    let raw_subscriptions = self.state.raw_subscriptions.lock().await;
-                                    let senders: Vec<_> = raw_subscriptions.iter().cloned().collect();
+                                    let raw_subscriptions =
+                                        self.state.raw_subscriptions.lock().await;
+                                    let senders: Vec<_> =
+                                        raw_subscriptions.iter().cloned().collect();
                                     drop(raw_subscriptions);
                                     for sender in senders {
                                         let _ = sender.try_send(event.clone());
@@ -656,20 +858,38 @@ mod tests {
 
     #[test]
     fn test_duration_to_time_intervals() {
-        assert_eq!(CloseOption::duration_to_time_intervals(30).unwrap(), "30 Seconds");
-        assert_eq!(CloseOption::duration_to_time_intervals(60).unwrap(), "1 Minute");
-        assert_eq!(CloseOption::duration_to_time_intervals(300).unwrap(), "5 Minutes");
-        assert_eq!(CloseOption::duration_to_time_intervals(600).unwrap(), "10 Minutes");
-        assert_eq!(CloseOption::duration_to_time_intervals(45).unwrap(), "30 Seconds");
-        assert_eq!(CloseOption::duration_to_time_intervals(350).unwrap(), "10 Minutes");
+        assert_eq!(
+            CloseOption::duration_to_time_intervals(30).unwrap(),
+            "30 Seconds"
+        );
+        assert_eq!(
+            CloseOption::duration_to_time_intervals(60).unwrap(),
+            "1 Minute"
+        );
+        assert_eq!(
+            CloseOption::duration_to_time_intervals(300).unwrap(),
+            "5 Minutes"
+        );
+        assert_eq!(
+            CloseOption::duration_to_time_intervals(600).unwrap(),
+            "10 Minutes"
+        );
+        assert_eq!(
+            CloseOption::duration_to_time_intervals(45).unwrap(),
+            "30 Seconds"
+        );
+        assert_eq!(
+            CloseOption::duration_to_time_intervals(350).unwrap(),
+            "10 Minutes"
+        );
         assert!(CloseOption::duration_to_time_intervals(999).is_err());
     }
 
     #[tokio::test]
     async fn test_raw_subscription_ordered_delivery_under_backpressure() {
-        use kanal::bounded_async;
-        use crate::closeoption::types::SubscriptionEvent;
         use crate::closeoption::state::StateBuilder;
+        use crate::closeoption::types::SubscriptionEvent;
+        use kanal::bounded_async;
 
         // Create a state with raw subscriptions
         let state = StateBuilder::new()
@@ -719,14 +939,14 @@ mod tests {
         // Verify tx1 and tx3 received the event, tx2 did not (backpressure)
         let received1 = rx1.recv().await.is_ok();
         let received3 = rx3.recv().await.is_ok();
-        
+
         // tx2 should not have received event3 (buffer full)
         // But we can't easily test that without timing - the key invariant is:
         // - No panic, no deadlock
         // - Other subscribers still receive events in order
         assert!(received1, "Subscriber 1 should receive event");
         assert!(received3, "Subscriber 3 should receive event");
-        
+
         // Verify ordering: events received by each subscriber are in order
         // (tx1 received event3, tx3 received event3)
         // This test primarily ensures no crash and basic delivery works

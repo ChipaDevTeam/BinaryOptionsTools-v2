@@ -4,13 +4,15 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-## [Unreleased]
+
+## [0.2.15]
 
 ### Added
 
 - **Node.js Bindings**: Added `crates/bindings_napi`, an N-API (napi-rs) native addon exposing the PocketOption client, the raw WebSocket helpers, the message validators and the logging setup to JavaScript and TypeScript. The JavaScript examples and documentation previously referenced a `binary-options-tools.node` addon that did not exist anywhere in the repository, so none of them could run.
 - Added the `nodejs/` package (`index.js`, `index.d.ts`, `scripts/build.js`, smoke tests) which loads the addon, adds `Symbol.asyncIterator` support to the subscription and raw streams, and exposes `snake_case` aliases next to the idiomatic `camelCase` method names.
-- Added a `nodejs` CI job building the addon and running its tests on Linux, Windows and macOS.
+- **SSID Fetchers**: Rewrote both CloseOption and PocketOption SSID extractor userscripts to use Violentmonkey/Tampermonkey menu commands only (no floating buttons, no `alert()`/`confirm()` dialogs). Added `GM_notification` support for success/error feedback.
+- **CI/CD Cleanup**: Removed `docs-site` (Docusaurus documentation site) entirely from the repository. Deleted `.github/workflows/deploy.yml`, removed `docs` job from CI, removed `docs` stage from `.gitlab-ci.yml`, and cleaned up `.dockerignore`.
 
 ### Changed
 

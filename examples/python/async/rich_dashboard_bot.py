@@ -99,6 +99,7 @@ async def main():
         # Start bot in background
         async def run_bot():
             await bot.run()
+
         bot_task = asyncio.create_task(run_bot())
 
         try:

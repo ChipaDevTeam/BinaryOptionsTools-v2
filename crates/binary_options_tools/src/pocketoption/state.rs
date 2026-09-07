@@ -427,7 +427,7 @@ impl TradeState {
         if closed.len() > max_deals {
             let mut deals: Vec<_> = closed.values().collect();
             // Sort by close timestamp (descending)
-            deals.sort_by(|a, b| b.close_timestamp.cmp(&a.close_timestamp));
+            deals.sort_by_key(|d| std::cmp::Reverse(d.close_timestamp));
 
             let to_keep: std::collections::HashSet<_> =
                 deals.iter().take(max_deals).map(|d| d.id).collect();

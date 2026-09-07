@@ -7,6 +7,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Lay
 use crate::error::{napi_err, BinaryErrorNode};
 
 /// Options accepted by [`start_logs`].
+#[allow(dead_code)]
 #[napi(object)]
 pub struct LogOptions {
     /// Directory that receives `logs.log` and `error.log`. Defaults to `"."`.
@@ -24,6 +25,7 @@ pub struct LogOptions {
 /// (warnings and errors) inside `options.path`. Calling this more than once is
 /// a no-op: only the first subscriber to be installed wins.
 #[napi]
+#[allow(dead_code)]
 pub fn start_logs(options: Option<LogOptions>) -> napi::Result<()> {
     let options = options.unwrap_or(LogOptions {
         path: None,

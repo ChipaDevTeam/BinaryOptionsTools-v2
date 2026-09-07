@@ -25,7 +25,6 @@ class SyncSubscription:
         return json.loads(next(self.subscription))
 
 
-
 class SyncCandleLiveIterator:
     """Synchronous iterator for live candle updates."""
 
@@ -47,6 +46,8 @@ class SyncCandleLiveIterator:
             return asyncio.run_coroutine_threadsafe(get_next(), self.loop).result()
         except StopIteration:
             raise StopIteration
+
+
 class RawHandlerSync:
     """Synchronous handler for advanced raw WebSocket message operations."""
 
@@ -390,6 +391,7 @@ class PocketOption:
         Returns:
             An iterator yielding (closed_candles, forming_candle).
         """
+
         async def create_gen():
             return self._client.get_candles_live(
                 asset=asset,
@@ -530,6 +532,7 @@ class PocketOption:
             A list of historical trade dictionaries.
         """
         return self._run(self._client.history(asset, period))
+
     def get_ticks(self, asset: str, lookback_seconds: int) -> List[Tuple[int, float]]:
         """Get historical tick data for an asset.
 

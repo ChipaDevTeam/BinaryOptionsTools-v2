@@ -1,19 +1,19 @@
 #[cfg(test)]
 mod tests {
-use binary_options_tools::pocketoption::{
-    modules::deals::{Command, CommandResponse, DealsApiModule},
-    state::TradeState,
-    types::Deal,
-};
-use binary_options_tools_core::{
-    reimports::Message,
-    traits::{ApiModule, RunnerCommand},
-};
-use kanal::bounded_async;
-use serde_json::json;
-use std::sync::Arc;
-use tokio::sync::oneshot;
-use uuid::Uuid;
+    use binary_options_tools::pocketoption::{
+        modules::deals::{Command, CommandResponse, DealsApiModule},
+        state::TradeState,
+        types::Deal,
+    };
+    use binary_options_tools_core::{
+        reimports::Message,
+        traits::{ApiModule, RunnerCommand},
+    };
+    use kanal::bounded_async;
+    use serde_json::json;
+    use std::sync::Arc;
+    use tokio::sync::oneshot;
+    use uuid::Uuid;
     fn create_mock_deal(id: Uuid) -> Deal {
         let json = json!({
             "id": id,

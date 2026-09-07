@@ -1,6 +1,6 @@
 [package]
 name = "binary-options-tools-core"
-version = "0.2.14"
+version = "0.2.15"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 repository = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"

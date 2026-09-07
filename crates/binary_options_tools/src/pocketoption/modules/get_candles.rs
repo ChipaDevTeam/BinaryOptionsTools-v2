@@ -692,10 +692,14 @@ impl GetCandlesApiModule {
                                 candles.push(Candle {
                                     symbol: asset.clone(),
                                     timestamp: c.timestamp,
-                                    open: rust_decimal::prelude::FromPrimitive::from_f64(c.open).unwrap_or_default(),
-                                    high: rust_decimal::prelude::FromPrimitive::from_f64(c.high).unwrap_or_default(),
-                                    low: rust_decimal::prelude::FromPrimitive::from_f64(c.low).unwrap_or_default(),
-                                    close: rust_decimal::prelude::FromPrimitive::from_f64(c.close).unwrap_or_default(),
+                                    open: rust_decimal::prelude::FromPrimitive::from_f64(c.open)
+                                        .unwrap_or_default(),
+                                    high: rust_decimal::prelude::FromPrimitive::from_f64(c.high)
+                                        .unwrap_or_default(),
+                                    low: rust_decimal::prelude::FromPrimitive::from_f64(c.low)
+                                        .unwrap_or_default(),
+                                    close: rust_decimal::prelude::FromPrimitive::from_f64(c.close)
+                                        .unwrap_or_default(),
                                     volume: if c.volume > 0.0 {
                                         rust_decimal::prelude::FromPrimitive::from_f64(c.volume)
                                     } else {
@@ -711,7 +715,8 @@ impl GetCandlesApiModule {
                     }
 
                     if !ticks_to_compile.is_empty() {
-                        let compiled = compile_candles_from_ticks(&ticks_to_compile, requested_period, &asset);
+                        let compiled =
+                            compile_candles_from_ticks(&ticks_to_compile, requested_period, &asset);
                         candles.extend(compiled);
                     }
 

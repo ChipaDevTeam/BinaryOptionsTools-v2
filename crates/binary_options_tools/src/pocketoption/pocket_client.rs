@@ -124,13 +124,15 @@ impl PocketOption {
             .with_module::<HistoricalDataApiModule>()
             .with_module::<RawApiModule>()
             .with_lightweight_handler(|msg, _, _| Box::pin(print_handler(msg)))
-            .with_lightweight_handler(|msg, state, _| Box::pin(async move {
-                let subs = state.raw_subscribers.read().await;
-                for sub in subs.iter() {
-                    let _ = sub.send(msg.clone()).await;
-                }
-                Ok(())
-            }))
+            .with_lightweight_handler(|msg, state, _| {
+                Box::pin(async move {
+                    let subs = state.raw_subscribers.read().await;
+                    for sub in subs.iter() {
+                        let _ = sub.send(msg.clone()).await;
+                    }
+                    Ok(())
+                })
+            })
             .on_reconnect(Box::new(TradeReconciliationCallback))
     }
     async fn require_handle<M: ApiModule<State>>(
@@ -158,7 +160,8 @@ impl PocketOption {
                 break;
             }
 
-            match tokio::time::timeout(remaining.min(POLL_INTERVAL), client.wait_connected()).await {
+            match tokio::time::timeout(remaining.min(POLL_INTERVAL), client.wait_connected()).await
+            {
                 Ok(_) => return Ok(()),
                 Err(_) => {
                     if let Some(reason) = client.state.auth_error() {
@@ -254,8 +257,7 @@ impl PocketOption {
         }
 
         // Pass all URLs as fallbacks
-        builder = builder
-            .urls(config.urls.iter().map(|u| u.to_string()).collect());
+        builder = builder.urls(config.urls.iter().map(|u| u.to_string()).collect());
 
         let state = builder.build()?;
         let client_builder =
@@ -342,7 +344,6 @@ impl PocketOption {
     pub fn is_connected(&self) -> bool {
         self.client.is_connected()
     }
-
 
     /// Subscribes to an asset's stream and prepends historical data.
     ///
@@ -1009,7 +1010,11 @@ impl PocketOption {
     /// Shuts down the client and stops the runner.
     pub async fn shutdown_owned(self) -> PocketResult<()> {
         self._runner.abort();
-        self.client.clone().shutdown().await.map_err(PocketError::from)
+        self.client
+            .clone()
+            .shutdown()
+            .await
+            .map_err(PocketError::from)
     }
 
     pub async fn new_testing_wrapper(ssid: impl ToString) -> PocketResult<TestingWrapper<State>> {
@@ -1039,10 +1044,16 @@ impl PocketOption {
     }
 
     /// Subscribes to a stream of all incoming WebSocket messages verbatim.
-    pub async fn subscribe_raw(&self) -> PocketResult<impl futures_util::Stream<Item = Arc<binary_options_tools_core::reimports::Message>> + 'static> {
-        let (tx, rx) = binary_options_tools_core::reimports::bounded_async::<Arc<binary_options_tools_core::reimports::Message>>(1000);
+    pub async fn subscribe_raw(
+        &self,
+    ) -> PocketResult<
+        impl futures_util::Stream<Item = Arc<binary_options_tools_core::reimports::Message>> + 'static,
+    > {
+        let (tx, rx) = binary_options_tools_core::reimports::bounded_async::<
+            Arc<binary_options_tools_core::reimports::Message>,
+        >(1000);
         self.client.state.raw_subscribers.write().await.push(tx);
-        
+
         let stream = futures_util::stream::unfold(rx, |rx| async move {
             match rx.recv().await {
                 Ok(msg) => Some((msg, rx)),

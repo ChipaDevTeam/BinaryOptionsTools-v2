@@ -1,6 +1,6 @@
 {
   "name": "binary-options-tools",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "description": "Node.js bindings for BinaryOptionsToolsV2 — PocketOption trading automation with real-time data streaming and raw WebSocket access.",
   "main": "index.js",
   "types": "index.d.ts",

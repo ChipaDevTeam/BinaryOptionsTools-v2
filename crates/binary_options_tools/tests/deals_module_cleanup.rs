@@ -90,7 +90,12 @@ async fn test_deals_module_cleanup_on_stop() {
             Ok(_) => {}
             Err(e) => {
                 let err_str = e.to_string();
-                assert!(err_str.contains("WebSocket receiver closed") || err_str.contains("Command receiver closed"), "Unexpected module error: {:?}", e);
+                assert!(
+                    err_str.contains("WebSocket receiver closed")
+                        || err_str.contains("Command receiver closed"),
+                    "Unexpected module error: {:?}",
+                    e
+                );
             }
         }
     })

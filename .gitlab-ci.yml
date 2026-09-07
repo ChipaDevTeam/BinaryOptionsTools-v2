@@ -1,6 +1,5 @@
 stages:
   - build
-  - docs
   - deploy
 
 .wheel_rules: &wheel_rules
@@ -70,46 +69,6 @@ release:
       $r = Invoke-RestMethod -Method Post -Uri "$($env:CI_API_V4_URL)/projects/$($env:CI_PROJECT_ID)/releases" -Headers @{ 'JOB-TOKEN' = $env:CI_JOB_TOKEN } -ContentType 'application/json' -Body $body
       Write-Output "Created release: $($r.name)"
 
-pages:
-  stage: docs
-  image: node:20-bookworm
-  tags:
-    - linux
-  variables:
-    HUSKY: "0"
-    SITE_URL: "https://chipatrade.gitlab.io"
-    BASE_URL: "/chipadevorg/BinaryOptionsTools-v2/"
-  before_script:
-    - cd docs-site
-    - npm ci
-  script:
-    - npm run build
-    - cd ..
-    - Move-Item -Force docs-site/build public
-  artifacts:
-    paths:
-      - public
-    expire_in: 7 days
-  only:
-    - main
-    - master
-  dependencies: []
-
-deploy:
-  stage: deploy
-  image: node:20-bookworm
-  tags:
-    - linux
-  script:
-    - echo "Deploy to GitLab Pages/"
-  environment:
-    name: production
-    url: https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-  dependencies:
-    - pages
-
 sync:github:
   stage: deploy
   image: alpine:latest
@@ -121,7 +80,8 @@ sync:github:
     - git config --global user.name "GitLab CI"
     - git config --global user.email "ci@gitlab.chipatrade.com"
     - git remote add github https://${GITHUB_SYNC_USER}:${GITHUB_SYNC_TOKEN}@github.com/ChipaDevTeam/BinaryOptionsTools-v2.git || true
-    - git push --force --prune github +refs/heads/*:refs/heads/* +refs/tags/*:refs/tags/*
+    - git fetch origin "+refs/heads/*:refs/heads/*" "+refs/tags/*:refs/tags/*"
+    - git push --force --prune github "+refs/heads/*:refs/heads/*" "+refs/tags/*:refs/tags/*"
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
     - if: $CI_COMMIT_TAG

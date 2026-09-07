@@ -10,12 +10,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "python"))
 
 from BinaryOptionsToolsV2.pocketoption.asynchronous import PocketOptionAsync
 
+
 async def main():
     # Load .env file
     env_path = Path(__file__).resolve().parents[3] / ".env"
     if env_path.exists():
         load_dotenv(env_path)
-    
+
     ssid = os.getenv("POCKET_OPTION_SSID")
     if not ssid:
         print("Error: POCKET_OPTION_SSID not found in .env")
@@ -31,8 +32,10 @@ async def main():
 
         print("\nStreaming live candles for EURUSD_otc...")
         # Stream live candles (yields a tuple: closed_candles list, current_forming_candle dict)
-        generator = client.get_candles_live("EURUSD_otc", period=60, hours=1.0, max_rows=10)
-        
+        generator = client.get_candles_live(
+            "EURUSD_otc", period=60, hours=1.0, max_rows=10
+        )
+
         # We use aclosing to ensure the generator is closed and its finally block runs
         # before the client context is exited.
         count = 0
@@ -44,10 +47,11 @@ async def main():
                     print(f"Last closed candle: {closed[-1]}")
                 if forming:
                     print(f"Currently forming candle: {forming}")
-                
+
                 count += 1
                 if count >= 3:
                     break
+
 
 if __name__ == "__main__":
     asyncio.run(main())

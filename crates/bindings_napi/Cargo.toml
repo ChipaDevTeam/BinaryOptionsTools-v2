@@ -1,6 +1,6 @@
 [package]
 name = "binary_options_tools_napi"
-version = "0.2.14"
+version = "0.2.15"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 description = "Node.js (N-API) bindings for binary-options-tools. Native addon exposing the PocketOption client to JavaScript and TypeScript."
@@ -21,7 +21,7 @@ test = false
 napi = { version = "3.12.2", features = ["napi6", "async", "serde-json"] }
 napi-derive = "3.6.3"
 
-binary_options_tools = { path = "../binary_options_tools", version = "0.2.14", default-features = false, features = ["pocketoption"] }
+binary_options_tools = { path = "../binary_options_tools", version = "0.2.15", default-features = false, features = ["pocketoption"] }
 
 async-stream = "0.3.6"
 chrono = { workspace = true }

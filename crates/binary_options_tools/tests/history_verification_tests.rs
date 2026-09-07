@@ -29,7 +29,8 @@ async fn test_history_validation_and_compilation() {
     );
 
     // Initialize the module
-    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
+    let mut module =
+        HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
     // Spawn the module loop
     tokio::spawn(async move {
@@ -143,7 +144,8 @@ async fn test_candle_format_ochlv() {
     );
 
     // Initialize the module
-    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
+    let mut module =
+        HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
     // Spawn the module loop
     tokio::spawn(async move {
@@ -219,7 +221,8 @@ async fn test_ticks_request() {
     );
 
     // Initialize the module
-    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
+    let mut module =
+        HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
     // Spawn the module loop
     tokio::spawn(async move {
@@ -299,7 +302,8 @@ async fn test_mismatched_response_handling() {
     );
 
     // Initialize the module
-    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
+    let mut module =
+        HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
     // Spawn the module loop
     tokio::spawn(async move {
@@ -389,7 +393,8 @@ async fn test_tick_to_candle_data_integrity() {
     );
 
     // Initialize the module
-    let mut module = HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
+    let mut module =
+        HistoricalDataApiModule::new(state.clone(), cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
 
     // Spawn the module loop
     tokio::spawn(async move {

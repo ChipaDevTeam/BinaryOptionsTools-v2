@@ -132,10 +132,8 @@ impl<S: AppState> Router<S> {
 
         // Route to all matching API modules
         for (rule, sender) in &self.module_rules {
-            if rule.call(&message) {
-                if sender.send(message.clone()).await.is_err() {
-                    error!(target: "Router", "A module has shut down and its channel is closed.");
-                }
+            if rule.call(&message) && sender.send(message.clone()).await.is_err() {
+                error!(target: "Router", "A module has shut down and its channel is closed.");
             }
         }
         Ok(())

@@ -7,7 +7,7 @@ use thiserror::Error;
     name = "UniError",
     path = "crates/bindings_uniffi/docs_json/error.json"
 )]
-#[derive(Error, Debug, uniffi::Error)]
+#[derive(Error, Debug, Clone, uniffi::Error)]
 pub enum UniError {
     #[error("An error occurred in the underlying binary_options_tools crate: {0}")]
     BinaryOptions(String),

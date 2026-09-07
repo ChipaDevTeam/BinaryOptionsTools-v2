@@ -29,6 +29,7 @@ pub struct PriceData {
 /// Candle data point
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Candle {
+    #[serde(alias = "timeStamp")]
     pub timestamp: i64,
     pub value: f64,
 }
@@ -37,6 +38,7 @@ pub struct Candle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Get30MinRequest {
+    #[serde(rename = "_token")]
     pub token: String,
     pub ps_type: String,
     pub public_code: String,
@@ -84,28 +86,41 @@ pub struct OrderResult {
 
 /// Historical candles result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Get30MinResult {
-    pub candles: Vec<Candle>,
-    pub pair: String,
+    pub price: Vec<Candle>,
 }
 
 /// Outgoing message types
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "event", rename_all = "camelCase")]
+#[serde(untagged)]
 pub enum Outgoing {
     Get30Min(Get30MinRequest),
     SetOrder(SetOrderRequest),
     Ping,
 }
 
+impl Outgoing {
+    pub fn event_name(&self) -> &'static str {
+        match self {
+            Outgoing::Get30Min(_) => "get30Min",
+            Outgoing::SetOrder(_) => "setOrder",
+            Outgoing::Ping => "ping",
+        }
+    }
+
+    pub fn as_value(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
+    }
+}
+
 /// Incoming subscription events
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "event", rename_all = "camelCase")]
+#[serde(untagged)]
 pub enum SubscriptionEvent {
     PriceData(PriceData),
     Get30MinResult(Get30MinResult),
     SetOrderResult(OrderResult),
+    Error(String),
 }
 
 /// Raw Socket.IO message frame
@@ -172,16 +187,17 @@ pub mod socket_io {
         if data.is_empty() {
             return Err(CloseOptionError::Parse("Empty frame".to_string()));
         }
-        
+
         let chars: Vec<char> = data.chars().collect();
         if chars.is_empty() {
             return Err(CloseOptionError::Parse("Empty frame".to_string()));
         }
-        
+
         // First digit is Engine.IO packet type
-        let engine_type = chars[0].to_digit(10)
-            .ok_or_else(|| CloseOptionError::Parse(format!("Invalid first character: {}", chars[0])))?;
-        
+        let engine_type = chars[0].to_digit(10).ok_or_else(|| {
+            CloseOptionError::Parse(format!("Invalid first character: {}", chars[0]))
+        })?;
+
         match engine_type {
             // Engine.IO ping (2)
             2 => {
@@ -202,37 +218,49 @@ pub mod socket_io {
                 })
             }
             // Engine.IO upgrade (5)
-            5 => {
-                Ok(SocketIoFrame {
-                    message_type: SocketIoMessageType::EngineUpgrade,
-                    namespace: None,
-                    data: String::new(),
-                })
-            }
+            5 => Ok(SocketIoFrame {
+                message_type: SocketIoMessageType::EngineUpgrade,
+                namespace: None,
+                data: String::new(),
+            }),
             // Engine.IO message (4) - contains Socket.IO packet
             4 => {
                 let rest = &data[1..];
                 if rest.is_empty() {
-                    return Err(CloseOptionError::Parse("Empty Socket.IO payload".to_string()));
+                    return Err(CloseOptionError::Parse(
+                        "Empty Socket.IO payload".to_string(),
+                    ));
                 }
                 let socket_io_chars: Vec<char> = rest.chars().collect();
-                let socket_io_type = socket_io_chars[0].to_digit(10)
-                    .ok_or_else(|| CloseOptionError::Parse(format!("Invalid Socket.IO type character: {}", socket_io_chars[0])))?;
-                
-                let msg_type = SocketIoMessageType::from_u8(socket_io_type as u8)
-                    .ok_or_else(|| CloseOptionError::Parse(format!("Invalid Socket.IO message type: {}", socket_io_type)))?;
-                
+                let socket_io_type = socket_io_chars[0].to_digit(10).ok_or_else(|| {
+                    CloseOptionError::Parse(format!(
+                        "Invalid Socket.IO type character: {}",
+                        socket_io_chars[0]
+                    ))
+                })?;
+
+                let msg_type =
+                    SocketIoMessageType::from_u8(socket_io_type as u8).ok_or_else(|| {
+                        CloseOptionError::Parse(format!(
+                            "Invalid Socket.IO message type: {}",
+                            socket_io_type
+                        ))
+                    })?;
+
                 let payload = &rest[1..];
-                
+
                 // Check for namespace (starts with '/')
                 let (namespace, payload) = if payload.starts_with('/') {
-                    let end = payload.find(',').or_else(|| payload.find('[')).unwrap_or(payload.len());
+                    let end = payload
+                        .find(',')
+                        .or_else(|| payload.find('['))
+                        .unwrap_or(payload.len());
                     let ns = payload[1..end].to_string();
                     (Some(ns), &payload[end..])
                 } else {
                     (None, payload)
                 };
-                
+
                 Ok(SocketIoFrame {
                     message_type: msg_type,
                     namespace,
@@ -255,12 +283,19 @@ pub mod socket_io {
                 namespace: None,
                 data: data[1..].to_string(),
             }),
-            _ => Err(CloseOptionError::Parse(format!("Unknown Engine.IO packet type: {}", engine_type))),
+            _ => Err(CloseOptionError::Parse(format!(
+                "Unknown Engine.IO packet type: {}",
+                engine_type
+            ))),
         }
     }
 
     /// Encode a Socket.IO EIO=3 frame
-    pub fn encode_frame(msg_type: SocketIoMessageType, namespace: Option<&str>, data: &str) -> String {
+    pub fn encode_frame(
+        msg_type: SocketIoMessageType,
+        namespace: Option<&str>,
+        data: &str,
+    ) -> String {
         let mut result = String::new();
         let code = msg_type.as_u8();
         if code < 8 {
@@ -350,7 +385,6 @@ mod tests {
         assert!(frame.data.contains("priceData"));
     }
 
-
     #[test]
     fn test_encode_probe() {
         assert_eq!(socket_io::probe(), "2probe");
@@ -380,7 +414,8 @@ mod tests {
 
     #[test]
     fn test_encode_socket_event() {
-        let encoded = socket_io::encode_frame(SocketIoMessageType::Event, None, r#"["priceData",{}]"#);
+        let encoded =
+            socket_io::encode_frame(SocketIoMessageType::Event, None, r#"["priceData",{}]"#);
         assert_eq!(encoded, r#"42["priceData",{}]"#);
     }
 }

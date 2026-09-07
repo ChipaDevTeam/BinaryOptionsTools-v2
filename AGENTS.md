@@ -9,8 +9,8 @@ This is a multi-language project: **Rust** core with **Python** bindings (via Py
   - `macros/` — Proc-macros (`Config`, `RegionImpl`, `ActionImpl`, `#[timeout]`)
   - `binary_options_tools/` — Platform implementations (PocketOption, ExpertOption), `framework` module for bots
   - `bindings_napi/` — N-API (napi-rs) native addon for Node.js
-- `BinaryOptionsToolsV2/` — Python package (maturin/PyO3). Rust source in `rust/`, Python wrapper in `python/`
-- `BinaryOptionsToolsUni/` — UniFFI multi-language bindings
+- `python/` — Python package (maturin/PyO3). `python/pyproject.toml` builds the `BinaryOptionsToolsV2` module from `crates/bindings_pyo3/`; Python wrapper lives in `python/BinaryOptionsToolsV2/`
+- `crates/bindings_uniffi/` — UniFFI multi-language bindings (`binary_options_tools_uni` crate; bindings generated via the `uniffi-bindgen` binary, proc-macro based — no UDL)
 - `nodejs/` — Node.js package wrapping the N-API addon (`npm run build`, `npm test`)
 - `tests/` — Python tests (`tests/python/`), Rust tests inline
 - `docs/` — MkDocs documentation
@@ -45,7 +45,7 @@ To bridge the gap between low-level performance and high-level usability, provid
 ### Languages
 
 - **Rust**: Core logic, performance-critical components, and WebSocket handling.
-- **Python**: Primary user interface via high-level bindings (3.8 – 3.13 support).
+- **Python**: Primary user interface via high-level bindings (3.9 – 3.13 support).
 - **JavaScript/TypeScript**: Documentation tooling and potential future bindings.
 
 ### Rust Core Libraries
@@ -96,7 +96,7 @@ cargo clean                              # Clean artifacts
 ### Python (maturin)
 
 ```bash
-maturin develop                          # Dev install (from BinaryOptionsToolsV2/)
+maturin develop                          # Dev install (from python/)
 maturin build --release                  # Build wheel
 maturin build --release -i python3.13t   # Free-threaded Python build
 maturin sdist                            # Source distribution
@@ -105,8 +105,9 @@ maturin sdist                            # Source distribution
 ### UniFFI Bindings
 
 ```bash
-cargo run -p uniffi-bindgen generate src/binary_options_tools_uni.udl --language kotlin --out-dir out/kotlin
-cargo run -p uniffi-bindgen generate src/binary_options_tools_uni.udl --language swift --out-dir out/swift
+# Run from crates/bindings_uniffi/ (proc-macro based, no UDL file)
+cargo run -p binary_options_tools_uni --bin uniffi-bindgen generate --library --language kotlin --out-dir out/kotlin
+cargo run -p binary_options_tools_uni --bin uniffi-bindgen generate --library --language swift --out-dir out/swift
 ```
 
 ## Test Commands
@@ -122,7 +123,7 @@ pytest -m "pocketoption"                 # By marker
 pytest --cov=BinaryOptionsToolsV2        # With coverage
 ```
 
-- Config: `pytest.ini` sets `asyncio_mode = auto`, `timeout = 60`, testpaths = `tests/python/core tests/python/pocketoption tests/python/tracing`
+- Config: `pytest.ini` sets `asyncio_mode = auto`, `asyncio_default_fixture_loop_scope = module`, `timeout = 15`, testpaths = `tests/python`
 - `conftest.py` loads `.env` for `POCKET_OPTION_SSID`; tests skip if not set
 - Fixtures: `api` (async), `api_sync` — module-scoped, reuse connections
 - Tests located in `tests/` directory
@@ -152,8 +153,8 @@ ruff format .                            # Format
 ruff format --check .                    # Check formatting
 ```
 
-- Line length: 120, target Python: 3.8+
-- Config in `BinaryOptionsToolsV2/pyproject.toml`
+- Line length: 120, target Python: 3.9+
+- Config in `python/pyproject.toml`
 
 ### Rust
 
@@ -198,7 +199,7 @@ Install hooks: `bun install` (uses `bun@1.3.10`)
 
 ## Code Style — Python
 
-- **Version**: 3.8+
+- **Version**: 3.9+
 - **Formatter/Linter**: Ruff (replaces black + flake8 + isort)
 - **Line length**: 120
 - **Imports**: Ruff handles ordering (stdlib → third-party → local)
@@ -216,7 +217,7 @@ Install hooks: `bun install` (uses `bun@1.3.10`)
 - **Body**: Detailed description of the "why" behind the change
 - **Footer**: Reference issues using `Fixes #123` or `Closes #123`
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for full commit message guidelines and examples.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full commit message guidelines and examples.
 
 ## Workflow & PRs
 

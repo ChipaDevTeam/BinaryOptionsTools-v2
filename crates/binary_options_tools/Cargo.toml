@@ -1,6 +1,6 @@
 [package]
 name = "binary_options_tools"
-version = "0.2.14"
+version = "0.2.15"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 description = "High-level library for binary options trading automation. Supports PocketOption and ExpertOption with real-time data streaming, WebSocket API access, and automated trading strategies."
@@ -24,7 +24,7 @@ chrono = { workspace = true }
 # binary-options-tools-core = { path = "../core", version = "0.2.0" }
 # trading-macros = { path = "../macros" }
 futures-util = { workspace = true }
-reqwest = { version = "0.13.4", default-features = false, features = ["rustls-no-provider", "json"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls-no-provider", "json", "socks"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

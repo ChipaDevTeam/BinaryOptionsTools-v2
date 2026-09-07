@@ -86,11 +86,11 @@ def sanitize_and_validate_ssid(ssid: str, logger: "Logger") -> str:
     ssid = ssid.strip()
 
     # Try to parse as JSON first
-    if ssid.startswith('{') and ssid.endswith('}'):
+    if ssid.startswith("{") and ssid.endswith("}"):
         try:
             data = json.loads(ssid)
             if isinstance(data, dict):
-                required = ['token', 'sid']
+                required = ["token", "sid"]
                 if all(k in data for k in required):
                     logger.debug("SSID parsed as JSON with token and sid")
                     return ssid
@@ -98,7 +98,7 @@ def sanitize_and_validate_ssid(ssid: str, logger: "Logger") -> str:
             pass
 
     # Try pipe-delimited format: token|sid|demo|public_code|hidden_code
-    parts = ssid.split('|')
+    parts = ssid.split("|")
     if len(parts) >= 3:
         logger.debug(f"SSID parsed as pipe-delimited with {len(parts)} parts")
         return ssid
@@ -111,31 +111,31 @@ def sanitize_and_validate_ssid(ssid: str, logger: "Logger") -> str:
 def parse_ssid(ssid: str) -> Tuple[str, str, bool, str, str]:
     """Parse SSID into token, sid, demo, public_code, hidden_code."""
     # Try JSON first
-    if ssid.startswith('{') and ssid.endswith('}'):
+    if ssid.startswith("{") and ssid.endswith("}"):
         try:
             data = json.loads(ssid)
             if isinstance(data, dict):
-                token = data.get('token', '')
-                sid = data.get('sid', '')
-                demo = data.get('demo', False)
-                public_code = data.get('public_code', '')
-                hidden_code = data.get('hidden_code', '')
+                token = data.get("token", "")
+                sid = data.get("sid", "")
+                demo = data.get("demo", False)
+                public_code = data.get("public_code", "")
+                hidden_code = data.get("hidden_code", "")
                 return token, sid, demo, public_code, hidden_code
         except json.JSONDecodeError:
             pass
 
     # Try pipe-delimited
-    parts = ssid.split('|')
+    parts = ssid.split("|")
     if len(parts) >= 3:
         token = parts[0]
         sid = parts[1]
-        demo = parts[2].lower() in ('true', '1', 'yes', 'demo') if len(parts) > 2 else False
-        public_code = parts[3] if len(parts) > 3 else ''
-        hidden_code = parts[4] if len(parts) > 4 else ''
+        demo = parts[2].lower() in ("true", "1", "yes", "demo") if len(parts) > 2 else False
+        public_code = parts[3] if len(parts) > 3 else ""
+        hidden_code = parts[4] if len(parts) > 4 else ""
         return token, sid, demo, public_code, hidden_code
 
     # Fallback: treat as token only
-    return ssid, '', False, '', ''
+    return ssid, "", False, "", ""
 
 
 # This file contains all the async code for the CloseOption Module
@@ -156,6 +156,11 @@ class CloseOptionAsync:
         self._client = None
         self._raw_handler = None
         self._connected = False
+
+    @property
+    def is_connected(self) -> bool:
+        """Whether the connection to CloseOption has been established."""
+        return self._connected
 
     async def __aenter__(self):
         await self.connect()
@@ -179,7 +184,9 @@ class CloseOptionAsync:
             raise ValueError("SSID must contain token and sid")
 
         if not public_code or not hidden_code:
-            raise ValueError("SSID must contain public_code and hidden_code (format: token|sid|demo|public_code|hidden_code)")
+            raise ValueError(
+                "SSID must contain public_code and hidden_code (format: token|sid|demo|public_code|hidden_code)"
+            )
 
         # Build URL with sid
         if self._url:
@@ -187,8 +194,9 @@ class CloseOptionAsync:
         else:
             ws_url = f"wss://www.closeoption.com:8443/socket.io/?EIO=3&transport=websocket&sid={sid}"
 
+        logger.info("CloseOption: connecting to WebSocket")
         self._client = RawCloseOption(token, sid, public_code, hidden_code, demo, ws_url, self._config.pyconfig)
-        await self._client.connect()
+        logger.info("CloseOption: WebSocket connection established")
         self._connected = True
 
     async def _ensure_connected(self):
@@ -229,6 +237,12 @@ class CloseOptionAsync:
         """Get historical candles with count."""
         await self._ensure_connected()
         result = await self._client.get_candles(asset, period, count)
+        return json.loads(result)
+
+    async def get_ticks(self, asset: str) -> List[dict]:
+        """Get tick series for an asset."""
+        await self._ensure_connected()
+        result = await self._client.get_ticks(asset)
         return json.loads(result)
 
     async def get_candles_live(self, asset: str, period: int) -> AsyncGenerator[dict, None]:

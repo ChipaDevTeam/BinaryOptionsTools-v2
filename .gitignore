@@ -99,13 +99,9 @@ __pycache__/
 
 # ARIVE MCP - https://github.com/sixtysixx/ARIVE
 .arive
-.arive-tasks
 
 #Build artifacts
 site
 logs_fail
 wheels/
 config.toml
-
-#debug
-websocket history po.csv

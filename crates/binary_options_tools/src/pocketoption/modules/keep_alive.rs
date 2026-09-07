@@ -181,8 +181,8 @@ impl LightweightModule<State> for InitModule {
                                     let event_name = arr.first().and_then(|v| v.as_str());
                                     if event_name == Some("successauth") {
                                         trigger_auth = true;
-                                    } else if let Some(event) = event_name
-                                        .filter(|e| AUTH_REJECTED_EVENTS.contains(e))
+                                    } else if let Some(event) =
+                                        event_name.filter(|e| AUTH_REJECTED_EVENTS.contains(e))
                                     {
                                         return self.reject_auth(event).await;
                                     }

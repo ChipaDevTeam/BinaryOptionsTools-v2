@@ -1,4 +1,4 @@
-use binary_options_tools::closeoption::{CloseOption, StateBuilder};
+use binary_options_tools::closeoption::state::StateBuilder;
 
 #[tokio::test]
 async fn test_state_builder() {
@@ -144,4 +144,55 @@ async fn test_asset_updates() {
     assert_eq!(eurusd.bid, 1.1000);
     assert_eq!(eurusd.ask, 1.1002);
     assert_eq!(eurusd.main, 1.1001);
+}
+
+#[tokio::test]
+async fn test_get_ticks_request_shape() {
+    use binary_options_tools::closeoption::types::Get30MinRequest;
+
+    let state = StateBuilder::new()
+        .token("test_token")
+        .sid("test_sid")
+        .public_code("pub_code")
+        .hidden_code("hid_code")
+        .demo(true)
+        .build()
+        .unwrap();
+
+    let request = Get30MinRequest {
+        token: state.token.clone(),
+        ps_type: "30min".to_string(),
+        public_code: state.public_code.clone(),
+        hidden_code: state.hidden_code.clone(),
+        acc_type: state.acc_type().to_string(),
+        pair: "EUR/USD:AFX".to_string(),
+        contest_type: "".to_string(),
+    };
+
+    assert_eq!(request.token, "test_token");
+    assert_eq!(request.ps_type, "30min");
+    assert_eq!(request.public_code, "pub_code");
+    assert_eq!(request.hidden_code, "hid_code");
+    assert_eq!(request.acc_type, "demo");
+    assert_eq!(request.pair, "EUR/USD:AFX");
+    assert_eq!(request.contest_type, "");
+}
+
+#[tokio::test]
+async fn test_get_ticks_result_parsing() {
+    use binary_options_tools::closeoption::types::Get30MinResult;
+
+    let json = r#"{
+        "price": [
+            {"timeStamp": 1704067200, "value": 1.1001},
+            {"timeStamp": 1704067201, "value": 1.1002}
+        ]
+    }"#;
+
+    let result: Get30MinResult = serde_json::from_str(json).unwrap();
+    assert_eq!(result.price.len(), 2);
+    assert_eq!(result.price[0].timestamp, 1704067200);
+    assert_eq!(result.price[0].value, 1.1001);
+    assert_eq!(result.price[1].timestamp, 1704067201);
+    assert_eq!(result.price[1].value, 1.1002);
 }

@@ -164,7 +164,11 @@ class MockPocketOptionAsync:
         return [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
 
     async def get_candles_live(self, asset, period, hours=2.0, max_rows=100):
-        yield [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}], None
+        yield (
+            [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}],
+            None,
+        )
+
     async def clear_closed_deals(self):
         pass
 
@@ -662,10 +666,14 @@ class TestCandles:
 
     def test_get_candles_live_success(self, sync_client):
         """Test get_candles_live streaming."""
-        iterator = sync_client.get_candles_live("EURUSD_otc", period=60, hours=0.1, max_rows=10)
-        closed, forming = next(iterator)
+        iterator = sync_client.get_candles_live(
+            "EURUSD_otc", period=60, hours=0.1, max_rows=10
+        )
+        closed, _forming = next(iterator)
         assert isinstance(closed, list)
         assert len(closed) > 0
+
+
 class TestBalance:
     """Tests for balance method."""
 

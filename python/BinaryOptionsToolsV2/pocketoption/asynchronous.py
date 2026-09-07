@@ -679,7 +679,7 @@ class PocketOptionAsync:
             # 2. Fetch history while buffering ticks
             offset_seconds = int(hours * 3600)
             platform_time = int(time.time()) + platform_time_offset
-            
+
             try:
                 advanced_candles = await asyncio.wait_for(
                     self.get_candles_advanced(
@@ -688,16 +688,13 @@ class PocketOptionAsync:
                         offset_seconds,
                         platform_time,
                     ),
-                    timeout=3.0
+                    timeout=3.0,
                 )
             except Exception:
                 advanced_candles = []
 
             try:
-                recent_candles = await asyncio.wait_for(
-                    self.history(asset, period),
-                    timeout=3.0
-                )
+                recent_candles = await asyncio.wait_for(self.history(asset, period), timeout=3.0)
             except Exception:
                 recent_candles = []
 
@@ -708,7 +705,7 @@ class PocketOptionAsync:
                         period,
                         offset_seconds,
                     ),
-                    timeout=3.0
+                    timeout=3.0,
                 )
             except Exception:
                 compiled_candles = []
@@ -1189,6 +1186,7 @@ class PocketOptionAsync:
             historical data with specific time ranges, consider using `get_candles_advanced()`.
         """
         return json.loads(await self.client.history(asset, period))
+
     async def get_ticks(self, asset: str, lookback_seconds: int) -> List[Tuple[int, float]]:
         """Retrieves historical tick data for an asset.
 

@@ -67,7 +67,6 @@ async fn test_connection_and_basic_info() {
             let server_time = api.server_time().await;
             println!("✓ Server time: {}", server_time);
 
-
             // Shutdown
             api.shutdown().await.unwrap();
             println!("✓ Client shutdown successfully");

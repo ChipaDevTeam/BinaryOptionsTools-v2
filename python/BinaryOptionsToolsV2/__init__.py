@@ -59,7 +59,16 @@ __all__ = list(
     set(
         __pocket_all__
         + __close_all__
-        + ["tracing", "validator", "PocketOptionAsync", "PocketOption", "CloseOptionAsync", "CloseOption", "RawHandler", "Validator"]
+        + [
+            "tracing",
+            "validator",
+            "PocketOptionAsync",
+            "PocketOption",
+            "CloseOptionAsync",
+            "CloseOption",
+            "RawHandler",
+            "Validator",
+        ]
         + __rust_all__
     )
 )
