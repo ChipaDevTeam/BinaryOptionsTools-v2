@@ -317,14 +317,14 @@ class PocketOption:
         closed, forming = next(iterator)
         return closed
 
-    def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> List[Dict]:
+    def get_candles_advanced(self, asset: str, period: int, time: int, offset: int) -> List[Dict]:
         """Get historical candle data with a specific reference time.
 
         Args:
             asset: The trading asset name.
             period: The candle period in seconds.
-            offset: The offset from the reference time in seconds.
             time: The reference Unix timestamp.
+            offset: The number of periods to look back from reference time.
 
         Returns:
             A list of candle dictionaries.
@@ -336,7 +336,7 @@ class PocketOption:
             and can introduce gaps if called sequentially during live trading.
             For live gap-free candle feeds, use `get_candles_live()` instead.
         """
-        return self._run(self._client.get_candles_advanced(asset, period, offset, time))
+        return self._run(self._client.get_candles_advanced(asset, period, time, offset))
 
     def candles(self, asset: str, period: int) -> List[Dict]:
         """Get the most recent candles for an asset.
