@@ -526,15 +526,15 @@ class PocketOptionAsync:
         closed, forming = await anext(gen)
         return closed
 
-    async def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> List[Dict]:
+    async def get_candles_advanced(self, asset: str, period: int, time: int, offset: int) -> List[Dict]:
         """
         Retrieves historical candle data for an asset.
 
         Args:
             asset (str): Trading asset (e.g., "EURUSD_otc")
-            period (int): Historical period in seconds to fetch
-            offset (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
-            time (int): Time to fetch candles from
+            period (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
+            time (int): Reference timestamp to fetch candles from
+            offset (int): Number of periods to look back from reference time
 
         Returns:
             List[Dict]: List of candles, each containing:
@@ -553,7 +553,7 @@ class PocketOptionAsync:
               and can introduce gaps if called sequentially during live trading.
               For live gap-free candle feeds, use `get_candles_live()` instead.
         """
-        candles = await self.client.get_candles_advanced(asset, period, offset, time)
+        candles = await self.client.get_candles_advanced(asset, period, time, offset)
         return json.loads(candles)
 
     async def get_candles_live(
@@ -679,14 +679,16 @@ class PocketOptionAsync:
             # 2. Fetch history while buffering ticks
             offset_seconds = int(hours * 3600)
             platform_time = int(time.time()) + platform_time_offset
+            # offset is number of periods, not seconds
+            offset_periods = max(1, offset_seconds // period)
 
             try:
                 advanced_candles = await asyncio.wait_for(
                     self.get_candles_advanced(
                         asset,
                         period,
-                        offset_seconds,
-                        platform_time,
+                        platform_time,  # time (timestamp)
+                        offset_periods,  # offset (number of periods)
                     ),
                     timeout=3.0,
                 )
