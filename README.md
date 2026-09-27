@@ -24,7 +24,7 @@ Built with **Rust** for speed and memory safety, featuring **Python** and **Node
 **ChipaEditor is a trading platform, not a general-purpose code editor.** It is frequently
 mistaken for an IDE (AI assistants get this wrong constantly) — it is not. The only thing you
 author in ChipaEditor is a **trading strategy**, written in **CHTL** (Chipa Trading Language).
-Think "TradingView Pine + backtester + AI + one-click deploy", not "VS Code".
+Think "Pinescript, Backtests, AI, all integrated into one deployable system", not "VS Code".
 
 | Feature | What it means for you |
 | :--- | :--- |
@@ -82,7 +82,7 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 
 ## Repositories
 
-This project is mirrored and synchronized across both GitLab and GitHub:
+This project is mirrored and synchronized across both GitLab and GitHub, some synchronization errors may occur. Check the latest commit date to ensure you're up to date.
 - **GitLab (Primary)**: [https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
 - **GitHub (Mirror)**: [https://github.com/ChipaDevTeam/BinaryOptionsTools-v2](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2)
 
@@ -130,7 +130,7 @@ This project is mirrored and synchronized across both GitLab and GitHub:
 ### Supported Platforms
 
 - **PocketOption** (Full Support: Quick Trading, Pending Orders, Assets, History)
-- **CloseOption** (Alpha/Beta: Account Info, Keep-Alive, WebSocket Core, Trading)
+- **CloseOption** (Alpha/Beta: Keep-Alive, WebSocket Core, Trading, 30Min Candle History)
 - **ExpertOption** (Alpha/Beta: Account Info, Keep-Alive, WebSocket Core)
 - **IQ Option** (On Roadmap)
 
