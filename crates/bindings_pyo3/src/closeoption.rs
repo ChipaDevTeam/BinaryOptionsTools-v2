@@ -25,9 +25,11 @@ impl RawCloseOption {
         demo: bool,
         url: String,
         config: Option<crate::config::PyConfig>,
-        py: Python<'_>,
     ) -> PyResult<Self> {
-        let runtime = get_runtime(py)?;
+        // `py` is acquired here instead of being taken as a parameter: pyo3
+        // injects it automatically, and an explicit parameter would push this
+        // constructor past the argument-count lint threshold.
+        let runtime = Python::attach(get_runtime)?;
         runtime.block_on(async move {
             let mut builder = binary_options_tools::closeoption::State::builder()
                 .token(token)
@@ -179,12 +181,11 @@ impl RawCloseOption {
     pub fn send_raw<'py>(&self, py: Python<'py>, message: String) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
         future_into_py(py, async move {
-            let res = client
+            client
                 .send_raw(&message)
                 .await
                 .map_err(BinaryErrorPy::from)?;
-            let deal = serde_json::to_string(&res).map_err(BinaryErrorPy::from)?;
-            Python::attach(|py| deal.into_py_any(py))
+            Python::attach(|py| py.None().into_py_any(py))
         })
     }
 

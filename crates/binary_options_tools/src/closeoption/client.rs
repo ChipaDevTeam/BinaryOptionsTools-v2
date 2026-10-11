@@ -54,7 +54,7 @@ impl LightweightModule<State> for PriceDataModule {
                                 serde_json::from_str::<Vec<serde_json::Value>>(&frame.data)
                             {
                                 if let Some(event_name) =
-                                    event_array.get(0).and_then(|v| v.as_str())
+                                    event_array.first().and_then(|v| v.as_str())
                                 {
                                     if event_name == "priceData" {
                                         if let Some(data_value) = event_array.get(1) {
@@ -119,7 +119,7 @@ impl LightweightModule<State> for BalanceModule {
                                 serde_json::from_str::<Vec<serde_json::Value>>(&frame.data)
                             {
                                 if let Some(event_name) =
-                                    event_array.get(0).and_then(|v| v.as_str())
+                                    event_array.first().and_then(|v| v.as_str())
                                 {
                                     if event_name == "setOrderResult" {
                                         if let Some(data_value) = event_array.get(1) {
@@ -653,7 +653,7 @@ impl LightweightModule<State> for ResponseRouterModule {
                         if let Ok(event_array) =
                             serde_json::from_str::<Vec<serde_json::Value>>(&frame.data)
                         {
-                            if let Some(event_name) = event_array.get(0).and_then(|v| v.as_str()) {
+                            if let Some(event_name) = event_array.first().and_then(|v| v.as_str()) {
                                 debug!(target: "Router", event_name, "parsed event from frame");
                                 if let Some(payload) = event_array.get(1) {
                                     // Resolve pending requests by ID
@@ -752,10 +752,10 @@ impl LightweightModule<State> for ResponseRouterModule {
                                                 self.state.subscriptions.lock().await;
                                             let mut failed: Vec<String> = Vec::new();
                                             for (symbol, sender) in subscriptions.iter() {
-                                                if price_data.prices.contains_key(symbol) {
-                                                    if sender.send(event.clone()).await.is_err() {
-                                                        failed.push(symbol.clone());
-                                                    }
+                                                if price_data.prices.contains_key(symbol)
+                                                    && sender.send(event.clone()).await.is_err()
+                                                {
+                                                    failed.push(symbol.clone());
                                                 }
                                             }
                                             for sym in failed {

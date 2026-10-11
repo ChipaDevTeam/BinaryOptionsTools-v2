@@ -519,33 +519,67 @@ mod integration_tests {
         // client.ticks("EURUSD".to_string(), 3600).await
         // client.wait_for_assets(30.0).await
 
-        // If this compiles, the API surface is correct
-        assert!(true);
+        // If this compiles, the API surface is correct. Referencing every method
+        // as a function item turns that claim into a compile-time check.
+        let _ = PocketOption::balance;
+        let _ = PocketOption::is_demo;
+        let _ = PocketOption::trade;
+        let _ = PocketOption::buy;
+        let _ = PocketOption::sell;
+        let _ = PocketOption::server_time;
+        let _ = PocketOption::assets;
+        let _ = PocketOption::result;
+        let _ = PocketOption::result_with_timeout;
+        let _ = PocketOption::get_opened_deals;
+        let _ = PocketOption::get_closed_deals;
+        let _ = PocketOption::clear_closed_deals;
+        let _ = PocketOption::subscribe;
+        let _ = PocketOption::unsubscribe;
+        let _ = PocketOption::get_candles_advanced;
+        let _ = PocketOption::get_candles;
+        let _ = PocketOption::history;
+        let _ = PocketOption::reconnect;
+        let _ = PocketOption::shutdown;
+        let _ = PocketOption::create_raw_handler;
+        let _ = PocketOption::payout;
+        let _ = PocketOption::get_trade_history;
+        let _ = PocketOption::get_deal_end_time;
+        let _ = PocketOption::cancel_pending_order;
+        let _ = PocketOption::cancel_pending_orders;
+        let _ = PocketOption::is_connected;
+        let _ = PocketOption::connect;
+        let _ = PocketOption::disconnect;
+        let _ = PocketOption::get_pending_deal;
+        let _ = PocketOption::active_assets;
+        let _ = PocketOption::compile_candles;
+        let _ = PocketOption::ticks;
+        let _ = PocketOption::wait_for_assets;
     }
 }
 
 #[cfg(test)]
 mod raw_handler_tests {
+    use crate::platforms::pocketoption::raw_handler::RawHandler;
 
     #[test]
     fn test_raw_handler_methods_exist() {
-        // Verify RawHandler API surface
-        // RawHandler::send_text(&self, message: String) -> Result<(), UniError>
-        // RawHandler::send_binary(&self, data: Vec<u8>) -> Result<(), UniError>
-        // RawHandler::send_and_wait(&self, message: String) -> Result<String, UniError>
-        // RawHandler::wait_next(&self) -> Result<String, UniError>
-        assert!(true);
+        // Referencing each method as a function item is a compile-time check that
+        // the RawHandler API surface exists.
+        let _ = RawHandler::send_text;
+        let _ = RawHandler::send_binary;
+        let _ = RawHandler::send_and_wait;
+        let _ = RawHandler::wait_next;
     }
 }
 
 #[cfg(test)]
 mod subscription_stream_tests {
+    use crate::platforms::pocketoption::stream::SubscriptionStream;
 
     #[test]
     fn test_subscription_stream_methods_exist() {
-        // Verify SubscriptionStream API surface
-        // SubscriptionStream::next(&self) -> Result<Candle, UniError>
-        assert!(true);
+        // Compile-time check that the SubscriptionStream API surface exists.
+        let _ = SubscriptionStream::next;
     }
 }
 
@@ -554,9 +588,10 @@ mod uniffi_scaffolding_tests {
 
     #[test]
     fn test_uniffi_scaffolding_generated() {
-        // Verify that uniffi::setup_scaffolding!() was called
-        // This is a compile-time check - if the crate compiles, scaffolding exists
-        assert!(true);
+        // `uniffi::setup_scaffolding!()` (lib.rs) defines `UniFfiTag`, the marker
+        // every generated FFI converter is parameterised by, so this only
+        // compiles when the scaffolding was generated.
+        assert!(std::any::type_name::<crate::UniFfiTag>().ends_with("UniFfiTag"));
     }
 
     #[test]

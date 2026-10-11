@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `open_pending_order` now takes keyword-only arguments and a string `open_time` (`"YYYY-MM-DD HH:MM:SS"` in UTC, or `"0"` for price-based orders), matching the underlying Rust binding. The silent type-coercion fallback was removed.
 - `payout(asset)` accepts a single asset symbol only; call `payouts()` and index it when several assets are needed.
+- `RawCloseOption.send_raw()` now returns `None` instead of the JSON string `"null"`, matching `RawPocketOption.send_raw()`. The `CloseOption` Python wrappers already declared `-> None` and discarded the value.
 
 ### Deprecated
 
