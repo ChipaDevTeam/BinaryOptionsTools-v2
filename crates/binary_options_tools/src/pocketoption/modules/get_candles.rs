@@ -10,6 +10,7 @@ use binary_options_tools_core::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::select;
+use tokio::sync::{oneshot, Mutex as TokioMutex};
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -175,10 +176,75 @@ pub enum CommandResponse {
     },
 }
 
+/// Routes `CommandResponse`s to the caller awaiting a specific `req_id`.
+///
+/// The module's response channel is a single queue shared by every clone of
+/// [`GetCandlesHandle`]. Without this router, concurrent requests (for example
+/// candle backfill for several assets at once) steal and discard each other's
+/// responses. A one-shot per request id makes concurrent calls safe.
+struct ResponseRouter {
+    pending: TokioMutex<HashMap<Uuid, oneshot::Sender<CommandResponse>>>,
+}
+
+impl ResponseRouter {
+    fn new(receiver: AsyncReceiver<CommandResponse>) -> Arc<Self> {
+        let router = Arc::new(Self {
+            pending: TokioMutex::new(HashMap::new()),
+        });
+        let router_clone = router.clone();
+        tokio::spawn(async move {
+            while let Ok(resp) = receiver.recv().await {
+                if let Some(id) = response_req_id(&resp) {
+                    let mut pending = router_clone.pending.lock().await;
+                    // Forget callers that gave up (cancelled request) so the map
+                    // does not grow with every abandoned request.
+                    pending.retain(|_, tx| !tx.is_closed());
+                    if let Some(tx) = pending.remove(&id) {
+                        if tx.send(resp).is_err() {
+                            tracing::trace!(target: "GetCandlesResponseRouter", "Failed to route response: receiver dropped");
+                        }
+                    }
+                }
+            }
+            let mut pending = router_clone.pending.lock().await;
+            for (id, tx) in pending.drain() {
+                if tx.send(CommandResponse::Shutdown { req_id: id }).is_err() {
+                    tracing::trace!(target: "GetCandlesResponseRouter", "Failed to send shutdown notification: receiver dropped");
+                }
+            }
+        });
+        router
+    }
+
+    /// Register interest in the response for `id` before the request is sent.
+    async fn register(&self, id: Uuid) -> oneshot::Receiver<CommandResponse> {
+        let (tx, rx) = oneshot::channel();
+        self.pending.lock().await.insert(id, tx);
+        rx
+    }
+}
+
+fn response_req_id(resp: &CommandResponse) -> Option<Uuid> {
+    match resp {
+        CommandResponse::CandlesResult { req_id, .. }
+        | CommandResponse::TicksResult { req_id, .. }
+        | CommandResponse::Error { req_id, .. }
+        | CommandResponse::Shutdown { req_id } => Some(*req_id),
+    }
+}
+
+/// Await a response registered through [`ResponseRouter`].
+async fn await_response(rx: oneshot::Receiver<CommandResponse>) -> PocketResult<CommandResponse> {
+    rx.await.map_err(|_| PocketError::ModuleStopped {
+        module_name: "GetCandlesApiModule".to_string(),
+        context: "Response router channel closed".to_string(),
+    })
+}
+
 #[derive(Clone)]
 pub struct GetCandlesHandle {
     sender: AsyncSender<Command>,
-    receiver: AsyncReceiver<CommandResponse>,
+    router: Arc<ResponseRouter>,
 }
 
 impl GetCandlesHandle {
@@ -221,6 +287,7 @@ impl GetCandlesHandle {
     ) -> PocketResult<Vec<Candle>> {
         info!(target: "GetCandlesHandle", "Requesting candles for asset: {}, period: {}, time: {}, offset: {}", asset.to_string(), period, time, offset);
         let req_id = Uuid::new_v4();
+        let response = self.router.register(req_id).await;
 
         self.sender
             .send(Command::GetCandles {
@@ -233,39 +300,16 @@ impl GetCandlesHandle {
             .await
             .map_err(CoreError::from)?;
 
-        loop {
-            match self.receiver.recv().await {
-                Ok(CommandResponse::CandlesResult {
-                    req_id: response_id,
-                    candles,
-                }) => {
-                    if req_id == response_id {
-                        return Ok(candles);
-                    }
-                    // Continue waiting for the correct response
-                }
-                Ok(CommandResponse::Error {
-                    req_id: response_id,
-                    error,
-                }) => {
-                    if req_id == response_id {
-                        return Err(PocketError::General(error));
-                    }
-                    // Continue waiting for the correct response
-                }
-                Ok(CommandResponse::Shutdown {
-                    req_id: response_id,
-                }) => {
-                    if req_id == response_id {
-                        return Err(PocketError::ModuleStopped {
-                            module_name: "GetCandlesApiModule".to_string(),
-                            context: "GetCandlesApiModule stopped during request".to_string(),
-                        });
-                    }
-                }
-                Ok(_) => continue, // Ignore other response types
-                Err(e) => return Err(CoreError::from(e).into()),
-            }
+        match await_response(response).await? {
+            CommandResponse::CandlesResult { candles, .. } => Ok(candles),
+            CommandResponse::Error { error, .. } => Err(PocketError::General(error)),
+            CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
+                module_name: "GetCandlesApiModule".to_string(),
+                context: "GetCandlesApiModule stopped during request".to_string(),
+            }),
+            other => Err(PocketError::General(format!(
+                "Unexpected response to get_candles request: {other:?}"
+            ))),
         }
     }
 
@@ -301,6 +345,7 @@ impl GetCandlesHandle {
             // Use loadHistoryPeriodFast for small offsets if needed, but here we use the module's logic
             info!(target: "GetCandlesHandle", "Requesting ticks for asset: {}, period: {}, time: {}, offset: {}", asset_str, period, current_time, page_offset);
 
+            let response = self.router.register(req_id).await;
             self.sender
                 .send(Command::GetTicks {
                     asset: asset_str.clone(),
@@ -312,37 +357,19 @@ impl GetCandlesHandle {
                 .await
                 .map_err(CoreError::from)?;
 
-            // Wait for the response
-            let ticks = loop {
-                match self.receiver.recv().await {
-                    Ok(CommandResponse::TicksResult {
-                        req_id: response_id,
-                        ticks,
-                    }) => {
-                        if req_id == response_id {
-                            break ticks;
-                        }
-                    }
-                    Ok(CommandResponse::Error {
-                        req_id: response_id,
-                        error,
-                    }) => {
-                        if req_id == response_id {
-                            return Err(PocketError::General(error));
-                        }
-                    }
-                    Ok(CommandResponse::Shutdown {
-                        req_id: response_id,
-                    }) => {
-                        if req_id == response_id {
-                            return Err(PocketError::ModuleStopped {
-                                module_name: "GetCandlesApiModule".to_string(),
-                                context: "GetCandlesApiModule stopped during request".to_string(),
-                            });
-                        }
-                    }
-                    Ok(_) => continue,
-                    Err(e) => return Err(CoreError::from(e).into()),
+            let ticks = match await_response(response).await? {
+                CommandResponse::TicksResult { ticks, .. } => ticks,
+                CommandResponse::Error { error, .. } => return Err(PocketError::General(error)),
+                CommandResponse::Shutdown { .. } => {
+                    return Err(PocketError::ModuleStopped {
+                        module_name: "GetCandlesApiModule".to_string(),
+                        context: "GetCandlesApiModule stopped during request".to_string(),
+                    })
+                }
+                other => {
+                    return Err(PocketError::General(format!(
+                        "Unexpected response to get_ticks request: {other:?}"
+                    )))
                 }
             };
 
@@ -423,7 +450,10 @@ impl ApiModule<State> for GetCandlesApiModule {
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
     ) -> Self::Handle {
-        GetCandlesHandle { sender, receiver }
+        GetCandlesHandle {
+            sender,
+            router: ResponseRouter::new(receiver),
+        }
     }
 
     async fn run(&mut self) -> CoreResult<()> {
@@ -780,5 +810,102 @@ impl GetCandlesApiModule {
             // Remove the entry entirely if no ticks remain
             !ticks.is_empty()
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use binary_options_tools_core::reimports::bounded_async;
+
+    #[tokio::test]
+    async fn router_routes_out_of_order_responses_by_request_id() {
+        let (responder, response_rx) = bounded_async::<CommandResponse>(8);
+        let router = ResponseRouter::new(response_rx);
+        let first = Uuid::new_v4();
+        let second = Uuid::new_v4();
+        let first_rx = router.register(first).await;
+        let second_rx = router.register(second).await;
+
+        // Answer the second request before the first.
+        responder
+            .send(CommandResponse::Error {
+                req_id: second,
+                error: "second".to_string(),
+            })
+            .await
+            .unwrap();
+        responder
+            .send(CommandResponse::Shutdown { req_id: first })
+            .await
+            .unwrap();
+
+        assert!(matches!(
+            second_rx.await.unwrap(),
+            CommandResponse::Error { ref error, .. } if error == "second"
+        ));
+        assert!(matches!(
+            first_rx.await.unwrap(),
+            CommandResponse::Shutdown { req_id } if req_id == first
+        ));
+    }
+
+    #[tokio::test]
+    async fn router_forgets_waiters_whose_caller_gave_up() {
+        let (responder, response_rx) = bounded_async::<CommandResponse>(8);
+        let router = ResponseRouter::new(response_rx);
+        drop(router.register(Uuid::new_v4()).await);
+
+        let live = Uuid::new_v4();
+        let live_rx = router.register(live).await;
+        responder
+            .send(CommandResponse::Shutdown { req_id: live })
+            .await
+            .unwrap();
+
+        assert!(matches!(
+            live_rx.await.unwrap(),
+            CommandResponse::Shutdown { req_id } if req_id == live
+        ));
+        assert!(router.pending.lock().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn concurrent_get_candles_requests_each_receive_their_own_response() {
+        let (command_tx, command_rx) = bounded_async::<Command>(8);
+        let (response_tx, response_rx) = bounded_async::<CommandResponse>(8);
+        let handle = GetCandlesHandle {
+            sender: command_tx,
+            router: ResponseRouter::new(response_rx),
+        };
+
+        tokio::spawn(async move {
+            let mut requests = Vec::new();
+            for _ in 0..2 {
+                match command_rx.recv().await {
+                    Ok(Command::GetCandles { asset, req_id, .. }) => requests.push((asset, req_id)),
+                    other => panic!("unexpected command: {other:?}"),
+                }
+            }
+            // Reply in reverse order to prove responses are routed by id, not arrival order.
+            for (asset, req_id) in requests.into_iter().rev() {
+                let candles = vec![Candle {
+                    symbol: asset,
+                    ..Default::default()
+                }];
+                response_tx
+                    .send(CommandResponse::CandlesResult { req_id, candles })
+                    .await
+                    .unwrap();
+            }
+        });
+
+        let (a, b) = tokio::join!(
+            handle.get_candles_advanced("AAA_otc", 60, 0, 10),
+            handle.get_candles_advanced("BBB_otc", 60, 0, 10),
+        );
+
+        assert_eq!(a.unwrap()[0].symbol, "AAA_otc");
+        assert_eq!(b.unwrap()[0].symbol, "BBB_otc");
     }
 }

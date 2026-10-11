@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added the `Trade` model (a `dict` subclass with attribute access plus `result`/`profit`/`is_win`/`is_loss`/`is_draw`/`is_settled`), returned by `buy`, `sell`, `check_win`, `get_opened_deal` and `get_closed_deal`. Exported as `BinaryOptionsToolsV2.Trade` alongside the `TradeResult` alias.
 - Added `PocketOption.is_ssid_valid()`, mirroring the async client.
 
+### Fixed
+
+- **Multi-asset candle feed**: fetching live candles for several assets at once (e.g. `get_candles_live()`/`candles()` for multiple symbols concurrently) no longer returns empty history. The historical-candle module shared a single response queue across all callers, so concurrent requests consumed and discarded each other's responses; responses are now routed to the waiting request by request id.
+- **Pending history requests**: a cancelled or abandoned Rust `SubscriptionsHandle::history()` call no longer leaves the `(asset, period)` marked as in-flight, which previously made every later request for that pair fail as a duplicate forever. This path is not used by the Python `history()`/`candles()` methods, which compile candles from tick history instead.
+
 ### Changed
 
 - `open_pending_order` now takes keyword-only arguments and a string `open_time` (`"YYYY-MM-DD HH:MM:SS"` in UTC, or `"0"` for price-based orders), matching the underlying Rust binding. The silent type-coercion fallback was removed.

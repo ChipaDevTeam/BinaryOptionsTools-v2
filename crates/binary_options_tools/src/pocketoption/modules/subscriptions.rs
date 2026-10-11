@@ -171,6 +171,11 @@ pub enum Command {
         period: u32,
         command_id: Uuid,
     },
+    /// Cancels a pending [`Command::History`] for an `(asset, period)`.
+    ///
+    /// Sent when the caller is dropped before its history response arrives, so
+    /// the module does not keep rejecting later requests as duplicates.
+    CancelHistory { asset: String, period: u32 },
     /// Requests the number of active subscriptions
     SubscriptionCount { command_id: Uuid },
 }
@@ -267,6 +272,31 @@ pub struct SubscriptionsHandle {
     sender: AsyncSender<Command>,
     router: Arc<ResponseRouter>,
     cached_max: Arc<AtomicUsize>,
+}
+
+/// Cancels the module-side pending history request for `(asset, period)` if the
+/// caller is dropped before the response arrives.
+///
+/// `SubscriptionsApiModule` rejects a second history request for the same
+/// `(asset, period)` while one is pending. When a caller is cancelled (for
+/// example when Python abandons the await), nothing else clears that pending
+/// entry, so every later request would fail as a duplicate forever.
+struct HistoryRequestGuard {
+    sender: AsyncSender<Command>,
+    asset: String,
+    period: u32,
+    armed: bool,
+}
+
+impl Drop for HistoryRequestGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = self.sender.as_sync().try_send(Command::CancelHistory {
+                asset: self.asset.clone(),
+                period: self.period,
+            });
+        }
+    }
 }
 
 impl SubscriptionsHandle {
@@ -429,34 +459,47 @@ impl SubscriptionsHandle {
         let receiver = self.router.register(id).await;
         self.sender
             .send(Command::History {
-                asset,
+                asset: asset.clone(),
                 period,
                 command_id: id,
             })
             .await
             .map_err(CoreError::from)?;
-        // Wait for the history response with timeout
-        match tokio::time::timeout(SUBSCRIBE_TIMEOUT, receiver)
-            .await
-            .map_err(|_| {
-                PocketError::General(format!(
-                    "History request timed out after {:?} waiting for server response",
-                    SUBSCRIBE_TIMEOUT
-                ))
-            })?
-            .map_err(|_| PocketError::ModuleStopped {
+
+        // If this future is dropped (for example cancelled by the caller)
+        // before the module resolves the request, cancel the pending entry so
+        // later requests for the same (asset, period) are not rejected as
+        // duplicates.
+        let mut guard = HistoryRequestGuard {
+            sender: self.sender.clone(),
+            asset,
+            period,
+            armed: true,
+        };
+
+        match tokio::time::timeout(SUBSCRIBE_TIMEOUT, receiver).await {
+            Ok(Ok(response)) => {
+                guard.armed = false;
+                match response {
+                    CommandResponse::History { data, .. } => Ok(data),
+                    CommandResponse::HistoryFailed { error, .. } => Err(*error),
+                    CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
+                        module_name: "SubscriptionsApiModule".to_string(),
+                        context: "SubscriptionsApiModule stopped during request".to_string(),
+                    }),
+                    _ => Err(PocketError::General(
+                        "Unexpected response to history command".into(),
+                    )),
+                }
+            }
+            Ok(Err(_)) => Err(PocketError::ModuleStopped {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "Response router channel closed".to_string(),
-            })? {
-            CommandResponse::History { data, .. } => Ok(data),
-            CommandResponse::HistoryFailed { error, .. } => Err(*error),
-            CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
-                module_name: "SubscriptionsApiModule".to_string(),
-                context: "SubscriptionsApiModule stopped during request".to_string(),
             }),
-            _ => Err(PocketError::General(
-                "Unexpected response to history command".into(),
-            )),
+            Err(_) => Err(PocketError::General(format!(
+                "History request timed out after {:?} waiting for server response",
+                SUBSCRIBE_TIMEOUT
+            ))),
         }
     }
 }
@@ -612,6 +655,13 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             } else {
                                 self.state.histories.write().await.push((asset, period, command_id));
                             }
+                        }
+                        Command::CancelHistory { asset, period } => {
+                            self.state
+                                .histories
+                                .write()
+                                .await
+                                .retain(|(a, p, _)| !(a == &asset && *p == period));
                         }
                     }
                 },
@@ -1040,5 +1090,46 @@ impl Drop for SubscriptionStream {
             };
             let _ = sender.as_sync().try_send(drop_command);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use binary_options_tools_core::reimports::bounded_async;
+
+    #[tokio::test]
+    async fn dropping_armed_history_guard_cancels_pending_request() {
+        let (sender, receiver) = bounded_async::<Command>(8);
+        {
+            let _guard = HistoryRequestGuard {
+                sender: sender.clone(),
+                asset: "EURUSD_otc".to_string(),
+                period: 60,
+                armed: true,
+            };
+        }
+        match receiver.recv().await.unwrap() {
+            Command::CancelHistory { asset, period } => {
+                assert_eq!(asset, "EURUSD_otc");
+                assert_eq!(period, 60);
+            }
+            other => panic!("expected CancelHistory, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn disarmed_history_guard_sends_nothing() {
+        let (sender, receiver) = bounded_async::<Command>(8);
+        {
+            let _guard = HistoryRequestGuard {
+                sender: sender.clone(),
+                asset: "EURUSD_otc".to_string(),
+                period: 60,
+                armed: false,
+            };
+        }
+        drop(sender);
+        assert!(receiver.recv().await.is_err());
     }
 }
