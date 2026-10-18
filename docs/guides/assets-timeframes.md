@@ -8,7 +8,6 @@ historical data for that asset before any capital is at risk. Free to start.
 Trading crypto instead? **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** lists BTC perpetuals, spot and margin markets.
 :::
 
-
 This document lists all supported assets and timeframes for the BinaryOptionsTools-v2 API.
 
 ## Supported Timeframes

@@ -13,14 +13,13 @@ Then come back here to build the same thing with full control.
 Want crypto markets too? **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** has a demo mode to practise on.
 :::
 
-
 Step-by-step guides for getting started with BinaryOptionsTools.
 
 ## Getting Your PocketOption SSID
 
 To use BinaryOptionsTools, you need your PocketOption session ID (SSID).
 
-### Steps:
+### Steps
 
 1. **Login to PocketOption** on your browser
 2. **Navigate to Demo or Real account** whichever you'd like to use

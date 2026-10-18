@@ -12,7 +12,6 @@ language description in **CHTL**, backtests it on historical data, and deploys i
 connection. Free to start — then come back here when you need full control.
 :::
 
-
 Complete API reference for BinaryOptionsTools with examples in all supported languages.
 
 ## Installation
@@ -70,7 +69,7 @@ go get gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/bindings/go
 gem install binaryoptionstoolsv2
 ```
 
-### C#
+### C #
 
 ```bash
 dotnet add package BinaryOptionsToolsV2
@@ -644,12 +643,13 @@ See the [examples directory](/examples) for complete working examples in each la
 - [Python Sync Examples](/examples/python/sync)
 - [JavaScript Examples](/examples/javascript)
 - [Rust Examples](/examples/rust)
+
 ---
 
 ## API Method Reference
 
 | Method | Description | Returns |
-|--------|-------------|---------|
+| -------- | ------------- | --------- |
 | `PocketOption(ssid)` / `PocketOptionAsync(ssid)` | Initialize client with session ID | Client instance |
 | `new_with_url(ssid, url)` | Initialize with custom WebSocket URL | Client instance |
 | `balance()` | Get current account balance | Float |

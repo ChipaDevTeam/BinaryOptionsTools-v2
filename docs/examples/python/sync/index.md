@@ -289,7 +289,7 @@ api.shutdown()
 ## Sync vs Async
 
 | Feature | Sync | Async |
-|---------|------|-------|
+| --------- | ------ | ------- |
 | Syntax | `with PocketOption(ssid)` | `async with PocketOptionAsync(ssid)` |
 | Methods | `api.balance()` | `await api.balance()` |
 | Sleep | `time.sleep()` | `await asyncio.sleep()` |

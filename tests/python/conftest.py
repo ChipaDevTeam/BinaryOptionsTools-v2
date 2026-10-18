@@ -1,6 +1,5 @@
 """Load .env file before any test module runs, if python-dotenv is available."""
 
-import os
 from pathlib import Path
 
 try:

@@ -61,14 +61,17 @@ sequenceDiagram
 ## API Sketch
 
 ### PocketOption
+
 - `raw_handle()` → `RawHandle`
 - `create_raw_handler(validator, keep_alive)` → `RawHandler`
 
 ### RawHandle
+
 - `create(validator, keep_alive)` → `RawHandler`
 - `remove(id)` → `bool`
 
 ### RawHandler
+
 - `id()` → `Uuid`
 - `send_text(text)`
 - `send_binary(bytes)`
@@ -137,22 +140,26 @@ asyncio.run(main("your-ssid"))
 ## Validator Types
 
 ### Basic Validators
+
 - `starts_with(prefix)` - Check if message starts with prefix
 - `ends_with(suffix)` - Check if message ends with suffix
 - `contains(substring)` - Check if message contains substring
 - `regex(pattern)` - Match against regex pattern
 
 ### Logical Combinators
+
 - `ne(validator)` - Negate a validator (NOT)
 - `all(validators)` - All validators must match (AND)
 - `any(validators)` - At least one validator must match (OR)
 
 ### Instance Method
+
 - `check(message)` - Test if message matches validator
 
 ## Use Cases
 
 ### 1. Custom Message Monitoring
+
 ```python
 validator = Validator.all([
     Validator.starts_with("42["),
@@ -162,6 +169,7 @@ handler = await client.create_raw_handler(validator, None)
 ```
 
 ### 2. Low-Level Protocol Implementation
+
 ```python
 async def send_custom_command(handler, command, args):
     message = json.dumps([command, args])
@@ -170,6 +178,7 @@ async def send_custom_command(handler, command, args):
 ```
 
 ### 3. Debugging and Logging
+
 ```python
 error_validator = Validator.contains("error")
 error_handler = await client.create_raw_handler(error_validator, None)
@@ -180,6 +189,7 @@ while True:
 ```
 
 ### 4. Multiple Subscriptions
+
 ```python
 balance_handler = await client.create_raw_handler(
     Validator.contains("balance"), None

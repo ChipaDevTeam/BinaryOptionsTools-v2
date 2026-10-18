@@ -4,7 +4,6 @@
 >
 > **📈 Trade crypto perps, spot & margin on [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
 
-
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ChipaDevTeam/BinaryOptionsTools-v2)
 [![Crates.io](https://img.shields.io/crates/v/binary_options_tools.svg)](https://crates.io/crates/binary_options_tools)
 [![Docs.rs](https://docs.rs/binary_options_tools/badge.svg)](https://docs.rs/binary_options_tools)

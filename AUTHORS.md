@@ -26,7 +26,6 @@
 - **Role**: developer
 - **Contributions**: Python bindings, API design, testing infrastructure
 
-
 ## Contributors
 
 We welcome contributions from the community! This project wouldn't be possible without the help of many contributors.

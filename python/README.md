@@ -4,7 +4,6 @@
 >
 > **📈 Trade crypto perps, spot & margin on [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
 
-
 [![Discord](https://img.shields.io/discord/your-discord-id?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/T3FGXcmd)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://pypi.org/project/binaryoptionstoolsv2/)
 
@@ -89,11 +88,11 @@ Key Features of PocketOptionAsync
   - `buy()`: Places a buy trade asynchronously.
   - `sell()`: Places a sell trade asynchronously.
   - `check_win()`: Checks the outcome of a trade ('win', 'draw', or 'loss').
- - **Market Data**:
-   - `get_candles_live()`: Streams real-time gap-free candles (closed and currently forming) with historical backfill.
-   - `candles()` / `get_candles()`: (Deprecated) Fetches historical candles (delegates to `get_candles_live`).
-   - `history()`: Retrieves recent historical data for a specific asset through the dedicated history endpoint.
-   - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
+- **Market Data**:
+  - `get_candles_live()`: Streams real-time gap-free candles (closed and currently forming) with historical backfill.
+  - `candles()` / `get_candles()`: (Deprecated) Fetches historical candles (delegates to `get_candles_live`).
+  - `history()`: Retrieves recent historical data for a specific asset through the dedicated history endpoint.
+  - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
 - **Account Management**:
   - `balance()`: Returns the current account balance.
   - `opened_deals()`: Lists all open trades.
@@ -163,11 +162,11 @@ Key Features of PocketOption
   - `buy()`: Places a buy trade using synchronous execution.
   - `sell()`: Places a sell trade.
   - `check_win()`: Checks the trade outcome synchronously.
- - **Market Data**:
-   - `get_candles_live()`: Streams real-time gap-free candles (closed and currently forming) with historical backfill.
-   - `candles()` / `get_candles()`: (Deprecated) Fetches historical candles (delegates to `get_candles_live`).
-   - `history()`: Retrieves recent historical data for a specific asset through the dedicated history endpoint.
-   - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
+- **Market Data**:
+  - `get_candles_live()`: Streams real-time gap-free candles (closed and currently forming) with historical backfill.
+  - `candles()` / `get_candles()`: (Deprecated) Fetches historical candles (delegates to `get_candles_live`).
+  - `history()`: Retrieves recent historical data for a specific asset through the dedicated history endpoint.
+  - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
 - **Account Management**:
   - `balance()`: Retrieves account balance.
   - `opened_deals()`: Lists all open trades.
@@ -321,11 +320,12 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
- ### Retrieving Historical & Live Candles (Recommended)
- 
+### Retrieving Historical & Live Candles (Recommended)
+
  To fetch historical backfill and stream gap-free live candles in real-time, use `get_candles_live()`. This method is available in both async and sync clients. It buffers incoming ticks, merges historical data, and yields updated candles (both closed candles and the forming candle).
- 
+
  **Async Example:**
+
  ```python
  from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
  import asyncio
@@ -341,8 +341,9 @@ if __name__ == "__main__":
  if __name__ == "__main__":
      asyncio.run(main())
  ```
- 
+
  **Sync Example:**
+
  ```python
  from BinaryOptionsToolsV2.pocketoption import PocketOption
  
@@ -353,12 +354,13 @@ if __name__ == "__main__":
      if forming:
          print(f"Forming Candle Close Price: {forming['close']}")
  ```
- 
- ### Deprecated Candle Methods
- 
- The duplicate candle functions `candles()` and `get_candles()` are **deprecated** and will be removed in a future release. 
- * **Reason**: They only fetch closed historical candles, can introduce gaps when called sequentially during live trading, and do not include the currently forming candle.
- * **Compatibility**: To preserve backward compatibility, these methods have been redirected to run `get_candles_live()` internally under the hood (returning the first yielded list of closed candles).
+
+### Deprecated Candle Methods
+
+ The duplicate candle functions `candles()` and `get_candles()` are **deprecated** and will be removed in a future release.
+
+- **Reason**: They only fetch closed historical candles, can introduce gaps when called sequentially during live trading, and do not include the currently forming candle.
+- **Compatibility**: To preserve backward compatibility, these methods have been redirected to run `get_candles_live()` internally under the hood (returning the first yielded list of closed candles).
 
 ### Compiling Custom Period Candles
 

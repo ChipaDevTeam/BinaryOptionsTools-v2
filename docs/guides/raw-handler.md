@@ -7,7 +7,6 @@ handles generation, backtesting and live deployment for you. See the
 [Chipa Ecosystem](/ecosystem) for how the two fit together.
 :::
 
-
 This document shows how to use the raw handler and validator features in `BinaryOptionsToolsV2`.
 
 ## Table of Contents

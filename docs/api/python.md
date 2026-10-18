@@ -11,7 +11,6 @@ you whether the edge is real, and only then is it worth building here properly.
 [Try it free →](https://chipaeditor.com/?utm_source=docs&utm_medium=api-python&utm_campaign=BinaryOptionsToolsV2&utm_content=cta)
 :::
 
-
 Complete reference guide for all features and methods available in the BinaryOptionsToolsV2 Python library.
 
 ## Async Client
@@ -28,7 +27,7 @@ await asyncio.sleep(2)  # Wait for initialization
 ### Methods
 
 | Method | Description | Returns |
-|--------|-------------|---------|
+| -------- | ------------- | --------- |
 | `__init__(ssid)` | Initialize with session ID | Self |
 | `balance()` | Get account balance | `float` |
 | `is_demo()` | Check if demo account | `bool` |
@@ -63,7 +62,7 @@ time.sleep(2)  # Wait for initialization
 ### Methods
 
 | Method | Description | Returns |
-|--------|-------------|---------|
+| -------- | ------------- | --------- |
 | `__init__(ssid)` | Initialize with session ID | Self |
 | `balance()` | Get account balance | `float` |
 | `is_demo()` | Check if demo account | `bool` |
@@ -118,7 +117,7 @@ handler = RawHandler("your_ssid")
 ### Methods
 
 | Method | Description |
-|--------|-------------|
+| -------- | ------------- |
 | `connect()` | Connect to WebSocket |
 | `send(message)` | Send raw message |
 | `receive()` | Receive raw message |
@@ -138,7 +137,7 @@ result = validator.validate_ssid("your_ssid")
 ### Methods
 
 | Method | Description | Returns |
-|--------|-------------|---------|
+| -------- | ------------- | --------- |
 | `validate_ssid(ssid)` | Validate SSID format | `bool` |
 | `validate_credentials(email, password)` | Validate login credentials | `bool` |
 
@@ -156,7 +155,7 @@ config.set("timeout", 30)
 ### Methods
 
 | Method | Description |
-|--------|-------------|
+| -------- | ------------- |
 | `set(key, value)` | Set configuration value |
 | `get(key)` | Get configuration value |
 | `load_from_file(path)` | Load config from file |

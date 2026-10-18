@@ -1,13 +1,11 @@
 import asyncio
 import json
 import sys
-import os
 import types
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import urlparse
 
-import anyio
 import pytest
 
 from BinaryOptionsToolsV2.config import Config

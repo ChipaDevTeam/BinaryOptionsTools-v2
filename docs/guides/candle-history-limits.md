@@ -8,7 +8,7 @@ expected.
 ## The short answer
 
 | Method | Capped by this library? | Practical ceiling |
-|---|---|---|
+| --- | --- | --- |
 | `get_candles(asset, period, offset)` | No | Whatever the server returns for one request |
 | `get_candles_advanced(asset, period, offset, time)` | No | Same, anchored at `time` |
 | `candles(asset, period)` | Yes | 20,000 ticks, so ~20,000 seconds of history |
@@ -62,7 +62,7 @@ seconds or less. Above that, the tick budget runs out before the window is
 covered:
 
 | `period` | Lookback requested | Ticks needed | Candles you actually get |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 1s | 1,000s | ~1,000 | ~1000 |
 | 5s | 5,000s | ~5,000 | ~1000 |
 | 15s | 15,000s | ~15,000 | ~1000 |

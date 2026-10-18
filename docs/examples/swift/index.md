@@ -48,7 +48,6 @@ try await Task.sleep(nanoseconds: 5_000_000_000)  // Critical!
 
 See the Swift README in `BinaryOptionsToolsUni/out/swift/` for SwiftUI examples.
 
-
 ---
 
 ## Build strategies faster

@@ -1,6 +1,5 @@
 ---
 sidebar_position: 2
-title: Chipa Ecosystem
 description: ChipaEditor (AI algorithmic trading strategy builder) and ChipaX (hybrid crypto exchange) — the platforms built alongside BinaryOptionsTools V2.
 keywords: [ChipaEditor, CHTL, algorithmic trading, strategy builder, backtesting, ChipaX, crypto exchange, perpetuals, spot trading]
 ---

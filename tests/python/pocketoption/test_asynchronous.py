@@ -130,6 +130,7 @@ async def test_extra_api_methods(api):
     # Test unsubscribe (Line 735)
     # We must subscribe first to unsubscribe without "Subscription not found" error
     sub = await api.subscribe_symbol("EURUSD_otc")
+    assert sub is not None
     await api.unsubscribe("EURUSD_otc")
 
     # Test send_raw_message (Line 783)
