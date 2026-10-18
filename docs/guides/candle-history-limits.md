@@ -28,6 +28,14 @@ candles = await api.get_candles("EURUSD_otc", 60, 3600)
 Use these when you want a lot of history on a standard timeframe and do not
 need candles aligned to your own boundaries.
 
+> **These can come back empty.** The server currently answers
+> `loadHistoryPeriod` with `{"asset":"EURUSD_otc","index":N,"data":[],"period":60}`
+> (an empty `data` array) for demo sessions, so there is nothing to build candles
+> from and the call returns `[]` (any candles you do get come from ticks buffered
+> off the live stream). When you need history that is actually there,
+> use `history()` / `candles()` below, or `get_candles_live()`, which ask for the
+> chart history and compile tick pages.
+
 ## Tick-compiled: `candles`, `history`, `compile_candles`
 
 These fetch raw 1-second ticks and aggregate them client-side, which is what

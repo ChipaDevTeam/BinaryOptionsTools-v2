@@ -282,6 +282,78 @@ impl PocketOption {
         })
     }
 
+    /// Creates a client on a free "try demo" (guest) session.
+    ///
+    /// The guest token is generated locally, exactly like PocketOption's own
+    /// "Try demo" client does, so there is no endpoint or credential involved.
+    /// The client connects to the demo server and waits for the asset list before
+    /// returning.
+    ///
+    /// Use [`PocketOption::new_try_demo_with_token`] to replay a token the browser
+    /// already cached (`localStorage['po-td-token']`).
+    pub async fn new_try_demo() -> PocketResult<Self> {
+        Self::new_try_demo_with_config(Config::default()).await
+    }
+
+    /// Creates a try-demo client using the supplied configuration.
+    pub async fn new_try_demo_with_config(config: Config) -> PocketResult<Self> {
+        Self::new_try_demo_with_balance_and_config(
+            crate::pocketoption::try_demo::DEFAULT_TRY_DEMO_BALANCE,
+            config,
+        )
+        .await
+    }
+
+    /// Creates a try-demo client with a custom starting virtual balance.
+    pub async fn new_try_demo_with_balance(balance: u64) -> PocketResult<Self> {
+        Self::new_try_demo_with_balance_and_config(balance, Config::default()).await
+    }
+
+    /// Creates a try-demo client with a custom starting virtual balance and configuration.
+    pub async fn new_try_demo_with_balance_and_config(
+        balance: u64,
+        config: Config,
+    ) -> PocketResult<Self> {
+        let ssid = crate::pocketoption::try_demo::generate_try_demo_ssid(balance)?;
+        Self::connect_try_demo(ssid, balance, config).await
+    }
+
+    /// Creates a client from an already known try-demo guest `token`.
+    pub async fn new_try_demo_with_token(token: impl ToString) -> PocketResult<Self> {
+        Self::new_try_demo_with_token_and_config(token, Config::default()).await
+    }
+
+    /// Creates a try-demo client from a known guest `token` and configuration.
+    pub async fn new_try_demo_with_token_and_config(
+        token: impl ToString,
+        config: Config,
+    ) -> PocketResult<Self> {
+        let balance = crate::pocketoption::try_demo::DEFAULT_TRY_DEMO_BALANCE;
+        let ssid = crate::pocketoption::try_demo::try_demo_ssid_from_token(token, balance)?;
+        Self::connect_try_demo(ssid, balance, config).await
+    }
+
+    /// Connects a try-demo session and waits for its initial data snapshot.
+    async fn connect_try_demo(ssid: Ssid, balance: u64, config: Config) -> PocketResult<Self> {
+        let timeout = config.connection_initialization_timeout;
+        let client = Self::new_with_config(ssid, config).await?;
+
+        // The server pushes the asset list right after auth; waiting for it keeps
+        // the returned client immediately usable.
+        client.wait_for_assets(timeout).await?;
+
+        // Guest sessions are not sent a balance frame (verified against the live
+        // demo servers), so seed the balance the session was opened with - the same
+        // value the platform's own client displays. A server-sent balance still
+        // overwrites this as soon as it arrives.
+        let state = &client.client.state;
+        if state.get_balance().await.is_none() {
+            state.set_balance(Decimal::from(balance)).await;
+        }
+
+        Ok(client)
+    }
+
     /// Get a handle to the Raw module for ad-hoc validators and custom message processing.
     pub async fn raw_handle(&self) -> PocketResult<InnerRawHandle> {
         self.require_handle::<RawApiModule>("RawApiModule").await

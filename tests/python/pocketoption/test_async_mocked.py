@@ -60,8 +60,10 @@ class MockRawClient:
         )
 
     async def get_candles_advanced(self, asset, period, offset, time):
+        # (asset, period, offset, time) is the raw client's order; return a
+        # plausible historical candle instead of echoing the window anchor.
         return json.dumps(
-            [{"time": time, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
+            [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
         )
 
     async def balance(self):
@@ -626,6 +628,101 @@ class TestCandles:
             ValueError, match="lookback_period must be a positive integer"
         ):
             await async_client.compile_candles("EURUSD_otc", 20, -1)
+
+    @pytest.mark.asyncio
+    async def test_get_candles_advanced_forwards_offset_and_time(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """The public (asset, period, time, offset) order maps to raw (offset, time).
+
+        Regression test for #141: the wrapper used to forward time as offset and
+        offset as time, so history requests asked the server for a window at a
+        timestamp of a few dozen seconds and came back empty.
+        """
+        import warnings
+
+        mock_raw_pocketoption.get_candles_advanced = AsyncMock(
+            return_value=json.dumps([])
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            await async_client.get_candles_advanced(
+                "EURUSD_otc", 60, time=1700000000, offset=10
+            )
+        mock_raw_pocketoption.get_candles_advanced.assert_awaited_once_with(
+            "EURUSD_otc", 60, offset=10, time=1700000000
+        )
+
+    @pytest.mark.asyncio
+    async def test_candles_end_time_forwards_offset_and_time(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """candles(..., end_time=...) anchors the window and asks for count periods."""
+        mock_raw_pocketoption.get_candles_advanced = AsyncMock(
+            return_value=json.dumps(
+                [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
+            )
+        )
+        candles = await async_client.candles(
+            "EURUSD_otc", 60, count=5, end_time=1700000000
+        )
+        assert candles[0]["time"] == 1000
+        mock_raw_pocketoption.get_candles_advanced.assert_awaited_once_with(
+            "EURUSD_otc", 60, offset=5, time=1700000000
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_candles_live_skips_chart_history_when_ticks_cover_window(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """The tick-compiled history is the only source when it covers the window.
+
+        Regression test for #141: every asset used to issue all three history
+        requests at once, which floods the socket when many assets are polled.
+        """
+        ticks = json.dumps(
+            [
+                {
+                    "time": 1000 + i * 60,
+                    "open": 1.1,
+                    "high": 1.2,
+                    "low": 1.0,
+                    "close": 1.15,
+                }
+                for i in range(10)
+            ]
+        )
+        mock_raw_pocketoption.compile_candles = AsyncMock(return_value=ticks)
+        mock_raw_pocketoption.history = AsyncMock(return_value=ticks)
+        mock_raw_pocketoption.get_candles_advanced = AsyncMock(return_value=ticks)
+        gen = async_client.get_candles_live(
+            "EURUSD_otc", period=60, hours=0.1, max_rows=10
+        )
+        closed, _forming = await gen.__anext__()
+        await gen.aclose()
+        assert len(closed) > 0
+        mock_raw_pocketoption.compile_candles.assert_awaited()
+        mock_raw_pocketoption.history.assert_not_awaited()
+        mock_raw_pocketoption.get_candles_advanced.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_get_candles_live_falls_back_to_chart_history(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """When tick pages do not cover the window, the chart history fills it in."""
+        candle = json.dumps(
+            [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
+        )
+        mock_raw_pocketoption.compile_candles = AsyncMock(return_value=json.dumps([]))
+        mock_raw_pocketoption.history = AsyncMock(return_value=candle)
+        gen = async_client.get_candles_live(
+            "EURUSD_otc", period=60, hours=0.1, max_rows=10
+        )
+        closed, _forming = await gen.__anext__()
+        await gen.aclose()
+        mock_raw_pocketoption.compile_candles.assert_awaited()
+        mock_raw_pocketoption.history.assert_awaited()
+        assert len(closed) > 0
 
     @pytest.mark.asyncio
     async def test_get_candles_live_success(self, async_client, mock_raw_pocketoption):

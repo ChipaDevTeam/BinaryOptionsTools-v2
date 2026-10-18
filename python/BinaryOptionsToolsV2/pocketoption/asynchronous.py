@@ -6,12 +6,18 @@ import time
 import warnings
 from collections import deque
 from datetime import timedelta
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union, AsyncGenerator
+from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional, Tuple, Union, AsyncGenerator
 
 from ..config import Config
 from ..validator import Validator
 
 from .models import Trade, TradeResult
+
+# `changeSymbol` history can take tens of seconds on a fresh connection; the
+# previous 3s cut discarded it, which left `get_candles_live` without backfill.
+HISTORY_FETCH_TIMEOUT = 20.0
+# Compiling candles from tick pages takes ~1s per hour of history.
+TICK_HISTORY_FETCH_TIMEOUT = 10.0
 
 if TYPE_CHECKING:
     from ..BinaryOptionsToolsV2 import Logger, RawPocketOption
@@ -336,6 +342,34 @@ class PocketOptionAsync:
 
         self.client: "RawPocketOption" = RawPocketOption.new_with_config(ssid, self.config.pyconfig)
 
+    @classmethod
+    async def try_demo(cls, token: Optional[str] = None) -> "PocketOptionAsync":
+        """Create a client on PocketOption's free "try demo" (guest) session.
+
+        Guest sessions authenticate with a short-lived token instead of an account
+        session, so no credentials are required.
+
+        Args:
+            token: An existing guest token. When omitted, one is generated locally,
+                exactly like PocketOption's own "Try demo" client.
+
+        Returns:
+            A connected client with assets and balance already loaded.
+        """
+        try:
+            from ..BinaryOptionsToolsV2 import RawPocketOption
+        except ImportError:
+            from BinaryOptionsToolsV2 import RawPocketOption
+
+        from ..tracing import Logger
+
+        self = cls.__new__(cls)
+        self.logger = Logger()
+        self._ssid_valid = True
+        self.config = Config()
+        self.client = await RawPocketOption.create_try_demo(token)
+        return self
+
     async def __aenter__(self):
         """
         Context manager entry. Waits for assets to be loaded.
@@ -475,7 +509,8 @@ class PocketOptionAsync:
             ```
         """
         if end_time is not None:
-            return json.loads(await self.client.get_candles_advanced(asset, period, end_time, count))
+            # RawPocketOption takes (asset, period, offset, time).
+            return json.loads(await self.client.get_candles_advanced(asset, period, offset=count, time=end_time))
         lookback_seconds = max(period, count * period)
         hours = max(0.1, lookback_seconds / 3600.0)
         gen = self.get_candles_live(asset, period, hours=hours, max_rows=count)
@@ -557,7 +592,8 @@ class PocketOptionAsync:
             DeprecationWarning,
             stacklevel=2,
         )
-        candles = await self.client.get_candles_advanced(asset, period, time, offset)
+        # RawPocketOption takes (asset, period, offset, time).
+        candles = await self.client.get_candles_advanced(asset, period, offset=offset, time=time)
         return json.loads(candles)
 
     async def get_candles_live(
@@ -570,9 +606,10 @@ class PocketOptionAsync:
         """Fetches historical backfill and streams gap-free live candles.
 
         This method subscribes to raw ticks first and buffers them, then fetches
-        historical candles (using get_candles_advanced, history, and compile_candles),
-        merges them, replays the buffered ticks, and yields updated candles (both
-        closed historical candles and the current forming candle) in real-time.
+        historical candles (compiled from raw tick pages, falling back to the chart
+        history when those do not cover the requested window), merges them, replays
+        the buffered ticks, and yields updated candles (both closed historical
+        candles and the current forming candle) in real-time.
 
         Args:
             asset (str): Trading asset (e.g., "EURUSD_otc")
@@ -682,45 +719,43 @@ class PocketOptionAsync:
         try:
             # 2. Fetch history while buffering ticks
             offset_seconds = int(hours * 3600)
-            platform_time = int(time.time()) + platform_time_offset
-            # offset is number of periods, not seconds
-            offset_periods = max(1, offset_seconds // period)
 
-            try:
-                advanced_candles = json.loads(
-                    await asyncio.wait_for(
-                        self.client.get_candles_advanced(
-                            asset,
-                            period,
-                            platform_time,  # time (timestamp)
-                            offset_periods,  # offset (number of periods)
-                        ),
-                        timeout=3.0,
-                    )
-                )
-            except Exception:
-                advanced_candles = []
+            async def fetch_history(
+                request: Callable[[], Awaitable[Optional[str]]],
+                timeout: float,
+            ) -> List[Dict]:
+                """Run one history source, treating a failure as empty history."""
+                try:
+                    payload = await asyncio.wait_for(request(), timeout=timeout)
+                    candles = json.loads(payload) if payload else []
+                except Exception:
+                    return []
+                return candles if isinstance(candles, list) else []
 
-            try:
-                recent_candles = json.loads(await asyncio.wait_for(self.client.history(asset, period), timeout=3.0))
-            except Exception:
-                recent_candles = []
-
-            try:
-                compiled_candles = json.loads(
-                    await asyncio.wait_for(
-                        self.client.compile_candles(asset, period, offset_seconds),
-                        timeout=3.0,
-                    )
-                )
-            except Exception:
-                compiled_candles = []
-
-            history = merge_candles(
-                compiled_candles,
-                recent_candles,
-                advanced_candles,
+            # Compiling from raw tick pages is the fastest and most dependable
+            # source, so ask it first. `get_candles_advanced` is not used at all:
+            # its `loadHistoryPeriodFast` request was never answered, and every call
+            # left a request hanging that eventually dropped the connection (#141).
+            compiled_candles = await fetch_history(
+                lambda: self.client.compile_candles(asset, period, offset_seconds),
+                TICK_HISTORY_FETCH_TIMEOUT,
             )
+
+            # The chart history covers the same window with more candles but takes
+            # much longer, so it only runs when the tick pages did not cover what
+            # was asked for. Requesting both for every asset at once is what flooded
+            # the socket and dropped subscriptions (#141).
+            wanted = min(max_rows, max(1, offset_seconds // period))
+            recent_candles = (
+                []
+                if len(compiled_candles) >= wanted
+                else await fetch_history(
+                    lambda: self.client.history(asset, period),
+                    HISTORY_FETCH_TIMEOUT,
+                )
+            )
+
+            history = merge_candles(compiled_candles, recent_candles)
             seed_history(history)
 
             # 3. Replay backlog

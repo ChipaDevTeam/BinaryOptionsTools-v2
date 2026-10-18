@@ -46,6 +46,7 @@ await asyncio.sleep(2)  # Wait for initialization
 | `unsubscribe(asset)` | Unsubscribe from asset | `None` |
 | `reconnect()` | Reconnect to server | `None` |
 | `shutdown()` | Shutdown client | `None` |
+| `try_demo(token=None)` | Connect to a free guest demo session | `PocketOptionAsync` |
 
 ## Sync Client
 
@@ -76,6 +77,33 @@ time.sleep(2)  # Wait for initialization
 | `unsubscribe(asset)` | Unsubscribe from asset | `None` |
 | `reconnect()` | Reconnect to server | `None` |
 | `shutdown()` | Shutdown client | `None` |
+| `try_demo(token=None)` | Connect to a free guest demo session | `PocketOption` |
+
+## Try Demo (guest) sessions
+
+PocketOption's free "try demo" hands out a short-lived guest token instead of an
+account session, so no credentials are needed:
+
+```python
+from binaryoptionstoolsv2 import PocketOptionAsync
+
+client = await PocketOptionAsync.try_demo()
+assets = await client.active_assets()  # 100+ tradable symbols
+```
+
+`try_demo(token=None)` mints the guest token locally - the Python equivalent of
+PocketOption's own "Try demo" client, which generates a 10-character id and caches
+it in `localStorage['po-td-token']` - then connects to the demo server and waits for
+the asset list. Pass `token=` to replay a token you already captured from the
+browser. The auth frame looks like
+`42["auth",{"token":"...","balance":50000,"isFastHistory":true}]`.
+
+```python
+client = await PocketOptionAsync.try_demo("9PRxPzq6mQ")
+```
+
+Guest sessions are demo-only. The server does not send a balance frame for them, so
+the client reports the guest balance the session was opened with (`50000`).
 
 ## Raw Handler
 

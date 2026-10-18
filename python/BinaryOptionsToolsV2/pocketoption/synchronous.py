@@ -163,6 +163,36 @@ class PocketOption:
         future = asyncio.run_coroutine_threadsafe(self._client.wait_for_assets(), self._loop)
         future.result()
 
+    @classmethod
+    def try_demo(cls, token: Optional[str] = None) -> "PocketOption":
+        """Create a client on PocketOption's free "try demo" (guest) session.
+
+        Args:
+            token: An existing guest token. When omitted, one is generated locally,
+                exactly like PocketOption's own "Try demo" client.
+
+        Returns:
+            A connected client with assets and balance already loaded.
+        """
+        self = cls.__new__(cls)
+        self._lock = threading.RLock()
+        loop = asyncio.new_event_loop()
+        self._loop = loop
+
+        def _run_loop(loop_to_run):
+            asyncio.set_event_loop(loop_to_run)
+            loop_to_run.run_forever()
+
+        self._loop_thread = threading.Thread(target=_run_loop, args=(loop,), daemon=True)
+        self._loop_thread.start()
+        try:
+            self._client = asyncio.run_coroutine_threadsafe(PocketOptionAsync.try_demo(token), self._loop).result()
+        except Exception:
+            # Don't leak the background loop/thread when setup fails.
+            self._cleanup_loop()
+            raise
+        return self
+
     def __del__(self):
         self._cleanup_loop()
 

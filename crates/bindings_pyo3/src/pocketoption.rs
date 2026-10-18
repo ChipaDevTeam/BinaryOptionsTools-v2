@@ -182,6 +182,47 @@ impl RawPocketOption {
         })
     }
 
+    /// Creates a client on PocketOption's free "try demo" (guest) session.
+    ///
+    /// Blocks until the client is connected and its snapshot (assets and balance)
+    /// has been loaded. When `token` is omitted a guest token is generated
+    /// locally, exactly like PocketOption's own "Try demo" client; pass one to
+    /// replay a token the browser already cached.
+    ///
+    /// No short outer timeout is applied here: connecting and waiting for the
+    /// snapshot each carry their own timeouts, and aborting early would discard a
+    /// session that is still being set up.
+    #[staticmethod]
+    #[pyo3(signature = (token = None))]
+    pub fn new_try_demo(py: Python<'_>, token: Option<String>) -> PyResult<Self> {
+        let runtime = get_runtime(py)?;
+        runtime.block_on(async move {
+            let client = match token {
+                Some(token) => PocketOption::new_try_demo_with_token(token).await,
+                None => PocketOption::new_try_demo().await,
+            }
+            .map_err(BinaryErrorPy::from)?;
+            Ok(Self { client })
+        })
+    }
+
+    /// Asynchronous variant of [`RawPocketOption::new_try_demo`].
+    #[staticmethod]
+    #[pyo3(signature = (token = None))]
+    pub fn create_try_demo<'py>(
+        py: Python<'py>,
+        token: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        future_into_py(py, async move {
+            let client = match token {
+                Some(token) => PocketOption::new_try_demo_with_token(token).await,
+                None => PocketOption::new_try_demo().await,
+            }
+            .map_err(BinaryErrorPy::from)?;
+            Ok(RawPocketOption { client })
+        })
+    }
+
     pub fn wait_for_assets<'py>(
         &self,
         py: Python<'py>,
