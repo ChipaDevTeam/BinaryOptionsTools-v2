@@ -47,6 +47,18 @@ use crate::{
 const MINIMUM_TRADE_AMOUNT: Decimal = dec!(1.0);
 const MAXIMUM_TRADE_AMOUNT: Decimal = dec!(20000.0);
 
+/// Balance a guest ("try demo") session reports before any trade.
+///
+/// Guest sessions never receive a `successupdateBalance` frame: the only balance
+/// the server communicates is the one carried by the auth payload. `None` means
+/// the session was replayed from a bare token and the balance is unknown.
+fn guest_session_balance(ssid: &Ssid) -> Option<Decimal> {
+    match ssid {
+        Ssid::TryDemo(guest) => guest.balance.map(Decimal::from),
+        Ssid::Demo(_) | Ssid::Real(_) => None,
+    }
+}
+
 /// Reconnection callback to verify potential lost trades
 struct TradeReconciliationCallback;
 
@@ -387,6 +399,10 @@ impl PocketOption {
     /// This method waits up to 10 seconds for the balance to be populated from the server.
     /// If the balance cannot be retrieved within the timeout, it returns -1.0.
     ///
+    /// Guest ("try demo") sessions never receive a balance frame, so for them this
+    /// method returns immediately: the balance carried by their auth payload when
+    /// there is one, and -1.0 otherwise.
+    ///
     /// # Returns
     /// The current balance as a `Decimal`, or `-1.0` if the balance is unknown.
     pub async fn balance(&self) -> Decimal {
@@ -395,6 +411,12 @@ impl PocketOption {
         // Fast path: return immediately if available
         if let Some(balance) = *state.balance.read().await {
             return balance;
+        }
+
+        // Guest sessions are never sent a balance frame, so waiting only burns the
+        // timeout. Report the balance their auth payload carries, if any.
+        if let Ssid::TryDemo(_) = &state.ssid {
+            return guest_session_balance(&state.ssid).unwrap_or_else(|| dec!(-1.0));
         }
 
         // Wait for update
@@ -1164,7 +1186,25 @@ mod tests {
     use futures_util::StreamExt;
     use rust_decimal_macros::dec;
 
-    use super::PocketOption;
+    use super::{guest_session_balance, PocketOption};
+    use crate::pocketoption::ssid::Ssid;
+
+    #[test]
+    fn guest_session_balance_comes_from_the_auth_payload_only() {
+        let fresh = crate::pocketoption::try_demo::generate_try_demo_ssid(1_000).unwrap();
+        assert_eq!(guest_session_balance(&fresh), Some(dec!(1000)));
+
+        // Replaying a bare token sends no balance and the server reports none.
+        let replayed = Ssid::try_demo("9PRxPzq6mQ").unwrap();
+        assert_eq!(guest_session_balance(&replayed), None);
+
+        // Account sessions do receive balance frames, so this must not short-circuit.
+        let demo = Ssid::parse(
+            r#"42["auth",{"session":"dummy_session_id","isDemo":1,"uid":87654321,"platform":2}]"#,
+        )
+        .unwrap();
+        assert_eq!(guest_session_balance(&demo), None);
+    }
 
     #[tokio::test]
     async fn test_pocket_option_tester() {

@@ -800,6 +800,17 @@ class TestBalance:
         assert isinstance(balance, float)
         assert balance >= 0
 
+    @pytest.mark.asyncio
+    async def test_guest_balance_does_not_poll(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A guest session never receives a balance frame, so it must not retry."""
+        async_client._guest_session = True
+        mock_raw_pocketoption.balance = AsyncMock(return_value=-1.0)
+
+        assert await async_client.balance() == -1.0
+        mock_raw_pocketoption.balance.assert_awaited_once()
+
 
 class TestOpenedDeals:
     """Tests for opened_deals method."""
@@ -1425,6 +1436,13 @@ class TestSsidValidation:
         ssid = '42["auth",{"token":"9PRxPzq6mQ","balance":50000,"isFastHistory":true}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
         assert client.is_ssid_valid() is True
+        assert client._guest_session is True
+
+    def test_account_ssid_is_not_marked_as_guest(self):
+        """An account SSID receives balance frames, so balance() keeps polling."""
+        ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":1,"platform":2}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client._guest_session is False
 
     def test_token_with_account_session_is_still_validated(self):
         """A payload that also carries a session is an account SSID, not a guest."""

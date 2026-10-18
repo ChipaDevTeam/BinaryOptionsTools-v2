@@ -166,6 +166,15 @@ class RawHandler:
         self._handler = None  # Release reference to allow Rust Drop
 
 
+def _is_guest_auth_payload(auth_data: dict) -> bool:
+    """Return True when `auth_data` is a try-demo (guest) auth payload.
+
+    Guest sessions authenticate with a short-lived `token` and no account
+    `session`. Mirrors the Rust `try_demo_payload` rule in `pocketoption/ssid.rs`.
+    """
+    return "token" in auth_data and "session" not in auth_data and "sessionToken" not in auth_data
+
+
 def sanitize_and_validate_ssid(ssid: str, logger: "Logger") -> str:
     """Sanitize SSID format and validate session payload semantics.
 
@@ -207,14 +216,8 @@ def sanitize_and_validate_ssid(ssid: str, logger: "Logger") -> str:
         return ssid
 
     # Guest ("try demo") payloads authenticate with a short-lived `token` and no
-    # account session; they have no `session`/`uid` to validate. Mirrors the
-    # Rust `try_demo_payload` rule in `pocketoption/ssid.rs`.
-    is_guest_payload = (
-        "token" in auth_data
-        and "session" not in auth_data
-        and "sessionToken" not in auth_data
-    )
-    if is_guest_payload:
+    # account session; they have no `session`/`uid` to validate.
+    if _is_guest_auth_payload(auth_data):
         logger.debug("SSID is a guest (try demo) payload; skipping session validation")
         return ssid
 
@@ -312,6 +315,7 @@ class PocketOptionAsync:
 
         self.logger = Logger()
         self._ssid_valid = True
+        self._guest_session = False
 
         if ssid is not None:
             ssid = sanitize_and_validate_ssid(ssid, self.logger)
@@ -322,6 +326,8 @@ class PocketOptionAsync:
                     payload = json.loads(ssid[2:])
                     if not isinstance(payload, list) or len(payload) < 2:
                         self._ssid_valid = False
+                    elif isinstance(payload[1], dict):
+                        self._guest_session = _is_guest_auth_payload(payload[1])
                 except json.JSONDecodeError:
                     self._ssid_valid = False
         else:
@@ -378,6 +384,7 @@ class PocketOptionAsync:
         self = cls.__new__(cls)
         self.logger = Logger()
         self._ssid_valid = True
+        self._guest_session = True
         self.config = Config()
         self.client = await RawPocketOption.create_try_demo(token)
         return self
@@ -867,11 +874,17 @@ class PocketOptionAsync:
             float: Account balance in account currency
 
         Note:
-            Updates in real-time as trades are completed
+            Updates in real-time as trades are completed. Guest ("try demo")
+            sessions never receive a balance frame, so they return -1.0 straight
+            away when the balance is unknown instead of retrying.
         """
         for _ in range(100):
             bal = await self.client.balance()
             if bal >= 0.0:
+                return bal
+            if self._guest_session:
+                # Guest (try demo) sessions never receive a balance frame, so
+                # polling cannot produce a different answer.
                 return bal
             await asyncio.sleep(0.1)
         return await self.client.balance()

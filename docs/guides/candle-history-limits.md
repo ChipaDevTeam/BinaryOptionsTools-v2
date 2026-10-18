@@ -9,8 +9,8 @@ expected.
 
 | Method | Capped by this library? | Practical ceiling |
 | --- | --- | --- |
-| `get_candles_advanced(asset, period, offset, time)` | No | Whatever the `loadHistoryPeriod` endpoint returns (currently an empty list) |
-| `candles(asset, period, count, end_time=...)` | Only without `end_time` | With `end_time`: the same endpoint response. Without: 20,000 ticks |
+| `get_candles_advanced(asset, period, offset, time)` | No | Everything the `loadHistoryPeriod` response yields, compiled into candles (often empty, see below) |
+| `candles(asset, period, count, end_time=...)` | Only without `end_time` | With `end_time`: the same endpoint response, compiled into candles. Without: 20,000 ticks |
 | `get_candles(asset, period, offset)` (deprecated) | Yes | Alias of `get_candles_live()`: 20,000 ticks |
 | `candles(asset, period)` | Yes | 20,000 ticks, so ~20,000 seconds of history |
 | `history(asset, period)` | Yes | Alias of `candles()` |
@@ -19,19 +19,28 @@ expected.
 ## Server-side: `get_candles_advanced`
 
 `get_candles_advanced(asset, period, offset, time)` sends a single
-`loadHistoryPeriod` request and returns the endpoint response directly. There is
-no pagination and no client-side cap, so the limit is PocketOption's, not this
-library's.
+`loadHistoryPeriod` request and returns the candles compiled from its response.
+There is no pagination and no client-side cap, so the limit is PocketOption's,
+not this library's.
 
 ```python
 candles = await api.get_candles_advanced("EURUSD_otc", 60, 3600, 1700000000)
 ```
 
-> **It can come back empty.** For demo sessions the server currently answers
-> `loadHistoryPeriod` with
-> `{"asset":"EURUSD_otc","index":N,"data":[],"period":60}`, and the call
-> returns that empty list. If the server does not answer at all, the call fails
-> with a timeout instead of hanging.
+`GetCandlesApiModule::process_result` does not hand the raw endpoint payload
+back to you. It turns the response into candles: entries that already carry
+OHLC are returned as candles, anything else is treated as ticks and aggregated
+into candles of the requested period. It also appends the `updateStream` ticks
+it has buffered for that asset (at most 10,000 ticks, no older than five
+minutes). So an empty endpoint `data` array does **not** guarantee an empty
+returned list - buffered live ticks are compiled into candles too.
+
+> **It can still come back empty.** For demo sessions the server currently
+> answers `loadHistoryPeriod` with
+> `{"asset":"EURUSD_otc","index":N,"data":[],"period":60}`. With no OHLC
+> data and no buffered ticks for that asset, the call returns an empty list. If
+> the server does not answer at all, the call fails with a timeout instead of
+> hanging.
 
 `get_candles(asset, period, offset)` is deprecated and does **not** call this
 endpoint: it delegates to `get_candles_live()`, which compiles candles from tick
@@ -84,13 +93,18 @@ than about 20,000 seconds (~5.5 hours) will not get you more data.
 
 ## Which to use
 
-- **Standard timeframe, want depth** → `get_candles`. No library cap.
+- **Standard timeframe, want endpoint history** → `get_candles_advanced` (or
+  `candles(..., end_time=...)`, which calls it). There is no library cap, but the
+  endpoint may answer with nothing, and there is no pagination.
+- **`get_candles` is not the deep-history option.** It is deprecated and
+  delegates to `get_candles_live()`, so it is bound by the 20,000-tick ceiling
+  above and cannot return 1,000 long-timeframe candles either.
 - **Non-standard timeframe, or you need UTC-aligned boundaries** →
   `compile_candles`, and keep `lookback_period` under ~20,000 seconds.
 - **Short timeframes (≤20s)** → `candles()` behaves as documented.
-- **Long timeframes (≥60s) and you need 1000 candles** → use `get_candles`, or
-  make several `get_candles_advanced` calls with different `time` anchors and
-  join the results.
+- **Long timeframes (≥60s) and you need 1000 candles** → `get_candles_advanced`
+  with different `time` anchors, joined together, keeping its documented
+  empty-response limitation in mind.
 
 ## A caveat on "roughly one tick per second"
 
@@ -116,9 +130,10 @@ print(len(ticks), ticks[-1][0] - ticks[0][0])  # count vs seconds covered
 - `crates/binary_options_tools/src/pocketoption/pocket_client.rs` —
   `candles()` choosing `1000 * period` as its lookback, and `compile_candles()`.
 
-`MAX_TICKS_PER_ASSET` and `MAX_TICK_AGE_SECS` in the same module are unrelated
-to historical fetches: they bound the in-memory cache of *live* ticks from
-subscriptions and do not affect any of the calls above.
+`MAX_TICKS_PER_ASSET` and `MAX_TICK_AGE_SECS` in the same module bound the
+in-memory cache of *live* ticks from subscriptions. They do not cap historical
+fetches; they only limit how many extra ticks `get_candles_advanced` can append
+to a response.
 
 ## Version Information
 

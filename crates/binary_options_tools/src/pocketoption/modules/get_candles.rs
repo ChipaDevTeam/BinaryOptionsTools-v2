@@ -206,7 +206,11 @@ impl ResponseRouter {
     /// Register interest in the response for `id` before the request is sent.
     async fn register(&self, id: Uuid) -> oneshot::Receiver<CommandResponse> {
         let (tx, rx) = oneshot::channel();
-        self.pending.lock().await.insert(id, tx);
+        let mut pending = self.pending.lock().await;
+        // Forget callers that gave up (cancelled request) so the map does not
+        // grow when no response arrives to trigger the same cleanup.
+        pending.retain(|_, tx| !tx.is_closed());
+        pending.insert(id, tx);
         rx
     }
 }
@@ -911,6 +915,22 @@ mod tests {
             first_rx.await.unwrap(),
             CommandResponse::Shutdown { req_id } if req_id == first
         ));
+    }
+
+    #[tokio::test]
+    async fn register_forgets_abandoned_waiters_without_a_response() {
+        // A caller that dropped its receiver must not stay in the map: with no
+        // response arriving there is nothing else to prune it.
+        let (_responder, response_rx) = bounded_async::<CommandResponse>(8);
+        let router = ResponseRouter::new(response_rx);
+        drop(router.register(Uuid::new_v4()).await);
+
+        let live = Uuid::new_v4();
+        let _live_rx = router.register(live).await;
+
+        let pending = router.pending.lock().await;
+        assert_eq!(pending.len(), 1);
+        assert!(pending.contains_key(&live));
     }
 
     #[tokio::test]
