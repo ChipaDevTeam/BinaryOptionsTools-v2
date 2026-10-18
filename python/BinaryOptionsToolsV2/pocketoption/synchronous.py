@@ -48,6 +48,10 @@ class SyncCandleLiveIterator:
         except StopIteration:
             raise StopIteration
 
+    def close(self) -> None:
+        """Close the underlying async feed and release its subscription."""
+        asyncio.run_coroutine_threadsafe(self.async_gen.aclose(), self.loop).result()
+
 
 class RawHandlerSync:
     """Synchronous handler for advanced raw WebSocket message operations."""
@@ -350,17 +354,22 @@ class PocketOption:
         lookback_seconds = offset * period
         hours = max(0.1, lookback_seconds / 3600.0)
         iterator = self.get_candles_live(asset, period, hours=hours, max_rows=offset)
-        closed, forming = next(iterator)
+        try:
+            closed, _forming = next(iterator)
+        finally:
+            # Close the feed even when the first `next` raises, otherwise the
+            # subscription task behind it is left running.
+            iterator.close()
         return closed
 
-    def get_candles_advanced(self, asset: str, period: int, time: int, offset: int) -> List[Dict]:
+    def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> List[Dict]:
         """Get historical candle data with a specific reference time.
 
         Args:
             asset: The trading asset name.
             period: The candle period in seconds.
-            time: The reference Unix timestamp.
             offset: The number of periods to look back from reference time.
+            time: The reference Unix timestamp.
 
         Returns:
             A list of candle dictionaries.
@@ -374,7 +383,8 @@ class PocketOption:
             DeprecationWarning,
             stacklevel=2,
         )
-        return self._run(self._client.get_candles_advanced(asset, period, time, offset))
+        # The raw binding takes (asset, period, offset, time).
+        return self._run(self._client.get_candles_advanced(asset, period, offset, time))
 
     def candles(
         self,

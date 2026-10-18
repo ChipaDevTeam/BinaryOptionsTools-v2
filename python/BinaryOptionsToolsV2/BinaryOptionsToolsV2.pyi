@@ -5,15 +5,19 @@ class Action:
     Put: "Action"
 
 class PyConfig:
-    def __init__(
-        self,
-        max_allowed_loops: int = 10,
-        sleep_interval: int = 100,
-        reconnect_time: int = 5,
-        connection_initialization_timeout: float = 30.0,
-        timeout: float = 10.0,
-        urls: List[str] = [],
-    ) -> None: ...
+    # The Rust constructor takes no arguments; fields are read/written through
+    # properties. Defaults mirror `binary_options_tools::config::Config`.
+    def __init__(self) -> None: ...
+    max_allowed_loops: int
+    sleep_interval: int
+    reconnect_time: int
+    connection_initialization_timeout_secs: int
+    timeout_secs: int
+    urls: List[str]
+    proxy: Optional[str]
+    user_agent: Optional[str]
+    origin: Optional[str]
+    sec_websocket_extensions: Optional[str]
 
 class RawValidator:
     @staticmethod

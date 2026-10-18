@@ -514,47 +514,8 @@ impl ApiModule<State> for GetCandlesApiModule {
                     match msg_res {
                         Ok(msg) => {
                             match msg.as_ref() {
-                                Message::Binary(data) => {
-                                    if let Ok(result) = serde_json::from_slice::<LoadHistoryPeriodResult>(data) {
-                                        if let Err(e) = self.process_result(result).await {
-                                            warn!(target: "GetCandlesApiModule", "Error processing binary result: {}", e);
-                                        }
-                                    } else {
-                                        // Try parsing as updateStream tick data
-                                        if let Ok(text) = std::str::from_utf8(data) {
-                                            if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
-                                                self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
-                                                self.prune_latest_ticks();
-                                            }
-                                        }
-                                    }
-                                }
-                                Message::Text(text) => {
-                                    if let Ok(result) = serde_json::from_str::<LoadHistoryPeriodResult>(text) {
-                                        if let Err(e) = self.process_result(result).await {
-                                            warn!(target: "GetCandlesApiModule", "Error processing text result: {}", e);
-                                        }
-                                    } else if let Some(frame) = SocketIoFrame::parse(text) {
-                                        let event_payload: Option<(String, serde_json::Value)> = frame.extract_event();
-                                        if let Some((event_name, payload)) = event_payload {
-                                            if event_name == "loadHistoryPeriod" || event_name == "loadHistoryPeriodFast" {
-                                                match serde_json::from_value::<LoadHistoryPeriodResult>(payload) {
-                                                    Ok(result) => {
-                                                        if let Err(e) = self.process_result(result).await {
-                                                            warn!(target: "GetCandlesApiModule", "Error processing event result: {}", e);
-                                                        }
-                                                    }
-                                                    Err(e) => {
-                                                        warn!("Failed to deserialize LoadHistoryPeriodResult from Socket.IO frame (event: {}): {}", event_name, e);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    } else if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
-                                        self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
-                                        self.prune_latest_ticks();
-                                    }
-                                }
+                                Message::Binary(data) => self.handle_binary(data).await,
+                                Message::Text(text) => self.handle_text(text).await,
                                 _ => {
                                     warn!(target: "GetCandlesApiModule", "Received unexpected message type: {:?}", msg);
                                 }
@@ -666,6 +627,59 @@ impl ApiModule<State> for GetCandlesApiModule {
 }
 
 impl GetCandlesApiModule {
+    /// Handles a binary frame: either a history result or an `updateStream` tick.
+    async fn handle_binary(&mut self, data: &[u8]) {
+        if let Ok(result) = serde_json::from_slice::<LoadHistoryPeriodResult>(data) {
+            self.report_result(result, "binary").await;
+            return;
+        }
+        // Try parsing as updateStream tick data
+        if let Ok(text) = std::str::from_utf8(data) {
+            self.store_tick(text);
+        }
+    }
+
+    /// Handles a text frame: a bare result, a Socket.IO history event, or a tick.
+    async fn handle_text(&mut self, text: &str) {
+        if let Ok(result) = serde_json::from_str::<LoadHistoryPeriodResult>(text) {
+            self.report_result(result, "text").await;
+            return;
+        }
+        if let Some(frame) = SocketIoFrame::parse(text) {
+            if let Some((event_name, payload)) = frame.extract_event() {
+                if event_name == "loadHistoryPeriod" || event_name == "loadHistoryPeriodFast" {
+                    match serde_json::from_value::<LoadHistoryPeriodResult>(payload) {
+                        Ok(result) => self.report_result(result, "event").await,
+                        Err(e) => warn!(
+                            "Failed to deserialize LoadHistoryPeriodResult from Socket.IO frame (event: {}): {}",
+                            event_name, e
+                        ),
+                    }
+                }
+            }
+            return;
+        }
+        self.store_tick(text);
+    }
+
+    /// Records a tick parsed from `text`, if it is an `updateStream` payload.
+    fn store_tick(&mut self, text: &str) {
+        if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
+            self.latest_ticks
+                .entry(symbol)
+                .or_default()
+                .push((timestamp, price));
+            self.prune_latest_ticks();
+        }
+    }
+
+    /// Passes `result` to the response router, logging processing failures.
+    async fn report_result(&mut self, result: LoadHistoryPeriodResult, kind: &str) {
+        if let Err(e) = self.process_result(result).await {
+            warn!(target: "GetCandlesApiModule", "Error processing {} result: {}", kind, e);
+        }
+    }
+
     /// Notifies all pending waiters that the module has stopped.
     async fn notify_waiters_module_stopped(&mut self) {
         let waiters = std::mem::take(&mut self.pending_requests);

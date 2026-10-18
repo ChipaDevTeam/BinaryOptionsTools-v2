@@ -149,7 +149,7 @@ pub enum SubscriptionError {
 }
 
 /// Command enum for the `SubscriptionsApiModule`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Command {
     /// Subscribe to an asset's stream
     Subscribe {
@@ -171,11 +171,17 @@ pub enum Command {
         period: u32,
         command_id: Uuid,
     },
-    /// Cancels a pending [`Command::History`] for an `(asset, period)`.
+    /// Cancels the pending [`Command::History`] identified by `command_id`.
     ///
     /// Sent when the caller is dropped before its history response arrives, so
-    /// the module does not keep rejecting later requests as duplicates.
-    CancelHistory { asset: String, period: u32 },
+    /// the module does not keep rejecting later requests as duplicates. The id
+    /// is what makes this safe: a late cancellation from one caller must not
+    /// remove a newer request for the same `(asset, period)`.
+    CancelHistory {
+        asset: String,
+        period: u32,
+        command_id: Uuid,
+    },
     /// Requests the number of active subscriptions
     SubscriptionCount { command_id: Uuid },
 }
@@ -285,16 +291,31 @@ struct HistoryRequestGuard {
     sender: AsyncSender<Command>,
     asset: String,
     period: u32,
+    command_id: Uuid,
     armed: bool,
 }
 
 impl Drop for HistoryRequestGuard {
     fn drop(&mut self) {
-        if self.armed {
-            let _ = self.sender.as_sync().try_send(Command::CancelHistory {
-                asset: self.asset.clone(),
-                period: self.period,
-            });
+        if !self.armed {
+            return;
+        }
+        let command = Command::CancelHistory {
+            asset: self.asset.clone(),
+            period: self.period,
+            command_id: self.command_id,
+        };
+        // `try_send` drops the command when the channel is full, which would
+        // leave the pending entry behind, so retry from a task in that case.
+        // `Ok(true)` means it was queued; an error means the module is gone and
+        // there is nothing left to cancel.
+        if let Ok(false) = self.sender.as_sync().try_send(command.clone()) {
+            let sender = self.sender.clone();
+            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                handle.spawn(async move {
+                    let _ = sender.send(command).await;
+                });
+            }
         }
     }
 }
@@ -474,6 +495,7 @@ impl SubscriptionsHandle {
             sender: self.sender.clone(),
             asset,
             period,
+            command_id: id,
             armed: true,
         };
 
@@ -656,12 +678,14 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                 self.state.histories.write().await.push((asset, period, command_id));
                             }
                         }
-                        Command::CancelHistory { asset, period } => {
-                            self.state
-                                .histories
-                                .write()
-                                .await
-                                .retain(|(a, p, _)| !(a == &asset && *p == period));
+                        Command::CancelHistory {
+                            asset,
+                            period,
+                            command_id,
+                        } => {
+                            self.state.histories.write().await.retain(|(a, p, id)| {
+                                !(a == &asset && *p == period && *id == command_id)
+                            });
                         }
                     }
                 },
@@ -1101,19 +1125,57 @@ mod tests {
     #[tokio::test]
     async fn dropping_armed_history_guard_cancels_pending_request() {
         let (sender, receiver) = bounded_async::<Command>(8);
+        let request_id = Uuid::new_v4();
         {
             let _guard = HistoryRequestGuard {
                 sender: sender.clone(),
                 asset: "EURUSD_otc".to_string(),
                 period: 60,
+                command_id: request_id,
                 armed: true,
             };
         }
         match receiver.recv().await.unwrap() {
-            Command::CancelHistory { asset, period } => {
+            Command::CancelHistory {
+                asset,
+                period,
+                command_id,
+            } => {
                 assert_eq!(asset, "EURUSD_otc");
                 assert_eq!(period, 60);
+                assert_eq!(command_id, request_id);
             }
+            other => panic!("expected CancelHistory, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn full_channel_still_delivers_cancellation() {
+        // A cancellation must not be lost just because the command queue is full.
+        let (sender, receiver) = bounded_async::<Command>(1);
+        let request_id = Uuid::new_v4();
+        sender
+            .send(Command::SubscriptionCount {
+                command_id: Uuid::new_v4(),
+            })
+            .await
+            .unwrap();
+        {
+            let _guard = HistoryRequestGuard {
+                sender: sender.clone(),
+                asset: "EURUSD_otc".to_string(),
+                period: 60,
+                command_id: request_id,
+                armed: true,
+            };
+        }
+        // First message fills the slot; the cancellation is retried from a task.
+        assert!(matches!(
+            receiver.recv().await.unwrap(),
+            Command::SubscriptionCount { .. }
+        ));
+        match receiver.recv().await.unwrap() {
+            Command::CancelHistory { command_id, .. } => assert_eq!(command_id, request_id),
             other => panic!("expected CancelHistory, got {other:?}"),
         }
     }
@@ -1126,6 +1188,7 @@ mod tests {
                 sender: sender.clone(),
                 asset: "EURUSD_otc".to_string(),
                 period: 60,
+                command_id: Uuid::new_v4(),
                 armed: false,
             };
         }

@@ -18,7 +18,7 @@ Complete reference guide for all features and methods available in the BinaryOpt
 The `PocketOptionAsync` class provides asynchronous access to PocketOption's API.
 
 ```python
-from binaryoptionstoolsv2 import PocketOptionAsync
+from BinaryOptionsToolsV2 import PocketOptionAsync
 
 client = await PocketOptionAsync("your_ssid")
 await asyncio.sleep(2)  # Wait for initialization
@@ -52,7 +52,7 @@ await asyncio.sleep(2)  # Wait for initialization
 The `PocketOption` class provides synchronous access to PocketOption's API.
 
 ```python
-from binaryoptionstoolsv2 import PocketOption
+from BinaryOptionsToolsV2 import PocketOption
 
 client = PocketOption("your_ssid")
 import time
@@ -84,7 +84,7 @@ PocketOption's free "try demo" hands out a short-lived guest token instead of an
 account session, so no credentials are needed:
 
 ```python
-from binaryoptionstoolsv2 import PocketOptionAsync
+from BinaryOptionsToolsV2 import PocketOptionAsync
 
 client = await PocketOptionAsync.try_demo()
 assets = await client.active_assets()  # 100+ tradable symbols
@@ -102,14 +102,16 @@ client = await PocketOptionAsync.try_demo("9PRxPzq6mQ")
 ```
 
 Guest sessions are demo-only. The server does not send a balance frame for them, so
-the client reports the guest balance the session was opened with (`50000`).
+the client reports the balance the session was opened with (`50000`). A replayed
+`token` does not carry a balance - sending one would reset the guest balance - so
+the auth frame omits it and the balance is reported as unknown if the server never sends one (guests normally do not).
 
 ## Raw Handler
 
 The `RawHandler` class provides low-level access to PocketOption's WebSocket messages.
 
 ```python
-from binaryoptionstoolsv2 import RawHandler
+from BinaryOptionsToolsV2 import RawHandler
 
 handler = RawHandler("your_ssid")
 ```
@@ -128,7 +130,7 @@ handler = RawHandler("your_ssid")
 The `Validator` class validates session data and SSID tokens.
 
 ```python
-from binaryoptionstoolsv2 import Validator
+from BinaryOptionsToolsV2 import Validator
 
 validator = Validator()
 result = validator.validate_ssid("your_ssid")
@@ -146,7 +148,7 @@ result = validator.validate_ssid("your_ssid")
 The `Config` class manages library configuration.
 
 ```python
-from binaryoptionstoolsv2 import Config
+from BinaryOptionsToolsV2 import Config
 
 config = Config()
 config.set("timeout", 30)
@@ -167,7 +169,7 @@ config.set("timeout", 30)
 
 ```python
 import asyncio
-from binaryoptionstoolsv2 import PocketOptionAsync
+from BinaryOptionsToolsV2 import PocketOptionAsync
 
 async def basic_trade():
     client = await PocketOptionAsync("your_ssid")
@@ -244,7 +246,7 @@ async def get_candles():
 ## Error Handling
 
 ```python
-from binaryoptionstoolsv2 import PocketOptionAsync, PocketError
+from BinaryOptionsToolsV2 import PocketOptionAsync, PocketError
 
 async def safe_trade():
     try:

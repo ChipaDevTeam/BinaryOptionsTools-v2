@@ -315,7 +315,7 @@ impl PocketOption {
         config: Config,
     ) -> PocketResult<Self> {
         let ssid = crate::pocketoption::try_demo::generate_try_demo_ssid(balance)?;
-        Self::connect_try_demo(ssid, balance, config).await
+        Self::connect_try_demo(ssid, Some(balance), config).await
     }
 
     /// Creates a client from an already known try-demo guest `token`.
@@ -324,17 +324,27 @@ impl PocketOption {
     }
 
     /// Creates a try-demo client from a known guest `token` and configuration.
+    ///
+    /// Replaying a token does not reset the guest balance: no balance is sent in
+    /// the auth frame and no local balance is seeded, because the server keeps the
+    /// balance the token was opened with.
     pub async fn new_try_demo_with_token_and_config(
         token: impl ToString,
         config: Config,
     ) -> PocketResult<Self> {
-        let balance = crate::pocketoption::try_demo::DEFAULT_TRY_DEMO_BALANCE;
-        let ssid = crate::pocketoption::try_demo::try_demo_ssid_from_token(token, balance)?;
-        Self::connect_try_demo(ssid, balance, config).await
+        let ssid = crate::pocketoption::try_demo::replay_try_demo_ssid(token)?;
+        Self::connect_try_demo(ssid, None, config).await
     }
 
     /// Connects a try-demo session and waits for its initial data snapshot.
-    async fn connect_try_demo(ssid: Ssid, balance: u64, config: Config) -> PocketResult<Self> {
+    ///
+    /// `opening_balance` is only known for sessions this client created; replayed
+    /// sessions pass `None` so no synthetic balance is reported.
+    async fn connect_try_demo(
+        ssid: Ssid,
+        opening_balance: Option<u64>,
+        config: Config,
+    ) -> PocketResult<Self> {
         let timeout = config.connection_initialization_timeout;
         let client = Self::new_with_config(ssid, config).await?;
 
@@ -345,10 +355,13 @@ impl PocketOption {
         // Guest sessions are not sent a balance frame (verified against the live
         // demo servers), so seed the balance the session was opened with - the same
         // value the platform's own client displays. A server-sent balance still
-        // overwrites this as soon as it arrives.
-        let state = &client.client.state;
-        if state.get_balance().await.is_none() {
-            state.set_balance(Decimal::from(balance)).await;
+        // overwrites this as soon as it arrives. Replayed tokens have no known
+        // opening balance, so nothing is seeded for them.
+        if let Some(balance) = opening_balance {
+            let state = &client.client.state;
+            if state.get_balance().await.is_none() {
+                state.set_balance(Decimal::from(balance)).await;
+            }
         }
 
         Ok(client)

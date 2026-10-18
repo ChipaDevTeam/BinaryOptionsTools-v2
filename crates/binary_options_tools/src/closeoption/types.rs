@@ -87,13 +87,27 @@ pub struct OrderResult {
 /// Same as [`flex_f64`] but for `Option<f64>` fields: JSON `null` maps to
 /// `None`, and present values accept both numbers and numeric strings.
 mod flex_opt_f64 {
-    use serde::{Deserializer, Serializer};
+    use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        Ok(Some(super::flex_f64::deserialize(deserializer)?))
+        /// One present value: a bare number or a numeric string.
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            Number(f64),
+            Text(String),
+        }
+
+        // `Option` first so JSON `null` maps to `None` instead of failing the
+        // whole payload: `userBalance` is null on some `get30MinResult` frames.
+        match Option::<Raw>::deserialize(deserializer)? {
+            None => Ok(None),
+            Some(Raw::Number(n)) => Ok(Some(n)),
+            Some(Raw::Text(s)) => s.parse::<f64>().map(Some).map_err(serde::de::Error::custom),
+        }
     }
 
     pub fn serialize<S>(value: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
@@ -483,6 +497,27 @@ pub mod socket_io {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn null_user_balance_deserializes_as_none() {
+        // Some `get30MinResult` frames carry `"userBalance": null`; the payload
+        // must still deserialize instead of being dropped.
+        let result: Get30MinResult =
+            serde_json::from_value(json!({ "price": [], "userBalance": null })).unwrap();
+        assert_eq!(result.user_balance, None);
+    }
+
+    #[test]
+    fn present_user_balance_accepts_numbers_and_strings() {
+        let from_number: Get30MinResult =
+            serde_json::from_value(json!({ "price": [], "userBalance": 3039.6 })).unwrap();
+        assert_eq!(from_number.user_balance, Some(3039.6));
+
+        let from_string: Get30MinResult =
+            serde_json::from_value(json!({ "price": [], "userBalance": "3039.60" })).unwrap();
+        assert_eq!(from_string.user_balance, Some(3039.6));
+    }
 
     #[test]
     fn test_parse_probe() {

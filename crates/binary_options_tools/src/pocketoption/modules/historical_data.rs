@@ -19,7 +19,7 @@ use crate::pocketoption::candle::{
 use crate::pocketoption::error::{PocketError, PocketResult};
 use crate::pocketoption::state::State;
 use crate::pocketoption::types::MultiPatternRule;
-use crate::pocketoption::utils::normalize_timestamp;
+use crate::pocketoption::utils::{normalize_timestamp, parse_socketio_array};
 
 const HISTORICAL_DATA_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_MISMATCH_RETRIES: usize = 5;
@@ -330,52 +330,13 @@ impl ApiModule<State> for HistoricalDataApiModule {
                 msg_res = self.message_receiver.recv() => {
                     match msg_res {
                         Ok(msg) => {
-                            let mut is_binary_placeholder = false;
-                            let response = match &*msg {
-                                Message::Binary(data) => match serde_json::from_slice::<ServerResponse>(data) {
-                                    Ok(res) => Some(res),
-                                    Err(e) => {
-                                        warn!(target: "HistoricalDataApiModule", "Failed to parse binary ServerResponse: {}", e);
-                                        None
-                                    }
-                                },
-                                Message::Text(text) => {
-                                    if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
-                                        Some(res)
-                                    } else if let Some(start) = text.find('[') {
-                                        match serde_json::from_str::<serde_json::Value>(&text[start..]) {
-                                            Ok(serde_json::Value::Array(arr)) => {
-                                                if arr.len() >= 2 && arr[0].as_str().map(|s| s.starts_with("updateHistory")).unwrap_or(false) {
-                                                    if arr[1].as_object().is_some_and(|obj| obj.contains_key("_placeholder")) {
-                                                        is_binary_placeholder = true;
-                                                        None
-                                                    } else {
-                                                        match serde_json::from_value::<ServerResponse>(arr[1].clone()) {
-                                                            Ok(res) => Some(res),
-                                                            Err(e) => {
-                                                                warn!(target: "HistoricalDataApiModule", "Failed to parse updateHistory payload: {}", e);
-                                                                None
-                                                            }
-                                                        }
-                                                    }
-                                                } else {
-                                                    None
-                                                }
-                                            }
-                                            Ok(_) => None,
-                                            Err(e) => {
-                                                warn!(target: "HistoricalDataApiModule", "Failed to parse JSON array from text: {}", e);
-                                                None
-                                            }
-                                        }
-                                    } else {
-                                        None
-                                    }
-                                },
+                            let (response, is_binary_placeholder) = match &*msg {
+                                Message::Binary(data) => (Self::parse_binary_response(data), false),
+                                Message::Text(text) => Self::parse_text_response(text),
                                 _ => {
                                     warn!(target: "HistoricalDataApiModule", "Received unexpected message type: {:?}", msg);
-                                    None
-                                },
+                                    (None, false)
+                                }
                             };
 
                             if is_binary_placeholder { continue; }
@@ -484,9 +445,62 @@ impl ApiModule<State> for HistoricalDataApiModule {
 }
 
 impl HistoricalDataApiModule {
+    /// Parses a binary frame as a `ServerResponse`.
+    fn parse_binary_response(data: &[u8]) -> Option<ServerResponse> {
+        match serde_json::from_slice::<ServerResponse>(data) {
+            Ok(res) => Some(res),
+            Err(e) => {
+                warn!(target: "HistoricalDataApiModule", "Failed to parse binary ServerResponse: {}", e);
+                None
+            }
+        }
+    }
+
+    /// Parses a text frame as a `ServerResponse` or an `updateHistory` event.
+    ///
+    /// The returned boolean reports a binary placeholder header: the frame only
+    /// announces that the payload follows in the next binary frame, so it must not
+    /// be treated as data.
+    fn parse_text_response(text: &str) -> (Option<ServerResponse>, bool) {
+        if let Ok(res) = serde_json::from_str::<ServerResponse>(text) {
+            return (Some(res), false);
+        }
+        let value = match parse_socketio_array(text) {
+            Some(Ok(value)) => value,
+            Some(Err(e)) => {
+                warn!(target: "HistoricalDataApiModule", "Failed to parse JSON array from text: {}", e);
+                return (None, false);
+            }
+            None => return (None, false),
+        };
+        let Some(array) = value.as_array() else {
+            return (None, false);
+        };
+        let is_history_event = array
+            .first()
+            .and_then(|v| v.as_str())
+            .is_some_and(|s| s.starts_with("updateHistory"));
+        if !is_history_event || array.len() < 2 {
+            return (None, false);
+        }
+        let payload = &array[1];
+        if payload
+            .as_object()
+            .is_some_and(|obj| obj.contains_key("_placeholder"))
+        {
+            return (None, true);
+        }
+        match serde_json::from_value::<ServerResponse>(payload.clone()) {
+            Ok(res) => (Some(res), false),
+            Err(e) => {
+                warn!(target: "HistoricalDataApiModule", "Failed to parse updateHistory payload: {}", e);
+                (None, false)
+            }
+        }
+    }
+
     fn parse_update_stream(text: &str) -> Option<(String, i64, f64)> {
-        let start = text.find('[')?;
-        let arr: serde_json::Value = serde_json::from_str(&text[start..]).ok()?;
+        let arr = parse_socketio_array(text)?.ok()?;
         let outer = arr.as_array()?;
         let data = if let Some(first) = outer.first() {
             if first.is_string() && outer.len() >= 2 {

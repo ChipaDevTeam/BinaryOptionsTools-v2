@@ -206,6 +206,18 @@ def sanitize_and_validate_ssid(ssid: str, logger: "Logger") -> str:
         logger.warn("SSID auth data is not a dictionary")
         return ssid
 
+    # Guest ("try demo") payloads authenticate with a short-lived `token` and no
+    # account session; they have no `session`/`uid` to validate. Mirrors the
+    # Rust `try_demo_payload` rule in `pocketoption/ssid.rs`.
+    is_guest_payload = (
+        "token" in auth_data
+        and "session" not in auth_data
+        and "sessionToken" not in auth_data
+    )
+    if is_guest_payload:
+        logger.debug("SSID is a guest (try demo) payload; skipping session validation")
+        return ssid
+
     warnings_list = []
 
     required_fields = ["session", "uid"]
@@ -557,18 +569,23 @@ class PocketOptionAsync:
         lookback_seconds = offset * period
         hours = max(0.1, lookback_seconds / 3600.0)
         gen = self.get_candles_live(asset, period, hours=hours, max_rows=offset)
-        closed, forming = await anext(gen)
+        try:
+            closed, _forming = await anext(gen)
+        finally:
+            # Close the feed even when the first `anext` raises, otherwise the
+            # subscription task behind it is left running.
+            await gen.aclose()
         return closed
 
-    async def get_candles_advanced(self, asset: str, period: int, time: int, offset: int) -> List[Dict]:
+    async def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> List[Dict]:
         """
         Retrieves historical candle data for an asset.
 
         Args:
             asset (str): Trading asset (e.g., "EURUSD_otc")
             period (int): Candle timeframe in seconds (e.g., 60 for 1-minute candles)
-            time (int): Reference timestamp to fetch candles from
             offset (int): Number of periods to look back from reference time
+            time (int): Reference timestamp to fetch candles from
 
         Returns:
             List[Dict]: List of candles, each containing:

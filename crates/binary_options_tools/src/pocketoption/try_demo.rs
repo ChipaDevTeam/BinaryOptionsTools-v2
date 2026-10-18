@@ -55,6 +55,15 @@ pub fn try_demo_ssid_from_token(token: impl ToString, balance: u64) -> PocketRes
     Ok(Ssid::TryDemo(guest))
 }
 
+/// Builds the guest auth payload for replaying a cached `token`.
+///
+/// No balance is sent: a replayed guest keeps the balance the server already
+/// associated with its token, and sending a synthetic value would reset it.
+pub fn replay_try_demo_ssid(token: impl ToString) -> PocketResult<Ssid> {
+    let guest = TryDemo::new(token)?.with_fast_history(true);
+    Ok(Ssid::TryDemo(guest))
+}
+
 /// Mints a token and builds the guest auth payload for `balance`.
 pub fn generate_try_demo_ssid(balance: u64) -> PocketResult<Ssid> {
     try_demo_ssid_from_token(generate_try_demo_token(), balance)
@@ -104,6 +113,18 @@ mod tests {
         let reparsed = Ssid::parse(&frame).unwrap();
         assert_eq!(reparsed.session_id(), ssid.session_id());
         assert_eq!(reparsed.to_string(), frame);
+    }
+
+    #[test]
+    fn replayed_token_omits_balance() {
+        let ssid = replay_try_demo_ssid("9PRxPzq6mQ").unwrap();
+        let frame = ssid.to_string();
+
+        // Replaying must not reset the guest balance with a synthetic value.
+        assert!(!frame.contains("\"balance\""), "replay frame was {frame}");
+        assert!(frame.contains("\"token\":\"9PRxPzq6mQ\""));
+        assert_eq!(ssid.session_id(), "9PRxPzq6mQ");
+        assert!(ssid.demo());
     }
 
     #[test]

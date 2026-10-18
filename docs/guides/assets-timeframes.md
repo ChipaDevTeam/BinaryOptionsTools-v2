@@ -127,7 +127,7 @@ To check if an asset is available for trading at a specific timeframe, use the a
 ### Python
 
 ```python
-from binaryoptionstoolsv2 import PocketOptionAPI
+from BinaryOptionsToolsV2 import PocketOptionAPI
 
 async with PocketOptionAPI(ssid="your_ssid") as api:
     assets = await api.get_assets()

@@ -9,32 +9,36 @@ expected.
 
 | Method | Capped by this library? | Practical ceiling |
 | --- | --- | --- |
-| `get_candles(asset, period, offset)` | No | Whatever the server returns for one request |
-| `get_candles_advanced(asset, period, offset, time)` | No | Same, anchored at `time` |
+| `get_candles_advanced(asset, period, offset, time)` | No | Whatever the `loadHistoryPeriod` endpoint returns (currently an empty list) |
+| `candles(asset, period, count, end_time=...)` | Only without `end_time` | With `end_time`: the same endpoint response. Without: 20,000 ticks |
+| `get_candles(asset, period, offset)` (deprecated) | Yes | Alias of `get_candles_live()`: 20,000 ticks |
 | `candles(asset, period)` | Yes | 20,000 ticks, so ~20,000 seconds of history |
 | `history(asset, period)` | Yes | Alias of `candles()` |
 | `compile_candles(asset, custom_period, lookback_period)` | Yes | Same 20,000-tick ceiling |
 
-## Server-side: `get_candles`
+## Server-side: `get_candles_advanced`
 
-`get_candles` and `get_candles_advanced` send a single `loadHistoryPeriod`
-request and return what comes back. There is no pagination and no client-side
-cap, so the limit is PocketOption's, not this library's.
+`get_candles_advanced(asset, period, offset, time)` sends a single
+`loadHistoryPeriod` request and returns the endpoint response directly. There is
+no pagination and no client-side cap, so the limit is PocketOption's, not this
+library's.
 
 ```python
-candles = await api.get_candles("EURUSD_otc", 60, 3600)
+candles = await api.get_candles_advanced("EURUSD_otc", 60, 3600, 1700000000)
 ```
 
-Use these when you want a lot of history on a standard timeframe and do not
-need candles aligned to your own boundaries.
+> **It can come back empty.** For demo sessions the server currently answers
+> `loadHistoryPeriod` with
+> `{"asset":"EURUSD_otc","index":N,"data":[],"period":60}`, and the call
+> returns that empty list. If the server does not answer at all, the call fails
+> with a timeout instead of hanging.
 
-> **These can come back empty.** The server currently answers
-> `loadHistoryPeriod` with `{"asset":"EURUSD_otc","index":N,"data":[],"period":60}`
-> (an empty `data` array) for demo sessions, so there is nothing to build candles
-> from and the call returns `[]` (any candles you do get come from ticks buffered
-> off the live stream). When you need history that is actually there,
-> use `history()` / `candles()` below, or `get_candles_live()`, which ask for the
-> chart history and compile tick pages.
+`get_candles(asset, period, offset)` is deprecated and does **not** call this
+endpoint: it delegates to `get_candles_live()`, which compiles candles from tick
+pages (falling back to the `changeSymbol` chart history when those pages do not
+cover the window) and then replays the live ticks it buffered while fetching.
+That path is bounded by the tick fetcher described below, which is why
+`get_candles()` is capped by this library and `get_candles_advanced()` is not.
 
 ## Tick-compiled: `candles`, `history`, `compile_candles`
 

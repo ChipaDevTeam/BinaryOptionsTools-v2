@@ -72,8 +72,7 @@ client = await RawPocketOption.create(ssid)
 - `async opened_deals() -> List[Dict]`
 - `async closed_deals() -> List[Dict]`
 - `async clear_closed_deals() -> None`
-- `async payouts() -> Dict[str, int]`
-- `async payout(asset: str) -> int | None`
+- `async payout() -> str` - JSON-encoded `{asset: payout_percent}` for every asset; pass it through `json.loads()` before selecting or comparing payouts
 - `async candles(asset: str, period: int) -> List[Dict]`
 - `async get_candles(asset: str, period: int, offset: int) -> List[Dict]`
 - `async get_server_time() -> int`
@@ -286,8 +285,9 @@ async def execute_trade(self, ctx, asset):
     # Get opened deals
     opened = await ctx.client.opened_deals()
 
-    # Get payout percentage
-    payout = await ctx.client.payout(asset)
+    # Get payouts for every asset: JSON string, decode before comparing
+    payouts = json.loads(await ctx.client.payout())
+    best_asset = max(payouts, key=payouts.get)
 ```
 
 ### Get Current Time

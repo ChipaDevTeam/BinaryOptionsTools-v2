@@ -69,7 +69,7 @@ go get gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/bindings/go
 gem install binaryoptionstoolsv2
 ```
 
-### C #
+### C#
 
 ```bash
 dotnet add package BinaryOptionsToolsV2
@@ -85,7 +85,7 @@ dotnet add package BinaryOptionsToolsV2
 
 ```python
 import asyncio
-from binaryoptionstoolsv2 import PocketOptionAsync
+from BinaryOptionsToolsV2 import PocketOptionAsync
 
 async def main():
     client = await PocketOptionAsync("your_ssid")
@@ -102,7 +102,7 @@ asyncio.run(main())
 #### Python (Sync)
 
 ```python
-from binaryoptionstoolsv2 import PocketOption
+from BinaryOptionsToolsV2 import PocketOption
 
 client = PocketOption("your_ssid")
 import time
@@ -551,7 +551,7 @@ println!("Client shut down gracefully");
 ### Python
 
 ```python
-from binaryoptionstoolsv2 import PocketOptionAsync, PocketError
+from BinaryOptionsToolsV2 import PocketOptionAsync, PocketError
 
 try:
     client = await PocketOptionAsync("invalid_ssid")

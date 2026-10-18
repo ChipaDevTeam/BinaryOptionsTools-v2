@@ -389,10 +389,10 @@ for closed, forming in client.get_candles_live("EURUSD_otc", period=60, hours=2.
 
 ### Deprecated Candle Methods
 
-The duplicate candle functions `candles()` and `get_candles()` are **deprecated** and will be removed in a future release.
+The legacy `get_candles()` and `get_candles_advanced()` methods are **deprecated** and will be removed in a future release. `candles()` is the primary method for closed historical candles and is **not** deprecated.
 
-- **Reason**: They only fetch closed historical candles, can introduce gaps when called sequentially during live trading, and do not include the currently forming candle.
-- **Compatibility**: To preserve backward compatibility, these methods have been redirected to run `get_candles_live()` internally under the hood (returning the first yielded list of closed candles). However, it is highly recommended to migrate to `get_candles_live()`.
+- **Reason**: The legacy methods only fetch closed historical candles, can introduce gaps when called sequentially during live trading, and do not include the currently forming candle. `get_candles_advanced()` additionally requests a server window that currently comes back empty.
+- **Compatibility**: `get_candles()` has been redirected to run `get_candles_live()` internally (returning the first yielded list of closed candles). For live gap-free candles use `get_candles_live()` / `stream_candles()`; for closed history use `candles()`.
 
 ---
 

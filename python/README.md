@@ -89,15 +89,19 @@ Key Features of PocketOptionAsync
   - `sell()`: Places a sell trade asynchronously.
   - `check_win()`: Checks the outcome of a trade ('win', 'draw', or 'loss').
 - **Market Data**:
+  - `candles()`: Fetches closed historical candles for an asset.
+  - `stream_candles()`: Streams gap-free live candles (closed plus the currently forming one).
+  - `ticks()`: Fetches recent raw ticks for an asset.
   - `get_candles_live()`: Streams real-time gap-free candles (closed and currently forming) with historical backfill.
-  - `candles()` / `get_candles()`: (Deprecated) Fetches historical candles (delegates to `get_candles_live`).
+  - `get_candles()`: (Deprecated) Alias of `get_candles_live()`; returns the first list of closed candles.
   - `history()`: Retrieves recent historical data for a specific asset through the dedicated history endpoint.
   - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
 - **Account Management**:
   - `balance()`: Returns the current account balance.
   - `opened_deals()`: Lists all open trades.
   - `closed_deals()`: Lists all closed trades.
-  - `payout()`: Returns payout percentages.
+  - `payouts()`: Returns the payout percentage of every asset.
+  - `payout(asset)`: Returns the payout percentage of one asset, or `None` if it is unknown.
 - **Real-Time Data**:
   - `subscribe_symbol()`: Provides an asynchronous iterator for real-time candle updates.
   - `subscribe_symbol_timed()`: Provides an asynchronous iterator for timed real-time candle updates.

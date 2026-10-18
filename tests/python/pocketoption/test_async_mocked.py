@@ -1420,6 +1420,18 @@ class TestSsidValidation:
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
         assert client.is_ssid_valid() is True
 
+    def test_guest_token_payload_skips_session_validation(self):
+        """A token-only guest payload is valid even without session/uid."""
+        ssid = '42["auth",{"token":"9PRxPzq6mQ","balance":50000,"isFastHistory":true}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+
+    def test_token_with_account_session_is_still_validated(self):
+        """A payload that also carries a session is an account SSID, not a guest."""
+        ssid = '42["auth",{"token":"t","session":"abc123def456","isDemo":1}]'
+        with pytest.raises(ValueError, match="missing required field 'uid'"):
+            PocketOptionAsync(ssid, config={"terminal_logging": False})
+
     def test_missing_session_raises(self):
         """SSID missing the 'session' field raises ValueError."""
         ssid = '42["auth",{"uid":69982301,"isDemo":1}]'
