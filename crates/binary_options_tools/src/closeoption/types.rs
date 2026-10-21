@@ -84,10 +84,158 @@ pub struct OrderResult {
     pub open_time: i64,
 }
 
-/// Historical candles result
+/// Same as [`flex_f64`] but for `Option<f64>` fields: JSON `null` maps to
+/// `None`, and present values accept both numbers and numeric strings.
+mod flex_opt_f64 {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        /// One present value: a bare number or a numeric string.
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            Number(f64),
+            Text(String),
+        }
+
+        // `Option` first so JSON `null` maps to `None` instead of failing the
+        // whole payload: `userBalance` is null on some `get30MinResult` frames.
+        match Option::<Raw>::deserialize(deserializer)? {
+            None => Ok(None),
+            Some(Raw::Number(n)) => Ok(Some(n)),
+            Some(Raw::Text(s)) => s.parse::<f64>().map(Some).map_err(serde::de::Error::custom),
+        }
+    }
+
+    pub fn serialize<S>(value: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match value {
+            Some(v) => serializer.serialize_f64(*v),
+            None => serializer.serialize_none(),
+        }
+    }
+}
+/// Round-trip string-or-number JSON values (e.g. `"1.00"`, `0`, `"0"`) as f64.
+///
+/// The CloseOption wire format is inconsistent: the same field arrives as a
+/// JSON string in some frames and a bare number in others, so both forms must
+/// deserialize identically.
+mod flex_f64 {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<f64, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            Number(f64),
+            Text(String),
+        }
+        match Raw::deserialize(deserializer)? {
+            Raw::Number(n) => Ok(n),
+            Raw::Text(s) => s.parse::<f64>().map_err(serde::de::Error::custom),
+        }
+    }
+
+    pub fn serialize<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_f64(*value)
+    }
+}
+
+/// Time window (epoch seconds) during which a 30-minute round is open for
+/// trading. Serialized key on the wire is `startTimeStopTime`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartStopTime {
+    pub start_time: i64,
+    pub stop_time: i64,
+}
+
+/// A single order as reported by CloseOption in `get30MinResult`
+/// (`closeOrders`/`openOrders`) and `setOrderResult`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloseOrder {
+    #[serde(rename = "orderID")]
+    pub order_id: i64,
+    #[serde(rename = "member_id")]
+    pub member_id: i64,
+    pub pair: String,
+    #[serde(rename = "pair_id", default)]
+    pub pair_id: i64,
+    #[serde(rename = "accountID")]
+    pub account_id: i64,
+    #[serde(rename = "openTime")]
+    pub open_time: i64,
+    #[serde(rename = "deadTime")]
+    pub dead_time: i64,
+    pub status: String,
+    #[serde(with = "flex_f64")]
+    pub amount: f64,
+    #[serde(rename = "openPrice", with = "flex_f64")]
+    pub open_price: f64,
+    #[serde(rename = "closePrice", with = "flex_f64", default)]
+    pub close_price: f64,
+    #[serde(with = "flex_f64", default)]
+    pub profit: f64,
+    #[serde(rename = "orderType")]
+    pub order_type: String,
+    /// `"loss"`, `"profit"`, or the literal string `"null"` while a round is
+    /// still open — kept as a raw string to avoid lossy semantics.
+    pub result: String,
+    #[serde(rename = "payOut", with = "flex_f64")]
+    pub pay_out: f64,
+    #[serde(rename = "pairCode", default)]
+    pub pair_code: String,
+    #[serde(rename = "accType", default)]
+    pub acc_type: String,
+    #[serde(rename = "sellingAt", default)]
+    pub selling_at: Option<serde_json::Value>,
+    #[serde(rename = "sellingBack", default)]
+    pub selling_back: Option<serde_json::Value>,
+    #[serde(rename = "sellingResult", default)]
+    pub selling_result: Option<serde_json::Value>,
+    #[serde(rename = "IdCode", default)]
+    pub id_code: String,
+}
+
+/// Full `get30MinResult` payload: round price series plus open/closed orders,
+/// balance, and round metadata. Fields other than `price` are defaulted so
+/// payloads missing them still deserialize.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Get30MinResult {
     pub price: Vec<Candle>,
+    #[serde(default)]
+    pub start_time_stop_time: Option<StartStopTime>,
+    #[serde(default)]
+    pub bonus_result: Option<Vec<String>>,
+    #[serde(default)]
+    pub close_orders: Vec<CloseOrder>,
+    #[serde(default)]
+    pub open_orders: Vec<CloseOrder>,
+    #[serde(with = "flex_opt_f64", default)]
+    pub user_balance: Option<f64>,
+    #[serde(default)]
+    pub ps_type: Option<String>,
+    #[serde(default)]
+    pub time: Option<i64>,
+    #[serde(default)]
+    pub code: Option<String>,
+    #[serde(default)]
+    pub head: Option<String>,
+    #[serde(default)]
+    pub pair: Option<String>,
 }
 
 /// Outgoing message types
@@ -349,6 +497,27 @@ pub mod socket_io {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn null_user_balance_deserializes_as_none() {
+        // Some `get30MinResult` frames carry `"userBalance": null`; the payload
+        // must still deserialize instead of being dropped.
+        let result: Get30MinResult =
+            serde_json::from_value(json!({ "price": [], "userBalance": null })).unwrap();
+        assert_eq!(result.user_balance, None);
+    }
+
+    #[test]
+    fn present_user_balance_accepts_numbers_and_strings() {
+        let from_number: Get30MinResult =
+            serde_json::from_value(json!({ "price": [], "userBalance": 3039.6 })).unwrap();
+        assert_eq!(from_number.user_balance, Some(3039.6));
+
+        let from_string: Get30MinResult =
+            serde_json::from_value(json!({ "price": [], "userBalance": "3039.60" })).unwrap();
+        assert_eq!(from_string.user_balance, Some(3039.6));
+    }
 
     #[test]
     fn test_parse_probe() {

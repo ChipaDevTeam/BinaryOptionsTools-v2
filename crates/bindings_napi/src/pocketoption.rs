@@ -1,13 +1,13 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::Duration;
 
 use binary_options_tools::pocketoption::candle::SubscriptionType;
 use binary_options_tools::pocketoption::modules::raw::{
-    Outgoing, RawHandle as InnerRawHandle, RawHandler as InnerRawHandler,
+    send_and_wait as send_raw_and_wait, Outgoing, RawHandle as InnerRawHandle,
+    RawHandler as InnerRawHandler,
 };
 use binary_options_tools::pocketoption::pocket_client::PocketOption as InnerClient;
-use binary_options_tools::utils::f64_to_decimal;
+use binary_options_tools::utils::{arc_message_to_string, f64_to_decimal};
 use binary_options_tools::validator::Validator as CrateValidator;
 use futures_util::future::{BoxFuture, Shared};
 use futures_util::{FutureExt, StreamExt};
@@ -31,18 +31,6 @@ const CONNECTION_TIMEOUT_SECS: u64 = 20;
 /// so `new PocketOption(ssid)` starts connecting immediately even though it
 /// returns synchronously. Awaiting any method resolves the same attempt.
 type ConnectFuture = Shared<BoxFuture<'static, Result<InnerClient, String>>>;
-
-fn message_to_string(message: &tungstenite::Message) -> String {
-    match message {
-        tungstenite::Message::Text(text) => text.to_string(),
-        tungstenite::Message::Binary(data) => String::from_utf8_lossy(data).into_owned(),
-        _ => String::new(),
-    }
-}
-
-fn arc_message_to_string(message: &Arc<tungstenite::Message>) -> String {
-    message_to_string(message.as_ref())
-}
 
 /// Wraps a connection attempt so that it is driven eagerly and can be awaited
 /// any number of times.
@@ -78,12 +66,7 @@ async fn send_raw_message_and_wait(
     validator: CrateValidator,
     message: String,
 ) -> napi::Result<String> {
-    let handler = client
-        .create_raw_handler(validator, None)
-        .await
-        .map_err(napi_err)?;
-    let response = handler
-        .send_and_wait(Outgoing::Text(message))
+    let response = send_raw_and_wait(client, validator, Outgoing::Text(message))
         .await
         .map_err(napi_err)?;
     Ok(arc_message_to_string(&response))

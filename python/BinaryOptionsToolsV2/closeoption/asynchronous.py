@@ -1,16 +1,12 @@
-import asyncio
 import json
-import re
 import sys
-import warnings
-from datetime import timedelta
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union, AsyncGenerator
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union, AsyncGenerator
 
 from ..config import Config
 from ..validator import Validator
 
 if TYPE_CHECKING:
-    from ..BinaryOptionsToolsV2 import Logger, RawCloseOption
+    from ..BinaryOptionsToolsV2 import Logger
 
 if sys.version_info < (3, 10):
 

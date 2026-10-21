@@ -13,7 +13,6 @@ and **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** — a h
 See the [Chipa Ecosystem overview](/ecosystem).
 :::
 
-
 BinaryOptionsTools v2 features a modern, comprehensive documentation system built with Docusaurus. This system provides a dynamic, searchable, and maintainable documentation site.
 
 ## Documentation Structure

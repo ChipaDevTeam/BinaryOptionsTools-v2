@@ -14,8 +14,11 @@ __all__ = [
     "RawHandler",
     "RawHandlerSync",
     "Validator",
+    "Trade",
+    "TradeResult",
 ]
 from .tools.login import login, login_async
 from . import asynchronous, synchronous as synchronous
 from .asynchronous import PocketOptionAsync, RawHandler, Validator
 from .synchronous import PocketOption, RawHandlerSync
+from .models import Trade, TradeResult

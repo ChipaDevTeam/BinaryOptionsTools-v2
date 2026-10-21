@@ -12,7 +12,7 @@ everything below are in [`examples/javascript`](https://gitlab.chipatrade.com/ch
 ## Examples
 
 | File | Description |
-|------|-------------|
+| ------ | ------------- |
 | `balance.js` | Get account balance |
 | `basic.js` | Connect, read the balance, disconnect |
 | `buy.js` | Place a buy trade |
@@ -294,7 +294,6 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 ## ⚠️ Risk Warning
 
 Trading binary options involves substantial risk and may result in the loss of all invested capital. These examples are provided for educational purposes only. Always trade responsibly and never invest more than you can afford to lose.
-
 
 ---
 

@@ -50,7 +50,6 @@ Console.WriteLine($"Balance: ${balance}");
 await client.ShutdownAsync();
 ```
 
-
 ---
 
 ## Build strategies faster

@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from ..config import Config
 from ..validator import Validator as Validator
 from .asynchronous import PocketOptionAsync as PocketOptionAsync
+from .models import Trade, TradeResult
 
 
 class SyncSubscription:
@@ -46,6 +47,10 @@ class SyncCandleLiveIterator:
             return asyncio.run_coroutine_threadsafe(get_next(), self.loop).result()
         except StopIteration:
             raise StopIteration
+
+    def close(self) -> None:
+        """Close the underlying async feed and release its subscription."""
+        asyncio.run_coroutine_threadsafe(self.async_gen.aclose(), self.loop).result()
 
 
 class RawHandlerSync:
@@ -162,6 +167,36 @@ class PocketOption:
         future = asyncio.run_coroutine_threadsafe(self._client.wait_for_assets(), self._loop)
         future.result()
 
+    @classmethod
+    def try_demo(cls, token: Optional[str] = None) -> "PocketOption":
+        """Create a client on PocketOption's free "try demo" (guest) session.
+
+        Args:
+            token: An existing guest token. When omitted, one is generated locally,
+                exactly like PocketOption's own "Try demo" client.
+
+        Returns:
+            A connected client with assets and balance already loaded.
+        """
+        self = cls.__new__(cls)
+        self._lock = threading.RLock()
+        loop = asyncio.new_event_loop()
+        self._loop = loop
+
+        def _run_loop(loop_to_run):
+            asyncio.set_event_loop(loop_to_run)
+            loop_to_run.run_forever()
+
+        self._loop_thread = threading.Thread(target=_run_loop, args=(loop,), daemon=True)
+        self._loop_thread.start()
+        try:
+            self._client = asyncio.run_coroutine_threadsafe(PocketOptionAsync.try_demo(token), self._loop).result()
+        except Exception:
+            # Don't leak the background loop/thread when setup fails.
+            self._cleanup_loop()
+            raise
+        return self
+
     def __del__(self):
         self._cleanup_loop()
 
@@ -236,44 +271,49 @@ class PocketOption:
         with self._lock:
             self._cleanup_loop()
 
-    def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
-        """Place a buy (call) option.
+    def buy(self, asset: str, amount: float, time: int, check_win: bool = False) -> TradeResult:
+        """Place a buy (call) order.
 
         Args:
-            asset: The trading asset name (e.g. "EURUSD").
-            amount: The investment amount.
-            time: The expiration time in seconds.
-            check_win: Whether to immediately check the trade result.
+            asset: Trading asset symbol (e.g. ``"EURUSD_otc"``).
+            amount: Amount to invest.
+            time: Trade duration in seconds.
+            check_win: When ``True``, block until the trade settles and return
+                the settled :class:`Trade` instead of the opening order.
 
         Returns:
-            A tuple of (trade_id, trade_details_dict).
+            ``(trade_id, trade)`` where ``trade`` is a :class:`Trade`.
         """
         return self._run(self._client.buy(asset, amount, time, check_win))
 
-    def sell(self, asset: str, amount: float, time: int, check_win: bool = False) -> Tuple[str, Dict]:
-        """Place a sell (put) option.
+    def sell(self, asset: str, amount: float, time: int, check_win: bool = False) -> TradeResult:
+        """Place a sell (put) order.
 
         Args:
-            asset: The trading asset name.
-            amount: The investment amount.
-            time: The expiration time in seconds.
-            check_win: Whether to immediately check the trade result.
+            asset: Trading asset symbol (e.g. ``"EURUSD_otc"``).
+            amount: Amount to invest.
+            time: Trade duration in seconds.
+            check_win: When ``True``, block until the trade settles and return
+                the settled :class:`Trade` instead of the opening order.
 
         Returns:
-            A tuple of (trade_id, trade_details_dict).
+            ``(trade_id, trade)`` where ``trade`` is a :class:`Trade`.
         """
         return self._run(self._client.sell(asset, amount, time, check_win))
 
-    def check_win(self, id: str) -> dict:
-        """Check the result of a completed trade.
+    def check_win(self, id: str, timeout_seconds: Optional[int] = None) -> Trade:
+        """Wait for and return the settled result of a trade.
 
         Args:
-            id: The trade ID to check.
+            id: Trade identifier (as returned by :meth:`buy`/:meth:`sell`).
+            timeout_seconds: Maximum seconds to wait. ``None`` uses the configured
+                default (300s); ``0`` waits indefinitely.
 
         Returns:
-            A dictionary with the win/loss result and details.
+            The settled :class:`Trade`, with ``result`` set to
+            ``"win"``, ``"loss"`` or ``"draw"``.
         """
-        return self._run(self._client.check_win(id))
+        return self._run(self._client.check_win(id, timeout_seconds))
 
     def get_deal_end_time(self, trade_id: str) -> Optional[int]:
         """Get the end time of a deal.
@@ -314,7 +354,12 @@ class PocketOption:
         lookback_seconds = offset * period
         hours = max(0.1, lookback_seconds / 3600.0)
         iterator = self.get_candles_live(asset, period, hours=hours, max_rows=offset)
-        closed, forming = next(iterator)
+        try:
+            closed, _forming = next(iterator)
+        finally:
+            # Close the feed even when the first `next` raises, otherwise the
+            # subscription task behind it is left running.
+            iterator.close()
         return closed
 
     def get_candles_advanced(self, asset: str, period: int, offset: int, time: int) -> List[Dict]:
@@ -323,50 +368,100 @@ class PocketOption:
         Args:
             asset: The trading asset name.
             period: The candle period in seconds.
-            offset: The offset from the reference time in seconds.
+            offset: The number of periods to look back from reference time.
             time: The reference Unix timestamp.
 
         Returns:
             A list of candle dictionaries.
 
         Note:
-            WARNING: This function only fetches closed historical candles and is intended
-            for training models, backtesting, or historical analysis. It is NOT designed
-            for real-time/live trading as it does not include the current forming candle
-            and can introduce gaps if called sequentially during live trading.
-            For live gap-free candle feeds, use `get_candles_live()` instead.
-        """
-        return self._run(self._client.get_candles_advanced(asset, period, offset, time))
-
-    def candles(self, asset: str, period: int) -> List[Dict]:
-        """Get the most recent candles for an asset.
-
-        Args:
-            asset: The trading asset name.
-            period: The candle period in seconds.
-
-        Returns:
-            A list of candle dictionaries.
-
-        Note:
-            WARNING: This function only fetches closed historical candles and is intended
-            for training models, backtesting, or historical analysis. It is NOT designed
-            for real-time/live trading as it does not include the current forming candle
-            and can introduce gaps if called sequentially during live trading.
-            For live gap-free candle feeds, use `get_candles_live()` instead.
+            This method only returns closed candles for historical analysis.
+            Use :meth:`candles` (or :meth:`stream_candles` for live data) instead.
         """
         warnings.warn(
-            "candles() is deprecated and will be removed in a new release. "
-            "Please use get_candles_live() for live gap-free candles instead.",
+            "get_candles_advanced() is deprecated; use candles() instead.",
             DeprecationWarning,
             stacklevel=2,
         )
-        # period = candle timeframe in seconds, default 2 hours lookback
-        lookback_seconds = 2 * 3600
-        hours = max(0.1, lookback_seconds / 3600.0)
-        iterator = self.get_candles_live(asset, period, hours=hours)
-        closed, forming = next(iterator)
-        return closed
+        # The raw binding takes (asset, period, offset, time).
+        return self._run(self._client.get_candles_advanced(asset, period, offset, time))
+
+    def candles(
+        self,
+        asset: str,
+        period: int,
+        count: int = 100,
+        end_time: Optional[int] = None,
+    ) -> List[Dict]:
+        """Fetch closed historical candles for an asset.
+
+        Args:
+            asset: Trading asset (e.g. "EURUSD_otc").
+            period: Candle timeframe in seconds (e.g. 60 for 1-minute candles).
+            count: Number of closed candles to return. Defaults to 100.
+            end_time: Optional Unix timestamp to end the window at. When
+                omitted, the most recent candles are returned.
+
+        Returns:
+            List of closed candles, each with 'time', 'open', 'high',
+            'low', 'close'.
+
+        Example:
+            ```python
+            with PocketOption(ssid) as client:
+                candles = client.candles("EURUSD_otc", 60, count=200)
+            ```
+        """
+        return self._run(self._client.candles(asset, period, count=count, end_time=end_time))
+
+    def stream_candles(
+        self,
+        asset: str,
+        period: int,
+        *,
+        history: float = 2.0,
+        max_rows: int = 100,
+    ) -> SyncCandleLiveIterator:
+        """Stream gap-free live candles for an asset.
+
+        Backfills `history` hours of closed candles, then yields updated
+        (closed_candles, forming_candle) tuples as ticks arrive.
+
+        Args:
+            asset: Trading asset (e.g. "EURUSD_otc").
+            period: Candle timeframe in seconds.
+            history: Hours of history to backfill. Defaults to 2.0.
+            max_rows: Maximum number of closed candles to retain.
+
+        Returns:
+            An iterator yielding (closed_candles, forming_candle).
+
+        Example:
+            ```python
+            with PocketOption(ssid) as client:
+                for candles, forming in client.stream_candles("EURUSD_otc", 60):
+                    ...
+            ```
+        """
+        return self.get_candles_live(asset, period, hours=history, max_rows=max_rows)
+
+    def ticks(self, asset: str, seconds: int) -> List[Tuple[int, float]]:
+        """Fetch historical raw ticks for an asset.
+
+        Args:
+            asset: Trading asset (e.g. "USDCHF_otc").
+            seconds: Seconds of tick history to fetch.
+
+        Returns:
+            List of (timestamp, price) tuples sorted by timestamp.
+
+        Example:
+            ```python
+            with PocketOption(ssid) as client:
+                ticks = client.ticks("USDCHF_otc", 300)
+            ```
+        """
+        return self._run(self._client.ticks(asset, seconds))
 
     def get_candles_live(
         self,
@@ -419,46 +514,58 @@ class PocketOption:
         """
         return self._run(self._client.opened_deals())
 
-    def get_opened_deal(self, trade_id: str) -> Optional[Dict]:
+    def get_opened_deal(self, trade_id: str) -> Optional[Trade]:
         """Get details of a specific open deal.
 
         Args:
             trade_id: The trade identifier.
 
         Returns:
-            A dictionary with deal details, or None if the deal is not found.
+            A :class:`Trade` with the deal details, or None if not found.
         """
         return self._run(self._client.get_opened_deal(trade_id))
 
     def open_pending_order(
         self,
+        *,
         open_type: int,
         amount: float,
         asset: str,
-        open_time: int,
+        open_time: str,
         open_price: float,
         timeframe: int,
         min_payout: int,
         command: int,
     ) -> Dict:
-        """Open a pending order with specified parameters.
+        """Place a pending order that triggers on a time or a price.
+
+        All fields are keyword-only so the eight similar scalars cannot be
+        transposed at the call site.
 
         Args:
-            open_type: The order type identifier.
-            amount: The investment amount.
-            asset: The trading asset name.
-            open_time: The scheduled open time.
-            open_price: The target open price.
-            timeframe: The candle timeframe.
-            min_payout: The minimum acceptable payout.
-            command: The command type.
+            open_type: ``0`` triggers at ``open_time``, ``1`` triggers at ``open_price``.
+            amount: Amount to invest.
+            asset: Trading asset symbol (e.g. ``"EURUSD_otc"``).
+            open_time: Trigger time, ``"YYYY-MM-DD HH:MM:SS"`` in UTC for
+                time-based orders or ``"0"`` for price-based orders.
+            open_price: Trigger price for price-based orders, ``0`` for time-based.
+            timeframe: Trade duration in seconds.
+            min_payout: Minimum payout percentage required to open the order.
+            command: ``0`` for call/buy, ``1`` for put/sell.
 
         Returns:
-            A dictionary with the order result.
+            The created pending order.
         """
         return self._run(
             self._client.open_pending_order(
-                open_type, amount, asset, open_time, open_price, timeframe, min_payout, command
+                open_type=open_type,
+                amount=amount,
+                asset=asset,
+                open_time=open_time,
+                open_price=open_price,
+                timeframe=timeframe,
+                min_payout=min_payout,
+                command=command,
             )
         )
 
@@ -492,14 +599,14 @@ class PocketOption:
         """
         return self._run(self._client.closed_deals())
 
-    def get_closed_deal(self, trade_id: str) -> Optional[Dict]:
+    def get_closed_deal(self, trade_id: str) -> Optional[Trade]:
         """Get details of a specific closed deal.
 
         Args:
             trade_id: The trade identifier.
 
         Returns:
-            A dictionary with deal details, or None if not found.
+            A :class:`Trade` with the deal details, or None if not found.
         """
         return self._run(self._client.get_closed_deal(trade_id))
 
@@ -507,17 +614,25 @@ class PocketOption:
         """Clear the list of closed deals from local storage."""
         self._run(self._client.clear_closed_deals())
 
-    def payout(
-        self, asset: Optional[Union[str, List[str]]] = None
-    ) -> Union[Dict[str, Optional[int]], List[Optional[int]], int, None]:
-        """Get payout information for one or more assets.
-
-        Args:
-            asset: The asset name, a list of asset names, or None for all assets.
+    def payouts(self) -> Dict[str, int]:
+        """Get the current payout percentage for every asset.
 
         Returns:
-            Payout data: a dict mapping asset names to payouts, a list of
-            payouts, a single payout value, or None.
+            Mapping of asset symbol to payout percentage.
+        """
+        return self._run(self._client.payouts())
+
+    def payout(self, asset: str) -> Optional[int]:
+        """Get the current payout percentage for a single asset.
+
+        Args:
+            asset: Asset symbol (e.g. ``"EURUSD_otc"``).
+
+        Returns:
+            The payout percentage, or ``None`` if the asset is unknown.
+
+        See Also:
+            :meth:`payouts` for the payout of every asset at once.
         """
         return self._run(self._client.payout(asset))
 
@@ -531,6 +646,11 @@ class PocketOption:
         Returns:
             A list of historical trade dictionaries.
         """
+        warnings.warn(
+            "history() is deprecated; use candles() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self._run(self._client.history(asset, period))
 
     def get_ticks(self, asset: str, lookback_seconds: int) -> List[Tuple[int, float]]:
@@ -564,6 +684,11 @@ class PocketOption:
             - Uses loadHistoryPeriod pagination internally (period=1 for tick data).
             - Returns raw ticks, not aggregated candles.
         """
+        warnings.warn(
+            "get_ticks() is deprecated; use ticks() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if not isinstance(lookback_seconds, int) or lookback_seconds <= 0:
             raise ValueError("lookback_seconds must be a positive integer")
 
@@ -580,78 +705,113 @@ class PocketOption:
         Returns:
             A list of compiled candle dictionaries.
         """
+        warnings.warn(
+            "compile_candles() is deprecated; use candles() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self._run(self._client.compile_candles(asset, custom_period, lookback_period))
 
     def send_raw(self, message: str) -> None:
-        """Send a raw Engine.io/Socket.io message directly over the connection."""
+        """Send a raw Engine.io/Socket.io message directly over the connection.
+
+        Args:
+            message: The raw protocol frame to send verbatim.
+        """
         self._run(self._client.send_raw(message))
 
     def subscribe_raw(self) -> SyncRawSubscription:
-        """Subscribe to all incoming WebSocket messages verbatim."""
+        """Subscribe to all incoming WebSocket messages verbatim.
+
+        Returns:
+            An iterator of raw message strings.
+        """
         return SyncRawSubscription(self._run(self._client.subscribe_raw()))
 
-    def subscribe_symbol(self, asset: str) -> SyncSubscription:
-        """Subscribe to real-time price updates for a symbol.
+    def subscribe_ticks(
+        self,
+        asset: str,
+        *,
+        chunk_size: Optional[int] = None,
+        interval: Optional[timedelta] = None,
+        aligned: bool = False,
+    ) -> SyncSubscription:
+        """Subscribe to a live tick stream for an asset.
+
+        Single entry point for live price subscriptions. See
+        :meth:`PocketOptionAsync.subscribe_ticks` for mode selection: no
+        keywords yields raw ticks, ``chunk_size`` aggregates ticks, and
+        ``interval`` (with optional ``aligned``) emits on a timer.
 
         Args:
-            asset: The trading asset name to subscribe to.
+            asset: Trading asset (e.g. ``"EURUSD_otc"``).
+            chunk_size: Number of ticks to aggregate per update.
+            interval: Time interval between updates.
+            aligned: When True, align interval emissions to clock boundaries.
 
         Returns:
             A SyncSubscription for iterating over price updates.
         """
+        if chunk_size is not None:
+            return self._subscribe_stream("subscribe_symbol_chunked", asset, chunk_size)
+        if interval is not None:
+            if aligned:
+                return self._subscribe_stream("subscribe_symbol_time_aligned", asset, interval)
+            return self._subscribe_stream("subscribe_symbol_timed", asset, interval)
+        return self._subscribe_stream("subscribe_symbol", asset)
 
-        async def _sub():
-            return await self._client.client.subscribe_symbol(asset)
+    def _subscribe_stream(self, method: str, *args) -> SyncSubscription:
+        """Await a Rust subscription method on the event-loop thread.
 
-        return SyncSubscription(self._run(_sub()))
+        The Rust subscription bindings need a running loop, so they are
+        dispatched as a coroutine instead of being called on the caller thread.
+        """
+        rust_method = getattr(self._client.client, method)
+
+        async def subscribe():
+            return await rust_method(*args)
+
+        return SyncSubscription(self._run(subscribe()))
+
+    def subscribe_symbol(self, asset: str) -> SyncSubscription:
+        """Subscribe to a live raw tick stream for an asset.
+
+        Alias for :meth:`subscribe_ticks` with no aggregation options.
+
+        Args:
+            asset: Trading asset (e.g. ``"EURUSD_otc"``).
+
+        Returns:
+            A SyncSubscription iterating over price updates.
+        """
+        return self.subscribe_ticks(asset)
 
     def subscribe_symbol_chunked(self, asset: str, chunk_size: int) -> SyncSubscription:
-        """Subscribe to real-time price updates with chunked delivery.
-
-        Args:
-            asset: The trading asset name to subscribe to.
-            chunk_size: The number of updates per chunk.
-
-        Returns:
-            A SyncSubscription for iterating over batched price updates.
-        """
-
-        async def _sub():
-            return await self._client.client.subscribe_symbol_chunked(asset, chunk_size)
-
-        return SyncSubscription(self._run(_sub()))
+        """Deprecated: use ``subscribe_ticks(asset, chunk_size=...)``."""
+        warnings.warn(
+            "subscribe_symbol_chunked() is deprecated; use subscribe_ticks(asset, chunk_size=...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.subscribe_ticks(asset, chunk_size=chunk_size)
 
     def subscribe_symbol_timed(self, asset: str, time: timedelta) -> SyncSubscription:
-        """Subscribe to periodic real-time price updates.
-
-        Args:
-            asset: The trading asset name to subscribe to.
-            time: The interval between updates.
-
-        Returns:
-            A SyncSubscription for iterating over timed price updates.
-        """
-
-        async def _sub():
-            return await self._client.client.subscribe_symbol_timed(asset, time)
-
-        return SyncSubscription(self._run(_sub()))
+        """Deprecated: use ``subscribe_ticks(asset, interval=...)``."""
+        warnings.warn(
+            "subscribe_symbol_timed() is deprecated; use subscribe_ticks(asset, interval=...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.subscribe_ticks(asset, interval=time)
 
     def subscribe_symbol_time_aligned(self, asset: str, time: timedelta) -> SyncSubscription:
-        """Subscribe to time-aligned periodic price updates.
-
-        Args:
-            asset: The trading asset name to subscribe to.
-            time: The interval between updates, aligned to the clock.
-
-        Returns:
-            A SyncSubscription for iterating over time-aligned price updates.
-        """
-
-        async def _sub():
-            return await self._client.client.subscribe_symbol_time_aligned(asset, time)
-
-        return SyncSubscription(self._run(_sub()))
+        """Deprecated: use ``subscribe_ticks(asset, interval=..., aligned=True)``."""
+        warnings.warn(
+            "subscribe_symbol_time_aligned() is deprecated; use subscribe_ticks(asset, interval=..., aligned=True) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.subscribe_ticks(asset, interval=time, aligned=True)
 
     def get_server_time(self) -> int:
         """Get the current server time.
@@ -685,6 +845,14 @@ class PocketOption:
         """
         return self._client.is_connected()
 
+    def is_ssid_valid(self) -> bool:
+        """Check whether the SSID passed format validation at construction time.
+
+        Returns:
+            True if the SSID was valid, False otherwise.
+        """
+        return self._client.is_ssid_valid()
+
     def wait_for_assets(self, timeout: float = 60.0) -> None:
         """Wait for asset data to finish loading.
 
@@ -717,7 +885,7 @@ class PocketOption:
         """Shut down the client and release all resources."""
         self.close()
 
-    def create_raw_handler(self, validator: Validator, keep_alive: Optional[str] = None) -> "RawHandlerSync":
+    def raw_handler(self, validator: Validator, keep_alive: Optional[str] = None) -> "RawHandlerSync":
         """Create a synchronous raw WebSocket message handler.
 
         Args:
@@ -727,68 +895,99 @@ class PocketOption:
         Returns:
             A RawHandlerSync instance wrapping the async raw handler.
         """
-        async_handler = self._run(self._client.create_raw_handler(validator, keep_alive))
+        async_handler = self._run(self._client.raw_handler(validator, keep_alive))
         return RawHandlerSync(async_handler, self.loop)
 
+    def create_raw_handler(self, validator: Validator, keep_alive: Optional[str] = None) -> "RawHandlerSync":
+        """Deprecated: use ``raw_handler()`` instead."""
+        warnings.warn(
+            "create_raw_handler() is deprecated; use raw_handler() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.raw_handler(validator, keep_alive)
+
     def send_raw_message(self, message: str) -> None:
-        """Send a raw message through the WebSocket connection.
+        """Deprecated: use ``send_raw()`` instead."""
+        warnings.warn(
+            "send_raw_message() is deprecated; use send_raw() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.send_raw(message)
+
+    def raw_request(
+        self,
+        message: str,
+        validator: Validator,
+        timeout: Optional[timedelta] = None,
+        retry: bool = False,
+    ) -> str:
+        """Send a raw message and wait for the first matching response.
 
         Args:
-            message: The raw message string to send.
+            message: Raw WebSocket message to send, formatted as JSON or
+                Socket.IO protocol.
+            validator: Validator identifying the expected response.
+            timeout: Maximum time to wait. ``None`` uses the client default.
+            retry: When True, retry on timeout or failure; requires ``timeout``.
+
+        Returns:
+            The first response matching the validator, as a raw string.
         """
-        self._run(self._client.send_raw_message(message))
+        return self._run(self._client.raw_request(message, validator, timeout=timeout, retry=retry))
 
     def create_raw_order(self, message: str, validator: Validator) -> str:
-        """Create a raw order and wait for the response.
-
-        Args:
-            message: The raw order message string.
-            validator: A Validator instance for validating the response.
-
-        Returns:
-            The validated response string.
-        """
-        return self._run(self._client.create_raw_order(message, validator))
+        """Deprecated: use ``raw_request()`` instead."""
+        warnings.warn(
+            "create_raw_order() is deprecated; use raw_request() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.raw_request(message, validator)
 
     def create_raw_order_with_timeout(self, message: str, validator: Validator, timeout: timedelta) -> str:
-        """Create a raw order with a custom timeout.
-
-        Args:
-            message: The raw order message string.
-            validator: A Validator instance for validating the response.
-            timeout: The maximum time to wait for a response.
-
-        Returns:
-            The validated response string.
-        """
-        return self._run(self._client.create_raw_order_with_timeout(message, validator, timeout))
+        """Deprecated: use ``raw_request(..., timeout=...)`` instead."""
+        warnings.warn(
+            "create_raw_order_with_timeout() is deprecated; use raw_request(..., timeout=...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.raw_request(message, validator, timeout=timeout)
 
     def create_raw_order_with_timeout_and_retry(self, message: str, validator: Validator, timeout: timedelta) -> str:
-        """Create a raw order with timeout and automatic retry on failure.
+        """Deprecated: use ``raw_request(..., timeout=..., retry=True)`` instead."""
+        warnings.warn(
+            "create_raw_order_with_timeout_and_retry() is deprecated; "
+            "use raw_request(..., timeout=..., retry=True) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.raw_request(message, validator, timeout=timeout, retry=True)
+
+    def raw_stream(self, message: str, validator: Validator, timeout: Optional[timedelta] = None):
+        """Send a raw message and iterate over every matching response.
 
         Args:
-            message: The raw order message string.
-            validator: A Validator instance for validating the response.
-            timeout: The maximum time to wait for each attempt.
+            message: Raw WebSocket message to send, formatted as JSON or
+                Socket.IO protocol.
+            validator: Validator identifying the responses to yield.
+            timeout: Optional timeout for the iterator session.
 
         Returns:
-            The validated response string.
+            A SyncRawSubscription iterating matching messages as raw strings.
         """
-        return self._run(self._client.create_raw_order_with_timeout_and_retry(message, validator, timeout))
+        async_iterator = self._run(self._client.raw_stream(message, validator, timeout))
+        return SyncRawSubscription(async_iterator)
 
     def create_raw_iterator(self, message: str, validator: Validator, timeout: Optional[timedelta] = None):
-        """Create an iterator for streaming raw messages.
-
-        Args:
-            message: The raw message string to send.
-            validator: A Validator instance for message validation.
-            timeout: Optional timeout for each iteration step.
-
-        Returns:
-            A SyncRawSubscription for iterating over the message stream.
-        """
-        async_iterator = self._run(self._client.create_raw_iterator(message, validator, timeout))
-        return SyncRawSubscription(async_iterator)
+        """Deprecated: use ``raw_stream()`` instead."""
+        warnings.warn(
+            "create_raw_iterator() is deprecated; use raw_stream() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.raw_stream(message, validator, timeout)
 
     def active_assets(self) -> List[Dict]:
         """Get the list of currently active trading assets.

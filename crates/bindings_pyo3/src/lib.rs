@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
-mod config;
 mod closeoption;
+mod config;
 mod error;
 mod framework;
 mod logs;
@@ -77,7 +77,11 @@ mod tests {
 
     #[test]
     fn test_py_config_defaults() {
+        // The binding must expose the same default as `Config::default()` (and the
+        // Python `Config` dataclass in `python/BinaryOptionsToolsV2/config.py`).
+        // `0` means "unlimited reconnection attempts" and is only a value callers
+        // opt into explicitly, not the default.
         let config = PyConfig::default();
-        assert_eq!(config.inner.max_allowed_loops, 0);
+        assert_eq!(config.inner.max_allowed_loops, 100);
     }
 }

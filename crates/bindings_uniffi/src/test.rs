@@ -4,12 +4,12 @@
 //! They test the PocketOption client, Validator, RawHandler, SubscriptionStream,
 //! and all associated types.
 
+use crate::error::UniError;
 use crate::platforms::pocketoption::{
     client::PocketOption,
     types::{Action, Asset, AssetType, Candle, CandleLength, Deal, PendingOrder, Tick},
     validator::Validator,
 };
-use crate::error::UniError;
 use crate::utils;
 use std::time::Duration;
 use tokio::time::timeout;
@@ -31,7 +31,7 @@ mod pocket_option_client_tests {
         // Test that client creation returns an error for invalid SSID
         let result = PocketOption::new(test_ssid()).await;
         assert!(result.is_err(), "Expected error for invalid SSID");
-        
+
         match result {
             Err(UniError::PocketOption(_)) | Err(UniError::BinaryOptions(_)) => {
                 // Expected error types
@@ -43,7 +43,8 @@ mod pocket_option_client_tests {
 
     #[tokio::test]
     async fn test_new_with_url() {
-        let result = PocketOption::new_with_url(test_ssid(), "wss://test.example.com".to_string()).await;
+        let result =
+            PocketOption::new_with_url(test_ssid(), "wss://test.example.com".to_string()).await;
         assert!(result.is_err(), "Expected error for invalid SSID");
     }
 
@@ -53,7 +54,8 @@ mod pocket_option_client_tests {
             test_ssid(),
             vec!["wss://test.example.com".to_string()],
             10,
-        ).await;
+        )
+        .await;
         assert!(result.is_err(), "Expected error for invalid SSID");
     }
 
@@ -169,7 +171,7 @@ mod types_tests {
     fn test_action_enum() {
         let call = Action::Call;
         let put = Action::Put;
-        
+
         assert_eq!(format!("{:?}", call), "Call");
         assert_eq!(format!("{:?}", put), "Put");
         // Note: Action doesn't implement PartialEq, so we can't use assert_ne!
@@ -190,7 +192,7 @@ mod types_tests {
         let commodity = AssetType::Commodity;
         let crypto = AssetType::Cryptocurrency;
         let index = AssetType::Index;
-        
+
         // Note: AssetType doesn't implement PartialEq
         let _ = (stock, currency, commodity, crypto, index);
     }
@@ -199,7 +201,7 @@ mod types_tests {
     fn test_candle_length() {
         let cl = CandleLength { time: 60 };
         assert_eq!(cl.time, 60);
-        
+
         let cloned = cl.clone();
         assert_eq!(cloned.time, 60);
     }
@@ -216,7 +218,7 @@ mod types_tests {
             allowed_candles: vec![CandleLength { time: 60 }, CandleLength { time: 300 }],
             asset_type: AssetType::Currency,
         };
-        
+
         assert_eq!(asset.symbol, "EURUSD");
         assert_eq!(asset.payout, 85);
         assert!(asset.is_active);
@@ -253,7 +255,7 @@ mod types_tests {
             amount_usd: Some(10.0),
             amount_usd2: Some(10.0),
         };
-        
+
         assert_eq!(deal.id, "test-deal-id");
         assert_eq!(deal.asset, "EURUSD");
         assert_eq!(deal.is_demo, 1);
@@ -275,7 +277,7 @@ mod types_tests {
             date_created: "2024-01-01 11:00:00".to_string(),
             id: 12345,
         };
-        
+
         assert_eq!(order.ticket, "12345");
         assert_eq!(order.symbol, "EURUSD");
         assert_eq!(order.timeframe, 60);
@@ -292,7 +294,7 @@ mod types_tests {
             close: 1.1005,
             volume: Some(1000.0),
         };
-        
+
         assert_eq!(candle.symbol, "EURUSD");
         assert_eq!(candle.timestamp, 1234567890);
         assert_eq!(candle.open, 1.1000);
@@ -306,7 +308,7 @@ mod types_tests {
             timestamp: 1234567890,
             price: 1.1000,
         };
-        
+
         assert_eq!(tick.timestamp, 1234567890);
         assert_eq!(tick.price, 1.1000);
     }
@@ -323,10 +325,10 @@ mod types_tests {
             allowed_candles: vec![],
             asset_type: AssetType::Currency,
         };
-        
+
         let debug_str = format!("{:?}", asset);
         assert!(debug_str.contains("EURUSD"));
-        
+
         let cloned = asset.clone();
         assert_eq!(cloned.symbol, asset.symbol);
     }
@@ -343,7 +345,7 @@ mod error_tests {
         let err3 = UniError::Uuid("test".to_string());
         let err4 = UniError::Validator("test".to_string());
         let err5 = UniError::General("test".to_string());
-        
+
         assert!(err1.to_string().contains("binary_options_tools"));
         assert!(err2.to_string().contains("PocketOption"));
         assert!(err3.to_string().contains("UUID"));
@@ -354,10 +356,10 @@ mod error_tests {
     #[test]
     fn test_unierror_from_binary_options_error() {
         use binary_options_tools::error::BinaryOptionsError;
-        
+
         let boe = BinaryOptionsError::General("test config error".to_string());
         let uni_err: UniError = boe.into();
-        
+
         match uni_err {
             UniError::BinaryOptions(msg) => assert!(msg.contains("test config error")),
             _ => panic!("Expected BinaryOptions variant"),
@@ -367,10 +369,10 @@ mod error_tests {
     #[test]
     fn test_unierror_from_pocket_error() {
         use binary_options_tools::pocketoption::error::PocketError;
-        
+
         let pe = PocketError::General("test connection error".to_string());
         let uni_err: UniError = pe.into();
-        
+
         match uni_err {
             UniError::PocketOption(msg) => assert!(msg.contains("test connection error")),
             _ => panic!("Expected PocketOption variant"),
@@ -481,7 +483,7 @@ mod integration_tests {
         // This test verifies the API surface by attempting to call methods
         // on a mock client. Since we can't create a real client without a valid SSID,
         // we just verify the method signatures are correct.
-        
+
         // The following would be the method calls if we had a client:
         // client.balance().await
         // client.is_demo()
@@ -516,34 +518,68 @@ mod integration_tests {
         // client.compile_candles("EURUSD".to_string(), 60, 3600).await
         // client.ticks("EURUSD".to_string(), 3600).await
         // client.wait_for_assets(30.0).await
-        
-        // If this compiles, the API surface is correct
-        assert!(true);
+
+        // If this compiles, the API surface is correct. Referencing every method
+        // as a function item turns that claim into a compile-time check.
+        let _ = PocketOption::balance;
+        let _ = PocketOption::is_demo;
+        let _ = PocketOption::trade;
+        let _ = PocketOption::buy;
+        let _ = PocketOption::sell;
+        let _ = PocketOption::server_time;
+        let _ = PocketOption::assets;
+        let _ = PocketOption::result;
+        let _ = PocketOption::result_with_timeout;
+        let _ = PocketOption::get_opened_deals;
+        let _ = PocketOption::get_closed_deals;
+        let _ = PocketOption::clear_closed_deals;
+        let _ = PocketOption::subscribe;
+        let _ = PocketOption::unsubscribe;
+        let _ = PocketOption::get_candles_advanced;
+        let _ = PocketOption::get_candles;
+        let _ = PocketOption::history;
+        let _ = PocketOption::reconnect;
+        let _ = PocketOption::shutdown;
+        let _ = PocketOption::create_raw_handler;
+        let _ = PocketOption::payout;
+        let _ = PocketOption::get_trade_history;
+        let _ = PocketOption::get_deal_end_time;
+        let _ = PocketOption::cancel_pending_order;
+        let _ = PocketOption::cancel_pending_orders;
+        let _ = PocketOption::is_connected;
+        let _ = PocketOption::connect;
+        let _ = PocketOption::disconnect;
+        let _ = PocketOption::get_pending_deal;
+        let _ = PocketOption::active_assets;
+        let _ = PocketOption::compile_candles;
+        let _ = PocketOption::ticks;
+        let _ = PocketOption::wait_for_assets;
     }
 }
 
 #[cfg(test)]
 mod raw_handler_tests {
+    use crate::platforms::pocketoption::raw_handler::RawHandler;
 
     #[test]
     fn test_raw_handler_methods_exist() {
-        // Verify RawHandler API surface
-        // RawHandler::send_text(&self, message: String) -> Result<(), UniError>
-        // RawHandler::send_binary(&self, data: Vec<u8>) -> Result<(), UniError>
-        // RawHandler::send_and_wait(&self, message: String) -> Result<String, UniError>
-        // RawHandler::wait_next(&self) -> Result<String, UniError>
-        assert!(true);
+        // Referencing each method as a function item is a compile-time check that
+        // the RawHandler API surface exists.
+        let _ = RawHandler::send_text;
+        let _ = RawHandler::send_binary;
+        let _ = RawHandler::send_and_wait;
+        let _ = RawHandler::wait_next;
     }
 }
 
 #[cfg(test)]
 mod subscription_stream_tests {
+    use crate::platforms::pocketoption::stream::SubscriptionStream;
 
     #[test]
     fn test_subscription_stream_methods_exist() {
-        // Verify SubscriptionStream API surface
-        // SubscriptionStream::next(&self) -> Result<Candle, UniError>
-        assert!(true);
+        // Compile-time check that the SubscriptionStream API surface exists.
+        let _ = SubscriptionStream::next;
     }
 }
 
@@ -552,9 +588,10 @@ mod uniffi_scaffolding_tests {
 
     #[test]
     fn test_uniffi_scaffolding_generated() {
-        // Verify that uniffi::setup_scaffolding!() was called
-        // This is a compile-time check - if the crate compiles, scaffolding exists
-        assert!(true);
+        // `uniffi::setup_scaffolding!()` (lib.rs) defines `UniFfiTag`, the marker
+        // every generated FFI converter is parameterised by, so this only
+        // compiles when the scaffolding was generated.
+        assert!(std::any::type_name::<crate::UniFfiTag>().ends_with("UniFfiTag"));
     }
 
     #[test]
@@ -595,7 +632,7 @@ mod async_behavior_tests {
     async fn test_client_creation_timeout() {
         // Test that client creation doesn't hang indefinitely
         let result = timeout(Duration::from_secs(5), PocketOption::new(test_ssid())).await;
-        
+
         match result {
             Ok(Err(_)) => {
                 // Expected: client creation failed with error
@@ -614,7 +651,7 @@ mod async_behavior_tests {
     #[tokio::test]
     async fn test_validator_check_performance() {
         let validator = Validator::regex(r#"^42\[""#.to_string()).unwrap();
-        
+
         // Test many checks quickly
         let start = std::time::Instant::now();
         for i in 0..1000 {
@@ -622,9 +659,13 @@ mod async_behavior_tests {
             let _ = validator.check(msg);
         }
         let elapsed = start.elapsed();
-        
+
         // Should complete quickly (under 100ms for 1000 checks)
-        assert!(elapsed < Duration::from_millis(100), "Validator too slow: {:?}", elapsed);
+        assert!(
+            elapsed < Duration::from_millis(100),
+            "Validator too slow: {:?}",
+            elapsed
+        );
     }
 }
 
@@ -636,7 +677,7 @@ mod serialization_tests {
     fn test_types_are_send_sync() {
         // Verify all public types implement Send + Sync (required for UniFFI)
         fn assert_send_sync<T: Send + Sync>() {}
-        
+
         assert_send_sync::<Action>();
         assert_send_sync::<AssetType>();
         assert_send_sync::<CandleLength>();
@@ -652,7 +693,7 @@ mod serialization_tests {
     fn test_types_are_clone() {
         // Verify all public types implement Clone (required for UniFFI records/enums)
         fn assert_clone<T: Clone>() {}
-        
+
         assert_clone::<Action>();
         assert_clone::<AssetType>();
         assert_clone::<CandleLength>();
@@ -668,7 +709,7 @@ mod serialization_tests {
     fn test_types_are_debug() {
         // Verify all public types implement Debug
         fn assert_debug<T: std::fmt::Debug>() {}
-        
+
         assert_debug::<Action>();
         assert_debug::<AssetType>();
         assert_debug::<CandleLength>();

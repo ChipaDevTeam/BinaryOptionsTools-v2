@@ -149,7 +149,7 @@ pub enum SubscriptionError {
 }
 
 /// Command enum for the `SubscriptionsApiModule`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Command {
     /// Subscribe to an asset's stream
     Subscribe {
@@ -167,6 +167,17 @@ pub enum Command {
     },
     /// History
     History {
+        asset: String,
+        period: u32,
+        command_id: Uuid,
+    },
+    /// Cancels the pending [`Command::History`] identified by `command_id`.
+    ///
+    /// Sent when the caller is dropped before its history response arrives, so
+    /// the module does not keep rejecting later requests as duplicates. The id
+    /// is what makes this safe: a late cancellation from one caller must not
+    /// remove a newer request for the same `(asset, period)`.
+    CancelHistory {
         asset: String,
         period: u32,
         command_id: Uuid,
@@ -267,6 +278,46 @@ pub struct SubscriptionsHandle {
     sender: AsyncSender<Command>,
     router: Arc<ResponseRouter>,
     cached_max: Arc<AtomicUsize>,
+}
+
+/// Cancels the module-side pending history request for `(asset, period)` if the
+/// caller is dropped before the response arrives.
+///
+/// `SubscriptionsApiModule` rejects a second history request for the same
+/// `(asset, period)` while one is pending. When a caller is cancelled (for
+/// example when Python abandons the await), nothing else clears that pending
+/// entry, so every later request would fail as a duplicate forever.
+struct HistoryRequestGuard {
+    sender: AsyncSender<Command>,
+    asset: String,
+    period: u32,
+    command_id: Uuid,
+    armed: bool,
+}
+
+impl Drop for HistoryRequestGuard {
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+        let command = Command::CancelHistory {
+            asset: self.asset.clone(),
+            period: self.period,
+            command_id: self.command_id,
+        };
+        // `try_send` drops the command when the channel is full, which would
+        // leave the pending entry behind, so retry from a task in that case.
+        // `Ok(true)` means it was queued; an error means the module is gone and
+        // there is nothing left to cancel.
+        if let Ok(false) = self.sender.as_sync().try_send(command.clone()) {
+            let sender = self.sender.clone();
+            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                handle.spawn(async move {
+                    let _ = sender.send(command).await;
+                });
+            }
+        }
+    }
 }
 
 impl SubscriptionsHandle {
@@ -429,34 +480,48 @@ impl SubscriptionsHandle {
         let receiver = self.router.register(id).await;
         self.sender
             .send(Command::History {
-                asset,
+                asset: asset.clone(),
                 period,
                 command_id: id,
             })
             .await
             .map_err(CoreError::from)?;
-        // Wait for the history response with timeout
-        match tokio::time::timeout(SUBSCRIBE_TIMEOUT, receiver)
-            .await
-            .map_err(|_| {
-                PocketError::General(format!(
-                    "History request timed out after {:?} waiting for server response",
-                    SUBSCRIBE_TIMEOUT
-                ))
-            })?
-            .map_err(|_| PocketError::ModuleStopped {
+
+        // If this future is dropped (for example cancelled by the caller)
+        // before the module resolves the request, cancel the pending entry so
+        // later requests for the same (asset, period) are not rejected as
+        // duplicates.
+        let mut guard = HistoryRequestGuard {
+            sender: self.sender.clone(),
+            asset,
+            period,
+            command_id: id,
+            armed: true,
+        };
+
+        match tokio::time::timeout(SUBSCRIBE_TIMEOUT, receiver).await {
+            Ok(Ok(response)) => {
+                guard.armed = false;
+                match response {
+                    CommandResponse::History { data, .. } => Ok(data),
+                    CommandResponse::HistoryFailed { error, .. } => Err(*error),
+                    CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
+                        module_name: "SubscriptionsApiModule".to_string(),
+                        context: "SubscriptionsApiModule stopped during request".to_string(),
+                    }),
+                    _ => Err(PocketError::General(
+                        "Unexpected response to history command".into(),
+                    )),
+                }
+            }
+            Ok(Err(_)) => Err(PocketError::ModuleStopped {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "Response router channel closed".to_string(),
-            })? {
-            CommandResponse::History { data, .. } => Ok(data),
-            CommandResponse::HistoryFailed { error, .. } => Err(*error),
-            CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
-                module_name: "SubscriptionsApiModule".to_string(),
-                context: "SubscriptionsApiModule stopped during request".to_string(),
             }),
-            _ => Err(PocketError::General(
-                "Unexpected response to history command".into(),
-            )),
+            Err(_) => Err(PocketError::General(format!(
+                "History request timed out after {:?} waiting for server response",
+                SUBSCRIBE_TIMEOUT
+            ))),
         }
     }
 }
@@ -612,6 +677,15 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             } else {
                                 self.state.histories.write().await.push((asset, period, command_id));
                             }
+                        }
+                        Command::CancelHistory {
+                            asset,
+                            period,
+                            command_id,
+                        } => {
+                            self.state.histories.write().await.retain(|(a, p, id)| {
+                                !(a == &asset && *p == period && *id == command_id)
+                            });
                         }
                     }
                 },
@@ -1040,5 +1114,85 @@ impl Drop for SubscriptionStream {
             };
             let _ = sender.as_sync().try_send(drop_command);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use binary_options_tools_core::reimports::bounded_async;
+
+    #[tokio::test]
+    async fn dropping_armed_history_guard_cancels_pending_request() {
+        let (sender, receiver) = bounded_async::<Command>(8);
+        let request_id = Uuid::new_v4();
+        {
+            let _guard = HistoryRequestGuard {
+                sender: sender.clone(),
+                asset: "EURUSD_otc".to_string(),
+                period: 60,
+                command_id: request_id,
+                armed: true,
+            };
+        }
+        match receiver.recv().await.unwrap() {
+            Command::CancelHistory {
+                asset,
+                period,
+                command_id,
+            } => {
+                assert_eq!(asset, "EURUSD_otc");
+                assert_eq!(period, 60);
+                assert_eq!(command_id, request_id);
+            }
+            other => panic!("expected CancelHistory, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn full_channel_still_delivers_cancellation() {
+        // A cancellation must not be lost just because the command queue is full.
+        let (sender, receiver) = bounded_async::<Command>(1);
+        let request_id = Uuid::new_v4();
+        sender
+            .send(Command::SubscriptionCount {
+                command_id: Uuid::new_v4(),
+            })
+            .await
+            .unwrap();
+        {
+            let _guard = HistoryRequestGuard {
+                sender: sender.clone(),
+                asset: "EURUSD_otc".to_string(),
+                period: 60,
+                command_id: request_id,
+                armed: true,
+            };
+        }
+        // First message fills the slot; the cancellation is retried from a task.
+        assert!(matches!(
+            receiver.recv().await.unwrap(),
+            Command::SubscriptionCount { .. }
+        ));
+        match receiver.recv().await.unwrap() {
+            Command::CancelHistory { command_id, .. } => assert_eq!(command_id, request_id),
+            other => panic!("expected CancelHistory, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn disarmed_history_guard_sends_nothing() {
+        let (sender, receiver) = bounded_async::<Command>(8);
+        {
+            let _guard = HistoryRequestGuard {
+                sender: sender.clone(),
+                asset: "EURUSD_otc".to_string(),
+                period: 60,
+                command_id: Uuid::new_v4(),
+                armed: false,
+            };
+        }
+        drop(sender);
+        assert!(receiver.recv().await.is_err());
     }
 }

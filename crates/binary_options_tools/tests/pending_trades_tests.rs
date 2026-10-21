@@ -110,7 +110,7 @@ mod tests {
         let (runner_tx, _) = kanal::bounded_async(10);
 
         let ws_rx_clone = ws_rx.clone();
-        tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
+        tokio::spawn(async move { while ws_rx_clone.recv().await.is_ok() {} });
 
         let state = create_mock_state();
 
@@ -192,7 +192,7 @@ mod tests {
         let (runner_tx, _) = kanal::bounded_async(10);
 
         let ws_rx_clone = ws_rx.clone();
-        tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
+        tokio::spawn(async move { while ws_rx_clone.recv().await.is_ok() {} });
 
         let state = create_mock_state();
 
@@ -270,7 +270,7 @@ mod tests {
             let (ws_tx, ws_rx) = kanal::bounded_async(10);
             let (runner_tx, _) = kanal::bounded_async(10);
             let ws_rx_clone = ws_rx.clone();
-            tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
+            tokio::spawn(async move { while ws_rx_clone.recv().await.is_ok() {} });
             let state = create_mock_state();
             let mut module = PendingTradesApiModule::new(
                 state,
@@ -430,7 +430,7 @@ mod tests {
         let (runner_tx, _) = kanal::bounded_async(10);
 
         let ws_rx_clone = ws_rx.clone();
-        tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
+        tokio::spawn(async move { while ws_rx_clone.recv().await.is_ok() {} });
 
         let state = create_mock_state();
 
@@ -507,7 +507,7 @@ mod tests {
 
         // Drain ws_rx in background using a clone to prevent blocking
         let ws_rx_clone = ws_rx.clone();
-        tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
+        tokio::spawn(async move { while ws_rx_clone.recv().await.is_ok() {} });
 
         let state = create_mock_state();
 
@@ -603,7 +603,7 @@ mod tests {
 
         // Drain ws_rx in background using a clone to prevent blocking
         let ws_rx_clone = ws_rx.clone();
-        tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
+        tokio::spawn(async move { while ws_rx_clone.recv().await.is_ok() {} });
 
         let state = create_mock_state();
 
@@ -674,7 +674,7 @@ mod tests {
 
         // Drain ws_rx in background using a clone to prevent blocking
         let ws_rx_clone = ws_rx.clone();
-        tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
+        tokio::spawn(async move { while ws_rx_clone.recv().await.is_ok() {} });
 
         let state = create_mock_state();
 
@@ -850,7 +850,7 @@ mod tests {
         let (runner_tx, _) = kanal::bounded_async(10);
 
         let ws_rx_clone = ws_rx.clone();
-        tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
+        tokio::spawn(async move { while ws_rx_clone.recv().await.is_ok() {} });
 
         let state = create_mock_state();
 
@@ -923,7 +923,7 @@ mod tests {
         let (runner_tx, _) = kanal::bounded_async(10);
 
         let ws_rx_clone = ws_rx.clone();
-        tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
+        tokio::spawn(async move { while ws_rx_clone.recv().await.is_ok() {} });
 
         let state = create_mock_state();
 
@@ -994,7 +994,7 @@ mod tests {
         let (runner_tx, _) = kanal::bounded_async(10);
 
         let ws_rx_clone = ws_rx.clone();
-        tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
+        tokio::spawn(async move { while ws_rx_clone.recv().await.is_ok() {} });
 
         let state = create_mock_state();
 
@@ -1069,7 +1069,7 @@ mod tests {
         let (runner_tx, _) = kanal::bounded_async(10);
 
         let ws_rx_clone = ws_rx.clone();
-        tokio::spawn(async move { while let Ok(_) = ws_rx_clone.recv().await {} });
+        tokio::spawn(async move { while ws_rx_clone.recv().await.is_ok() {} });
 
         let state = create_mock_state();
 

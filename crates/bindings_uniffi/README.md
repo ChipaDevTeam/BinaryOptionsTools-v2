@@ -4,7 +4,6 @@
 >
 > **📈 Trade crypto perps, spot & margin on [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
 
-
 Cross-platform library for binary options trading automation using UniFFI. Provides native bindings for multiple programming languages from a single Rust codebase.
 
 ## 🌍 Supported Languages

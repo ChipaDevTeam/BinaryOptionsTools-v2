@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
-use crate::pocketoption::{state::State, types::Assets};
+use crate::pocketoption::{
+    state::State,
+    types::Assets,
+    utils::{parse_socketio_array, socketio_event_payload},
+};
 use async_trait::async_trait;
 use binary_options_tools_core::{
     error::{CoreError, CoreResult},
@@ -46,30 +50,17 @@ impl LightweightModule<State> for AssetsModule {
                         self.state.set_assets(assets).await;
                     } else {
                         // Try to parse as a 1-step Socket.IO message: 42["updateAssets", [...]]
-                        let mut parsed_1step = false;
-                        if let Some(start) = text.find('[') {
-                            if let Ok(mut value) =
-                                serde_json::from_str::<serde_json::Value>(&text[start..])
-                            {
-                                if let Some(arr) = value.as_array_mut() {
-                                    if arr.len() >= 2 && arr[0] == "updateAssets" {
-                                        if let Ok(assets) =
-                                            serde_json::from_value::<Assets>(arr[1].take())
-                                        {
-                                            debug!(
-                                                "Loaded assets (text 1-step): {:?}",
-                                                assets.names()
-                                            );
-                                            self.state.set_assets(assets).await;
-                                            parsed_1step = true;
-                                        }
-                                    }
+                        // A header-only frame yields no payload and is ignored here; the
+                        // rule already forwarded it so the binary half can follow.
+                        if let Some(Ok(value)) = parse_socketio_array(text) {
+                            if let Some(payload) = socketio_event_payload(&value, "updateAssets") {
+                                if let Ok(assets) =
+                                    serde_json::from_value::<Assets>(payload.clone())
+                                {
+                                    debug!("Loaded assets (text 1-step): {:?}", assets.names());
+                                    self.state.set_assets(assets).await;
                                 }
                             }
-                        }
-                        if !parsed_1step {
-                            // It might be the header message, which we ignore in the run loop
-                            // since TwoStepRule already matched it.
                         }
                     }
                 }

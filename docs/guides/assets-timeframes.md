@@ -8,7 +8,6 @@ historical data for that asset before any capital is at risk. Free to start.
 Trading crypto instead? **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** lists BTC perpetuals, spot and margin markets.
 :::
 
-
 This document lists all supported assets and timeframes for the BinaryOptionsTools-v2 API.
 
 ## Supported Timeframes
@@ -128,7 +127,7 @@ To check if an asset is available for trading at a specific timeframe, use the a
 ### Python
 
 ```python
-from binaryoptionstoolsv2 import PocketOptionAPI
+from BinaryOptionsToolsV2 import PocketOptionAPI
 
 async with PocketOptionAPI(ssid="your_ssid") as api:
     assets = await api.get_assets()

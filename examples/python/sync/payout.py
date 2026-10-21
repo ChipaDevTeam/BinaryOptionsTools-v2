@@ -9,17 +9,19 @@ def main(ssid: str):
     api = PocketOption(ssid)
     time.sleep(5)
 
-    # Candñes are returned in the format of a list of dictionaries
-    full_payout = api.payout()  # Returns a dictionary asset: payout
-    print(f"Full Payout: {full_payout}")
-    partial_payout = api.payout(
-        ["EURUSD_otc", "EURUSD", "AEX25"]
-    )  # Returns a list of the payout for each of the passed assets in order
-    print(f"Partial Payout: {partial_payout}")
-    single_payout = api.payout(
-        "EURUSD_otc"
-    )  # Returns the payout for the specified asset
+    # payouts() returns a dict of asset: payout for every asset.
+    all_payouts = api.payouts()
+    print(f"All Payouts: {all_payouts}")
+
+    # payout(asset) returns the payout for a single asset.
+    single_payout = api.payout("EURUSD_otc")
     print(f"Single Payout: {single_payout}")
+
+    # Pick specific assets out of the full mapping when you need several.
+    selected = {
+        asset: all_payouts.get(asset) for asset in ["EURUSD_otc", "EURUSD", "AEX25"]
+    }
+    print(f"Selected Payouts: {selected}")
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ Set the POCKET_OPTION_SSID environment variable before running:
     pytest tests/python/pocketoption/test_demo_ssid.py -v -s
 """
 
+import contextlib
 import os
 import asyncio
 import pytest
@@ -149,6 +150,69 @@ class TestDemoConnection:
             for stream in streams:
                 if hasattr(stream, "cancel"):
                     stream.cancel()
+
+    @pytest.mark.timeout(60)
+    @pytest.mark.asyncio
+    async def test_get_candles_live_multiple_assets_concurrently(self, api):
+        """Concurrent get_candles_live for several assets must each return history.
+
+        Regression test for #141: the shared response queue used to make
+        concurrent requests consume each other's responses, yielding empty
+        closed-candle lists for every asset.
+        """
+        import asyncio
+        from contextlib import aclosing
+
+        assets = ["EURUSD_otc", "GBPUSD_otc", "USDJPY_otc", "XAUUSD_otc"]
+
+        async def first_item(asset):
+            generator = api.get_candles_live(asset, period=60, hours=1.0, max_rows=20)
+            async with aclosing(generator) as stream:
+                return await asyncio.wait_for(stream.__anext__(), timeout=30)
+
+        results = await asyncio.gather(
+            *(first_item(asset) for asset in assets), return_exceptions=True
+        )
+        for asset, result in zip(assets, results):
+            assert not isinstance(result, Exception), f"{asset} failed: {result!r}"
+            closed, forming = result
+            print(f"  {asset}: {len(closed)} closed, forming={bool(forming)}")
+            assert len(closed) > 0, f"Expected closed candles for {asset}"
+
+    @pytest.mark.timeout(90)
+    @pytest.mark.asyncio
+    async def test_multi_asset_candles_repeated_with_abandoned_request(self, api):
+        """Polling several assets repeatedly works, even after a poll is abandoned.
+
+        Regression test for #141: concurrent candle requests used to consume
+        each other's responses, returning empty history. A bot that polls on a
+        timer also abandons in-flight requests (timeouts, cancellation), which
+        must not break the polls that follow.
+        """
+        assets = ["EURUSD_otc", "GBPUSD_otc", "USDJPY_otc"]
+
+        async def poll(asset):
+            return await asyncio.wait_for(api.candles(asset, 60, count=20), timeout=30)
+
+        for round_index in range(2):
+            if round_index == 1:
+                # Abandon a poll in flight, like a cancelled timer or shutdown.
+                abandoned = asyncio.create_task(poll(assets[0]))
+                await asyncio.sleep(1.0)
+                abandoned.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await abandoned
+
+            results = await asyncio.gather(
+                *(poll(asset) for asset in assets), return_exceptions=True
+            )
+            for asset, result in zip(assets, results):
+                assert not isinstance(result, Exception), (
+                    f"round {round_index} {asset} failed: {result!r}"
+                )
+                assert len(result) > 0, (
+                    f"round {round_index}: expected candles for {asset}"
+                )
 
 
 if __name__ == "__main__":

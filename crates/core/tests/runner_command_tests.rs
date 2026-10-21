@@ -62,7 +62,6 @@ fn test_exponential_backoff_calculation() {
     assert_eq!(delay15, 300);
 }
 
-
 #[allow(dead_code, clippy::unnecessary_min_or_max)]
 fn test_exponential_backoff_with_large_base_delay() {
     // Ensure large base delays don't cause overflow due to saturating_mul

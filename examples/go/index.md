@@ -38,7 +38,7 @@ go run buy.go
 - `subscribe_symbol.go` - Subscribe to real-time data
 - `validator.go` - Demonstrate validator usage
 
-## Important: Always wait 5 seconds after creating the client!
+## Important: Always wait 5 seconds after creating the client
 
 ```go
 client, _ := binary_options_tools_uni.NewPocketOption("your-session-id")

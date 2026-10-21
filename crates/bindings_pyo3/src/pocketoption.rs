@@ -6,7 +6,7 @@ use std::time::Duration;
 use binary_options_tools::pocketoption::candle::{Candle, SubscriptionType};
 use binary_options_tools::pocketoption::error::PocketResult;
 use binary_options_tools::pocketoption::pocket_client::PocketOption;
-use binary_options_tools::utils::f64_to_decimal;
+use binary_options_tools::utils::{arc_message_to_string, f64_to_decimal};
 use binary_options_tools::validator::Validator as CrateValidator;
 use binary_options_tools::validator::Validator;
 use futures_util::stream::{BoxStream, Fuse};
@@ -25,42 +25,20 @@ use tokio::sync::Mutex;
 
 const CONNECTION_TIMEOUT_SECS: u64 = 20;
 
-/// Convert a tungstenite message to a string
-fn message_to_string(msg: &tungstenite::Message) -> String {
-    match msg {
-        tungstenite::Message::Text(text) => text.to_string(),
-        tungstenite::Message::Binary(data) => String::from_utf8_lossy(data).into_owned(),
-        _ => String::new(),
-    }
-}
-
-/// Convert an Arc<Message> to a string
-fn arc_message_to_string(msg: &std::sync::Arc<tungstenite::Message>) -> String {
-    message_to_string(msg.as_ref())
-}
-
 /// Send a raw message and wait for the response
 async fn send_raw_message_and_wait(
     client: &PocketOption,
     validator: RawValidator,
     message: String,
 ) -> PyResult<String> {
-    // Convert RawValidator to CrateValidator
-    let crate_validator: CrateValidator = validator.into();
+    let response = binary_options_tools::pocketoption::modules::raw::send_and_wait(
+        client,
+        validator.into(),
+        binary_options_tools::pocketoption::modules::raw::Outgoing::Text(message),
+    )
+    .await
+    .map_err(BinaryErrorPy::from)?;
 
-    // Create a raw handler with the validator
-    let handler = client
-        .create_raw_handler(crate_validator, None)
-        .await
-        .map_err(BinaryErrorPy::from)?;
-
-    // Send the message and wait for the next matching response
-    let response = handler
-        .send_and_wait(binary_options_tools::pocketoption::modules::raw::Outgoing::Text(message))
-        .await
-        .map_err(BinaryErrorPy::from)?;
-
-    // Convert the response to a string
     Ok(arc_message_to_string(&response))
 }
 
@@ -182,6 +160,47 @@ impl RawPocketOption {
         })
     }
 
+    /// Creates a client on PocketOption's free "try demo" (guest) session.
+    ///
+    /// Blocks until the client is connected and its snapshot (assets and balance)
+    /// has been loaded. When `token` is omitted a guest token is generated
+    /// locally, exactly like PocketOption's own "Try demo" client; pass one to
+    /// replay a token the browser already cached.
+    ///
+    /// No short outer timeout is applied here: connecting and waiting for the
+    /// snapshot each carry their own timeouts, and aborting early would discard a
+    /// session that is still being set up.
+    #[staticmethod]
+    #[pyo3(signature = (token = None))]
+    pub fn new_try_demo(py: Python<'_>, token: Option<String>) -> PyResult<Self> {
+        let runtime = get_runtime(py)?;
+        runtime.block_on(async move {
+            let client = match token {
+                Some(token) => PocketOption::new_try_demo_with_token(token).await,
+                None => PocketOption::new_try_demo().await,
+            }
+            .map_err(BinaryErrorPy::from)?;
+            Ok(Self { client })
+        })
+    }
+
+    /// Asynchronous variant of [`RawPocketOption::new_try_demo`].
+    #[staticmethod]
+    #[pyo3(signature = (token = None))]
+    pub fn create_try_demo<'py>(
+        py: Python<'py>,
+        token: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        future_into_py(py, async move {
+            let client = match token {
+                Some(token) => PocketOption::new_try_demo_with_token(token).await,
+                None => PocketOption::new_try_demo().await,
+            }
+            .map_err(BinaryErrorPy::from)?;
+            Ok(RawPocketOption { client })
+        })
+    }
+
     pub fn wait_for_assets<'py>(
         &self,
         py: Python<'py>,
@@ -206,7 +225,6 @@ impl RawPocketOption {
     pub fn is_connected(&self) -> bool {
         self.client.is_connected()
     }
-
 
     pub fn buy<'py>(
         &self,
@@ -653,10 +671,7 @@ impl RawPocketOption {
     pub fn subscribe_raw<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
-            let raw_stream = client
-                .subscribe_raw()
-                .await
-                .map_err(BinaryErrorPy::from)?;
+            let raw_stream = client.subscribe_raw().await.map_err(BinaryErrorPy::from)?;
 
             let boxed_stream = async_stream::stream! {
                 tokio::pin!(raw_stream);

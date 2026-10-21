@@ -195,9 +195,10 @@ from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
 async def main(ssid: str):
     async with PocketOptionAsync(ssid) as api:
-        # Get payout for asset
-        payout = await api.payout("EURUSD_otc")
-        print(f"Payout for EURUSD_otc: {payout * 100}%")
+        # Get payout for every asset, then for a single one
+        all_payouts = await api.payouts()
+        print(f"EURUSD_otc payout: {all_payouts.get('EURUSD_otc')}%")
+        print(f"Payout for EURUSD_otc: {await api.payout('EURUSD_otc')}%")
 
 
 if __name__ == "__main__":
@@ -384,31 +385,37 @@ python strategy_example.py
 ## Key Concepts
 
 ### Context Manager
+
 All examples use the async context manager pattern:
+
 ```python
 async with PocketOptionAsync(ssid) as api:
     # API is automatically connected and cleaned up
 ```
 
 ### Initialization Wait
+
 Always wait ~2 seconds after creating the client:
+
 ```python
 async with PocketOptionAsync(ssid) as api:
     await asyncio.sleep(2)  # Critical for connection!
 ```
 
 ### Demo vs Real Account
+
 ```python
 if not api.is_demo():
     print("WARNING: Using REAL account!")
 ```
 
 ### Proper Cleanup
+
 The context manager handles cleanup automatically, but you can also call:
+
 ```python
 await api.shutdown()
 ```
-
 
 ---
 

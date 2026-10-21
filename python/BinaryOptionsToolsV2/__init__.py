@@ -8,13 +8,21 @@ from .pocketoption import (
     PocketOptionAsync as PocketOptionAsync,
     PocketOption as PocketOption,
     RawHandler as RawHandler,
+    RawHandlerSync as RawHandlerSync,
+    Trade as Trade,
+    TradeResult as TradeResult,
     Validator as Validator,
+    login as login,
+    login_async as login_async,
     __all__ as __pocket_all__,
 )
 from .closeoption import (
     CloseOptionAsync as CloseOptionAsync,
     CloseOption as CloseOption,
-    RawHandler as CloseRawHandler,
+    AsyncRawSubscription as AsyncRawSubscription,
+    AsyncSubscription as AsyncSubscription,
+    SyncRawSubscription as SyncRawSubscription,
+    SyncSubscription as SyncSubscription,
     __all__ as __close_all__,
 )
 
@@ -56,7 +64,7 @@ _rust_exported_names = [
 __rust_all__ = [n for n in _rust_exported_names if n in globals()]
 
 __all__ = list(
-    set(
+    dict.fromkeys(
         __pocket_all__
         + __close_all__
         + [
@@ -67,8 +75,14 @@ __all__ = list(
             "CloseOptionAsync",
             "CloseOption",
             "RawHandler",
+            "Trade",
+            "TradeResult",
             "Validator",
         ]
         + __rust_all__
     )
 )
+# The subpackage `__all__` lists include submodule names (e.g. "asynchronous")
+# that only exist there. Expose just the names this package actually resolves,
+# so `from BinaryOptionsToolsV2 import *` works instead of raising AttributeError.
+__all__ = [name for name in __all__ if name in globals()]

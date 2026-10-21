@@ -1,4 +1,6 @@
+#[cfg(feature = "expertoption")]
 use crate::expertoptions::error::ExpertOptionsError;
+#[cfg(feature = "pocketoption")]
 use crate::pocketoption::error::PocketError;
 use binary_options_tools_core::error::CoreError;
 use rust_decimal::Decimal;
@@ -9,9 +11,11 @@ pub enum BinaryOptionsError {
     #[error("Core error: {0}")]
     Core(#[from] CoreError),
 
+    #[cfg(feature = "pocketoption")]
     #[error("Pocket Options Error: {0}")]
     PocketOptions(#[from] PocketError),
 
+    #[cfg(feature = "expertoption")]
     #[error("Expert Options Error: {0}")]
     ExpertOptions(#[from] ExpertOptionsError),
 

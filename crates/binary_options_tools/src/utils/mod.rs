@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::Once;
 
 use binary_options_tools_core::{
     error::CoreResult,
@@ -12,15 +11,11 @@ use std::str::FromStr;
 
 pub mod serialize;
 
-static INIT: Once = Once::new();
-
-pub fn init_crypto_provider() {
-    INIT.call_once(|| {
-        rustls::crypto::ring::default_provider()
-            .install_default()
-            .ok();
-    });
-}
+/// Installs the process-wide rustls crypto provider.
+///
+/// Thin alias for the shared transport implementation so every platform in the
+/// crate agrees on a single provider (rustls only accepts one per process).
+pub use binary_options_tools_core::transport::init_crypto_provider;
 
 /// Lightweight message printer for debugging purposes
 ///
@@ -71,6 +66,28 @@ impl<S: AppState> WebSocketMiddleware<S> for PrintMiddleware {
         tracing::debug!(target: "Middleware", "Receiving: {message:?}");
         Ok(())
     }
+}
+
+/// Converts a WebSocket message into its UTF-8 payload.
+///
+/// Text frames are returned verbatim, binary frames are decoded lossily, and
+/// any other frame type (ping/pong/close) yields an empty string. Every
+/// language binding used to carry its own copy of this match; this is the
+/// single implementation they now share so the decoding rules cannot drift.
+pub fn message_to_string(message: &Message) -> String {
+    match message {
+        Message::Text(text) => text.to_string(),
+        Message::Binary(data) => String::from_utf8_lossy(data.as_ref()).into_owned(),
+        _ => String::new(),
+    }
+}
+
+/// Converts an `Arc<Message>` into its UTF-8 payload.
+///
+/// Convenience wrapper around [`message_to_string`] for the messages the core
+/// hands to module and binding streams.
+pub fn arc_message_to_string(message: &Arc<Message>) -> String {
+    message_to_string(message.as_ref())
 }
 
 /// Converts an f64 to Decimal with exact precision.
@@ -130,6 +147,28 @@ mod tests {
         // Test that the conversion round-trips correctly
         let round_trip = result.to_f64().unwrap();
         assert_eq!(round_trip, value);
+    }
+
+    #[test]
+    fn test_message_to_string_decoding_rules() {
+        assert_eq!(message_to_string(&Message::Text("hello".into())), "hello");
+        assert_eq!(
+            message_to_string(&Message::Binary(vec![b'h', b'i'].into())),
+            "hi"
+        );
+        // Invalid UTF-8 is replaced rather than causing an error.
+        assert_eq!(
+            message_to_string(&Message::Binary(vec![0xff].into())),
+            "\u{fffd}"
+        );
+        // Non-data frames have no payload representation.
+        assert_eq!(message_to_string(&Message::Ping(Vec::new().into())), "");
+        assert_eq!(message_to_string(&Message::Pong(Vec::new().into())), "");
+        assert_eq!(message_to_string(&Message::Close(None)), "");
+        assert_eq!(
+            arc_message_to_string(&Arc::new(Message::Text("arc".into()))),
+            "arc"
+        );
     }
 
     #[test]

@@ -10,6 +10,7 @@ use binary_options_tools_core::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::select;
+use tokio::sync::{oneshot, Mutex as TokioMutex};
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -21,7 +22,15 @@ use crate::pocketoption::{
     utils::{get_index, normalize_timestamp, SocketIoFrame},
 };
 
+/// Events that carry a `loadHistoryPeriod` response.
+///
+/// `loadHistoryPeriodFast` is still matched because older servers may emit it,
+/// but it is never *sent*: the current servers do not answer it, which left every
+/// such request hanging until the connection dropped (see #141).
 const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = ["loadHistoryPeriodFast", "loadHistoryPeriod"];
+
+/// How long to wait for a candle/tick response before giving up.
+const RESPONSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// Default number of ticks/candles to fetch per pagination page.
 const DEFAULT_PAGE_OFFSET: i64 = 1000;
@@ -37,8 +46,6 @@ pub struct LoadHistoryPeriod {
     pub time: i64,
     pub index: u64,
     pub offset: i64,
-    #[serde(skip)]
-    pub is_fast: bool,
 }
 
 impl LoadHistoryPeriod {
@@ -49,23 +56,6 @@ impl LoadHistoryPeriod {
             time,
             index: get_index()?,
             offset,
-            is_fast: false,
-        })
-    }
-
-    pub fn new_fast(
-        asset: impl ToString,
-        time: i64,
-        period: i64,
-        offset: i64,
-    ) -> PocketResult<Self> {
-        Ok(LoadHistoryPeriod {
-            asset: asset.to_string(),
-            period,
-            time,
-            index: get_index()?,
-            offset,
-            is_fast: true,
         })
     }
 }
@@ -73,12 +63,7 @@ impl LoadHistoryPeriod {
 impl std::fmt::Display for LoadHistoryPeriod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let data = serde_json::to_string(&self).map_err(|_| std::fmt::Error)?;
-        let event = if self.is_fast {
-            "loadHistoryPeriodFast"
-        } else {
-            "loadHistoryPeriod"
-        };
-        write!(f, "42[\"{event}\",{data}]")
+        write!(f, "42[\"loadHistoryPeriod\",{data}]")
     }
 }
 
@@ -153,6 +138,9 @@ pub enum Command {
         offset: i64,
         req_id: Uuid,
     },
+    /// Forgets any pending request whose caller gave up before a response
+    /// arrived, so abandoned requests do not accumulate in `pending_requests`.
+    Cancel { req_id: Uuid },
 }
 
 #[derive(Debug)]
@@ -175,10 +163,115 @@ pub enum CommandResponse {
     },
 }
 
+/// Routes `CommandResponse`s to the caller awaiting a specific `req_id`.
+///
+/// The module's response channel is a single queue shared by every clone of
+/// [`GetCandlesHandle`]. Without this router, concurrent requests (for example
+/// candle backfill for several assets at once) steal and discard each other's
+/// responses. A one-shot per request id makes concurrent calls safe.
+struct ResponseRouter {
+    pending: TokioMutex<HashMap<Uuid, oneshot::Sender<CommandResponse>>>,
+}
+
+impl ResponseRouter {
+    fn new(receiver: AsyncReceiver<CommandResponse>) -> Arc<Self> {
+        let router = Arc::new(Self {
+            pending: TokioMutex::new(HashMap::new()),
+        });
+        let router_clone = router.clone();
+        tokio::spawn(async move {
+            while let Ok(resp) = receiver.recv().await {
+                if let Some(id) = response_req_id(&resp) {
+                    let mut pending = router_clone.pending.lock().await;
+                    // Forget callers that gave up (cancelled request) so the map
+                    // does not grow with every abandoned request.
+                    pending.retain(|_, tx| !tx.is_closed());
+                    if let Some(tx) = pending.remove(&id) {
+                        if tx.send(resp).is_err() {
+                            tracing::trace!(target: "GetCandlesResponseRouter", "Failed to route response: receiver dropped");
+                        }
+                    }
+                }
+            }
+            let mut pending = router_clone.pending.lock().await;
+            for (id, tx) in pending.drain() {
+                if tx.send(CommandResponse::Shutdown { req_id: id }).is_err() {
+                    tracing::trace!(target: "GetCandlesResponseRouter", "Failed to send shutdown notification: receiver dropped");
+                }
+            }
+        });
+        router
+    }
+
+    /// Register interest in the response for `id` before the request is sent.
+    async fn register(&self, id: Uuid) -> oneshot::Receiver<CommandResponse> {
+        let (tx, rx) = oneshot::channel();
+        let mut pending = self.pending.lock().await;
+        // Forget callers that gave up (cancelled request) so the map does not
+        // grow when no response arrives to trigger the same cleanup.
+        pending.retain(|_, tx| !tx.is_closed());
+        pending.insert(id, tx);
+        rx
+    }
+}
+
+fn response_req_id(resp: &CommandResponse) -> Option<Uuid> {
+    match resp {
+        CommandResponse::CandlesResult { req_id, .. }
+        | CommandResponse::TicksResult { req_id, .. }
+        | CommandResponse::Error { req_id, .. }
+        | CommandResponse::Shutdown { req_id } => Some(*req_id),
+    }
+}
+
+/// Await a response registered through [`ResponseRouter`].
+async fn await_response(rx: oneshot::Receiver<CommandResponse>) -> PocketResult<CommandResponse> {
+    rx.await.map_err(|_| PocketError::ModuleStopped {
+        module_name: "GetCandlesApiModule".to_string(),
+        context: "Response router channel closed".to_string(),
+    })
+}
+
+/// Await a response with a timeout, propagating an error response unchanged.
+async fn await_response_timed(
+    rx: oneshot::Receiver<CommandResponse>,
+    task: &str,
+    context: String,
+) -> PocketResult<CommandResponse> {
+    tokio::time::timeout(RESPONSE_TIMEOUT, await_response(rx))
+        .await
+        .map_err(|_| PocketError::Timeout {
+            task: task.to_string(),
+            context,
+            duration: RESPONSE_TIMEOUT,
+        })?
+}
+
+/// Cancels the module-side pending request for `req_id` when the caller gives up
+/// before the response arrives (timeout or cancellation).
+///
+/// Without this, an abandoned request stays in the module's `pending_requests`
+/// map forever, and a late response would be logged as an unknown index.
+struct PendingRequestGuard {
+    sender: AsyncSender<Command>,
+    req_id: Uuid,
+    armed: bool,
+}
+
+impl Drop for PendingRequestGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = self.sender.as_sync().try_send(Command::Cancel {
+                req_id: self.req_id,
+            });
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct GetCandlesHandle {
     sender: AsyncSender<Command>,
-    receiver: AsyncReceiver<CommandResponse>,
+    router: Arc<ResponseRouter>,
 }
 
 impl GetCandlesHandle {
@@ -220,11 +313,13 @@ impl GetCandlesHandle {
         offset: i64,
     ) -> PocketResult<Vec<Candle>> {
         info!(target: "GetCandlesHandle", "Requesting candles for asset: {}, period: {}, time: {}, offset: {}", asset.to_string(), period, time, offset);
+        let asset_str = asset.to_string();
         let req_id = Uuid::new_v4();
+        let response = self.router.register(req_id).await;
 
         self.sender
             .send(Command::GetCandles {
-                asset: asset.to_string(),
+                asset: asset_str.clone(),
                 period,
                 time,
                 offset,
@@ -233,39 +328,30 @@ impl GetCandlesHandle {
             .await
             .map_err(CoreError::from)?;
 
-        loop {
-            match self.receiver.recv().await {
-                Ok(CommandResponse::CandlesResult {
-                    req_id: response_id,
-                    candles,
-                }) => {
-                    if req_id == response_id {
-                        return Ok(candles);
-                    }
-                    // Continue waiting for the correct response
-                }
-                Ok(CommandResponse::Error {
-                    req_id: response_id,
-                    error,
-                }) => {
-                    if req_id == response_id {
-                        return Err(PocketError::General(error));
-                    }
-                    // Continue waiting for the correct response
-                }
-                Ok(CommandResponse::Shutdown {
-                    req_id: response_id,
-                }) => {
-                    if req_id == response_id {
-                        return Err(PocketError::ModuleStopped {
-                            module_name: "GetCandlesApiModule".to_string(),
-                            context: "GetCandlesApiModule stopped during request".to_string(),
-                        });
-                    }
-                }
-                Ok(_) => continue, // Ignore other response types
-                Err(e) => return Err(CoreError::from(e).into()),
-            }
+        let guard = PendingRequestGuard {
+            sender: self.sender.clone(),
+            req_id,
+            armed: true,
+        };
+        let response = await_response_timed(
+            response,
+            "get_candles",
+            format!("asset: {asset_str}, period: {period}, offset: {offset}"),
+        )
+        .await?;
+        let mut guard = guard;
+        guard.armed = false;
+
+        match response {
+            CommandResponse::CandlesResult { candles, .. } => Ok(candles),
+            CommandResponse::Error { error, .. } => Err(PocketError::General(error)),
+            CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
+                module_name: "GetCandlesApiModule".to_string(),
+                context: "GetCandlesApiModule stopped during request".to_string(),
+            }),
+            other => Err(PocketError::General(format!(
+                "Unexpected response to get_candles request: {other:?}"
+            ))),
         }
     }
 
@@ -298,9 +384,9 @@ impl GetCandlesHandle {
 
         loop {
             let req_id = Uuid::new_v4();
-            // Use loadHistoryPeriodFast for small offsets if needed, but here we use the module's logic
             info!(target: "GetCandlesHandle", "Requesting ticks for asset: {}, period: {}, time: {}, offset: {}", asset_str, period, current_time, page_offset);
 
+            let response = self.router.register(req_id).await;
             self.sender
                 .send(Command::GetTicks {
                     asset: asset_str.clone(),
@@ -312,37 +398,33 @@ impl GetCandlesHandle {
                 .await
                 .map_err(CoreError::from)?;
 
-            // Wait for the response
-            let ticks = loop {
-                match self.receiver.recv().await {
-                    Ok(CommandResponse::TicksResult {
-                        req_id: response_id,
-                        ticks,
-                    }) => {
-                        if req_id == response_id {
-                            break ticks;
-                        }
-                    }
-                    Ok(CommandResponse::Error {
-                        req_id: response_id,
-                        error,
-                    }) => {
-                        if req_id == response_id {
-                            return Err(PocketError::General(error));
-                        }
-                    }
-                    Ok(CommandResponse::Shutdown {
-                        req_id: response_id,
-                    }) => {
-                        if req_id == response_id {
-                            return Err(PocketError::ModuleStopped {
-                                module_name: "GetCandlesApiModule".to_string(),
-                                context: "GetCandlesApiModule stopped during request".to_string(),
-                            });
-                        }
-                    }
-                    Ok(_) => continue,
-                    Err(e) => return Err(CoreError::from(e).into()),
+            let guard = PendingRequestGuard {
+                sender: self.sender.clone(),
+                req_id,
+                armed: true,
+            };
+            let response = await_response_timed(
+                response,
+                "get_ticks",
+                format!("asset: {asset_str}, period: {period}"),
+            )
+            .await?;
+            let mut guard = guard;
+            guard.armed = false;
+
+            let ticks = match response {
+                CommandResponse::TicksResult { ticks, .. } => ticks,
+                CommandResponse::Error { error, .. } => return Err(PocketError::General(error)),
+                CommandResponse::Shutdown { .. } => {
+                    return Err(PocketError::ModuleStopped {
+                        module_name: "GetCandlesApiModule".to_string(),
+                        context: "GetCandlesApiModule stopped during request".to_string(),
+                    })
+                }
+                other => {
+                    return Err(PocketError::General(format!(
+                        "Unexpected response to get_ticks request: {other:?}"
+                    )))
                 }
             };
 
@@ -423,7 +505,10 @@ impl ApiModule<State> for GetCandlesApiModule {
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
     ) -> Self::Handle {
-        GetCandlesHandle { sender, receiver }
+        GetCandlesHandle {
+            sender,
+            router: ResponseRouter::new(receiver),
+        }
     }
 
     async fn run(&mut self) -> CoreResult<()> {
@@ -433,47 +518,8 @@ impl ApiModule<State> for GetCandlesApiModule {
                     match msg_res {
                         Ok(msg) => {
                             match msg.as_ref() {
-                                Message::Binary(data) => {
-                                    if let Ok(result) = serde_json::from_slice::<LoadHistoryPeriodResult>(data) {
-                                        if let Err(e) = self.process_result(result).await {
-                                            warn!(target: "GetCandlesApiModule", "Error processing binary result: {}", e);
-                                        }
-                                    } else {
-                                        // Try parsing as updateStream tick data
-                                        if let Ok(text) = std::str::from_utf8(data) {
-                                            if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
-                                                self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
-                                                self.prune_latest_ticks();
-                                            }
-                                        }
-                                    }
-                                }
-                                Message::Text(text) => {
-                                    if let Ok(result) = serde_json::from_str::<LoadHistoryPeriodResult>(text) {
-                                        if let Err(e) = self.process_result(result).await {
-                                            warn!(target: "GetCandlesApiModule", "Error processing text result: {}", e);
-                                        }
-                                    } else if let Some(frame) = SocketIoFrame::parse(text) {
-                                        let event_payload: Option<(String, serde_json::Value)> = frame.extract_event();
-                                        if let Some((event_name, payload)) = event_payload {
-                                            if event_name == "loadHistoryPeriod" || event_name == "loadHistoryPeriodFast" {
-                                                match serde_json::from_value::<LoadHistoryPeriodResult>(payload) {
-                                                    Ok(result) => {
-                                                        if let Err(e) = self.process_result(result).await {
-                                                            warn!(target: "GetCandlesApiModule", "Error processing event result: {}", e);
-                                                        }
-                                                    }
-                                                    Err(e) => {
-                                                        warn!("Failed to deserialize LoadHistoryPeriodResult from Socket.IO frame (event: {}): {}", event_name, e);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    } else if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
-                                        self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
-                                        self.prune_latest_ticks();
-                                    }
-                                }
+                                Message::Binary(data) => self.handle_binary(data).await,
+                                Message::Text(text) => self.handle_text(text).await,
                                 _ => {
                                     warn!(target: "GetCandlesApiModule", "Received unexpected message type: {:?}", msg);
                                 }
@@ -492,11 +538,8 @@ impl ApiModule<State> for GetCandlesApiModule {
                         Ok(cmd) => {
                             match cmd {
                                 Command::GetCandles { asset, period, time, offset, req_id } => {
-                                    let load_history_res = if offset <= 100 {
-                                        LoadHistoryPeriod::new_fast(&asset, time, period, offset)
-                                    } else {
-                                        LoadHistoryPeriod::new(&asset, time, period, offset)
-                                    };
+                                    let load_history_res =
+                                        LoadHistoryPeriod::new(&asset, time, period, offset);
 
                                     match load_history_res {
                                         Ok(load_history) => {
@@ -530,11 +573,8 @@ impl ApiModule<State> for GetCandlesApiModule {
                                     }
                                 }
                                 Command::GetTicks { asset, period, time, offset, req_id } => {
-                                    let load_history_res = if offset <= 100 {
-                                        LoadHistoryPeriod::new_fast(&asset, time, period, offset)
-                                    } else {
-                                        LoadHistoryPeriod::new(&asset, time, period, offset)
-                                    };
+                                    let load_history_res =
+                                        LoadHistoryPeriod::new(&asset, time, period, offset);
 
                                     match load_history_res {
                                         Ok(load_history) => {
@@ -566,6 +606,10 @@ impl ApiModule<State> for GetCandlesApiModule {
                                         }
                                     }
                                 }
+                                Command::Cancel { req_id } => {
+                                    self.pending_requests
+                                        .retain(|_, (pending_id, _, _, _)| *pending_id != req_id);
+                                }
                             }
                         }
                         Err(_) => {
@@ -587,6 +631,59 @@ impl ApiModule<State> for GetCandlesApiModule {
 }
 
 impl GetCandlesApiModule {
+    /// Handles a binary frame: either a history result or an `updateStream` tick.
+    async fn handle_binary(&mut self, data: &[u8]) {
+        if let Ok(result) = serde_json::from_slice::<LoadHistoryPeriodResult>(data) {
+            self.report_result(result, "binary").await;
+            return;
+        }
+        // Try parsing as updateStream tick data
+        if let Ok(text) = std::str::from_utf8(data) {
+            self.store_tick(text);
+        }
+    }
+
+    /// Handles a text frame: a bare result, a Socket.IO history event, or a tick.
+    async fn handle_text(&mut self, text: &str) {
+        if let Ok(result) = serde_json::from_str::<LoadHistoryPeriodResult>(text) {
+            self.report_result(result, "text").await;
+            return;
+        }
+        if let Some(frame) = SocketIoFrame::parse(text) {
+            if let Some((event_name, payload)) = frame.extract_event() {
+                if event_name == "loadHistoryPeriod" || event_name == "loadHistoryPeriodFast" {
+                    match serde_json::from_value::<LoadHistoryPeriodResult>(payload) {
+                        Ok(result) => self.report_result(result, "event").await,
+                        Err(e) => warn!(
+                            "Failed to deserialize LoadHistoryPeriodResult from Socket.IO frame (event: {}): {}",
+                            event_name, e
+                        ),
+                    }
+                }
+            }
+            return;
+        }
+        self.store_tick(text);
+    }
+
+    /// Records a tick parsed from `text`, if it is an `updateStream` payload.
+    fn store_tick(&mut self, text: &str) {
+        if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
+            self.latest_ticks
+                .entry(symbol)
+                .or_default()
+                .push((timestamp, price));
+            self.prune_latest_ticks();
+        }
+    }
+
+    /// Passes `result` to the response router, logging processing failures.
+    async fn report_result(&mut self, result: LoadHistoryPeriodResult, kind: &str) {
+        if let Err(e) = self.process_result(result).await {
+            warn!(target: "GetCandlesApiModule", "Error processing {} result: {}", kind, e);
+        }
+    }
+
     /// Notifies all pending waiters that the module has stopped.
     async fn notify_waiters_module_stopped(&mut self) {
         let waiters = std::mem::take(&mut self.pending_requests);
@@ -780,5 +877,162 @@ impl GetCandlesApiModule {
             // Remove the entry entirely if no ticks remain
             !ticks.is_empty()
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use binary_options_tools_core::reimports::bounded_async;
+
+    #[tokio::test]
+    async fn router_routes_out_of_order_responses_by_request_id() {
+        let (responder, response_rx) = bounded_async::<CommandResponse>(8);
+        let router = ResponseRouter::new(response_rx);
+        let first = Uuid::new_v4();
+        let second = Uuid::new_v4();
+        let first_rx = router.register(first).await;
+        let second_rx = router.register(second).await;
+
+        // Answer the second request before the first.
+        responder
+            .send(CommandResponse::Error {
+                req_id: second,
+                error: "second".to_string(),
+            })
+            .await
+            .unwrap();
+        responder
+            .send(CommandResponse::Shutdown { req_id: first })
+            .await
+            .unwrap();
+
+        assert!(matches!(
+            second_rx.await.unwrap(),
+            CommandResponse::Error { ref error, .. } if error == "second"
+        ));
+        assert!(matches!(
+            first_rx.await.unwrap(),
+            CommandResponse::Shutdown { req_id } if req_id == first
+        ));
+    }
+
+    #[tokio::test]
+    async fn register_forgets_abandoned_waiters_without_a_response() {
+        // A caller that dropped its receiver must not stay in the map: with no
+        // response arriving there is nothing else to prune it.
+        let (_responder, response_rx) = bounded_async::<CommandResponse>(8);
+        let router = ResponseRouter::new(response_rx);
+        drop(router.register(Uuid::new_v4()).await);
+
+        let live = Uuid::new_v4();
+        let _live_rx = router.register(live).await;
+
+        let pending = router.pending.lock().await;
+        assert_eq!(pending.len(), 1);
+        assert!(pending.contains_key(&live));
+    }
+
+    #[tokio::test]
+    async fn router_forgets_waiters_whose_caller_gave_up() {
+        let (responder, response_rx) = bounded_async::<CommandResponse>(8);
+        let router = ResponseRouter::new(response_rx);
+        drop(router.register(Uuid::new_v4()).await);
+
+        let live = Uuid::new_v4();
+        let live_rx = router.register(live).await;
+        responder
+            .send(CommandResponse::Shutdown { req_id: live })
+            .await
+            .unwrap();
+
+        assert!(matches!(
+            live_rx.await.unwrap(),
+            CommandResponse::Shutdown { req_id } if req_id == live
+        ));
+        assert!(router.pending.lock().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn load_history_period_uses_the_event_servers_answer() {
+        // `loadHistoryPeriodFast` is never sent: current servers do not answer it,
+        // so requesting it only produced requests that hung until disconnect.
+        let request = LoadHistoryPeriod::new("EURUSD_otc", 1700000000, 60, 60).unwrap();
+        let frame = request.to_string();
+        assert!(
+            frame.starts_with("42[\"loadHistoryPeriod\","),
+            "unexpected frame: {frame}"
+        );
+        assert!(frame.contains("\"offset\":60"));
+    }
+
+    #[tokio::test]
+    async fn dropping_armed_pending_guard_cancels_the_request() {
+        let (sender, receiver) = bounded_async::<Command>(8);
+        let req_id = Uuid::new_v4();
+        {
+            let _guard = PendingRequestGuard {
+                sender: sender.clone(),
+                req_id,
+                armed: true,
+            };
+        }
+        match receiver.recv().await.unwrap() {
+            Command::Cancel { req_id: cancelled } => assert_eq!(cancelled, req_id),
+            other => panic!("expected Cancel, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn disarmed_pending_guard_sends_nothing() {
+        let (sender, receiver) = bounded_async::<Command>(8);
+        {
+            let _guard = PendingRequestGuard {
+                sender: sender.clone(),
+                req_id: Uuid::new_v4(),
+                armed: false,
+            };
+        }
+        drop(sender);
+        assert!(receiver.recv().await.is_err());
+    }
+
+    #[tokio::test]
+    async fn concurrent_get_candles_requests_each_receive_their_own_response() {
+        let (command_tx, command_rx) = bounded_async::<Command>(8);
+        let (response_tx, response_rx) = bounded_async::<CommandResponse>(8);
+        let handle = GetCandlesHandle {
+            sender: command_tx,
+            router: ResponseRouter::new(response_rx),
+        };
+
+        tokio::spawn(async move {
+            let mut requests = Vec::new();
+            for _ in 0..2 {
+                match command_rx.recv().await {
+                    Ok(Command::GetCandles { asset, req_id, .. }) => requests.push((asset, req_id)),
+                    other => panic!("unexpected command: {other:?}"),
+                }
+            }
+            // Reply in reverse order to prove responses are routed by id, not arrival order.
+            for (asset, req_id) in requests.into_iter().rev() {
+                let candles = vec![Candle {
+                    symbol: asset,
+                    ..Default::default()
+                }];
+                response_tx
+                    .send(CommandResponse::CandlesResult { req_id, candles })
+                    .await
+                    .unwrap();
+            }
+        });
+
+        let (a, b) = tokio::join!(
+            handle.get_candles_advanced("AAA_otc", 60, 0, 10),
+            handle.get_candles_advanced("BBB_otc", 60, 0, 10),
+        );
+
+        assert_eq!(a.unwrap()[0].symbol, "AAA_otc");
+        assert_eq!(b.unwrap()[0].symbol, "BBB_otc");
     }
 }

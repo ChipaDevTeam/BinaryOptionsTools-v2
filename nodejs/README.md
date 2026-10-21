@@ -93,7 +93,7 @@ HOST=0.0.0.0 npm run serve
 ```
 
 | Variable | Default | Meaning |
-|---|---|---|
+| --- | --- | --- |
 | `PORT` | `8787` | port to listen on |
 | `HOST` | `127.0.0.1` | bind address; use `0.0.0.0` to reach it from another device |
 | `AUTH_TOKEN` | unset | when set, every `/api` call needs `?token=…` or an `X-Auth-Token` header |
@@ -105,7 +105,7 @@ The validator and introspection endpoints need no account. Everything under
 memory, and never sent back to the browser.
 
 | Endpoint | Purpose |
-|---|---|
+| --- | --- |
 | `GET /api/health` | addon path and size, Node version, whether trading is on |
 | `GET /api/surface` | every class and method the addon exports |
 | `POST /api/validator` | build a validator from JSON and run it against a message |

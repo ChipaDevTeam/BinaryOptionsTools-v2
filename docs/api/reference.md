@@ -12,7 +12,6 @@ language description in **CHTL**, backtests it on historical data, and deploys i
 connection. Free to start — then come back here when you need full control.
 :::
 
-
 Complete API reference for BinaryOptionsTools with examples in all supported languages.
 
 ## Installation
@@ -86,7 +85,7 @@ dotnet add package BinaryOptionsToolsV2
 
 ```python
 import asyncio
-from binaryoptionstoolsv2 import PocketOptionAsync
+from BinaryOptionsToolsV2 import PocketOptionAsync
 
 async def main():
     client = await PocketOptionAsync("your_ssid")
@@ -103,7 +102,7 @@ asyncio.run(main())
 #### Python (Sync)
 
 ```python
-from binaryoptionstoolsv2 import PocketOption
+from BinaryOptionsToolsV2 import PocketOption
 
 client = PocketOption("your_ssid")
 import time
@@ -552,7 +551,7 @@ println!("Client shut down gracefully");
 ### Python
 
 ```python
-from binaryoptionstoolsv2 import PocketOptionAsync, PocketError
+from BinaryOptionsToolsV2 import PocketOptionAsync, PocketError
 
 try:
     client = await PocketOptionAsync("invalid_ssid")
@@ -644,12 +643,13 @@ See the [examples directory](/examples) for complete working examples in each la
 - [Python Sync Examples](/examples/python/sync)
 - [JavaScript Examples](/examples/javascript)
 - [Rust Examples](/examples/rust)
+
 ---
 
 ## API Method Reference
 
 | Method | Description | Returns |
-|--------|-------------|---------|
+| -------- | ------------- | --------- |
 | `PocketOption(ssid)` / `PocketOptionAsync(ssid)` | Initialize client with session ID | Client instance |
 | `new_with_url(ssid, url)` | Initialize with custom WebSocket URL | Client instance |
 | `balance()` | Get current account balance | Float |
