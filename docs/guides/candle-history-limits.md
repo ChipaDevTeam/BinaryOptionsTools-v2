@@ -132,8 +132,8 @@ print(len(ticks), ticks[-1][0] - ticks[0][0])  # count vs seconds covered
 
 `MAX_TICKS_PER_ASSET` and `MAX_TICK_AGE_SECS` in the same module bound the
 in-memory cache of *live* ticks from subscriptions. They do not cap historical
-fetches; they only limit how many extra ticks `get_candles_advanced` can append
-to a response.
+fetches; they limit how many buffered live ticks can be appended to
+`get_candles_advanced` and `get_ticks` responses.
 
 ## Version Information
 
