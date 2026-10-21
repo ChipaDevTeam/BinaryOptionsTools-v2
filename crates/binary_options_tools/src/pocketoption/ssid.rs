@@ -118,11 +118,104 @@ impl fmt::Debug for Real {
     }
 }
 
+/// A PocketOption "try demo" (guest) session.
+///
+/// Guest sessions carry no account `session`/`uid`; they authenticate with a
+/// short-lived `token` that the platform issues for the free demo. The auth
+/// frame observed in the browser is:
+///
+/// ```text
+/// 42["auth",{"token":"9PRxPzq6mQ","balance":50000,"isFastHistory":true}]
+/// ```
+///
+/// The payload is preserved verbatim in `raw` so the exact auth frame is
+/// replayed when the client connects.
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TryDemo {
+    /// Short-lived guest token; the try-demo equivalent of `session`.
+    pub token: String,
+    /// Starting virtual balance, when the server included one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balance: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_fast_history: Option<bool>,
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    pub extra: HashMap<String, Value>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub raw: String,
+}
+
+impl fmt::Debug for TryDemo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TryDemo")
+            .field("token", &"REDACTED")
+            .field("balance", &self.balance)
+            .field("is_fast_history", &self.is_fast_history)
+            .field("extra", &self.extra)
+            .finish()
+    }
+}
+
+impl fmt::Display for TryDemo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.raw)
+    }
+}
+
+impl TryDemo {
+    /// Creates a try-demo session from a guest token.
+    ///
+    /// # Errors
+    /// Returns `CoreError::SsidParsing` when the token is empty.
+    pub fn new(token: impl ToString) -> CoreResult<Self> {
+        let token = token.to_string();
+        if token.trim().is_empty() {
+            return Err(CoreError::SsidParsing(
+                "Try-demo `token` must not be empty".into(),
+            ));
+        }
+        let mut try_demo = Self {
+            token,
+            balance: None,
+            is_fast_history: None,
+            extra: HashMap::new(),
+            raw: String::new(),
+        };
+        try_demo.refresh_raw();
+        Ok(try_demo)
+    }
+
+    /// Sets the starting virtual balance recorded in the auth frame.
+    pub fn with_balance(mut self, balance: u64) -> Self {
+        self.balance = Some(balance);
+        self.refresh_raw();
+        self
+    }
+
+    /// Sets the `isFastHistory` flag recorded in the auth frame.
+    pub fn with_fast_history(mut self, is_fast_history: bool) -> Self {
+        self.is_fast_history = Some(is_fast_history);
+        self.refresh_raw();
+        self
+    }
+
+    /// Rebuilds the canonical `42["auth",{...}]` frame from the payload.
+    fn refresh_raw(&mut self) {
+        self.raw = format!(
+            "42[\"auth\",{}]",
+            serde_json::to_string(&*self).unwrap_or_default()
+        );
+    }
+}
+
 #[derive(Serialize, Clone)]
 #[serde(untagged)]
 pub enum Ssid {
     Demo(Demo),
     Real(Real),
+    TryDemo(TryDemo),
 }
 
 impl fmt::Debug for Ssid {
@@ -130,6 +223,7 @@ impl fmt::Debug for Ssid {
         match self {
             Self::Demo(d) => f.debug_tuple("Demo").field(d).finish(),
             Self::Real(r) => f.debug_tuple("Real").field(r).finish(),
+            Self::TryDemo(t) => f.debug_tuple("TryDemo").field(t).finish(),
         }
     }
 }
@@ -170,7 +264,34 @@ fn recover_json(input: &str) -> String {
         .to_string()
 }
 
+/// User agent used for demo and try-demo (guest) sessions.
+const DEMO_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36";
+
+/// Returns the JSON payload when `parsed` is a try-demo (guest) auth object,
+/// i.e. it carries a short-lived `token` and no account `session`.
+///
+/// Falls back to the same lenient recovery used for shell-mangled SSIDs so a
+/// token-only payload with unquoted keys is still recognised.
+fn try_demo_payload(parsed: &str) -> Option<Value> {
+    let value = serde_json::from_str::<Value>(parsed)
+        .ok()
+        .or_else(|| serde_json::from_str::<Value>(&recover_json(parsed)).ok())?;
+
+    let has_token = value.get("token").is_some();
+    let has_session = value.get("session").is_some() || value.get("sessionToken").is_some();
+    (has_token && !has_session).then_some(value)
+}
+
 impl Ssid {
+    /// Builds a try-demo (guest) SSID from a short-lived demo `token`.
+    ///
+    /// ```text
+    /// 42["auth",{"token":"<token>","balance":50000,"isFastHistory":true}]
+    /// ```
+    pub fn try_demo(token: impl ToString) -> CoreResult<Self> {
+        Ok(Self::TryDemo(TryDemo::new(token)?))
+    }
+
     /// Parses a raw SSID string from PocketOption
     ///
     /// # Arguments
@@ -204,6 +325,30 @@ impl Ssid {
         } else {
             trimmed
         };
+
+        // PocketOption's free "try demo" (guest) sessions authenticate with a
+        // short-lived `token` instead of an account `session`. Detect that shape
+        // and keep the payload intact so the emitted auth frame matches the
+        // browser capture.
+        if let Some(value) = try_demo_payload(parsed) {
+            let mut try_demo: TryDemo = serde_json::from_value(value)
+                .map_err(|e| CoreError::SsidParsing(format!("Error parsing try-demo SSID: {e}")))?;
+            if try_demo.token.trim().is_empty() {
+                return Err(CoreError::SsidParsing(
+                    "Try-demo SSID `token` must not be empty".into(),
+                ));
+            }
+            try_demo.raw = if trimmed.starts_with(prefix) {
+                trimmed.to_string()
+            } else {
+                format!(
+                    "42[\"auth\",{}]",
+                    serde_json::to_string(&try_demo).unwrap_or_default()
+                )
+            };
+            tracing::debug!(target: "Ssid", "Parsed TryDemo (guest) SSID.");
+            return Ok(Self::TryDemo(try_demo));
+        }
 
         // Track whether recovery was used and what the recovered string is
         let mut used_recovery = false;
@@ -309,7 +454,7 @@ impl Ssid {
 
     pub async fn server(&self) -> CoreResult<String> {
         match self {
-            Self::Demo(_) => Ok(Regions::DEMO.0.to_string()),
+            Self::Demo(_) | Self::TryDemo(_) => Ok(Regions::DEMO.0.to_string()),
             Self::Real(real) => Regions
                 .get_server_for_ip(&real.session.ip_address)
                 .await
@@ -320,7 +465,7 @@ impl Ssid {
 
     pub async fn servers(&self) -> CoreResult<Vec<String>> {
         match self {
-            Self::Demo(_) => Ok(Regions::demo_regions_str()
+            Self::Demo(_) | Self::TryDemo(_) => Ok(Regions::demo_regions_str()
                 .iter()
                 .map(|r| r.to_string())
                 .collect()),
@@ -336,14 +481,14 @@ impl Ssid {
 
     pub fn user_agent(&self) -> String {
         match self {
-            Self::Demo(_) => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36".into(),
+            Self::Demo(_) | Self::TryDemo(_) => DEMO_USER_AGENT.into(),
             Self::Real(real) => real.session.user_agent.clone(),
         }
     }
 
     pub fn ip_address(&self) -> Option<&str> {
         match self {
-            Self::Demo(_) => None,
+            Self::Demo(_) | Self::TryDemo(_) => None,
             Self::Real(real) => Some(&real.session.ip_address),
         }
     }
@@ -351,7 +496,7 @@ impl Ssid {
     /// Returns true if the session is a demo session.
     pub fn demo(&self) -> bool {
         match self {
-            Self::Demo(_) => true,
+            Self::Demo(_) | Self::TryDemo(_) => true,
             Self::Real(_) => false,
         }
     }
@@ -362,6 +507,7 @@ impl Ssid {
     pub fn current_url(&self) -> Option<String> {
         match self {
             Self::Demo(demo) => demo.current_url.clone(),
+            Self::TryDemo(_) => None,
             Self::Real(real) => {
                 // Try to get current_url from the extra field
                 if let Some(url) = real
@@ -380,6 +526,7 @@ impl Ssid {
     pub fn session_id(&self) -> String {
         match self {
             Self::Demo(demo) => demo.session.clone(),
+            Self::TryDemo(try_demo) => try_demo.token.clone(),
             Self::Real(real) => real.session_raw.clone(),
         }
     }
@@ -401,6 +548,7 @@ impl fmt::Display for Ssid {
         match self {
             Self::Demo(demo) => demo.fmt(f),
             Self::Real(real) => real.fmt(f),
+            Self::TryDemo(try_demo) => try_demo.fmt(f),
         }
     }
 }
@@ -499,7 +647,7 @@ mod tests {
                 assert_eq!(demo.is_fast_history, Some(true));
                 assert_eq!(demo.is_optimized, Some(true));
             }
-            Ssid::Real(_) => panic!("Expected Demo SSID, got Real"),
+            other => panic!("Expected Demo SSID, got {other:?}"),
         }
 
         let reconstructed = parsed.to_string();
@@ -603,5 +751,85 @@ mod tests {
         let result = Ssid::parse(malicious);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("double-encoding"));
+    }
+
+    /// Frame captured verbatim from a PocketOption "try demo" (guest) session.
+    const TRY_DEMO_CAPTURE: &str =
+        r#"42["auth",{"token":"9PRxPzq6mQ","balance":50000,"isFastHistory":true}]"#;
+
+    #[test]
+    fn test_parse_try_demo_ssid() -> Result<(), Box<dyn Error>> {
+        let parsed = Ssid::parse(TRY_DEMO_CAPTURE)?;
+
+        assert!(parsed.demo(), "try-demo sessions are demo sessions");
+        assert_eq!(parsed.session_id(), "9PRxPzq6mQ");
+        // The auth frame must be replayed exactly as captured.
+        assert_eq!(parsed.to_string(), TRY_DEMO_CAPTURE);
+
+        match parsed {
+            Ssid::TryDemo(t) => {
+                assert_eq!(t.token, "9PRxPzq6mQ");
+                assert_eq!(t.balance, Some(50000));
+                assert_eq!(t.is_fast_history, Some(true));
+            }
+            other => panic!("expected TryDemo, got {other:?}"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_try_demo_ssid_json_only_roundtrip() -> Result<(), Box<dyn Error>> {
+        let json_only = r#"{"token":"abc1234567","balance":10000,"isFastHistory":false}"#;
+        let parsed = Ssid::parse(json_only)?;
+        assert!(parsed.demo());
+
+        let frame = parsed.to_string();
+        assert!(frame.starts_with("42[\"auth\","));
+        assert!(frame.contains("\"token\":\"abc1234567\""));
+        assert!(!frame.contains("\"session\""));
+
+        let reparsed = Ssid::parse(&frame)?;
+        assert_eq!(reparsed.session_id(), "abc1234567");
+        assert!(reparsed.demo());
+        Ok(())
+    }
+
+    #[test]
+    fn test_try_demo_constructor() -> Result<(), Box<dyn Error>> {
+        let ssid = Ssid::try_demo("tok3n12345")?;
+        assert!(ssid.demo());
+        assert_eq!(ssid.session_id(), "tok3n12345");
+        assert_eq!(ssid.to_string(), r#"42["auth",{"token":"tok3n12345"}]"#);
+
+        let with_balance = Ssid::parse(r#"{"token":"tok3n12345","balance":50000}"#)?;
+        assert_eq!(with_balance.session_id(), "tok3n12345");
+
+        assert!(
+            Ssid::try_demo("  ").is_err(),
+            "blank token must be rejected"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_account_session_is_not_treated_as_try_demo() -> Result<(), Box<dyn Error>> {
+        // An account SSID must keep parsing as an account session even when the
+        // payload happens to carry a `token` field.
+        let raw = r#"42["auth",{"session":"acc0unt0ken","isDemo":1,"uid":42,"platform":2}]"#;
+        let parsed = Ssid::parse(raw)?;
+        assert_eq!(parsed.session_id(), "acc0unt0ken");
+        assert!(matches!(parsed, Ssid::Demo(_)));
+        Ok(())
+    }
+
+    #[test]
+    fn test_try_demo_debug_redacts_token() -> Result<(), Box<dyn Error>> {
+        let parsed = Ssid::parse(TRY_DEMO_CAPTURE)?;
+        let debug = format!("{parsed:?}");
+        assert!(
+            !debug.contains("9PRxPzq6mQ"),
+            "token must not leak: {debug}"
+        );
+        Ok(())
     }
 }

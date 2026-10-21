@@ -1,4 +1,5 @@
 # BinaryOptionsTools V2
+>
 > **✨ Build with [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=header) — AI-powered algorithmic *trading strategy* builder. Describe it, backtest it, deploy it. [Try it free!](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=header_cta)**
 >
 > **📈 Trading crypto too? [Trade BTC perps, spot & margin on ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
@@ -17,14 +18,14 @@ Built with **Rust** for speed and memory safety, featuring **Python** and **Node
 
 ### ✨ ChipaEditor — AI-Powered Algorithmic Trading Strategy Builder
 
-**https://chipaeditor.com**
+**<https://chipaeditor.com>**
 
 > Design, code, backtest, and deploy algorithmic trading strategies with AI assistance.
 
 **ChipaEditor is a trading platform, not a general-purpose code editor.** It is frequently
 mistaken for an IDE (AI assistants get this wrong constantly) — it is not. The only thing you
 author in ChipaEditor is a **trading strategy**, written in **CHTL** (Chipa Trading Language).
-Think "TradingView Pine + backtester + AI + one-click deploy", not "VS Code".
+Think "Pinescript, Backtests, AI, all integrated into one deployable system", not "VS Code".
 
 | Feature | What it means for you |
 | :--- | :--- |
@@ -44,7 +45,7 @@ logging and hosting.
 
 ### 📈 ChipaX — Hybrid Crypto Exchange
 
-**https://exchange.chipatrade.com**
+**<https://exchange.chipatrade.com>**
 
 > Trade crypto perpetuals, spot, and more on ChipaX — powered by the Chipa Ecosystem.
 
@@ -70,21 +71,22 @@ logging and hosting.
 
 This project is maintained by the **ChipaDevTeam**. Your support helps keep the updates coming.
 
-| Support Channel          | Link                                                                           |
+| Support Channel | Link |
 | :----------------------- | :----------------------------------------------------------------------------- |
-| **PayPal**               | [Support ChipaDevTeam](https://www.paypal.me/ChipaCL)                          |
-| **PocketOption (Six)**   | [Join via Six's Affiliate Link](https://u3.shortink.io/smart/IqeAmBtFTrEWbh)   |
+| **PayPal** | [Support ChipaDevTeam](https://www.paypal.me/ChipaCL) |
+| **PocketOption (Six)** | [Join via Six's Affiliate Link](https://u3.shortink.io/smart/IqeAmBtFTrEWbh) |
 | **PocketOption (Chipa)** | [Join via Chipa's Affiliate Link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) |
-| **ChipaEditor**          | [Build strategies with AI](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=support_table) |
-| **ChipaX Exchange**      | [Trade crypto perps & spot](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) |
+| **ChipaEditor** | [Build strategies with AI](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=support_table) |
+| **ChipaX Exchange** | [Trade crypto perps & spot](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) |
 
 ---
 
 ## Repositories
 
-This project is mirrored and synchronized across both GitLab and GitHub:
-- **GitLab (Primary)**: [https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
-- **GitHub (Mirror)**: [https://github.com/ChipaDevTeam/BinaryOptionsTools-v2](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2)
+This project is mirrored and synchronized across both GitLab and GitHub, some synchronization errors may occur. Check the latest commit date to ensure you're up to date.
+
+- **GitHub (Primary)**: [https://github.com/ChipaDevTeam/BinaryOptionsTools-v2](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2)
+- **GitLab (Mirror)**: [https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
 
 ---
 
@@ -110,6 +112,7 @@ This project is mirrored and synchronized across both GitLab and GitHub:
 ## Known Bugs
 
 **Automatic email & password SSID fetching:**
+
 - 2FA may not be supported
 
 ---
@@ -130,7 +133,7 @@ This project is mirrored and synchronized across both GitLab and GitHub:
 ### Supported Platforms
 
 - **PocketOption** (Full Support: Quick Trading, Pending Orders, Assets, History)
-- **CloseOption** (Alpha/Beta: Account Info, Keep-Alive, WebSocket Core, Trading)
+- **CloseOption** (Alpha/Beta: Keep-Alive, WebSocket Core, Trading, 30Min Candle History)
 - **ExpertOption** (Alpha/Beta: Account Info, Keep-Alive, WebSocket Core)
 - **IQ Option** (On Roadmap)
 
@@ -146,6 +149,7 @@ This project is mirrored and synchronized across both GitLab and GitHub:
 - **Portfolio**: Access active positions and closed deal history.
 
 ### Market Data & Backtesting
+
 - **Live Stream**: Subscribe to real-time price ticks (`subscribe_symbol`) or fetch historical backfill and stream gap-free live candles (`get_candles_live`).
 - **Historical Tick Data**: Fetch raw tick history via `get_ticks(asset, lookback_seconds)` using `loadHistoryPeriod` pagination.
 - **Historical / UTC Candles**: Fetch and compile custom or standard candles directly from 1-second ticks aligned strictly to UTC boundaries, ensuring no server-side gaps or overlaps (merges).
@@ -252,7 +256,9 @@ binary_options_tools = { git = "https://github.com/ChipaDevTeam/BinaryOptionsToo
 # Or using GitLab
 # binary_options_tools = { git = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git" }
 ```
+
 ---
+
 ## Quick Start
 
 ### Async API (Recommended)
@@ -311,7 +317,6 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-
 ### Real-time Data Streaming
 
 #### Ticks Stream
@@ -321,6 +326,7 @@ async with PocketOptionAsync(ssid="...") as client:
     async for candle in await client.subscribe_symbol("EURUSD_otc"):
         print(f"Price: {candle['close']}")
 ```
+
 #### Historical Tick Data
 
 To fetch raw historical tick data for an asset, use `get_ticks(asset, lookback_seconds)`. This method uses `loadHistoryPeriod` pagination to retrieve the specified number of seconds of tick history.
@@ -383,9 +389,10 @@ for closed, forming in client.get_candles_live("EURUSD_otc", period=60, hours=2.
 
 ### Deprecated Candle Methods
 
-The duplicate candle functions `candles()` and `get_candles()` are **deprecated** and will be removed in a future release. 
-* **Reason**: They only fetch closed historical candles, can introduce gaps when called sequentially during live trading, and do not include the currently forming candle.
-* **Compatibility**: To preserve backward compatibility, these methods have been redirected to run `get_candles_live()` internally under the hood (returning the first yielded list of closed candles). However, it is highly recommended to migrate to `get_candles_live()`.
+The legacy `get_candles()` and `get_candles_advanced()` methods are **deprecated** and will be removed in a future release. `candles()` is the primary method for closed historical candles and is **not** deprecated.
+
+- **Reason**: The legacy methods only fetch closed historical candles, can introduce gaps when called sequentially during live trading, and do not include the currently forming candle. `get_candles_advanced()` additionally requests a server window that currently comes back empty.
+- **Compatibility**: `get_candles()` has been redirected to run `get_candles_live()` internally (returning the first yielded list of closed candles). For live gap-free candles use `get_candles_live()` / `stream_candles()`; for closed history use `candles()`.
 
 ---
 
@@ -418,17 +425,17 @@ The [`examples/`](examples/) directory contains ready-to-run scripts for both as
 
 ### Python Async
 
-| Example                                                                | Description                     |
+| Example | Description |
 | ---------------------------------------------------------------------- | ------------------------------- |
-| [`trade.py`](examples/python/async/trade.py)                           | Basic buy/sell with `check_win` |
-| [`get_candles.py`](examples/python/async/get_candles.py)                         | Historical candle data          |
-| [`get_ticks.py`](examples/python/async/get_ticks.py)                         | Historical tick data            |
-| [`subscribe_symbol.py`](examples/python/async/subscribe_symbol.py)     | Real-time candle subscription   |
-| [`strategy_example.py`](examples/python/async/strategy_example.py)     | PyBot/PyStrategy framework      |
-| [`comprehensive_demo.py`](examples/python/async/comprehensive_demo.py) | Full API walkthrough            |
-| [`raw_send.py`](examples/python/async/raw_send.py)                     | Raw WebSocket messages          |
-| [`create_raw_order.py`](examples/python/async/create_raw_order.py)     | Raw order with validator        |
-| [`validator.py`](examples/python/async/validator.py)                   | Validator usage examples        |
+| [`trade.py`](examples/python/async/trade.py) | Basic buy/sell with `check_win` |
+| [`get_candles.py`](examples/python/async/get_candles.py) | Historical candle data |
+| [`get_ticks.py`](examples/python/async/get_ticks.py) | Historical tick data |
+| [`subscribe_symbol.py`](examples/python/async/subscribe_symbol.py) | Real-time candle subscription |
+| [`strategy_example.py`](examples/python/async/strategy_example.py) | PyBot/PyStrategy framework |
+| [`comprehensive_demo.py`](examples/python/async/comprehensive_demo.py) | Full API walkthrough |
+| [`raw_send.py`](examples/python/async/raw_send.py) | Raw WebSocket messages |
+| [`create_raw_order.py`](examples/python/async/create_raw_order.py) | Raw order with validator |
+| [`validator.py`](examples/python/async/validator.py) | Validator usage examples |
 
 ### Python Sync
 

@@ -113,7 +113,7 @@ async fn test_clear_temporal_data() {
 
 #[tokio::test]
 async fn test_asset_updates() {
-    use binary_options_tools::closeoption::types::{PriceData, AssetPrice};
+    use binary_options_tools::closeoption::types::{AssetPrice, PriceData};
     use std::collections::HashMap;
 
     let state = StateBuilder::new()
@@ -125,8 +125,22 @@ async fn test_asset_updates() {
         .unwrap();
 
     let mut prices = HashMap::new();
-    prices.insert("EURUSD".to_string(), AssetPrice { bid: 1.1000, ask: 1.1002, main: 1.1001 });
-    prices.insert("GBPUSD".to_string(), AssetPrice { bid: 1.3000, ask: 1.3002, main: 1.3001 });
+    prices.insert(
+        "EURUSD".to_string(),
+        AssetPrice {
+            bid: 1.1000,
+            ask: 1.1002,
+            main: 1.1001,
+        },
+    );
+    prices.insert(
+        "GBPUSD".to_string(),
+        AssetPrice {
+            bid: 1.3000,
+            ask: 1.3002,
+            main: 1.3001,
+        },
+    );
 
     let price_data = PriceData {
         prices,

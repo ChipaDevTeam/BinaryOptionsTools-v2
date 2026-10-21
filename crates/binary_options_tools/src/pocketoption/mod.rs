@@ -6,6 +6,9 @@ pub mod regions;
 pub mod ssid;
 pub mod state;
 
+/// Free "try demo" (guest) session support.
+pub mod try_demo;
+
 /// Contains types used across multiple modules.
 pub mod types;
 /// Contains utility functions and types used across the PocketOption module.

@@ -5,6 +5,7 @@ This directory contains examples for using the CloseOption trading platform inte
 ## Prerequisites
 
 To run these examples, you need:
+
 1. A valid CloseOption session ID (SSID) in the format: `token|sid|demo|public_code|hidden_code`
 2. Python 3.9+ with the BinaryOptionsToolsV2 package installed
 
@@ -55,17 +56,20 @@ python examples/async/closeoption_trading.py
 The CloseOption client supports the following methods:
 
 ### Account Management
+
 - `balance()` - Get current account balance
 - `get_server_time()` - Get server time
 - `reconnect()` - Reconnect to the server
 
 ### Market Data
+
 - `active_assets()` - Get list of active assets
 - `payout(asset)` - Get payout percentage for an asset
 - `get_candles(asset, period, count)` - Get historical candles
 - `get_candles_live(asset, period)` - Get live candle updates
 
 ### Trading
+
 - `buy(asset, amount, duration)` - Place a BUY (CALL) order
 - `sell(asset, amount, duration)` - Place a SELL (PUT) order
 - `check_win(order_id)` - Check trade result
@@ -74,6 +78,7 @@ The CloseOption client supports the following methods:
 - `closed_deals()` - Get closed deals
 
 ### Subscriptions
+
 - `subscribe_symbol(symbol)` - Subscribe to price updates for a symbol
 - `subscribe_raw()` - Subscribe to all raw messages
 - `send_raw(message)` - Send a raw message
@@ -82,11 +87,13 @@ The CloseOption client supports the following methods:
 ## SSID Format
 
 The session ID (SSID) format is:
+
 ```
 token|sid|demo|public_code|hidden_code
 ```
 
 Where:
+
 - `token` - Your authentication token
 - `sid` - Session ID from Socket.IO handshake
 - `demo` - `true` for demo account, `false` for real account

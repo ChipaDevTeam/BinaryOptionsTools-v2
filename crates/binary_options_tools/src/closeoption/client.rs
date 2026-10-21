@@ -54,7 +54,7 @@ impl LightweightModule<State> for PriceDataModule {
                                 serde_json::from_str::<Vec<serde_json::Value>>(&frame.data)
                             {
                                 if let Some(event_name) =
-                                    event_array.get(0).and_then(|v| v.as_str())
+                                    event_array.first().and_then(|v| v.as_str())
                                 {
                                     if event_name == "priceData" {
                                         if let Some(data_value) = event_array.get(1) {
@@ -119,7 +119,7 @@ impl LightweightModule<State> for BalanceModule {
                                 serde_json::from_str::<Vec<serde_json::Value>>(&frame.data)
                             {
                                 if let Some(event_name) =
-                                    event_array.get(0).and_then(|v| v.as_str())
+                                    event_array.first().and_then(|v| v.as_str())
                                 {
                                     if event_name == "setOrderResult" {
                                         if let Some(data_value) = event_array.get(1) {
@@ -653,7 +653,7 @@ impl LightweightModule<State> for ResponseRouterModule {
                         if let Ok(event_array) =
                             serde_json::from_str::<Vec<serde_json::Value>>(&frame.data)
                         {
-                            if let Some(event_name) = event_array.get(0).and_then(|v| v.as_str()) {
+                            if let Some(event_name) = event_array.first().and_then(|v| v.as_str()) {
                                 debug!(target: "Router", event_name, "parsed event from frame");
                                 if let Some(payload) = event_array.get(1) {
                                     // Resolve pending requests by ID
@@ -752,10 +752,10 @@ impl LightweightModule<State> for ResponseRouterModule {
                                                 self.state.subscriptions.lock().await;
                                             let mut failed: Vec<String> = Vec::new();
                                             for (symbol, sender) in subscriptions.iter() {
-                                                if price_data.prices.contains_key(symbol) {
-                                                    if sender.send(event.clone()).await.is_err() {
-                                                        failed.push(symbol.clone());
-                                                    }
+                                                if price_data.prices.contains_key(symbol)
+                                                    && sender.send(event.clone()).await.is_err()
+                                                {
+                                                    failed.push(symbol.clone());
                                                 }
                                             }
                                             for sym in failed {
@@ -950,5 +950,117 @@ mod tests {
         // Verify ordering: events received by each subscriber are in order
         // (tx1 received event3, tx3 received event3)
         // This test primarily ensures no crash and basic delivery works
+    }
+
+    #[test]
+    fn test_get30min_result_full_payload_parses() {
+        // Representative slice of a live `get30MinResult` capture: price
+        // series, order arrays with heterogeneous number/string fields, and
+        // round metadata. Full field coverage is exercised here.
+        let raw = r#"{
+            "price": [
+                {"timeStamp": 1788936193, "value": 1.163775},
+                {"timeStamp": 1788936194, "value": 1.163775}
+            ],
+            "startTimeStopTime": {"startTime": 1788937394, "stopTime": 1788937294},
+            "bonusResult": ["head", "body", "code"],
+            "closeOrders": [
+                {
+                    "orderID": 20486457, "member_id": 64102, "pair": "EUR/USD",
+                    "pair_id": 1, "accountID": 63871,
+                    "openTime": 1788937895, "deadTime": 1788937925,
+                    "status": "close", "amount": "1.00",
+                    "openPrice": "1.16435", "closePrice": "1.164325",
+                    "profit": 0, "orderType": "buy", "result": "loss",
+                    "payOut": "80.00", "pairCode": "EUR/USD:AFX",
+                    "accType": "demo", "sellingAt": null, "sellingBack": null,
+                    "sellingResult": null, "IdCode": "925204864657895"
+                },
+                {
+                    "orderID": 20486454, "member_id": 64102, "pair": "EUR/USD",
+                    "pair_id": 1, "accountID": 63871,
+                    "openTime": 1788937894, "deadTime": 1788937924,
+                    "status": "close", "amount": "1.00",
+                    "openPrice": "1.164320", "closePrice": "1.164310",
+                    "profit": 1.8, "orderType": "sell", "result": "profit",
+                    "payOut": "80.00", "pairCode": "EUR/USD:AFX",
+                    "accType": "demo", "sellingAt": null, "sellingBack": null,
+                    "sellingResult": null, "IdCode": "9242048646547895"
+                }
+            ],
+            "openOrders": [
+                {
+                    "orderID": 20486447, "member_id": 64102, "pair": "EUR/USD",
+                    "pair_id": 1, "accountID": 63871,
+                    "openTime": 1788937901, "deadTime": 1788938201,
+                    "status": "open", "amount": "1.00",
+                    "openPrice": "1.164335", "closePrice": "0.000000",
+                    "profit": "0", "orderType": "buy", "result": "null",
+                    "payOut": "80.00", "pairCode": "EUR/USD:AFX",
+                    "accType": "demo", "sellingAt": null, "sellingBack": null,
+                    "sellingResult": null, "IdCode": "201204864677901"
+                }
+            ],
+            "userBalance": "3039.60",
+            "psType": "30min",
+            "time": 1788937994,
+            "code": "CLO-200",
+            "head": "success.",
+            "pair": "EUR/USD:AFX"
+        }"#;
+
+        let result: Get30MinResult = serde_json::from_str(raw).unwrap();
+
+        assert_eq!(result.price.len(), 2);
+        assert_eq!(result.price[0].timestamp, 1788936193);
+        assert_eq!(result.price[0].value, 1.163775);
+
+        let sst = result.start_time_stop_time.unwrap();
+        assert_eq!(sst.start_time, 1788937394);
+        assert_eq!(sst.stop_time, 1788937294);
+        assert_eq!(result.bonus_result.unwrap(), vec!["head", "body", "code"]);
+
+        assert_eq!(result.close_orders.len(), 2);
+        let closed_loss = &result.close_orders[0];
+        assert_eq!(closed_loss.order_id, 20486457);
+        assert_eq!(closed_loss.status, "close");
+        assert!((closed_loss.amount - 1.0).abs() < f64::EPSILON);
+        assert!((closed_loss.open_price - 1.16435).abs() < f64::EPSILON);
+        assert!((closed_loss.close_price - 1.164325).abs() < f64::EPSILON);
+        assert!((closed_loss.profit - 0.0).abs() < f64::EPSILON);
+        assert_eq!(closed_loss.result, "loss");
+        assert!((closed_loss.pay_out - 80.0).abs() < f64::EPSILON);
+        assert!(closed_loss.selling_at.is_none());
+
+        let closed_win = &result.close_orders[1];
+        assert!((closed_win.profit - 1.8).abs() < f64::EPSILON);
+        assert_eq!(closed_win.result, "profit");
+
+        assert_eq!(result.open_orders.len(), 1);
+        let open_order = &result.open_orders[0];
+        assert_eq!(open_order.status, "open");
+        assert!((open_order.close_price - 0.0).abs() < f64::EPSILON);
+        assert!((open_order.profit - 0.0).abs() < f64::EPSILON);
+        assert_eq!(open_order.result, "null");
+
+        let balance = result.user_balance.unwrap();
+        assert!((balance - 3039.60).abs() < 0.001);
+        assert_eq!(result.ps_type.as_deref(), Some("30min"));
+        assert_eq!(result.time, Some(1788937994));
+        assert_eq!(result.code.as_deref(), Some("CLO-200"));
+        assert_eq!(result.head.as_deref(), Some("success."));
+        assert_eq!(result.pair.as_deref(), Some("EUR/USD:AFX"));
+    }
+
+    #[test]
+    fn test_get30min_result_minimal_payload_still_parses() {
+        // Backward compatibility: payloads with only the price array must
+        // continue to deserialize after the field expansion.
+        let result: Get30MinResult =
+            serde_json::from_str(r#"{"price":[{"timeStamp":1,"value":1.5}]}"#).unwrap();
+        assert_eq!(result.price.len(), 1);
+        assert!(result.close_orders.is_empty());
+        assert!(result.open_orders.is_empty());
+        assert!(result.user_balance.is_none());
     }
 }

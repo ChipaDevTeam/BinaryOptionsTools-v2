@@ -10,6 +10,7 @@ use binary_options_tools_core::{
 use tracing::{debug, warn};
 
 use crate::pocketoption::state::State;
+use crate::pocketoption::utils::socketio_event;
 
 /// Socket.IO event names the server emits when it refuses the auth payload.
 /// These are terminal: the server follows them with a disconnect (41).
@@ -173,20 +174,11 @@ impl LightweightModule<State> for InitModule {
 
                         // Handle complex event messages (successauth, NotAuthorized, etc.)
                         let mut trigger_auth = false;
-                        if let Some(start) = text.find('[') {
-                            if let Ok(value) =
-                                serde_json::from_str::<serde_json::Value>(&text[start..])
-                            {
-                                if let Some(arr) = value.as_array() {
-                                    let event_name = arr.first().and_then(|v| v.as_str());
-                                    if event_name == Some("successauth") {
-                                        trigger_auth = true;
-                                    } else if let Some(event) =
-                                        event_name.filter(|e| AUTH_REJECTED_EVENTS.contains(e))
-                                    {
-                                        return self.reject_auth(event).await;
-                                    }
-                                }
+                        if let Some((event_name, _)) = socketio_event(&text) {
+                            if event_name == "successauth" {
+                                trigger_auth = true;
+                            } else if AUTH_REJECTED_EVENTS.contains(&event_name.as_str()) {
+                                return self.reject_auth(&event_name).await;
                             }
                         } else if is_binary && text.contains("serverName") {
                             // Binary part of successauth
@@ -261,34 +253,22 @@ impl Rule for InitRule {
                 }
 
                 // Check for successauth in a Socket.IO array
-                if let Some(start) = text.find('[') {
-                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text[start..]) {
-                        if let Some(arr) = value.as_array() {
-                            if let Some(event_name) = arr.first().and_then(|v| v.as_str()) {
-                                if event_name == "successauth" {
-                                    // Detect if this is a binary placeholder
-                                    let has_placeholder = arr.iter().skip(1).any(|v| {
-                                        v.as_object()
-                                            .is_some_and(|obj| obj.contains_key("_placeholder"))
-                                    });
-
-                                    if arr.len() == 1 || has_placeholder {
-                                        self.valid.store(true, Ordering::SeqCst);
-                                        return false; // Wait for binary part
-                                    } else {
-                                        self.valid.store(false, Ordering::SeqCst);
-                                        return true;
-                                    }
-                                } else if AUTH_REJECTED_EVENTS.contains(&event_name) {
-                                    // Explicit auth rejection, must reach the module.
-                                    return true;
-                                } else {
-                                    // It's an event, but not successauth.
-                                    return false;
-                                }
-                            }
+                if let Some((event_name, is_placeholder)) = socketio_event(text) {
+                    if event_name == "successauth" {
+                        if is_placeholder {
+                            // The payload arrives in the following binary frame.
+                            self.valid.store(true, Ordering::SeqCst);
+                            return false;
                         }
+                        self.valid.store(false, Ordering::SeqCst);
+                        return true;
                     }
+                    if AUTH_REJECTED_EVENTS.contains(&event_name.as_str()) {
+                        // Explicit auth rejection, must reach the module.
+                        return true;
+                    }
+                    // It's an event, but not successauth.
+                    return false;
                 }
 
                 if self.valid.load(Ordering::SeqCst) {

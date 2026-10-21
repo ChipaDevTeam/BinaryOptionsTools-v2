@@ -6,7 +6,7 @@ use crate::error::UniError;
 use binary_options_tools::error::BinaryOptionsError;
 use binary_options_tools::{
     pocketoption::modules::raw::{Outgoing as InnerOutgoing, RawHandler as InnerRawHandler},
-    stream::Message,
+    utils::message_to_string,
 };
 
 #[uniffi_doc(
@@ -78,13 +78,5 @@ impl RawHandler {
 impl RawHandler {
     pub(crate) fn from_inner(inner: InnerRawHandler) -> Arc<Self> {
         Arc::new(Self { inner })
-    }
-}
-
-fn message_to_string(msg: &Message) -> String {
-    match msg {
-        Message::Text(text) => text.to_string(),
-        Message::Binary(data) => String::from_utf8_lossy(data.as_ref()).into_owned(),
-        _ => String::new(),
     }
 }

@@ -5,6 +5,37 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.16]
+
+### Added
+
+- **Simplified PocketOption client API**: the Python clients (`PocketOptionAsync`, `PocketOption`) now expose one obvious entry point per concern, each with the same Args/Returns docstring on both the async and sync clients.
+  - Market data: `candles(asset, period, count, end_time)`, `stream_candles(asset, period, count)` and `ticks(asset, seconds)`.
+  - Streaming: `subscribe_ticks(asset, *, chunk_size=None, interval=None, aligned=False)` replaces the four `subscribe_symbol*` variants.
+  - Raw protocol: `raw_request(message, validator, timeout, retry)`, `raw_stream(message, validator, timeout)` and `raw_handler(validator, keep_alive)`.
+  - Account: `payouts()` returns the payout of every asset; `payout(asset)` returns a single one.
+- Added the `Trade` model (a `dict` subclass with attribute access plus `result`/`profit`/`is_win`/`is_loss`/`is_draw`/`is_settled`), returned by `buy`, `sell`, `check_win`, `get_opened_deal` and `get_closed_deal`. Exported as `BinaryOptionsToolsV2.Trade` alongside the `TradeResult` alias.
+- Added `PocketOption.is_ssid_valid()`, mirroring the async client.
+
+### Fixed
+
+- **Multi-asset candle feed**: fetching live candles for several assets at once (e.g. `get_candles_live()`/`candles()` for multiple symbols concurrently) no longer returns empty history. The historical-candle module shared a single response queue across all callers, so concurrent requests consumed and discarded each other's responses; responses are now routed to the waiting request by request id.
+- **`get_candles_live()` backfill**: the backfill now compiles candles from raw tick pages - the fastest source that answers reliably - and only falls back to the `changeSymbol` chart history when those pages do not cover the requested window. It no longer calls `get_candles_advanced()`: that request used the `loadHistoryPeriodFast` event, which current servers never answer, so every call left a request hanging until the connection dropped. The previous 3s timeout also discarded the chart history, which takes several seconds, leaving the feed with no history at all.
+- **`get_candles_advanced()` arguments (Python)**: `PocketOptionAsync.candles(..., end_time=...)` and the deprecated `get_candles_advanced()` forwarded `time` as `offset` and `offset` as `time` to the Rust client, so the request asked the server for a window anchored at a handful of seconds. Both now map onto the raw `(asset, period, offset, time)` order.
+- **`get_candles_advanced()` no longer sends `loadHistoryPeriodFast`**: current servers do not answer that event, so the request waited for a response that never arrived (and its `pending` entry stayed behind). The regular `loadHistoryPeriod` event is answered, and an abandoned request is now removed from the module instead of being kept pending. There are two possible outcomes: if the server answers, the call returns the candles compiled from that answer - normally an empty list, because the server sends `"data":[]` (`{"asset":...,"index":...,"data":[],"period":...}`) and only buffered `updateStream` ticks can add candles; if the server stays silent, the caller gets a bounded timeout instead of waiting forever. Either way the endpoint itself contributes no candle data, so `get_candles_live()` compiles history from tick pages instead.
+- **Guest session balance**: guest ("try demo") sessions never receive a balance frame, so `balance()` burned its full timeout and `PocketOptionAsync.balance()` retried that 100 times (over 16 minutes without an answer). It now returns immediately with the balance carried by the auth payload, or `-1.0` when the token was replayed without one.
+- **Pending history requests**: a cancelled or abandoned Rust `SubscriptionsHandle::history()` call no longer leaves the `(asset, period)` marked as in-flight, which previously made every later request for that pair fail as a duplicate forever. This path is not used by the Python `history()`/`candles()` methods, which compile candles from tick history instead.
+
+### Changed
+
+- `open_pending_order` now takes keyword-only arguments and a string `open_time` (`"YYYY-MM-DD HH:MM:SS"` in UTC, or `"0"` for price-based orders), matching the underlying Rust binding. The silent type-coercion fallback was removed.
+- `payout(asset)` accepts a single asset symbol only; call `payouts()` and index it when several assets are needed.
+- `RawCloseOption.send_raw()` now returns `None` instead of the JSON string `"null"`, matching `RawPocketOption.send_raw()`. The `CloseOption` Python wrappers already declared `-> None` and discarded the value.
+
+### Deprecated
+
+These methods keep working (they emit `DeprecationWarning`) and forward to the replacements above: `get_candles`, `get_candles_advanced`, `history`, `get_ticks`, `compile_candles`, `subscribe_symbol_chunked`, `subscribe_symbol_timed`, `subscribe_symbol_time_aligned`, `create_raw_handler`, `send_raw_message`, `create_raw_order`, `create_raw_order_with_timeout`, `create_raw_order_with_timeout_and_retry`, `create_raw_iterator`.
+
 ## [0.2.15]
 
 ### Added
@@ -20,7 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated the JavaScript sections of the documentation (`docs/examples/javascript`, `docs/api/reference.md`, `docs/architecture/structure.md`) to match the implemented API. The previous snippets referenced an `binaryoptionstoolsv2` npm package and methods such as `getClosedDeals()` that do not exist.
 
 ## [0.2.14] - 2026-08-28
+
 ### Added
+
 - **CloseOption Support**: Added new `closeoption` module for the CloseOption binary options platform, supporting Socket.IO EIO=3 protocol on `wss://www.closeoption.com:8443`.
 - Added `CloseOptionAsync` and `CloseOption` Python clients mirroring the PocketOption API.
 - Added PyO3 bindings for CloseOption with full async method support.
@@ -320,7 +353,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.2.14]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.14
 [0.2.13]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.13
 [0.2.12]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.12
-[0.2.11]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.11
 [0.2.10]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.10
 [0.2.9]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.9
 [0.2.8]: https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/releases/v0.2.8

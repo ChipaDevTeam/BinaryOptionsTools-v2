@@ -130,6 +130,21 @@ impl RawHandle {
     }
 }
 
+/// Sends `message` through a one-off raw handler and waits for the first
+/// response accepted by `validator`.
+///
+/// The language bindings all expose a "send raw and wait" call with the same
+/// shape; this is the shared implementation so only the per-language error
+/// mapping differs between them.
+pub async fn send_and_wait(
+    client: &crate::pocketoption::pocket_client::PocketOption,
+    validator: Validator,
+    message: Outgoing,
+) -> PocketResult<Arc<Message>> {
+    let handler = client.create_raw_handler(validator, None).await?;
+    handler.send_and_wait(message).await
+}
+
 /// Per-validator raw handler: send, wait and subscribe to messages matching its validator
 pub struct RawHandler {
     id: Uuid,

@@ -20,11 +20,13 @@ Visit [PocketOption](https://pocketoption.com), open DevTools, find `ssid` cooki
 ## Running Examples
 
 ### Gradle
+
 ```bash
 ./gradlew run --args="your-ssid"
 ```
 
 ### Maven
+
 ```bash
 mvn exec:java -Dexec.args="your-ssid"
 ```
@@ -46,7 +48,6 @@ Always wait 2 seconds after initialization:
 val client = PocketOption.init("your-ssid")
 delay(2000)  // Critical!
 ```
-
 
 ---
 

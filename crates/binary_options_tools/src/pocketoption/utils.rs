@@ -6,6 +6,7 @@ use binary_options_tools_core::error::{CoreError, CoreResult};
 use binary_options_tools_core::reimports::{
     generate_key, MaybeTlsStream, Request, WebSocketStream,
 };
+use binary_options_tools_core::transport::{http_connect_handshake, parse_auth, socks5_handshake};
 use std::time::Duration as StdDuration;
 
 use crate::pocketoption::{
@@ -15,7 +16,6 @@ use crate::pocketoption::{
 use crate::utils::init_crypto_provider;
 use rustls::pki_types::ServerName;
 use serde_json::Value;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio_tungstenite::client_async_with_config;
 
@@ -33,28 +33,18 @@ const IP_PROVIDERS: &[&str] = &[
 ];
 const EARTH_RADIUS_KM: f64 = 6371.0;
 
-/// Threshold for distinguishing millisecond timestamps from second timestamps.
-/// 1_000_000_000_000.0 (~year 33658 in seconds) is far beyond any valid second-based
-/// Unix timestamp, so any value above this is treated as milliseconds.
-const MS_THRESHOLD: f64 = 1_000_000_000_000.0;
-
 /// Normalizes a raw timestamp value to Unix seconds (i64).
 ///
-/// Handles both second-based and millisecond-based timestamps automatically.
-/// Uses rounding (not truncation) to avoid off-by-one-second errors.
-///
-/// # Arguments
-/// * `raw` - Raw timestamp as f64 (either seconds or milliseconds)
-///
-/// # Returns
-/// Normalized Unix timestamp in seconds as i64
+/// Handles both second-based and millisecond-based timestamps, and truncates the
+/// fraction: PocketOption candle bucketing needs a tick at `...:59.9` to stay in
+/// the `...:59` bucket. The shared implementation takes the rounding policy as a
+/// parameter so the CloseOption side can round instead.
 #[inline]
 pub fn normalize_timestamp(raw: f64) -> i64 {
-    if raw > MS_THRESHOLD {
-        (raw / 1000.0).trunc() as i64
-    } else {
-        raw.trunc() as i64
-    }
+    binary_options_tools_core::transport::normalize_timestamp(
+        raw,
+        binary_options_tools_core::transport::TimestampResolution::Truncate,
+    )
 }
 
 static INDEX_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -147,276 +137,20 @@ pub async fn get_public_ip() -> PocketResult<String> {
     ))
 }
 
-fn base64_encode(input: &[u8]) -> String {
-    const CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut result = String::with_capacity(input.len().div_ceil(3) * 4);
-    for chunk in input.chunks(3) {
-        match chunk.len() {
-            3 => {
-                result.push(CHARSET[(chunk[0] >> 2) as usize] as char);
-                result.push(CHARSET[(((chunk[0] & 0x03) << 4) | (chunk[1] >> 4)) as usize] as char);
-                result.push(CHARSET[(((chunk[1] & 0x0f) << 2) | (chunk[2] >> 6)) as usize] as char);
-                result.push(CHARSET[(chunk[2] & 0x3f) as usize] as char);
-            }
-            2 => {
-                result.push(CHARSET[(chunk[0] >> 2) as usize] as char);
-                result.push(CHARSET[(((chunk[0] & 0x03) << 4) | (chunk[1] >> 4)) as usize] as char);
-                result.push(CHARSET[((chunk[1] & 0x0f) << 2) as usize] as char);
-                result.push('=');
-            }
-            1 => {
-                result.push(CHARSET[(chunk[0] >> 2) as usize] as char);
-                result.push(CHARSET[((chunk[0] & 0x03) << 4) as usize] as char);
-                result.push('=');
-                result.push('=');
-            }
-            _ => unreachable!(),
-        }
-    }
-    result
-}
-
-fn parse_auth(url: &Url) -> Option<(String, String)> {
-    let username = url.username();
-    if !username.is_empty() {
-        let password = url.password().unwrap_or("");
-        Some((username.to_string(), password.to_string()))
-    } else {
-        None
-    }
-}
-
-async fn socks5_handshake<S>(
-    stream: &mut S,
-    target_host: &str,
-    target_port: u16,
-    auth: Option<(String, String)>,
-) -> ConnectorResult<()>
-where
-    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
-{
-    if let Some((_user, _pass)) = &auth {
-        stream
-            .write_all(&[0x05, 0x02, 0x00, 0x02])
-            .await
-            .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting send failed: {e}")))?;
-    } else {
-        stream
-            .write_all(&[0x05, 0x01, 0x00])
-            .await
-            .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting send failed: {e}")))?;
-    }
-
-    let mut resp = [0u8; 2];
-    stream
-        .read_exact(&mut resp)
-        .await
-        .map_err(|e| ConnectorError::Custom(format!("SOCKS5 greeting read failed: {e}")))?;
-
-    if resp[0] != 0x05 {
-        return Err(ConnectorError::Custom("Invalid SOCKS5 version".into()));
-    }
-
-    if resp[1] == 0x02 {
-        if let Some((user, pass)) = &auth {
-            let user_bytes = user.as_bytes();
-            let pass_bytes = pass.as_bytes();
-
-            let mut auth_req = Vec::new();
-            auth_req.push(0x01);
-            auth_req.push(user_bytes.len() as u8);
-            auth_req.extend_from_slice(user_bytes);
-            auth_req.push(pass_bytes.len() as u8);
-            auth_req.extend_from_slice(pass_bytes);
-
-            stream
-                .write_all(&auth_req)
-                .await
-                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 auth failed: {e}")))?;
-
-            let mut auth_resp = [0u8; 2];
-            stream
-                .read_exact(&mut auth_resp)
-                .await
-                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 auth read failed: {e}")))?;
-
-            if auth_resp[1] != 0x00 {
-                return Err(ConnectorError::Custom(
-                    "SOCKS5 authentication failed".into(),
-                ));
-            }
-        } else {
-            return Err(ConnectorError::Custom(
-                "SOCKS5 proxy requested auth but no credentials provided".into(),
-            ));
-        }
-    } else if resp[1] != 0x00 {
-        return Err(ConnectorError::Custom(
-            "SOCKS5 authentication method rejected".into(),
-        ));
-    }
-
-    let host_bytes = target_host.as_bytes();
-    let mut req = Vec::new();
-    req.extend_from_slice(&[0x05, 0x01, 0x00, 0x03, host_bytes.len() as u8]);
-    req.extend_from_slice(host_bytes);
-    req.extend_from_slice(&target_port.to_be_bytes());
-
-    stream
-        .write_all(&req)
-        .await
-        .map_err(|e| ConnectorError::Custom(format!("SOCKS5 connect request failed: {e}")))?;
-
-    let mut resp_hdr = [0u8; 4];
-    stream
-        .read_exact(&mut resp_hdr)
-        .await
-        .map_err(|e| ConnectorError::Custom(format!("SOCKS5 connect response read failed: {e}")))?;
-
-    if resp_hdr[1] != 0x00 {
-        return Err(ConnectorError::Custom(format!(
-            "SOCKS5 connect request failed with error code: {}",
-            resp_hdr[1]
-        )));
-    }
-
-    match resp_hdr[3] {
-        0x01 => {
-            let mut addr = [0u8; 4 + 2];
-            stream
-                .read_exact(&mut addr)
-                .await
-                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 address read failed: {e}")))?;
-        }
-        0x03 => {
-            let mut len_buf = [0u8; 1];
-            stream.read_exact(&mut len_buf).await.map_err(|e| {
-                ConnectorError::Custom(format!("SOCKS5 domain len read failed: {e}"))
-            })?;
-            let mut domain_and_port = vec![0u8; len_buf[0] as usize + 2];
-            stream
-                .read_exact(&mut domain_and_port)
-                .await
-                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 domain read failed: {e}")))?;
-        }
-        0x04 => {
-            let mut addr = [0u8; 16 + 2];
-            stream
-                .read_exact(&mut addr)
-                .await
-                .map_err(|e| ConnectorError::Custom(format!("SOCKS5 address read failed: {e}")))?;
-        }
-        _ => return Err(ConnectorError::Custom("Unsupported address type".into())),
-    }
-
-    Ok(())
-}
-
-async fn http_connect_handshake<S>(
-    stream: &mut S,
-    target_host: &str,
-    target_port: u16,
-    auth: Option<(String, String)>,
-) -> ConnectorResult<()>
-where
-    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
-{
-    let mut req_str = format!(
-        "CONNECT {target_host}:{target_port} HTTP/1.1\r\nHost: {target_host}:{target_port}\r\n"
-    );
-    if let Some((user, pass)) = &auth {
-        let creds = format!("{user}:{pass}");
-        let encoded = base64_encode(creds.as_bytes());
-        req_str.push_str(&format!("Proxy-Authorization: Basic {encoded}\r\n"));
-    }
-    req_str.push_str("\r\n");
-
-    stream
-        .write_all(req_str.as_bytes())
-        .await
-        .map_err(|e| ConnectorError::Custom(format!("HTTP proxy CONNECT failed: {e}")))?;
-
-    let mut header_buf = Vec::new();
-    let mut temp = [0u8; 1];
-    loop {
-        stream
-            .read_exact(&mut temp)
-            .await
-            .map_err(|e| ConnectorError::Custom(format!("HTTP proxy read failed: {e}")))?;
-        header_buf.push(temp[0]);
-        if header_buf.ends_with(b"\r\n\r\n") {
-            break;
-        }
-        if header_buf.len() > 8192 {
-            return Err(ConnectorError::Custom(
-                "HTTP proxy response header too large".into(),
-            ));
-        }
-    }
-
-    let headers_text = String::from_utf8_lossy(&header_buf);
-    let first_line = headers_text
-        .lines()
-        .next()
-        .ok_or_else(|| ConnectorError::Custom("Empty HTTP proxy response".into()))?;
-    if !first_line.contains(" 200 ") {
-        return Err(ConnectorError::Custom(format!(
-            "HTTP proxy CONNECT rejected: {first_line}"
-        )));
-    }
-
-    Ok(())
-}
-
+/// TLS configuration for PocketOption connections.
+///
+/// Delegates to the shared transport implementation and maps its error into the
+/// crate's error type, which is what the connection code expects.
 fn get_tls_config(
     tls_cipher_suites: &Option<Vec<String>>,
     tls_alpn: &Option<Vec<String>>,
 ) -> CoreResult<rustls::ClientConfig> {
-    let mut root_store = rustls::RootCertStore::empty();
-    let certs = rustls_native_certs::load_native_certs().certs;
-    for cert in certs {
-        root_store.add(cert).ok();
-    }
-
-    let provider = rustls::crypto::ring::default_provider();
-    let mut cipher_suites = provider.cipher_suites;
-
-    if let Some(custom_suites) = tls_cipher_suites {
-        cipher_suites.retain(|cs| {
-            let name = format!("{:?}", cs.suite()).to_uppercase();
-            custom_suites
-                .iter()
-                .any(|c| name.contains(&c.to_uppercase()))
-        });
-    } else {
-        use rand::seq::SliceRandom;
-        let mut rng = rand::rng();
-        cipher_suites.shuffle(&mut rng);
-    }
-
-    let custom_provider = rustls::crypto::CryptoProvider {
-        cipher_suites,
-        ..provider
-    };
-
-    let mut tls_config =
-        rustls::ClientConfig::builder_with_provider(std::sync::Arc::new(custom_provider))
-            .with_safe_default_protocol_versions()
-            .map_err(|e| CoreError::Connection(ConnectorError::Tls(e.to_string())))?
-            .with_root_certificates(root_store)
-            .with_no_client_auth();
-
-    if let Some(alpn) = tls_alpn {
-        tls_config.alpn_protocols = alpn.iter().map(|s| s.as_bytes().to_vec()).collect();
-    } else {
-        tls_config.alpn_protocols = vec![b"http/1.1".to_vec()];
-    }
-
-    Ok(tls_config)
+    binary_options_tools_core::transport::get_tls_config(tls_cipher_suites, tls_alpn)
+        .map_err(CoreError::Connection)
 }
 
 fn per_url_connect_timeout() -> StdDuration {
-    StdDuration::from_secs(15)
+    binary_options_tools_core::transport::per_url_connect_timeout()
 }
 
 pub async fn try_connect(
@@ -794,6 +528,59 @@ impl SocketIoFrame {
     }
 }
 
+/// Parses the first JSON array contained in a raw Socket.IO text frame.
+///
+/// Frames reach the modules with an Engine.IO/Socket.IO prefix (`42[...]`), and
+/// some carry additional leading metadata, so the payload is located at the
+/// first `[` rather than parsed from the raw text. This is the shared fallback
+/// used by the modules; before it existed each module re-implemented the
+/// `find('[')` + `serde_json::from_str` pair.
+///
+/// Returns `None` when the text contains no `[`, and `Some(Err(_))` when the
+/// content after the bracket is not valid JSON.
+pub fn parse_socketio_array(text: &str) -> Option<serde_json::Result<Value>> {
+    let start = text.find('[')?;
+    Some(serde_json::from_str(&text[start..]))
+}
+
+/// Whether an event array's payload is a placeholder for an attached binary frame.
+///
+/// A header-only frame (`["event"]`) and a frame whose payload object contains
+/// `_placeholder` both announce that the real payload follows in a binary frame.
+pub fn has_binary_placeholder(array: &[Value]) -> bool {
+    array.len() == 1
+        || array.iter().skip(1).any(|v| {
+            v.as_object()
+                .is_some_and(|obj| obj.contains_key("_placeholder"))
+        })
+}
+
+/// Returns the payload of `event` from a parsed Socket.IO event array.
+///
+/// The array shape is `["event", payload, ...]`; `None` is returned when the
+/// value is not an array, has no string event name, or names a different event.
+pub fn socketio_event_payload<'a>(value: &'a Value, event: &str) -> Option<&'a Value> {
+    let array = value.as_array()?;
+    if array.first()?.as_str()? == event {
+        array.get(1)
+    } else {
+        None
+    }
+}
+
+/// Reads the name of the first event in a Socket.IO text frame.
+///
+/// The boolean reports whether the payload is a binary placeholder, i.e. whether
+/// the frame is only the first step of a two-step (text + binary) message. Rules
+/// use it to decide between forwarding the message now and waiting for the
+/// binary half.
+pub fn socketio_event(text: &str) -> Option<(String, bool)> {
+    let value = parse_socketio_array(text)?.ok()?;
+    let array = value.as_array()?;
+    let name = array.first()?.as_str()?.to_string();
+    Some((name, has_binary_placeholder(array)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -819,5 +606,45 @@ mod tests {
         let (event, payload) = frame.extract_event().unwrap();
         assert_eq!(event, "firstEvent");
         assert_eq!(payload, json!({"a":1}));
+    }
+
+    #[test]
+    fn test_parse_socketio_array() {
+        let parsed = parse_socketio_array(r#"42["successauth",{}]"#)
+            .unwrap()
+            .unwrap();
+        assert_eq!(parsed, json!(["successauth", {}]));
+
+        // No bracket: not a Socket.IO payload.
+        assert!(parse_socketio_array("41").is_none());
+
+        // Bracket present but malformed JSON.
+        assert!(parse_socketio_array("42[not-json").unwrap().is_err());
+    }
+
+    #[test]
+    fn test_has_binary_placeholder() {
+        assert!(has_binary_placeholder(&[json!("event")]));
+        assert!(has_binary_placeholder(&[
+            json!("event"),
+            json!({"_placeholder": true, "num": 1})
+        ]));
+        assert!(!has_binary_placeholder(&[
+            json!("event"),
+            json!({"payload": 1})
+        ]));
+    }
+
+    #[test]
+    fn test_socketio_event() {
+        assert_eq!(
+            socketio_event("42[\"successauth\",{\"ok\":true}]"),
+            Some(("successauth".to_string(), false))
+        );
+        assert_eq!(
+            socketio_event("42[\"successauth\"]"),
+            Some(("successauth".to_string(), true))
+        );
+        assert_eq!(socketio_event("not json"), None);
     }
 }

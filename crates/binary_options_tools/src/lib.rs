@@ -7,12 +7,16 @@
 //!
 //! ## Modules
 //!
+//! - `pocketoption` - Integration with PocketOption platform (feature: "pocketoption")
+//! - `expertoptions` - Integration with ExpertOption platform (feature: "expertoption")
 //! - `closeoption` - Integration with CloseOption platform (feature: "closeoption")
-//! - `expertoptions` - Integration with ExpertOption platform  
-//! - `closeoption` - Integration with CloseOption platform
+//! - `framework` - Bot framework built on top of the platform clients
 //! - `reimports` - Common re-exports for convenience
 //! - `error` - Error handling types and utilities
 //! - `stream` - Streaming utilities including receiver streams and logging layers
+//!
+//! Each platform module is behind its own feature so a binding only compiles the
+//! platform it actually exposes.
 //!
 //! ## Features
 //!
@@ -31,8 +35,11 @@
 pub mod closeoption;
 pub mod config;
 pub mod error;
+#[cfg(feature = "expertoption")]
 pub mod expertoptions;
+#[cfg(feature = "pocketoption")]
 pub mod framework;
+#[cfg(feature = "pocketoption")]
 pub mod pocketoption;
 pub mod traits;
 pub mod utils;

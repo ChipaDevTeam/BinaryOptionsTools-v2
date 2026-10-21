@@ -1,18 +1,17 @@
 import asyncio
 import json
 import sys
-import os
 import types
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import urlparse
 
-import anyio
 import pytest
 
 from BinaryOptionsToolsV2.config import Config
 from BinaryOptionsToolsV2.pocketoption.asynchronous import PocketOptionAsync
 from BinaryOptionsToolsV2.validator import Validator
+from BinaryOptionsToolsV2.pocketoption.models import Trade
 
 
 class MockRawClient:
@@ -50,14 +49,19 @@ class MockRawClient:
             ]
         )
 
+    async def get_ticks(self, asset, lookback_seconds):
+        return json.dumps([[1000, 1.1], [1001, 1.12]])
+
     async def get_candles(self, asset, period, offset):
         return json.dumps(
             [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
         )
 
     async def get_candles_advanced(self, asset, period, offset, time):
+        # (asset, period, offset, time) is the raw client's order; return a
+        # plausible historical candle instead of echoing the window anchor.
         return json.dumps(
-            [{"time": time, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
+            [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
         )
 
     async def balance(self):
@@ -514,6 +518,42 @@ class TestCheckWin:
             await async_client.check_win("trade_123")
 
 
+class TestTradeModel:
+    """Tests for the Trade result model."""
+
+    @pytest.mark.asyncio
+    async def test_buy_returns_trade_model(self, async_client):
+        """buy() returns a Trade that supports attribute and mapping access."""
+        _trade_id, trade = await async_client.buy("EURUSD_otc", 1.0, 60)
+        assert isinstance(trade, Trade)
+        assert trade.asset == "EURUSD_otc"
+        assert trade["direction"] == "buy"
+
+    @pytest.mark.asyncio
+    async def test_settled_trade_flags(self, async_client):
+        """A settled win reports outcome via flags and attributes."""
+        _trade_id, trade = await async_client.buy("EURUSD_otc", 1.0, 60, check_win=True)
+        assert trade.is_settled
+        assert trade.is_win
+        assert not trade.is_loss
+        assert not trade.is_draw
+        assert trade.result == "win"
+        assert trade.profit == 1.5
+
+    @pytest.mark.asyncio
+    async def test_check_win_returns_trade_model(self, async_client):
+        """check_win() returns a Trade model."""
+        result = await async_client.check_win("trade_123")
+        assert isinstance(result, Trade)
+        assert result["id"] == "trade_123"
+        assert result.to_dict() == dict(result)
+
+    def test_trade_unknown_field_raises(self):
+        """Missing fields raise AttributeError, not KeyError."""
+        with pytest.raises(AttributeError):
+            _ = Trade({}).missing_field
+
+
 class TestGetDealEndTime:
     """Tests for get_deal_end_time method."""
 
@@ -588,6 +628,101 @@ class TestCandles:
             await async_client.compile_candles("EURUSD_otc", 20, -1)
 
     @pytest.mark.asyncio
+    async def test_get_candles_advanced_forwards_offset_and_time(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """The public (asset, period, time, offset) order maps to raw (offset, time).
+
+        Regression test for #141: the wrapper used to forward time as offset and
+        offset as time, so history requests asked the server for a window at a
+        timestamp of a few dozen seconds and came back empty.
+        """
+        import warnings
+
+        mock_raw_pocketoption.get_candles_advanced = AsyncMock(
+            return_value=json.dumps([])
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            await async_client.get_candles_advanced(
+                "EURUSD_otc", 60, time=1700000000, offset=10
+            )
+        mock_raw_pocketoption.get_candles_advanced.assert_awaited_once_with(
+            "EURUSD_otc", 60, offset=10, time=1700000000
+        )
+
+    @pytest.mark.asyncio
+    async def test_candles_end_time_forwards_offset_and_time(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """candles(..., end_time=...) anchors the window and asks for count periods."""
+        mock_raw_pocketoption.get_candles_advanced = AsyncMock(
+            return_value=json.dumps(
+                [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
+            )
+        )
+        candles = await async_client.candles(
+            "EURUSD_otc", 60, count=5, end_time=1700000000
+        )
+        assert candles[0]["time"] == 1000
+        mock_raw_pocketoption.get_candles_advanced.assert_awaited_once_with(
+            "EURUSD_otc", 60, offset=5, time=1700000000
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_candles_live_skips_chart_history_when_ticks_cover_window(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """The tick-compiled history is the only source when it covers the window.
+
+        Regression test for #141: every asset used to issue all three history
+        requests at once, which floods the socket when many assets are polled.
+        """
+        ticks = json.dumps(
+            [
+                {
+                    "time": 1000 + i * 60,
+                    "open": 1.1,
+                    "high": 1.2,
+                    "low": 1.0,
+                    "close": 1.15,
+                }
+                for i in range(10)
+            ]
+        )
+        mock_raw_pocketoption.compile_candles = AsyncMock(return_value=ticks)
+        mock_raw_pocketoption.history = AsyncMock(return_value=ticks)
+        mock_raw_pocketoption.get_candles_advanced = AsyncMock(return_value=ticks)
+        gen = async_client.get_candles_live(
+            "EURUSD_otc", period=60, hours=0.1, max_rows=10
+        )
+        closed, _forming = await gen.__anext__()
+        await gen.aclose()
+        assert len(closed) > 0
+        mock_raw_pocketoption.compile_candles.assert_awaited()
+        mock_raw_pocketoption.history.assert_not_awaited()
+        mock_raw_pocketoption.get_candles_advanced.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_get_candles_live_falls_back_to_chart_history(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """When tick pages do not cover the window, the chart history fills it in."""
+        candle = json.dumps(
+            [{"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}]
+        )
+        mock_raw_pocketoption.compile_candles = AsyncMock(return_value=json.dumps([]))
+        mock_raw_pocketoption.history = AsyncMock(return_value=candle)
+        gen = async_client.get_candles_live(
+            "EURUSD_otc", period=60, hours=0.1, max_rows=10
+        )
+        closed, _forming = await gen.__anext__()
+        await gen.aclose()
+        mock_raw_pocketoption.compile_candles.assert_awaited()
+        mock_raw_pocketoption.history.assert_awaited()
+        assert len(closed) > 0
+
+    @pytest.mark.asyncio
     async def test_get_candles_live_success(self, async_client, mock_raw_pocketoption):
         """Test get_candles_live streaming."""
         mock_raw_pocketoption.compile_candles = AsyncMock(
@@ -626,6 +761,35 @@ class TestCandles:
         assert isinstance(forming, (dict, type(None)))
 
 
+class TestTicks:
+    """Tests for the ticks method."""
+
+    @pytest.mark.asyncio
+    async def test_ticks_success(self, async_client):
+        """ticks() returns (timestamp, price) tuples."""
+        ticks = await async_client.ticks("USDCHF_otc", 300)
+        assert ticks == [(1000, 1.1), (1001, 1.12)]
+
+    @pytest.mark.asyncio
+    async def test_ticks_rejects_non_positive_seconds(self, async_client):
+        """ticks() rejects zero or negative lookback."""
+        with pytest.raises(ValueError, match="seconds must be a positive integer"):
+            await async_client.ticks("USDCHF_otc", 0)
+
+
+class TestStreamCandles:
+    """Tests for the stream_candles method."""
+
+    @pytest.mark.asyncio
+    async def test_stream_candles_yields_closed_and_forming(self, async_client):
+        """stream_candles() yields (closed_candles, forming_candle) tuples."""
+        gen = async_client.stream_candles("EURUSD_otc", 60, history=0.1, max_rows=10)
+        closed, forming = await gen.__anext__()
+        assert isinstance(closed, list)
+        assert isinstance(forming, (dict, type(None)))
+        await gen.aclose()
+
+
 class TestBalance:
     """Tests for balance method."""
 
@@ -635,6 +799,17 @@ class TestBalance:
         balance = await async_client.balance()
         assert isinstance(balance, float)
         assert balance >= 0
+
+    @pytest.mark.asyncio
+    async def test_guest_balance_does_not_poll(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A guest session never receives a balance frame, so it must not retry."""
+        async_client._guest_session = True
+        mock_raw_pocketoption.balance = AsyncMock(return_value=-1.0)
+
+        assert await async_client.balance() == -1.0
+        mock_raw_pocketoption.balance.assert_awaited_once()
 
 
 class TestOpenedDeals:
@@ -695,7 +870,14 @@ class TestOpenPendingOrder:
         )
         with pytest.raises(ValueError, match="Invalid amount"):
             await async_client.open_pending_order(
-                0, -1.0, "EURUSD_otc", 1700000000, 1.1, 60, 80, 0
+                open_type=0,
+                amount=-1.0,
+                asset="EURUSD_otc",
+                open_time="0",
+                open_price=1.1,
+                timeframe=60,
+                min_payout=80,
+                command=0,
             )
 
 
@@ -808,41 +990,26 @@ class TestClearClosedDeals:
 
 
 class TestPayout:
-    """Tests for payout method."""
+    """Tests for payouts and payout methods."""
 
     @pytest.mark.asyncio
-    async def test_payout_all(self, async_client):
-        """Test payout with no asset parameter (all assets)."""
-        payouts = await async_client.payout()
+    async def test_payouts_all(self, async_client):
+        """Test payouts returns every asset's percentage."""
+        payouts = await async_client.payouts()
         assert isinstance(payouts, dict)
-        assert "EURUSD_otc" in payouts
+        assert payouts["EURUSD_otc"] == 85
 
     @pytest.mark.asyncio
     async def test_payout_single_asset(self, async_client):
-        """Test payout with single asset string."""
+        """Test payout for a known asset."""
         payout = await async_client.payout("EURUSD_otc")
         assert isinstance(payout, int)
         assert payout == 85
 
     @pytest.mark.asyncio
-    async def test_payout_list_of_assets(self, async_client):
-        """Test payout with list of assets."""
-        payouts = await async_client.payout(["EURUSD_otc", "GBPUSD_otc"])
-        assert isinstance(payouts, list)
-        assert len(payouts) == 2
-        assert payouts[0] == 85
-
-    @pytest.mark.asyncio
     async def test_payout_invalid_asset(self, async_client):
-        """Test payout with invalid asset returns None."""
-        payout = await async_client.payout("INVALID_ASSET")
-        assert payout is None
-
-    @pytest.mark.asyncio
-    async def test_payout_empty_list(self, async_client):
-        """Test payout with empty list."""
-        payouts = await async_client.payout([])
-        assert payouts == []
+        """Test payout for an unknown asset returns None."""
+        assert await async_client.payout("INVALID_ASSET") is None
 
 
 class TestActiveAssets:
@@ -1083,9 +1250,7 @@ class TestSendRawMessage:
     @pytest.mark.asyncio
     async def test_send_raw_message_error(self, async_client, mock_raw_pocketoption):
         """Test send_raw_message when client fails."""
-        mock_raw_pocketoption.send_raw_message = AsyncMock(
-            side_effect=Exception("Send failed")
-        )
+        mock_raw_pocketoption.send_raw = AsyncMock(side_effect=Exception("Send failed"))
         with pytest.raises(Exception, match="Send failed"):
             await async_client.send_raw_message('42["ping"]')
 
@@ -1266,6 +1431,25 @@ class TestSsidValidation:
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
         assert client.is_ssid_valid() is True
 
+    def test_guest_token_payload_skips_session_validation(self):
+        """A token-only guest payload is valid even without session/uid."""
+        ssid = '42["auth",{"token":"9PRxPzq6mQ","balance":50000,"isFastHistory":true}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client.is_ssid_valid() is True
+        assert client._guest_session is True
+
+    def test_account_ssid_is_not_marked_as_guest(self):
+        """An account SSID receives balance frames, so balance() keeps polling."""
+        ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":1,"platform":2}]'
+        client = PocketOptionAsync(ssid, config={"terminal_logging": False})
+        assert client._guest_session is False
+
+    def test_token_with_account_session_is_still_validated(self):
+        """A payload that also carries a session is an account SSID, not a guest."""
+        ssid = '42["auth",{"token":"t","session":"abc123def456","isDemo":1}]'
+        with pytest.raises(ValueError, match="missing required field 'uid'"):
+            PocketOptionAsync(ssid, config={"terminal_logging": False})
+
     def test_missing_session_raises(self):
         """SSID missing the 'session' field raises ValueError."""
         ssid = '42["auth",{"uid":69982301,"isDemo":1}]'
@@ -1415,8 +1599,8 @@ class TestAsynchronousExtraCoverage:
             return_value='{"id": "deal_123", "status": "open"}'
         )
         deal = await client.get_opened_deal("deal_123")
-        assert deal is not None
-        assert deal["id"] == "deal_123"
+        assert isinstance(deal, Trade)
+        assert deal.id == "deal_123"
 
         # 2. None
         mock_raw_pocketoption.get_opened_deal = AsyncMock(return_value=None)
@@ -1430,7 +1614,7 @@ class TestAsynchronousExtraCoverage:
             return_value='{"id": "deal_456", "status": "closed"}'
         )
         deal = await client.get_closed_deal("deal_456")
-        assert deal is not None
+        assert isinstance(deal, Trade)
         assert deal["id"] == "deal_456"
 
         # 2. None
@@ -1438,54 +1622,40 @@ class TestAsynchronousExtraCoverage:
         assert await client.get_closed_deal("not_found") is None
 
     @pytest.mark.asyncio
-    async def test_open_pending_order_type_error_fallbacks(self, mock_raw_pocketoption):
+    async def test_open_pending_order_keyword_only_forwards_open_time(
+        self, mock_raw_pocketoption
+    ):
         client = PocketOptionAsync("test_ssid")
 
-        # We want open_pending_order to raise TypeError on the first call, then succeed
-        call_count = 0
-
-        async def mock_open(ot, amt, asset, optime, opprice, tf, minp, cmd):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                raise TypeError("object cannot be interpreted as an integer")
-            return json.dumps({"optime": optime})
+        async def mock_open(
+            open_type,
+            amount,
+            asset,
+            open_time,
+            open_price,
+            timeframe,
+            min_payout,
+            command,
+        ):
+            return json.dumps({"open_time": open_time, "command": command})
 
         mock_raw_pocketoption.open_pending_order = mock_open
 
-        # Test "0" string
-        call_count = 0
-        res = await client.open_pending_order(1, 10.0, "EURUSD", "0", 1.1, 60, 80, 0)
-        assert res["optime"] == 0
-
-        # Test numeric string
-        call_count = 0
         res = await client.open_pending_order(
-            1, 10.0, "EURUSD", "12345678", 1.1, 60, 80, 0
+            open_type=0,
+            amount=10.0,
+            asset="EURUSD",
+            open_time="2026-06-25 12:00:00",
+            open_price=1.1,
+            timeframe=60,
+            min_payout=80,
+            command=1,
         )
-        assert res["optime"] == 12345678
+        assert res["open_time"] == "2026-06-25 12:00:00"
+        assert res["command"] == 1
 
-        # Test date string YYYY-MM-DD HH:MM:SS
-        call_count = 0
-        res = await client.open_pending_order(
-            1, 10.0, "EURUSD", "2026-06-25 12:00:00", 1.1, 60, 80, 0
-        )
-        assert res["optime"] > 0
-
-        # Test invalid date string
-        call_count = 0
-        res = await client.open_pending_order(
-            1, 10.0, "EURUSD", "invalid_date", 1.1, 60, 80, 0
-        )
-        assert res["optime"] == 0
-
-        # Test other TypeError is re-raised
-        async def mock_other_type_error(*args):
-            raise TypeError("some other error")
-
-        mock_raw_pocketoption.open_pending_order = mock_other_type_error
-        with pytest.raises(TypeError, match="some other error"):
-            await client.open_pending_order(1, 10.0, "EURUSD", "0", 1.1, 60, 80, 0)
+        with pytest.raises(TypeError):
+            await client.open_pending_order(0, 10.0, "EURUSD", "0", 1.1, 60, 80, 1)
 
     def test_anext_polyfill_coverage(self):
         import sys

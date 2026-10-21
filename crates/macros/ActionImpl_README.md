@@ -11,7 +11,7 @@ use binary_options_tools_macros::ActionImpl;
 use your_crate::expertoptions::action::ActionName;  // Import the trait
 ```
 
-2. **Add the derive macro to your struct or enum:**
+1. **Add the derive macro to your struct or enum:**
 
 ```rust
 #[derive(ActionImpl)]

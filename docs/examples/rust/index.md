@@ -175,7 +175,6 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 
 Trading binary options involves substantial risk and may result in the loss of all invested capital. These examples are provided for educational purposes only. Always trade responsibly and never invest more than you can afford to lose.
 
-
 ---
 
 ## Build strategies faster

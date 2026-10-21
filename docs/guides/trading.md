@@ -10,7 +10,6 @@ Applying these same ideas to crypto? **[ChipaX](https://exchange.chipatrade.com/
 demo mode to practise risk-free.
 :::
 
-
 Complete guide to trading binary options using BinaryOptionsToolsUni across all supported languages.
 
 ## Table of Contents

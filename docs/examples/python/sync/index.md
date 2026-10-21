@@ -182,9 +182,10 @@ from BinaryOptionsToolsV2.pocketoption import PocketOption
 
 def main(ssid: str):
     with PocketOption(ssid) as api:
-        # Get payout for asset
-        payout = api.payout("EURUSD_otc")
-        print(f"Payout for EURUSD_otc: {payout * 100}%")
+        # Get payout for every asset, then for a single one
+        all_payouts = api.payouts()
+        print(f"EURUSD_otc payout: {all_payouts.get('EURUSD_otc')}%")
+        print(f"Payout for EURUSD_otc: {api.payout('EURUSD_otc')}%")
 
 
 if __name__ == "__main__":
@@ -252,14 +253,18 @@ python login_with_email_and_password.py
 ## Key Concepts
 
 ### Context Manager
+
 All examples use the context manager pattern:
+
 ```python
 with PocketOption(ssid) as api:
     # API is automatically connected and cleaned up
 ```
 
 ### Initialization Wait
+
 The synchronous client handles initialization internally, but you can add a small delay:
+
 ```python
 with PocketOption(ssid) as api:
     import time
@@ -267,13 +272,16 @@ with PocketOption(ssid) as api:
 ```
 
 ### Demo vs Real Account
+
 ```python
 if not api.is_demo():
     print("WARNING: Using REAL account!")
 ```
 
 ### Proper Cleanup
+
 The context manager handles cleanup automatically, but you can also call:
+
 ```python
 api.shutdown()
 ```
@@ -281,22 +289,23 @@ api.shutdown()
 ## Sync vs Async
 
 | Feature | Sync | Async |
-|---------|------|-------|
+| --------- | ------ | ------- |
 | Syntax | `with PocketOption(ssid)` | `async with PocketOptionAsync(ssid)` |
 | Methods | `api.balance()` | `await api.balance()` |
 | Sleep | `time.sleep()` | `await asyncio.sleep()` |
 | Iteration | `for candle in subscription` | `async for candle in subscription` |
 
 Use **async** for:
+
 - High-frequency trading
 - Multiple concurrent operations
 - Better performance with many subscriptions
 
 Use **sync** for:
+
 - Simple scripts
 - Single operations
 - Easier debugging
-
 
 ---
 

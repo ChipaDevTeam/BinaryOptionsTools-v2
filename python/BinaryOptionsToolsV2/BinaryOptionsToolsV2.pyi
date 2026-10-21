@@ -5,15 +5,19 @@ class Action:
     Put: "Action"
 
 class PyConfig:
-    def __init__(
-        self,
-        max_allowed_loops: int = 10,
-        sleep_interval: int = 100,
-        reconnect_time: int = 5,
-        connection_initialization_timeout: float = 30.0,
-        timeout: float = 10.0,
-        urls: List[str] = [],
-    ) -> None: ...
+    # The Rust constructor takes no arguments; fields are read/written through
+    # properties. Defaults mirror `binary_options_tools::config::Config`.
+    def __init__(self) -> None: ...
+    max_allowed_loops: int
+    sleep_interval: int
+    reconnect_time: int
+    connection_initialization_timeout_secs: int
+    timeout_secs: int
+    urls: List[str]
+    proxy: Optional[str]
+    user_agent: Optional[str]
+    origin: Optional[str]
+    sec_websocket_extensions: Optional[str]
 
 class RawValidator:
     @staticmethod
@@ -72,6 +76,10 @@ class RawPocketOption:
     def new_with_config(ssid: str, config: PyConfig) -> "RawPocketOption": ...
     @staticmethod
     async def create_with_config(ssid: str, config: PyConfig) -> "RawPocketOption": ...
+    @staticmethod
+    def new_try_demo(token: Optional[str] = None) -> "RawPocketOption": ...
+    @staticmethod
+    async def create_try_demo(token: Optional[str] = None) -> "RawPocketOption": ...
     async def wait_for_assets(self, timeout_secs: float) -> None: ...
     def is_demo(self) -> bool: ...
     async def buy(self, asset: str, amount: float, time: int) -> List[str]: ...
@@ -87,7 +95,7 @@ class RawPocketOption:
         open_type: int,
         amount: float,
         asset: str,
-        open_time: int,
+        open_time: str,
         open_price: float,
         timeframe: int,
         min_payout: int,

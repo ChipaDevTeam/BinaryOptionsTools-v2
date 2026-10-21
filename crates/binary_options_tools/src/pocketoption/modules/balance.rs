@@ -11,7 +11,11 @@ use serde::Deserialize;
 use serde_json::Value;
 use tracing::{debug, warn};
 
-use crate::pocketoption::{state::State, types::MultiPatternRule};
+use crate::pocketoption::{
+    state::State,
+    types::MultiPatternRule,
+    utils::{parse_socketio_array, socketio_event_payload},
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -52,36 +56,35 @@ impl LightweightModule<State> for BalanceModule {
                     if let Ok(balance_msg) = serde_json::from_str::<BalanceMessage>(text) {
                         debug!("Received balance message (text): {:?}", balance_msg);
                         self.state.set_balance(balance_msg.balance).await;
-                    } else if let Some(start) = text.find('[') {
+                    } else if let Some(parsed) = parse_socketio_array(text) {
                         // Try to parse as a 1-step Socket.IO message: 42["successupdateBalance", {...}]
-                        match serde_json::from_str::<serde_json::Value>(&text[start..]) {
+                        match parsed {
                             Ok(value) => {
-                                if let Some(arr) = value.as_array() {
-                                    if arr.len() >= 2 && arr[0] == "successupdateBalance" {
-                                        match serde_json::from_value::<BalanceMessage>(
-                                            arr[1].clone(),
-                                        ) {
-                                            Ok(balance_msg) => {
-                                                debug!(
-                                                    "Received balance message (text 1-step): {:?}",
-                                                    balance_msg
-                                                );
-                                                self.state.set_balance(balance_msg.balance).await;
-                                            }
-                                            Err(e) => {
-                                                warn!(
-                                                    "Failed to deserialize BalanceMessage from Socket.IO payload (arr[1]): {}. Raw text slice: {}",
-                                                    e, &text[start..]
-                                                );
-                                            }
+                                if let Some(payload) =
+                                    socketio_event_payload(&value, "successupdateBalance")
+                                {
+                                    match serde_json::from_value::<BalanceMessage>(payload.clone())
+                                    {
+                                        Ok(balance_msg) => {
+                                            debug!(
+                                                "Received balance message (text 1-step): {:?}",
+                                                balance_msg
+                                            );
+                                            self.state.set_balance(balance_msg.balance).await;
+                                        }
+                                        Err(e) => {
+                                            warn!(
+                                                "Failed to deserialize BalanceMessage from Socket.IO payload: {}. Frame: {}",
+                                                e, text
+                                            );
                                         }
                                     }
                                 }
                             }
                             Err(e) => {
                                 warn!(
-                                    "Failed to parse Socket.IO JSON envelope for balance: {}. Raw text slice: {}",
-                                    e, &text[start..]
+                                    "Failed to parse Socket.IO JSON envelope for balance: {}. Frame: {}",
+                                    e, text
                                 );
                             }
                         }

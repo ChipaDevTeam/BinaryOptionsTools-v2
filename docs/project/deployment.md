@@ -30,9 +30,11 @@ projectName: 'BinaryOptionsTools-v2',
 ```
 
 ### 3. Deploy
+
 The site is automatically deployed via GitLab CI on push to master branch.
 
 Manual deployment:
+
 ```bash
 npm run build
 npm run deploy
@@ -41,9 +43,11 @@ npm run deploy
 ### 4. Custom Domain (Optional)
 
 1. Add a `CNAME` file to `static/` folder with your domain:
+
    ```
    your-domain.com
    ```
+
 2. Configure DNS settings with your domain provider
 
 ## GitLab CI Workflow
@@ -168,6 +172,7 @@ themeConfig: {
 ## Support
 
 For issues with the documentation site:
+
 1. Check this deployment guide
 2. Verify all file paths are correct
 3. Test locally with `npm run start`

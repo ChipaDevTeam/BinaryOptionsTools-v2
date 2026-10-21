@@ -11,7 +11,6 @@ you whether the edge is real, and only then is it worth building here properly.
 [Try it free →](https://chipaeditor.com/?utm_source=docs&utm_medium=api-python&utm_campaign=BinaryOptionsToolsV2&utm_content=cta)
 :::
 
-
 Complete reference guide for all features and methods available in the BinaryOptionsToolsV2 Python library.
 
 ## Async Client
@@ -19,7 +18,7 @@ Complete reference guide for all features and methods available in the BinaryOpt
 The `PocketOptionAsync` class provides asynchronous access to PocketOption's API.
 
 ```python
-from binaryoptionstoolsv2 import PocketOptionAsync
+from BinaryOptionsToolsV2 import PocketOptionAsync
 
 client = await PocketOptionAsync("your_ssid")
 await asyncio.sleep(2)  # Wait for initialization
@@ -28,7 +27,7 @@ await asyncio.sleep(2)  # Wait for initialization
 ### Methods
 
 | Method | Description | Returns |
-|--------|-------------|---------|
+| -------- | ------------- | --------- |
 | `__init__(ssid)` | Initialize with session ID | Self |
 | `balance()` | Get account balance | `float` |
 | `is_demo()` | Check if demo account | `bool` |
@@ -46,13 +45,14 @@ await asyncio.sleep(2)  # Wait for initialization
 | `unsubscribe(asset)` | Unsubscribe from asset | `None` |
 | `reconnect()` | Reconnect to server | `None` |
 | `shutdown()` | Shutdown client | `None` |
+| `try_demo(token=None)` | Connect to a free guest demo session | `PocketOptionAsync` |
 
 ## Sync Client
 
 The `PocketOption` class provides synchronous access to PocketOption's API.
 
 ```python
-from binaryoptionstoolsv2 import PocketOption
+from BinaryOptionsToolsV2 import PocketOption
 
 client = PocketOption("your_ssid")
 import time
@@ -62,7 +62,7 @@ time.sleep(2)  # Wait for initialization
 ### Methods
 
 | Method | Description | Returns |
-|--------|-------------|---------|
+| -------- | ------------- | --------- |
 | `__init__(ssid)` | Initialize with session ID | Self |
 | `balance()` | Get account balance | `float` |
 | `is_demo()` | Check if demo account | `bool` |
@@ -76,13 +76,42 @@ time.sleep(2)  # Wait for initialization
 | `unsubscribe(asset)` | Unsubscribe from asset | `None` |
 | `reconnect()` | Reconnect to server | `None` |
 | `shutdown()` | Shutdown client | `None` |
+| `try_demo(token=None)` | Connect to a free guest demo session | `PocketOption` |
+
+## Try Demo (guest) sessions
+
+PocketOption's free "try demo" hands out a short-lived guest token instead of an
+account session, so no credentials are needed:
+
+```python
+from BinaryOptionsToolsV2 import PocketOptionAsync
+
+client = await PocketOptionAsync.try_demo()
+assets = await client.active_assets()  # 100+ tradable symbols
+```
+
+`try_demo(token=None)` mints the guest token locally - the Python equivalent of
+PocketOption's own "Try demo" client, which generates a 10-character id and caches
+it in `localStorage['po-td-token']` - then connects to the demo server and waits for
+the asset list. Pass `token=` to replay a token you already captured from the
+browser. The auth frame looks like
+`42["auth",{"token":"...","balance":50000,"isFastHistory":true}]`.
+
+```python
+client = await PocketOptionAsync.try_demo("9PRxPzq6mQ")
+```
+
+Guest sessions are demo-only. The server does not send a balance frame for them, so
+the client reports the balance the session was opened with (`50000`). A replayed
+`token` does not carry a balance - sending one would reset the guest balance - so
+the auth frame omits it and the balance is reported as unknown if the server never sends one (guests normally do not).
 
 ## Raw Handler
 
 The `RawHandler` class provides low-level access to PocketOption's WebSocket messages.
 
 ```python
-from binaryoptionstoolsv2 import RawHandler
+from BinaryOptionsToolsV2 import RawHandler
 
 handler = RawHandler("your_ssid")
 ```
@@ -90,7 +119,7 @@ handler = RawHandler("your_ssid")
 ### Methods
 
 | Method | Description |
-|--------|-------------|
+| -------- | ------------- |
 | `connect()` | Connect to WebSocket |
 | `send(message)` | Send raw message |
 | `receive()` | Receive raw message |
@@ -101,7 +130,7 @@ handler = RawHandler("your_ssid")
 The `Validator` class validates session data and SSID tokens.
 
 ```python
-from binaryoptionstoolsv2 import Validator
+from BinaryOptionsToolsV2 import Validator
 
 validator = Validator()
 result = validator.validate_ssid("your_ssid")
@@ -110,7 +139,7 @@ result = validator.validate_ssid("your_ssid")
 ### Methods
 
 | Method | Description | Returns |
-|--------|-------------|---------|
+| -------- | ------------- | --------- |
 | `validate_ssid(ssid)` | Validate SSID format | `bool` |
 | `validate_credentials(email, password)` | Validate login credentials | `bool` |
 
@@ -119,7 +148,7 @@ result = validator.validate_ssid("your_ssid")
 The `Config` class manages library configuration.
 
 ```python
-from binaryoptionstoolsv2 import Config
+from BinaryOptionsToolsV2 import Config
 
 config = Config()
 config.set("timeout", 30)
@@ -128,7 +157,7 @@ config.set("timeout", 30)
 ### Methods
 
 | Method | Description |
-|--------|-------------|
+| -------- | ------------- |
 | `set(key, value)` | Set configuration value |
 | `get(key)` | Get configuration value |
 | `load_from_file(path)` | Load config from file |
@@ -140,7 +169,7 @@ config.set("timeout", 30)
 
 ```python
 import asyncio
-from binaryoptionstoolsv2 import PocketOptionAsync
+from BinaryOptionsToolsV2 import PocketOptionAsync
 
 async def basic_trade():
     client = await PocketOptionAsync("your_ssid")
@@ -217,7 +246,7 @@ async def get_candles():
 ## Error Handling
 
 ```python
-from binaryoptionstoolsv2 import PocketOptionAsync, PocketError
+from BinaryOptionsToolsV2 import PocketOptionAsync, PocketError
 
 async def safe_trade():
     try:

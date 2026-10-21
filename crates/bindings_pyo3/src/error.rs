@@ -1,4 +1,7 @@
-use binary_options_tools::{closeoption::error::CloseOptionError, error::BinaryOptionsError, pocketoption::error::PocketError};
+use binary_options_tools::{
+    closeoption::error::CloseOptionError, error::BinaryOptionsError,
+    pocketoption::error::PocketError,
+};
 use pyo3::{exceptions::PyValueError, PyErr};
 use thiserror::Error;
 use uuid::Uuid;

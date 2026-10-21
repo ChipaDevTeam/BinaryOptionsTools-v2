@@ -13,7 +13,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::pocketoption::error::{PocketError, PocketResult};
-use crate::pocketoption::utils::normalize_timestamp;
+use crate::pocketoption::utils::{normalize_timestamp, socketio_event};
 
 // Audit Note: Financial values (amount, price, profit) have been migrated to
 // `rust_decimal::Decimal` to prevent precision errors in financial calculations.
@@ -292,30 +292,16 @@ impl Rule for MultiPatternRule {
     fn call(&self, msg: &Message) -> bool {
         match msg {
             Message::Text(text) => {
-                if let Some(start) = text.find('[') {
-                    if let Ok(value) = serde_json::from_str::<Value>(&text[start..]) {
-                        if let Some(arr) = value.as_array() {
-                            if let Some(event_name) = arr.first().and_then(|v| v.as_str()) {
-                                for pattern in &self.patterns {
-                                    if event_name == pattern {
-                                        // Detect if this is a binary placeholder
-                                        let has_placeholder = arr.iter().skip(1).any(|v| {
-                                            v.as_object()
-                                                .is_some_and(|obj| obj.contains_key("_placeholder"))
-                                        });
-
-                                        if arr.len() == 1 || has_placeholder {
-                                            self.valid.store(true, Ordering::SeqCst);
-                                            return false;
-                                        } else {
-                                            // 1-step message, allow it through
-                                            self.valid.store(false, Ordering::SeqCst);
-                                            return true;
-                                        }
-                                    }
-                                }
-                            }
+                if let Some((event_name, is_placeholder)) = socketio_event(text) {
+                    if self.patterns.iter().any(|p| p == &event_name) {
+                        if is_placeholder {
+                            // Two-step message: wait for the binary half.
+                            self.valid.store(true, Ordering::SeqCst);
+                            return false;
                         }
+                        // 1-step message, allow it through
+                        self.valid.store(false, Ordering::SeqCst);
+                        return true;
                     }
                 }
 
