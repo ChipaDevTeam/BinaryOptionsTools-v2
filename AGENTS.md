@@ -6,15 +6,17 @@ This is a multi-language project: **Rust** core with **Python** bindings (via Py
 
 - `crates/` — Rust workspace crates
   - `core/` — Low-level utilities, config, WebSocket base
-  - `macros/` — Proc-macros (`Config`, `RegionImpl`, `ActionImpl`, `#[timeout]`)
+  - `macros/` — Proc-macros (`RegionImpl`, `ActionImpl`, `#[timeout]`). Topic docs live in `crates/macros/docs/`
+  - `core/macros/` — Proc-macros for `core` (`#[Rule]` / `#[rule(...)]`, and the `#[lightweight_module]` scaffold)
   - `binary_options_tools/` — Platform implementations (PocketOption, ExpertOption), `framework` module for bots
   - `bindings_napi/` — N-API (napi-rs) native addon for Node.js
 - `python/` — Python package (maturin/PyO3). `python/pyproject.toml` builds the `BinaryOptionsToolsV2` module from `crates/bindings_pyo3/`; Python wrapper lives in `python/BinaryOptionsToolsV2/`
 - `crates/bindings_uniffi/` — UniFFI multi-language bindings (`binary_options_tools_uni` crate; bindings generated via the `uniffi-bindgen` binary, proc-macro based — no UDL)
 - `nodejs/` — Node.js package wrapping the N-API addon (`npm run build`, `npm test`)
+- `examples/` — Per-language runnable examples (`examples/<language>/{async,sync}/`)
 - `tests/` — Python tests (`tests/python/`), Rust tests inline
-- `docs/` — MkDocs documentation
-- `data/` — Test fixtures and JSON data
+- `docs/` — Markdown documentation sources (Docusaurus-style frontmatter; the site generator config is not tracked in this repository)
+- `docs/data/`, `crates/binary_options_tools/data/` — Test fixtures and JSON data
 
 ## Product Context
 
@@ -76,10 +78,10 @@ To bridge the gap between low-level performance and high-level usability, provid
 
 - **Version Control**: Git (GitHub)
 - **CI/CD**: GitHub Actions
-- **Documentation**: MkDocs (Material theme)
+- **Documentation**: Markdown (Docusaurus-style frontmatter; no site generator config is tracked)
 - **Containerization**: Docker (multi-platform builds)
-- **Dependency Management**: Rust — `cargo`; Python — `pip`, `uv.lock`; JS — `bun`
-- **Quality Control**: `husky`, `lint-staged`, `rustfmt`, `prettier`, `markdownlint`
+- **Dependency Management**: Rust — `cargo`; Python — `uv` (`python/uv.lock`) / `pip`; JS — `npm` (under `nodejs/`)
+- **Quality Control**: `rustfmt`, `ruff`, `markdownlint`
 
 ## Build Commands
 
@@ -167,17 +169,15 @@ cargo clippy --all-targets --all-features -- -D warnings  # Lint (deny warnings)
 ### Markdown
 
 ```bash
-markdownlint-cli2 "**/*.md"              # Lint markdown
+npx markdownlint-cli2 "**/*.md"          # Lint markdown
 ```
 
-### Pre-commit (husky + lint-staged)
+### Pre-commit
 
-Runs on commit via `package.json` lint-staged config:
+No Git hooks are installed: the repository has no root Node manifest, so there is no `husky` / `lint-staged` setup. Format the files you change yourself before committing:
 
 - `*.py` → `ruff check --fix` then `ruff format`
-- `*.rs` → `rustfmt`
-
-Install hooks: `bun install` (uses `bun@1.3.10`)
+- `*.rs` → `cargo fmt`
 
 ## Code Style — Rust
 
@@ -222,7 +222,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full commit message guidelines and ex
 ## Workflow & PRs
 
 - **Branching**: Create feature branches from `master`
-- **Pre-commit**: `husky` and `lint-staged` run automatic formatting and linting on commit
+- **Pre-commit**: No hooks are installed; run `cargo fmt`, `ruff format` / `ruff check`, and `markdownlint-cli2` yourself before committing
 - **Testing**: Ensure all tests pass (`cargo test` and `pytest`) before submitting a PR
 - **Documentation**: Update `docs/` and `README.md` if the change affects public behavior
 - **Reviews**: All PRs require a clear description and must pass all CI checks
@@ -243,6 +243,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full commit message guidelines and ex
 
 ## Environment
 
-- Package manager: `bun@1.3.10` (for dev tooling only — husky, lint-staged, markdownlint)
+- Package managers: `cargo` (Rust), `uv` / `pip` (Python), `npm` (Node packages, e.g. under `nodejs/`). There is no root Node manifest
 - Virtual env: `.venv/` (gitignored)
 - `.env` file for secrets (`POCKET_OPTION_SSID`); never commit it

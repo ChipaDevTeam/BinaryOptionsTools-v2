@@ -20,4 +20,4 @@ jobs:
       - name: Push to GitLab
         run: |
           git remote add gitlab https://oauth2:${{ secrets.GITLAB_SYNC_TOKEN }}@gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
-          git push --force --prune gitlab +refs/heads/*:refs/heads/* +refs/tags/*:refs/tags/*
+          git push --force --prune gitlab +refs/heads/*:refs/heads/synced/* +refs/tags/*:refs/tags/*

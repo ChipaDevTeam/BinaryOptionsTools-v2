@@ -1189,6 +1189,32 @@ mod tests {
     use super::{guest_session_balance, PocketOption};
     use crate::pocketoption::ssid::Ssid;
 
+    /// These tests drive a real PocketOption session rather than a mock. They
+    /// are opt-in via `POCKET_OPTION_SSID`, and both a missing session id and an
+    /// unreachable broker are skip conditions: a machine without credentials or
+    /// network access must not report a failure for something it cannot exercise.
+    fn live_ssid(test_name: &str) -> Option<String> {
+        match std::env::var("POCKET_OPTION_SSID") {
+            Ok(ssid) if !ssid.trim().is_empty() => Some(ssid),
+            _ => {
+                println!("Skipping {test_name}: POCKET_OPTION_SSID not set");
+                None
+            }
+        }
+    }
+
+    /// Connects to the live broker, or reports a skip if it cannot be reached.
+    async fn live_client(test_name: &str) -> Option<PocketOption> {
+        let ssid = live_ssid(test_name)?;
+        match PocketOption::new(ssid).await {
+            Ok(api) => Some(api),
+            Err(error) => {
+                println!("Skipping {test_name}: cannot reach the broker ({error})");
+                None
+            }
+        }
+    }
+
     #[test]
     fn guest_session_balance_comes_from_the_auth_payload_only() {
         let fresh = crate::pocketoption::try_demo::generate_try_demo_ssid(1_000).unwrap();
@@ -1209,14 +1235,16 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_tester() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_tester: POCKET_OPTION_SSID not set");
+        let Some(ssid) = live_ssid("test_pocket_option_tester") else {
+            return;
+        };
+        let mut tester = match PocketOption::new_testing_wrapper(ssid).await {
+            Ok(tester) => tester,
+            Err(error) => {
+                println!("Skipping test_pocket_option_tester: cannot reach the broker ({error})");
                 return;
             }
         };
-        let mut tester = PocketOption::new_testing_wrapper(ssid).await.unwrap();
         tester.start().await.unwrap();
         tokio::time::sleep(Duration::from_secs(120)).await; // Wait for 2 minutes to allow the client to run and process messages
         println!("{}", tester.stop().await.unwrap().summary());
@@ -1225,14 +1253,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_balance() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_balance: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_balance").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         // Wait for assets as a proxy for full initialization
         if tokio::time::timeout(
             Duration::from_secs(15),
@@ -1252,14 +1275,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_server_time() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_server_time: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_server_time").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
@@ -1282,14 +1300,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_buy_sell() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_buy_sell: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_buy_sell").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
@@ -1325,14 +1338,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_result() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_result: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_result").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
@@ -1379,14 +1387,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_subscription() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_subscription: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_subscription").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
@@ -1433,14 +1436,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_get_candles() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_get_candles: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_get_candles").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
@@ -1486,14 +1484,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_history() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_history: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_history").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),

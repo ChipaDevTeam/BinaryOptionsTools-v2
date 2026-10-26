@@ -5,6 +5,23 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Repository layout cleanup**: tracked files that sat outside the area they belong to were moved or removed, and the documentation that described them was corrected.
+  - The CloseOption Python examples moved from the language-neutral `examples/async/` and `examples/sync/` into `examples/python/async/` and `examples/python/sync/`, next to the other Python examples. The run commands in `examples/README.md` point at the new paths.
+  - `docs/macro_examples.rs` moved to `crates/macros/docs/macro_examples.rs`. It is an illustrative, non-compiling placeholder and the `docs/macro_proposals.md` it referenced does not exist; it now documents the macros it demonstrates and why Cargo must not compile it.
+  - `AGENTS.md` no longer documents a `husky` / `lint-staged` pre-commit setup, because this repository configures no Git hooks.
+  - `AGENTS.md` now matches the tree it describes: the macro crate entry no longer lists a `Config` derive that does not exist and now covers `crates/core/macros/`, `examples/` is listed, and the documentation and fixture entries no longer point at a root `data/` directory or claim a MkDocs setup that has no `mkdocs.yml`.
+  - The crate documentation files `crates/binary_options_tools/Readme.md` and `crates/bindings_pyo3/Readme.md` are now `README.md`, matching `crates/core/`, `crates/bindings_uniffi/` and the `readme = "README.md"` field in each manifest.
+  - `crates/macros/ActionImpl_README.md` is now `crates/macros/docs/action-impl.md`, alongside the other macro documentation instead of at the crate root. It documents a single derive macro rather than the crate, so it is a topic document and follows the kebab-case naming the other topic documents use (for example `crates/core/docs/testing-framework.md`).
+
+### Removed
+
+- Deleted the `docs-site/` `package.json` and `package-lock.json` left behind by the documentation-site removal in 0.2.15, the root `bun.lock` and `package-lock.json` (there is no root `package.json` for them to describe), the `tests/assets.txt` file that duplicated `docs/data/assets.txt`, and the `tests/login_test.txt` scratch HTTP request dump.
+- Stopped tracking `crates/macros/Cargo.lock`. It was the only lockfile committed to this repository and `crates/macros/.gitignore` already listed it, so it was added by mistake; workspace builds read the root lockfile. The local copy is left in place and is now ignored.
+
 ## [0.2.16]
 
 ### Added

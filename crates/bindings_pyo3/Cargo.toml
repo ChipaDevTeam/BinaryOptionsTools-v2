@@ -7,7 +7,7 @@ description = "Python bindings for binary-options-tools. High-performance librar
 homepage = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2"
 repository = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"
 documentation = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html"
-readme = "Readme.md"
+readme = "README.md"
 keywords = ["binary-options", "pocketoption", "trading", "python", "pyo3"]
 categories = ["api-bindings"]
 

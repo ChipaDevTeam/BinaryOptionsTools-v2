@@ -42,13 +42,13 @@ $env:CLOSEOPTION_SSID="your_token|your_sid|true|your_public_code|your_hidden_cod
 
 ```bash
 # Run async basic example
-python examples/async/closeoption_basic.py
+python examples/python/async/closeoption_basic.py
 
 # Run sync advanced example
-python examples/sync/closeoption_advanced.py
+python examples/python/sync/closeoption_advanced.py
 
 # Run trading example (requires valid credentials)
-python examples/async/closeoption_trading.py
+python examples/python/async/closeoption_trading.py
 ```
 
 ## API Methods
