@@ -7,7 +7,7 @@ This directory contains examples for using the CloseOption trading platform inte
 To run these examples, you need:
 
 1. A valid CloseOption session ID (SSID) in the format: `token|sid|demo|public_code|hidden_code`
-2. Python 3.9+ with the BinaryOptionsToolsV2 package installed
+2. Python 3.10+ with the BinaryOptionsToolsV2 package installed
 
 ## Setting Up
 

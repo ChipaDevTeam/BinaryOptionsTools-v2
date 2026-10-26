@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`docs/project/deployment.md` no longer describes a Docusaurus site that does not exist.** It told readers to edit `docusaurus.config.js`, run `npm run deploy`, and configure a `pages` job in `.gitlab-ci.yml`; none of those files or jobs exist since the site was removed in 0.2.15. It now describes the Markdown that is actually tracked and what re-creating a site would take. `docs/OVERVIEW.md` and `docs/intro.md` had the same stale claim and were corrected.
 - `AGENTS.md` documents the `integration` marker, the offline `pytest -k "not integration"` command, and the fact that an unmarked network test blocks and then fails on teardown.
 
+### Security
+
+- **Tracked lockfile no longer resolves a vulnerable `pytest`.** `python/uv.lock` declared `requires-python = ">=3.9"`, which produced a second resolution branch pinned to `pytest 8.4.2` (GHSA-6w46-j5rx-g56g, fixed in 9.0.3). Python 3.9 was never actually supported — the extension is built `abi3-py310`, so maturin emits a `cp310-abi3` wheel that pip cannot install on 3.9 — so that branch resolved packages for an interpreter this package can never target. With the floor corrected to 3.10 the lock resolves a single `pytest 9.0.3`.
+- `requirements.txt` pinned `pytest>=7.0.0`, which permitted the vulnerable releases. Its floor is now `>=9.0.3`, and the MkDocs tooling group is gone: the documentation is plain Markdown and no site generator is configured.
+- The remaining open alerts reference manifests that do not exist in this repository (`.arive-tasks/python-docstrings/python/uv.lock` and `BinaryOptionsToolsV2/uv.lock`); `Pygments` was already at the patched 2.20.0 in the tracked lock. Nothing in this tree needed changing for those.
+
 ### Fixed
 
 - **`opened_deals()` / `closed_deals()` returned an object, not a list.** The Rust bindings serialised the trading state's `HashMap<Uuid, Deal>` directly, so Python received a JSON object keyed by deal id while the docstrings, the type stubs and `docs/api/python.md` all promised `List[Deal]`. Both methods now serialise the values as an array ordered by deal id, so `for deal in client.closed_deals()` and `len(...)`/indexing work as documented.
@@ -29,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The live PocketOption tests failed instead of skipping.** `pocket_client.rs` treated a missing `POCKET_OPTION_SSID` as a skip but an unreachable broker as a failure, so a machine without broker access reported seven errors. Connection failures now print a skip notice and return, matching the existing `POCKET_OPTION_SSID` behaviour.
 - **`test_concurrent_identical_trades_hammer` hung forever.** It assumed the order in which trades were spawned was the order they reached the socket, then awaited a reply for a request id that had not been sent, with no timeout. It now assigns its own request ids via `trade_with_id`, asserts the socket saw exactly those ids in any order, sends the id-less `failopenOrder` first and observes which trade it hit before answering two survivors by id, and bounds every wait so a regression fails with a message instead of hanging.
 - **`crates/binary_options_tools/tests/mod.rs` re-ran other test binaries.** The file declared `pub mod` for four test modules that Cargo already builds as their own binaries, so their tests ran twice in every workspace run. The file is removed.
+- **`requires-python` contradicted the built wheel.** `pyproject.toml` declared `>=3.9` and listed a Python 3.9 classifier while `crates/bindings_pyo3` builds with `abi3-py310`. The declared floor, the classifier and the Ruff `target-version` (now `py310`) all match the ABI, and `AGENTS.md`, `README.md` and `examples/README.md` now say Python 3.10+.
 
 ### Removed
 

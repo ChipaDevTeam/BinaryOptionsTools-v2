@@ -47,7 +47,7 @@ To bridge the gap between low-level performance and high-level usability, provid
 ### Languages
 
 - **Rust**: Core logic, performance-critical components, and WebSocket handling.
-- **Python**: Primary user interface via high-level bindings (3.9 – 3.13 support).
+- **Python**: Primary user interface via high-level bindings (3.10 – 3.13 support).
 - **JavaScript/TypeScript**: Documentation tooling and potential future bindings.
 
 ### Rust Core Libraries
@@ -161,7 +161,7 @@ ruff format .                            # Format
 ruff format --check .                    # Check formatting
 ```
 
-- Line length: 120, target Python: 3.9+
+- Line length: 120, target Python: 3.10+
 - Config in `python/pyproject.toml`
 
 ### Rust
@@ -205,7 +205,7 @@ No Git hooks are installed: the repository has no root Node manifest, so there i
 
 ## Code Style — Python
 
-- **Version**: 3.9+
+- **Version**: 3.10+
 - **Formatter/Linter**: Ruff (replaces black + flake8 + isort)
 - **Line length**: 120
 - **Imports**: Ruff handles ordering (stdlib → third-party → local)
