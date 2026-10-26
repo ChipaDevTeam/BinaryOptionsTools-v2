@@ -55,9 +55,11 @@ Add to `Package.swift`:
 
 ```swift
 dependencies: [
-dependencies: {
     .package(url: "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2", from: "0.1.0")
-}
+]
+```
+
+### Go
 
 ```bash
 go get gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/bindings/go

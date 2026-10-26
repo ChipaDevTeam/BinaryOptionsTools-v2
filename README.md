@@ -503,4 +503,4 @@ We welcome contributions!
 
 ---
 
-[Documentation](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/) | [API Reference](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/api/reference.md) | [Discord Community](https://discord.com/invite/p7YyFqSmAz) | [Agents & AI](agents/AGENTS.md)
+[Documentation](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/) | [API Reference](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/api/reference.md) | [Discord Community](https://discord.com/invite/p7YyFqSmAz) | [Agents & AI](AGENTS.md)

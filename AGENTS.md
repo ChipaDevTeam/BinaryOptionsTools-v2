@@ -123,12 +123,18 @@ pytest -s                                # Show print output
 pytest tests/python/pocketoption/test_synchronous.py::test_sync_manual_connect_shutdown  # Single test
 pytest -m "pocketoption"                 # By marker
 pytest --cov=BinaryOptionsToolsV2        # With coverage
+pytest -k "not integration"              # Offline only: no broker needed
 ```
 
 - Config: `pytest.ini` sets `asyncio_mode = auto`, `asyncio_default_fixture_loop_scope = module`, `timeout = 15`, testpaths = `tests/python`
 - `conftest.py` loads `.env` for `POCKET_OPTION_SSID`; tests skip if not set
 - Fixtures: `api` (async), `api_sync` — module-scoped, reuse connections
 - Tests located in `tests/` directory
+- `integration` marks tests that open a real PocketOption session. They need
+  `POCKET_OPTION_SSID` **and** a reachable broker, so run
+  `pytest -k "not integration"` on a machine without broker access — that
+  subset is fully green offline. Without the marker these modules block on the
+  connection timeout and then fail on teardown, so mark any new network test.
 
 ### Rust
 

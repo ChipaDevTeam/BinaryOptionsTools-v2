@@ -506,11 +506,12 @@ class PocketOption:
         """
         return self._run(self._client.balance())
 
-    def opened_deals(self) -> List[str]:
-        """Get a list of currently open deal IDs.
+    def opened_deals(self) -> List[Dict]:
+        """Get the currently open deals.
 
         Returns:
-            A list of open trade ID strings.
+            One dictionary per open deal, ordered by deal id. Each entry carries
+            the deal fields, including `id`, `asset`, `amount` and `direction`.
         """
         return self._run(self._client.opened_deals())
 
@@ -580,14 +581,15 @@ class PocketOption:
         """
         return self._run(self._client.cancel_pending_order(ticket))
 
-    def cancel_pending_orders(self, tickets: List[str]) -> List[Dict]:
-        """Cancel multiple pending orders.
+    def cancel_pending_orders(self, tickets: List[str]) -> Dict:
+        """Cancel multiple pending orders in one batch.
 
         Args:
             tickets: A list of order ticket/identifiers to cancel.
 
         Returns:
-            A list of dictionaries with the cancellation results.
+            A dictionary with a ``cancelled`` key holding the tickets that were
+            cancelled. Partial success is possible.
         """
         return self._run(self._client.cancel_pending_orders(tickets))
 

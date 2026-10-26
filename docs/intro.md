@@ -56,13 +56,14 @@ All documentation includes code examples in:
 
 ## Modern Documentation
 
-This site uses **Docusaurus** to provide:
+The documentation ships as **plain Markdown** with Docusaurus-style frontmatter,
+so it reads correctly in a checkout and can be rendered by any Markdown viewer:
 
-- **Unified Search**: Quickly find any API method or concept.
-- **Language Tabs**: Switch between programming languages in code blocks.
-- **Responsive Layout**: Works on desktop and mobile.
-- **Dark/Light Mode**: Choose your preferred viewing theme.
-- **Versioned Docs**: Maintain documentation for multiple versions.
+- **Unified Content**: Every API method and concept lives in one tree.
+- **Language Tabs Ready**: Code blocks are labelled per language.
+- **Responsive Output**: Any Markdown preview adapts to desktop and mobile.
+- **Dark/Light Mode**: Provided by the viewer you use.
+- **Versioned Copies**: Each release keeps its own snapshot of these pages.
 
 ## Documentation Structure
 

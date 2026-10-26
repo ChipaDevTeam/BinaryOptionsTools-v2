@@ -13,7 +13,7 @@ and **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** — a h
 See the [Chipa Ecosystem overview](/ecosystem).
 :::
 
-BinaryOptionsTools v2 features a modern, comprehensive documentation system built with Docusaurus. This system provides a dynamic, searchable, and maintainable documentation site.
+BinaryOptionsTools v2 ships a modern, comprehensive documentation tree written as plain Markdown, so it stays searchable, diffable and readable straight from the repository.
 
 ## Documentation Structure
 
@@ -59,8 +59,11 @@ Integrated with GitHub Actions to automatically build and deploy the latest docu
 ### For Contributors
 
 1. Documentation source is located in the `docs/` directory.
-2. Configuration is handled via `docusaurus.config.js` in the root.
-3. Preview changes locally using `npm run start`.
+2. Every page is plain Markdown with Docusaurus-style frontmatter; no site
+   generator configuration is tracked, so changes are reviewed in a diff or a
+   Markdown preview rather than a local server.
+3. When you move or rename a file, update the links that point at it — see
+   [Deployment](./project/deployment.md).
 
 ## Quality and Coverage
 
@@ -69,12 +72,9 @@ Integrated with GitHub Actions to automatically build and deploy the latest docu
 - **100+ Code Snippets** ready for copy-pasting.
 - **Interactive Guides** for complex features like Raw Handlers.
 
-## Migration from MkDocs
+## History
 
-This documentation was migrated from MkDocs Material to Docusaurus v3. Key improvements include:
-
-- Better React-based theming and customization
-- Improved MDX support for interactive components
-- Faster build times with modern tooling
-- Better TypeScript integration
-- Enhanced Algolia DocSearch integration
+These pages carry frontmatter written for Docusaurus v3, which the project used
+after migrating away from MkDocs Material. The generated site was removed in
+0.2.15; the Markdown remains the source of truth, and
+[Deployment](./project/deployment.md) explains how to build a site from it again.

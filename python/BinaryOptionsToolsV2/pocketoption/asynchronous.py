@@ -889,14 +889,17 @@ class PocketOptionAsync:
             await asyncio.sleep(0.1)
         return await self.client.balance()
 
-    async def opened_deals(self) -> List[str]:
+    async def opened_deals(self) -> List[Dict]:
         """Retrieves a list of all currently open (active) deals.
 
-        This method returns all deals ids that are currently active/open on the account,
-        including both pending and executed trades that have not yet closed.
+        This method returns the deals themselves that are currently active/open on
+        the account, including both pending and executed trades that have not yet
+        closed.
 
         Returns:
-            List[str]: List of currently opened deals IDs in UUID format.
+            List[Dict]: One dictionary per open deal, ordered by deal id. Each
+            entry carries the deal fields, including `id` (UUID string), `asset`,
+            `amount`, `direction` and `open_price`.
 
         Raises:
             ConnectionError: If the client is not connected to the platform
@@ -906,29 +909,27 @@ class PocketOptionAsync:
             Basic usage:
             ```python
             async with PocketOptionAsync(ssid) as client:
-                open_deals_ids = await client.opened_deals()
-                open_deals = [await client.get_opened_deal(deal_id) for deal_id in open_deals_ids]
+                open_deals = await client.opened_deals()
                 for deal in open_deals:
                     print(f"Deal {deal['id']}: {deal['asset']} {deal['direction']}")
             ```
 
-            Filtering active deals:
+            Total exposure:
             ```python
             async def monitor_open_deals(client):
-                deals_ids = await client.opened_deals()
-                deals = [await client.get_opened_deal(deal_id) for deal_id in deals_ids]
+                deals = await client.opened_deals()
                 total_value = sum(d['amount'] for d in deals)
                 print(f"Open deals: {len(deals)}, Total exposure: {total_value}")
             ```
         """
         return json.loads(await self.client.opened_deals())
 
-    async def get_opened_deal(self, id: str) -> Optional[Trade]:
+    async def get_opened_deal(self, trade_id: str) -> Optional[Trade]:
         """
         Retrieves details of a specific opened deal by its ID.
 
         Args:
-            id (str): The unique identifier of the deal to retrieve
+            trade_id (str): The unique identifier of the deal to retrieve
 
         Returns:
             Optional[Trade]: A :class:`Trade` with the deal details if found,
@@ -957,7 +958,7 @@ class PocketOptionAsync:
                     print("Deal not found")
             ```
         """
-        deal_json = await self.client.get_opened_deal(id)
+        deal_json = await self.client.get_opened_deal(trade_id)
         if deal_json is None:
             return None
         return Trade(json.loads(deal_json))
@@ -1055,14 +1056,16 @@ class PocketOptionAsync:
         result = await self.client.cancel_pending_orders(tickets)
         return json.loads(result)
 
-    async def closed_deals(self) -> List[str]:
-        """Retrieves a list of all closed/completed deals.
+    async def closed_deals(self) -> List[Dict]:
+        """Retrieves all closed/completed deals.
 
-        This method returns the ID of all deals that have been completed, including trades
-        that have expired and reached a final outcome (win, loss, or draw).
+        This method returns the deals that have reached a final outcome (win,
+        loss, or draw).
 
         Returns:
-            List[str]: A list of IDs, each representing a closed deal with details obtainable with the `get_closed_deal` method.:
+            List[Dict]: One dictionary per closed deal, ordered by deal id. Each
+            entry carries the deal fields, including `id` (UUID string), `asset`,
+            `amount`, `profit`, `result` and `close_price`.
 
         Raises:
             ConnectionError: If the client is not connected to the platform
@@ -1072,9 +1075,7 @@ class PocketOptionAsync:
             Basic usage:
             ```python
             async with PocketOptionAsync(ssid) as client:
-                closed = await client.closed_deals()
-                closed = [await client.get_closed_deal(deal_id) for deal_id in closed]
-                for deal in closed:
+                for deal in await client.closed_deals():
                     print(f"Deal {deal['id']}: {deal['result']} (profit: {deal['profit']})")
             ```
 
@@ -1082,8 +1083,7 @@ class PocketOptionAsync:
             ```python
             async def calculate_pnl():
                 async with PocketOptionAsync(ssid) as client:
-                    closed_ids = await client.closed_deals()
-                    closed = [await client.get_closed_deal(deal_id) for deal_id in closed_ids]
+                    closed = await client.closed_deals()
                     total_pnl = sum(d['profit'] for d in closed)
                     wins = sum(1 for d in closed if d['result'] == 'win')
                     print(f"Total P/L: {total_pnl}, Win rate: {wins}/{len(closed)}")
@@ -1091,12 +1091,12 @@ class PocketOptionAsync:
         """
         return json.loads(await self.client.closed_deals())
 
-    async def get_closed_deal(self, id: str) -> Optional[Trade]:
+    async def get_closed_deal(self, trade_id: str) -> Optional[Trade]:
         """
         Retrieves details of a specific closed deal by its ID.
 
         Args:
-            id (str): The unique identifier of the closed deal to retrieve
+            trade_id (str): The unique identifier of the closed deal to retrieve
 
         Returns:
             Optional[Trade]: The :class:`Trade` with the deal details if found,
@@ -1127,7 +1127,7 @@ class PocketOptionAsync:
                     print("Closed deal not found")
             ```
         """
-        deal_json = await self.client.get_closed_deal(id)
+        deal_json = await self.client.get_closed_deal(trade_id)
         if deal_json is None:
             return None
         return Trade(json.loads(deal_json))

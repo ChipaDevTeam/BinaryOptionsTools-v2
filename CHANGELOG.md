@@ -5,7 +5,7 @@ All notable changes to BinaryOptionsTools v2 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.17]
 
 ### Changed
 
@@ -16,6 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `AGENTS.md` now matches the tree it describes: the macro crate entry no longer lists a `Config` derive that does not exist and now covers `crates/core/macros/`, `examples/` is listed, and the documentation and fixture entries no longer point at a root `data/` directory or claim a MkDocs setup that has no `mkdocs.yml`.
   - The crate documentation files `crates/binary_options_tools/Readme.md` and `crates/bindings_pyo3/Readme.md` are now `README.md`, matching `crates/core/`, `crates/bindings_uniffi/` and the `readme = "README.md"` field in each manifest.
   - `crates/macros/ActionImpl_README.md` is now `crates/macros/docs/action-impl.md`, alongside the other macro documentation instead of at the crate root. It documents a single derive macro rather than the crate, so it is a topic document and follows the kebab-case naming the other topic documents use (for example `crates/core/docs/testing-framework.md`).
+
+- **Live-session Python tests are marked `integration`.** `test_demo_ssid.py`, `test_integration.py`, `test_asynchronous.py`, `test_synchronous.py` and `test_raw_handler.py` open real PocketOption sessions, so without the marker `pytest -k "not integration"` — the command `pytest.ini` documents for skipping network tests — still hung on them and then failed during teardown. Marking the modules makes the documented offline command pass.
+- **`docs/project/deployment.md` no longer describes a Docusaurus site that does not exist.** It told readers to edit `docusaurus.config.js`, run `npm run deploy`, and configure a `pages` job in `.gitlab-ci.yml`; none of those files or jobs exist since the site was removed in 0.2.15. It now describes the Markdown that is actually tracked and what re-creating a site would take. `docs/OVERVIEW.md` and `docs/intro.md` had the same stale claim and were corrected.
+- `AGENTS.md` documents the `integration` marker, the offline `pytest -k "not integration"` command, and the fact that an unmarked network test blocks and then fails on teardown.
+
+### Fixed
+
+- **`opened_deals()` / `closed_deals()` returned an object, not a list.** The Rust bindings serialised the trading state's `HashMap<Uuid, Deal>` directly, so Python received a JSON object keyed by deal id while the docstrings, the type stubs and `docs/api/python.md` all promised `List[Deal]`. Both methods now serialise the values as an array ordered by deal id, so `for deal in client.closed_deals()` and `len(...)`/indexing work as documented.
+- **`PocketOption.cancel_pending_orders()` annotation contradicted the async client.** The sync wrapper was annotated `List[Dict]` while the async wrapper and the binding both produce a single `Dict` with a `cancelled` key. The annotation and docstring now match, and `PocketOption.opened_deals()` is annotated `List[Dict]` instead of `List[str]`.
+- **`get_opened_deal()` / `get_closed_deal()` disagreed on their parameter name.** The async client called it `id`, the sync client and the type stubs called it `trade_id`. All of them now use `trade_id`, and the async bodies were updated so they still reference the parameter they receive.
+- **The live PocketOption tests failed instead of skipping.** `pocket_client.rs` treated a missing `POCKET_OPTION_SSID` as a skip but an unreachable broker as a failure, so a machine without broker access reported seven errors. Connection failures now print a skip notice and return, matching the existing `POCKET_OPTION_SSID` behaviour.
+- **`test_concurrent_identical_trades_hammer` hung forever.** It assumed the order in which trades were spawned was the order they reached the socket, then awaited a reply for a request id that had not been sent, with no timeout. It now assigns its own request ids via `trade_with_id`, asserts the socket saw exactly those ids in any order, sends the id-less `failopenOrder` first and observes which trade it hit before answering two survivors by id, and bounds every wait so a regression fails with a message instead of hanging.
+- **`crates/binary_options_tools/tests/mod.rs` re-ran other test binaries.** The file declared `pub mod` for four test modules that Cargo already builds as their own binaries, so their tests ran twice in every workspace run. The file is removed.
 
 ### Removed
 
