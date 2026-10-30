@@ -89,6 +89,10 @@ pub fn get_tls_config(
     for cert in certs_result.certs {
         root_store.add(cert).ok();
     }
+    // The OS store can be missing or outdated (containers, minimal distros, old
+    // Windows installs), which surfaces as `UnknownIssuer`. Always include the
+    // bundled Mozilla roots as a fallback.
+    root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 
     let provider = rustls::crypto::ring::default_provider();
     let mut cipher_suites = provider.cipher_suites;
