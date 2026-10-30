@@ -233,25 +233,17 @@ impl PocketOption {
     }
 
     /// Creates a new PocketOption client with a custom WebSocket URL.
+    ///
+    /// Goes through [`PocketOption::new_with_config`] so the auth handshake is waited
+    /// for exactly like the other constructors.
     pub async fn new_with_url(ssid: impl ToString, url: String) -> PocketResult<Self> {
-        let parsed_ssid = Ssid::parse(ssid)?;
-        let state = StateBuilder::default()
-            .ssid(parsed_ssid)
-            .default_connection_url(url)
-            .build()?;
-        let builder = Self::configure_common_modules(ClientBuilder::new(PocketConnect, state));
-        let (client, mut runner) = builder.build().await?;
-
-        let _runner = tokio::spawn(async move { runner.run().await });
-
-        Self::await_connected(&client, Duration::from_secs(30)).await?;
-
-        Ok(Self {
-            client,
-            _runner: Arc::new(_runner),
-            config: Config::default(),
-            pending_trades_lock: Arc::new(tokio::sync::Mutex::new(())),
-        })
+        let url =
+            url::Url::parse(&url).map_err(|e| PocketError::General(format!("Invalid URL: {e}")))?;
+        let config = Config {
+            urls: vec![url],
+            ..Config::default()
+        };
+        Self::new_with_config(ssid, config).await
     }
 
     /// Creates a new PocketOption client with the provided configuration.
@@ -286,6 +278,26 @@ impl PocketOption {
 
         Self::await_connected(&client, config.connection_initialization_timeout).await?;
 
+        // Wait for the auth handshake so a client returned from the constructor can be
+        // used immediately: until `successauth` is processed the server has not selected
+        // the default symbol and would silently drop history requests until they time out.
+        // This is best-effort: a session that does not confirm still gets a usable client
+        // (explicit rejections are handled by `await_connected` above).
+        let confirmed = client
+            .state
+            .wait_for_session_confirmation(
+                config
+                    .connection_initialization_timeout
+                    .min(Duration::from_secs(10)),
+            )
+            .await;
+        if !confirmed {
+            tracing::debug!(
+                target: "PocketOption",
+                "Session was not confirmed before the client was returned; continuing without the initial snapshot"
+            );
+        }
+
         Ok(Self {
             client,
             _runner: Arc::new(_runner),
@@ -298,8 +310,13 @@ impl PocketOption {
     ///
     /// The guest token is generated locally, exactly like PocketOption's own
     /// "Try demo" client does, so there is no endpoint or credential involved.
-    /// The client connects to the demo server and waits for the asset list before
-    /// returning.
+    /// The client connects to the demo server and waits for the session to be
+    /// confirmed before returning.
+    ///
+    /// # Errors
+    /// Returns [`PocketError::NotAuthorized`] when the demo server ignores the guest
+    /// token (no `successauth` and no balance frame). Guest sessions never fail
+    /// silently: without a confirmed session every request would block until it timed out.
     ///
     /// Use [`PocketOption::new_try_demo_with_token`] to replay a token the browser
     /// already cached (`localStorage['po-td-token']`).
@@ -364,13 +381,35 @@ impl PocketOption {
         // the returned client immediately usable.
         client.wait_for_assets(timeout).await?;
 
-        // Guest sessions are not sent a balance frame (verified against the live
-        // demo servers), so seed the balance the session was opened with - the same
-        // value the platform's own client displays. A server-sent balance still
-        // overwrites this as soon as it arrives. Replayed tokens have no known
+        // Assets alone prove nothing: the demo servers push the asset list to
+        // sockets that never authenticated. Only the auth ack or a balance frame
+        // shows that the guest token was accepted, and a token the broker ignores
+        // otherwise yields a client whose every request hangs until it times out.
+        let state = &client.client.state;
+        // `new_with_config` already waited for the handshake; only top up briefly so a
+        // slow demo server still gets a chance without the constructor stalling twice.
+        if !state.is_session_confirmed()
+            && !state
+                .wait_for_session_confirmation(Duration::from_secs(2))
+                .await
+        {
+            // Do not leave a half-initialised session running in the background.
+            client.shutdown().await.ok();
+            return Err(PocketError::NotAuthorized(
+                "The demo server did not accept the guest session: it sent no auth \
+                 confirmation and no balance. PocketOption now appears to require guest \
+                 sessions to be created through its website, so locally generated \
+                 try-demo tokens are ignored. Use a session SSID from \
+                 `PocketOption::new(...)` instead."
+                    .to_string(),
+            ));
+        }
+
+        // Guest sessions are sent the same balance frame as account sessions. Seed the
+        // opening balance only when the server sent none, so the client reports the
+        // value the platform's own client displays. Replayed tokens have no known
         // opening balance, so nothing is seeded for them.
         if let Some(balance) = opening_balance {
-            let state = &client.client.state;
             if state.get_balance().await.is_none() {
                 state.set_balance(Decimal::from(balance)).await;
             }
@@ -399,9 +438,10 @@ impl PocketOption {
     /// This method waits up to 10 seconds for the balance to be populated from the server.
     /// If the balance cannot be retrieved within the timeout, it returns -1.0.
     ///
-    /// Guest ("try demo") sessions never receive a balance frame, so for them this
-    /// method returns immediately: the balance carried by their auth payload when
-    /// there is one, and -1.0 otherwise.
+    /// Guest ("try demo") sessions receive the same `successupdateBalance` frame as
+    /// account sessions after the initial sync, so they wait too. When no frame
+    /// arrives, the balance carried by their auth payload is reported instead (the
+    /// value the platform's own client displays), and -1.0 when there is none.
     ///
     /// # Returns
     /// The current balance as a `Decimal`, or `-1.0` if the balance is unknown.
@@ -413,18 +453,18 @@ impl PocketOption {
             return balance;
         }
 
-        // Guest sessions are never sent a balance frame, so waiting only burns the
-        // timeout. Report the balance their auth payload carries, if any.
-        if let Ssid::TryDemo(_) = &state.ssid {
-            return guest_session_balance(&state.ssid).unwrap_or_else(|| dec!(-1.0));
-        }
-
         // Wait for update
         if tokio::time::timeout(Duration::from_secs(10), state.balance_updated.notified())
             .await
             .is_ok()
         {
             if let Some(balance) = *state.balance.read().await {
+                return balance;
+            }
+        }
+
+        if let Ssid::TryDemo(_) = &state.ssid {
+            if let Some(balance) = guest_session_balance(&state.ssid) {
                 return balance;
             }
         }
@@ -897,8 +937,11 @@ impl PocketOption {
     /// # Arguments
     /// * `asset` - Trading symbol (e.g., "EURUSD_otc")
     /// * `period` - Time period for each candle in seconds
-    /// * `time` - Current time timestamp
-    /// * `offset` - Number of periods to offset from current time
+    /// * `time` - End of the requested window (Unix seconds)
+    /// * `offset` - Length of the requested window in **seconds**, not periods.
+    ///   The server answers with the candles that fit inside `time - offset ..= time`,
+    ///   so a window shorter than `period` yields no data (asking for 10 with a
+    ///   60s period returns an empty vector). Use at least `period * candles_wanted`.
     ///
     /// # Returns
     /// A vector of Candle objects containing historical price data
@@ -934,7 +977,9 @@ impl PocketOption {
     /// # Arguments
     /// * `asset` - Trading symbol (e.g., "EURUSD_otc")
     /// * `period` - Time period for each candle in seconds
-    /// * `offset` - Number of periods to offset from current time
+    /// * `offset` - Length of the requested window in **seconds** (see
+    ///   [`PocketOption::get_candles_advanced`]); a window shorter than `period`
+    ///   returns no candles.
     ///
     /// # Returns
     /// A vector of Candle objects containing historical price data

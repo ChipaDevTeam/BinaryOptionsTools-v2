@@ -740,8 +740,11 @@ impl ApiModule<State> for SubscriptionsApiModule {
                     if let Some(response) = response {
                         match response {
                             ServerResponse::Candle(data) => {
+                                // Live ticks carry the broker's wall clock; history is UTC, so
+                                // each tick is normalised before it reaches the aggregators.
                                 for tick in data.0 {
-                                    if let Err(e) = self.forward_data_to_stream(&tick.symbol, tick.price, tick.timestamp).await {
+                                    let timestamp = self.state.normalize_stream_timestamp(tick.timestamp);
+                                    if let Err(e) = self.forward_data_to_stream(&tick.symbol, tick.price, timestamp).await {
                                         warn!(target: "SubscriptionsApiModule", "Failed to forward data: {}", e);
                                     }
                                 }
@@ -764,6 +767,13 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                             .collect::<Result<Vec<_>, _>>()
                                             .map_err(|e| PocketError::General(e.to_string()))
                                     } else if let Some(history) = data.history {
+                                        // `updateHistoryNewFast` is stamped with the broker's
+                                        // wall clock, while ticks compiled from `loadHistoryPeriod`
+                                        // follow the UTC `time` we send. Shift it onto UTC so both
+                                        // history paths agree.
+                                        let delta = -self.state.broker_clock_offset();
+                                        let history: Vec<HistoryItem> =
+                                            history.into_iter().map(|item| item.shifted(delta)).collect();
                                         Ok(compile_candles_from_ticks(&history, data.period, &symbol))
                                     } else {
                                         Ok(Vec::new())

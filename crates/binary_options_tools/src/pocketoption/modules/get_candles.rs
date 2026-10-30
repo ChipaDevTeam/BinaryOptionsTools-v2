@@ -466,7 +466,6 @@ impl GetCandlesHandle {
 
 /// API module for handling candle data requests.
 pub struct GetCandlesApiModule {
-    #[allow(dead_code)]
     state: Arc<State>,
     ws_receiver: AsyncReceiver<Arc<Message>>,
     ws_sender: AsyncSender<Message>,
@@ -667,8 +666,12 @@ impl GetCandlesApiModule {
     }
 
     /// Records a tick parsed from `text`, if it is an `updateStream` payload.
+    ///
+    /// `updateStream` timestamps come from the broker's clock, while the history
+    /// these ticks get appended to is UTC, so they are normalised before buffering.
     fn store_tick(&mut self, text: &str) {
         if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
+            let timestamp = self.state.normalize_stream_timestamp(timestamp);
             self.latest_ticks
                 .entry(symbol)
                 .or_default()

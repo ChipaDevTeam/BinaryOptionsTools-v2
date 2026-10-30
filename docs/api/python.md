@@ -92,19 +92,30 @@ assets = await client.active_assets()  # 100+ tradable symbols
 
 `try_demo(token=None)` mints the guest token locally - the Python equivalent of
 PocketOption's own "Try demo" client, which generates a 10-character id and caches
-it in `localStorage['po-td-token']` - then connects to the demo server and waits for
-the asset list. Pass `token=` to replay a token you already captured from the
-browser. The auth frame looks like
-`42["auth",{"token":"...","balance":50000,"isFastHistory":true}]`.
+it in `localStorage['po-td-token']` - then connects to the demo server. Pass
+`token=` to replay a token you already captured from the browser. The auth frame
+looks like `42["auth",{"token":"...","balance":50000,"isFastHistory":true}]`.
 
 ```python
 client = await PocketOptionAsync.try_demo("9PRxPzq6mQ")
 ```
 
-Guest sessions are demo-only. The server does not send a balance frame for them, so
-the client reports the balance the session was opened with (`50000`). A replayed
-`token` does not carry a balance - sending one would reset the guest balance - so
-the auth frame omits it and the balance is reported as unknown if the server never sends one (guests normally do not).
+Guest sessions are demo-only. The asset list is pushed to every socket, so receiving
+it does not prove the token was accepted: the client waits for the server to confirm
+the session (`successauth` or a balance frame) and raises `NotAuthorized` when that
+never happens, instead of returning a client whose every request blocks until it
+times out.
+
+> **Guest tokens are only honoured when the broker knows them.** As of October 2026
+> the demo servers ignore tokens generated locally, so `try_demo()` raises
+> `NotAuthorized` unless the token came from the website. Use a session SSID with
+> `PocketOption(...)` / `PocketOptionAsync(...)` in that case.
+
+Guest sessions receive the same balance frame as account sessions. When the server
+does not send one, the client reports the balance the session was opened with
+(`50000`). A replayed `token` does not carry a balance - sending one would reset the
+guest balance - so the auth frame omits it and the balance is reported as unknown if
+the server never sends one.
 
 ## Raw Handler
 

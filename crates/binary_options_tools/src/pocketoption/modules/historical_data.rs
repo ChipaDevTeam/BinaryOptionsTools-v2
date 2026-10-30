@@ -10,7 +10,7 @@ use rust_decimal::prelude::ToPrimitive;
 use serde::Deserialize;
 use tokio::sync::Mutex;
 use tokio::{select, time::timeout};
-use tracing::warn;
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::pocketoption::candle::{
@@ -231,7 +231,7 @@ impl HistoricalDataHandle {
 }
 
 pub struct HistoricalDataApiModule {
-    _state: Arc<State>,
+    state: Arc<State>,
     command_receiver: AsyncReceiver<Command>,
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
@@ -255,7 +255,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
         _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self {
-            _state: shared_state,
+            state: shared_state,
             command_receiver,
             command_responder,
             message_receiver,
@@ -344,12 +344,14 @@ impl ApiModule<State> for HistoricalDataApiModule {
                             if response.is_none() {
                                 if let Message::Text(text) = &*msg {
                                     if let Some((symbol, timestamp, price)) = Self::parse_update_stream(text) {
+                                        let timestamp = self.state.normalize_stream_timestamp(timestamp);
                                         self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
                                         continue;
                                     }
                                 } else if let Message::Binary(data) = &*msg {
                                     if let Ok(text) = std::str::from_utf8(data) {
                                         if let Some((symbol, timestamp, price)) = Self::parse_update_stream(text) {
+                                            let timestamp = self.state.normalize_stream_timestamp(timestamp);
                                             self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
                                             continue;
                                         }
@@ -399,7 +401,16 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                                         if let Ok(c) = Candle::try_from((bc, symbol.clone())) { candles.push(c); }
                                                     }
                                                 }
-                                                let mut h_items = history_response.history.unwrap_or_default();
+                                                // Chart history arrives on the broker's wall clock;
+                                                // move it onto UTC before merging with the ticks
+                                                // buffered from `updateStream`.
+                                                let delta = -self.state.broker_clock_offset();
+                                                let mut h_items: Vec<HistoryItem> = history_response
+                                                    .history
+                                                    .unwrap_or_default()
+                                                    .into_iter()
+                                                    .map(|item| item.shifted(delta))
+                                                    .collect();
                                                 if let Some(s_ticks) = self.latest_ticks.get(&symbol) {
                                                     for &(ts, price) in s_ticks {
                                                         h_items.push(HistoryItem::Tick([serde_json::Value::from(ts as f64), serde_json::Value::from(price)]));
@@ -446,11 +457,15 @@ impl ApiModule<State> for HistoricalDataApiModule {
 
 impl HistoricalDataApiModule {
     /// Parses a binary frame as a `ServerResponse`.
+    ///
+    /// Most binary frames this module sees are `updateStream` ticks, which are not
+    /// a `ServerResponse`; they are handled by `parse_update_stream` right after, so
+    /// the mismatch is logged at debug level instead of warning on every tick.
     fn parse_binary_response(data: &[u8]) -> Option<ServerResponse> {
         match serde_json::from_slice::<ServerResponse>(data) {
             Ok(res) => Some(res),
             Err(e) => {
-                warn!(target: "HistoricalDataApiModule", "Failed to parse binary ServerResponse: {}", e);
+                debug!(target: "HistoricalDataApiModule", "Binary frame is not a ServerResponse: {}", e);
                 None
             }
         }
@@ -502,14 +517,11 @@ impl HistoricalDataApiModule {
     fn parse_update_stream(text: &str) -> Option<(String, i64, f64)> {
         let arr = parse_socketio_array(text)?.ok()?;
         let outer = arr.as_array()?;
-        let data = if let Some(first) = outer.first() {
-            if first.is_string() && outer.len() >= 2 {
-                outer.get(1)?.as_array()?
-            } else {
-                outer
-            }
+        let first = outer.first()?;
+        let data = if first.is_string() && outer.len() >= 2 {
+            outer.get(1)?.as_array()?
         } else {
-            return None;
+            outer
         };
         if let Some(inner) = data.first().and_then(|v| v.as_array()) {
             if inner.len() >= 3 {

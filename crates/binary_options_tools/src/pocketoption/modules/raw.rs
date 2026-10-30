@@ -236,7 +236,7 @@ impl Rule for RawRule {
             .raw_validators
             .read()
             .unwrap_or_else(|e| e.into_inner());
-        for (_id, v) in validators.iter() {
+        for v in validators.values() {
             if v.call(msg_str.as_str()) {
                 return true;
             }

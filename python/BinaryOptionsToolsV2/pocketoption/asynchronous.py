@@ -648,16 +648,18 @@ class PocketOptionAsync:
                 - Optional[Dict]: The currently forming candle, containing 'time', 'open',
                   'high', 'low', 'close', or None if not yet started.
         """
-        platform_time_offset = 7200
-
         def bucket_start(timestamp: int, p: int) -> int:
             return (timestamp // p) * p
 
         def extract_time(candle: Dict) -> int:
+            # Every source this method mixes (compiled tick pages, chart history and
+            # the live tick stream) is reported in UTC by the engine. A fixed
+            # +2h "platform offset" used to be subtracted here, which pushed the
+            # historical candles two hours behind the ticks they were merged with.
             val = int(float(candle.get("timestamp", candle.get("time", 0))))
             if val > 10_000_000_000:
                 val //= 1000
-            return val - platform_time_offset
+            return val
 
         def merge_candles(*groups: List[Dict]) -> List[Dict]:
             res: Dict[int, Dict] = {}

@@ -35,12 +35,17 @@ it has buffered for that asset (at most 10,000 ticks, no older than five
 minutes). So an empty endpoint `data` array does **not** guarantee an empty
 returned list - buffered live ticks are compiled into candles too.
 
-> **It can still come back empty.** For demo sessions the server currently
-> answers `loadHistoryPeriod` with
-> `{"asset":"EURUSD_otc","index":N,"data":[],"period":60}`. With no OHLC
-> data and no buffered ticks for that asset, the call returns an empty list. If
-> the server does not answer at all, the call fails with a timeout instead of
-> hanging.
+> **`offset` is a window in seconds, not a candle count.** The server answers
+> with the candles that fit in `time - offset ..= time`, and a window shorter
+> than one period contains no candle: `get_candles("EURUSD_otc", 60, 10)`
+> therefore returns an empty list, while `get_candles("EURUSD_otc", 60, 3600)`
+> returns an hour of 60-second candles. Ask for at least `period * candles`.
+>
+> **One request is one page.** The page is capped by the server (the captures
+> from 2026-10-30 return ~150 OHLC rows per request), so longer windows need
+> pagination - which is what `candles()` and `compile_candles()` do by walking
+> `time` backwards. If the server does not answer at all, the call fails with a
+> timeout instead of hanging.
 
 `get_candles(asset, period, offset)` is deprecated and does **not** call this
 endpoint: it delegates to `get_candles_live()`, which compiles candles from tick

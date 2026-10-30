@@ -89,9 +89,16 @@ impl ServerTime {
 
     /// Get current estimated server time
     ///
+    /// Before the first tick arrives there is no offset to apply, so the local
+    /// clock is the best estimate. Reporting `last_server_time + elapsed` in that
+    /// state produced epoch timestamps (e.g. `1970-01-01T00:00:03Z`).
+    ///
     /// # Returns
     /// Current estimated server timestamp as i64
     pub fn get_server_time(&self) -> i64 {
+        if self.last_server_time == 0 {
+            return Utc::now().timestamp();
+        }
         let now = Utc::now();
         let elapsed = now.signed_duration_since(self.last_updated);
         self.last_server_time + elapsed.num_seconds()
@@ -791,6 +798,23 @@ mod tests {
 
         assert!(serde_json::from_str::<StreamBatch>("[]").is_err());
         assert!(serde_json::from_str::<StreamBatch>(r#"[["A",1]]"#).is_err());
+    }
+
+    #[test]
+    fn server_time_falls_back_to_the_local_clock_before_the_first_tick() {
+        // No tick received yet: reporting `last_server_time + elapsed` produced
+        // epoch timestamps like 1970-01-01T00:00:03Z.
+        let unsynced = ServerTime::default();
+        let reported = unsynced.get_server_time();
+        assert!(
+            (reported - Utc::now().timestamp()).abs() <= 5,
+            "unsynced server time must be ~now, got {reported}"
+        );
+
+        // Once a tick arrives the server clock is reported as-is (plus elapsed).
+        let mut synced = ServerTime::default();
+        synced.update(1_791_932_536);
+        assert!((synced.get_server_time() - 1_791_932_536).abs() <= 5);
     }
 
     #[test]
