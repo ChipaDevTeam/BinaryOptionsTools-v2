@@ -10,7 +10,7 @@ use tracing::debug;
 
 use crate::pocketoption::{
     state::State,
-    types::{StreamData, TwoStepRule},
+    types::{StreamBatch, TwoStepRule},
 };
 
 pub struct ServerTimeModule {
@@ -19,10 +19,13 @@ pub struct ServerTimeModule {
 }
 
 impl ServerTimeModule {
-    /// Processes a successfully deserialized StreamData by logging and updating server time.
-    async fn handle_stream_data(&self, candle: StreamData) {
-        debug!("Received candle data: {:?}", candle);
-        self.state.update_server_time(candle.timestamp).await;
+    /// Processes a successfully deserialized batch by logging and updating server time
+    /// from its most recent tick.
+    async fn handle_stream_data(&self, batch: StreamBatch) {
+        debug!("Received candle data: {:?}", batch);
+        if let Some(latest) = batch.0.iter().map(|t| t.timestamp).max() {
+            self.state.update_server_time(latest).await;
+        }
     }
 }
 
@@ -47,7 +50,7 @@ impl LightweightModule<State> for ServerTimeModule {
     async fn run(&mut self) -> CoreResult<()> {
         while let Ok(msg) = self.receiver.recv().await {
             match msg.as_ref() {
-                Message::Binary(data) => match serde_json::from_slice::<StreamData>(data) {
+                Message::Binary(data) => match serde_json::from_slice::<StreamBatch>(data) {
                     Ok(candle) => self.handle_stream_data(candle).await,
                     Err(e) => {
                         debug!(
@@ -57,7 +60,7 @@ impl LightweightModule<State> for ServerTimeModule {
                         );
                     }
                 },
-                Message::Text(text) => match serde_json::from_str::<StreamData>(text) {
+                Message::Text(text) => match serde_json::from_str::<StreamBatch>(text) {
                     Ok(candle) => self.handle_stream_data(candle).await,
                     Err(e) => {
                         debug!(

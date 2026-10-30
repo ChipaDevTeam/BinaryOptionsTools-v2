@@ -45,6 +45,7 @@ base64 = { workspace = true }
 http = { workspace = true }
  rustls = { version = "0.23.43", default-features = false, features = ["ring"] }
  rustls-native-certs = "0.8.4"
+ webpki-roots = "1"
  php_serde = "0.6.0"
  tokio-rustls = "0.26.4"
 

@@ -27,7 +27,7 @@ use crate::pocketoption::candle::{
     compile_candles_from_ticks, BaseCandle, HistoryItem, SubscriptionType,
 };
 use crate::pocketoption::error::PocketError;
-use crate::pocketoption::types::{MultiPatternRule, StreamData as RawCandle, SubscriptionEvent};
+use crate::pocketoption::types::{MultiPatternRule, StreamBatch, SubscriptionEvent};
 use crate::pocketoption::utils::SocketIoFrame;
 use crate::pocketoption::{
     candle::Candle, // Assuming this exists in your types
@@ -122,7 +122,7 @@ pub struct History {
 #[serde(untagged)]
 pub enum ServerResponse {
     History(History),
-    Candle(RawCandle),
+    Candle(StreamBatch),
 }
 
 impl fmt::Display for ChangeSymbol {
@@ -135,7 +135,10 @@ impl fmt::Display for ChangeSymbol {
     }
 }
 
-const MAX_CHANNEL_CAPACITY: usize = 64;
+/// Per-stream buffer. Ticks for a symbol arrive every few hundred milliseconds
+/// and aggregated subscriptions (e.g. 60s+ candles) only drain the buffer when
+/// the consumer polls, so this must tolerate a consumer that is busy elsewhere.
+const MAX_CHANNEL_CAPACITY: usize = 1024;
 const RECONNECT_INITIAL_DELAY: Duration = Duration::from_secs(2);
 const SUBSCRIBE_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_RECEIVE_TIMEOUT: Duration = Duration::from_secs(60);
@@ -737,8 +740,10 @@ impl ApiModule<State> for SubscriptionsApiModule {
                     if let Some(response) = response {
                         match response {
                             ServerResponse::Candle(data) => {
-                                if let Err(e) = self.forward_data_to_stream(&data.symbol, data.price, data.timestamp).await {
-                                    warn!(target: "SubscriptionsApiModule", "Failed to forward data: {}", e);
+                                for tick in data.0 {
+                                    if let Err(e) = self.forward_data_to_stream(&tick.symbol, tick.price, tick.timestamp).await {
+                                        warn!(target: "SubscriptionsApiModule", "Failed to forward data: {}", e);
+                                    }
                                 }
                             },
                             ServerResponse::History(data) => {
@@ -934,8 +939,17 @@ impl SubscriptionsApiModule {
             timestamp,
         };
 
+        // Never await on a stream's channel here: this loop serves every
+        // subscription, so one consumer that stops polling would otherwise stall
+        // the ticks of all the others until they time out.
         for stream_sender in senders {
-            let _ = stream_sender.send(update.clone()).await;
+            match stream_sender.as_sync().try_send(update.clone()) {
+                Ok(true) => {}
+                Ok(false) => {
+                    warn!(target: "SubscriptionsApiModule", "Stream buffer full for {asset}; dropping tick (consumer is not keeping up)");
+                }
+                Err(_) => {} // receiver dropped; cleanup happens through Unsubscribe
+            }
         }
         Ok(())
     }

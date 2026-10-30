@@ -66,15 +66,11 @@ pub async fn try_connect(
     if !certs_result.errors.is_empty() {
         warn!(target: "ExpertConnect", "Some native certificates failed to load: {:?}", certs_result.errors);
     }
-    let certs = certs_result.certs;
-    if certs.is_empty() {
-        return Err(ConnectorError::Custom(
-            "Could not load any native certificates".to_string(),
-        ));
-    }
-    for cert in certs {
+    for cert in certs_result.certs {
         root_store.add(cert).ok();
     }
+    // The OS store can be missing or outdated; always include the bundled roots.
+    root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
     let tls_config = rustls::ClientConfig::builder()
         .with_root_certificates(root_store)
         .with_no_client_auth();
