@@ -157,6 +157,41 @@ impl<'de> Deserialize<'de> for StreamData {
     }
 }
 
+/// One or more price ticks delivered in a single frame.
+///
+/// With a single active subscription the server sends `[["SYMBOL",ts,price]]`.
+/// Once several symbols are subscribed it batches them into one frame:
+/// `[["A",ts,price],["B",ts,price]]`. Parsing only the single-entry form drops
+/// every batched frame, so the streams of all subscribed symbols stall.
+#[derive(Debug, Clone)]
+pub struct StreamBatch(pub Vec<StreamData>);
+
+impl<'de> Deserialize<'de> for StreamBatch {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let rows: Vec<Vec<serde_json::Value>> = Vec::deserialize(deserializer)?;
+        if rows.is_empty() {
+            return Err(serde::de::Error::custom("Empty StreamBatch"));
+        }
+        let mut ticks = Vec::with_capacity(rows.len());
+        for row in rows {
+            if row.len() != 3 {
+                return Err(serde::de::Error::custom("Invalid StreamData format"));
+            }
+            let price =
+                Decimal::from_f64_retain(row[2].as_f64().unwrap_or(0.0)).unwrap_or_default();
+            ticks.push(StreamData {
+                symbol: row[0].as_str().unwrap_or_default().to_string(),
+                timestamp: normalize_timestamp(row[1].as_f64().unwrap_or(0.0)),
+                price,
+            });
+        }
+        Ok(StreamBatch(ticks))
+    }
+}
+
 impl StreamData {
     /// Create new stream data
     ///
@@ -738,6 +773,24 @@ mod tests {
         assert_eq!(data_float.symbol, "EURUSD_otc");
         assert_eq!(data_float.timestamp, 1770856131);
         assert_eq!(data_float.price, Decimal::from_f64_retain(1.19537).unwrap());
+    }
+
+    #[test]
+    fn test_stream_batch_deserialization() {
+        let single: StreamBatch =
+            serde_json::from_str(r#"[["EURUSD_otc",1770856131.3,1.19537]]"#).unwrap();
+        assert_eq!(single.0.len(), 1);
+
+        let batch: StreamBatch = serde_json::from_str(
+            r#"[["EURUSD_otc",1770856131.3,1.19537],["GBPUSD_otc",1770856131.3,1.28142]]"#,
+        )
+        .unwrap();
+        assert_eq!(batch.0.len(), 2);
+        assert_eq!(batch.0[1].symbol, "GBPUSD_otc");
+        assert_eq!(batch.0[1].timestamp, 1770856131);
+
+        assert!(serde_json::from_str::<StreamBatch>("[]").is_err());
+        assert!(serde_json::from_str::<StreamBatch>(r#"[["A",1]]"#).is_err());
     }
 
     #[test]
