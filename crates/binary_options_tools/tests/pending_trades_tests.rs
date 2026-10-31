@@ -61,6 +61,9 @@ mod tests {
             tls_alpn: None,
             raw_subscribers: tokio::sync::RwLock::new(Vec::new()),
             auth_error: std::sync::RwLock::new(None),
+            session_confirmed: std::sync::atomic::AtomicBool::new(false),
+            session_confirmed_notice: Arc::new(tokio::sync::Notify::new()),
+            broker_clock_offset: std::sync::atomic::AtomicI64::new(0),
         })
     }
 

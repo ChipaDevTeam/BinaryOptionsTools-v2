@@ -6,7 +6,7 @@ import time
 import warnings
 from collections import deque
 from datetime import timedelta
-from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional, Tuple, Union, AsyncGenerator
+from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from ..config import Config
 from ..validator import Validator
@@ -620,6 +620,49 @@ class PocketOptionAsync:
         candles = await self.client.get_candles_advanced(asset, period, offset=offset, time=time)
         return json.loads(candles)
 
+    async def candles_many(
+        self,
+        assets: Sequence[str],
+        period: int,
+        *,
+        count: int = 100,
+    ) -> Dict[str, List[Dict]]:
+        """Fetches the latest closed candles for many symbols in one call.
+
+        This is the right shape for "every minute, give me the last M1 candle of
+        each symbol": it polls snapshots instead of holding one live stream per
+        symbol, so it is not subject to the server's limit on how many symbols it
+        will stream at once (measured at about two per session). Requests are paced
+        and serialised by the client, so a dozen symbols are fetched reliably.
+
+        Args:
+            assets: Symbols to fetch (e.g. ``["EURUSD_otc", "GBPUSD_otc"]``).
+            period: Candle timeframe in seconds.
+            count: Candles to request per symbol. Only the last one is needed for
+                most bots, but a few extra make it easy to build indicators.
+
+        Returns:
+            Mapping of symbol to its candles, oldest first. Symbols that could not be
+            fetched are simply absent, so a closed market does not fail the batch.
+
+        Example:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                feed = await client.candles_many(["EURUSD_otc", "GBPUSD_otc"], 60)
+                for symbol, candles in feed.items():
+                    print(symbol, candles[-1]["close"])
+            ```
+        """
+        results: Dict[str, List[Dict]] = {}
+        for asset in assets:
+            try:
+                candles = await self.candles(asset, period, count=count)
+            except Exception:  # noqa: BLE001 - one bad symbol must not fail the batch
+                continue
+            if candles:
+                results[asset] = candles
+        return results
+
     async def get_candles_live(
         self,
         asset: str,
@@ -648,16 +691,19 @@ class PocketOptionAsync:
                 - Optional[Dict]: The currently forming candle, containing 'time', 'open',
                   'high', 'low', 'close', or None if not yet started.
         """
-        platform_time_offset = 7200
 
         def bucket_start(timestamp: int, p: int) -> int:
             return (timestamp // p) * p
 
         def extract_time(candle: Dict) -> int:
+            # Every source this method mixes (compiled tick pages, chart history and
+            # the live tick stream) is reported in UTC by the engine. A fixed
+            # +2h "platform offset" used to be subtracted here, which pushed the
+            # historical candles two hours behind the ticks they were merged with.
             val = int(float(candle.get("timestamp", candle.get("time", 0))))
             if val > 10_000_000_000:
                 val //= 1000
-            return val - platform_time_offset
+            return val
 
         def merge_candles(*groups: List[Dict]) -> List[Dict]:
             res: Dict[int, Dict] = {}
@@ -718,7 +764,7 @@ class PocketOptionAsync:
         # 1. Subscribe to ticks FIRST
         tick_buffer: List[Tuple[int, float]] = []
         buffering = True
-        stream = await self.subscribe_symbol(asset)
+        stream: Optional[AsyncSubscription] = await self.subscribe_symbol(asset)
 
         queue = asyncio.Queue()
 
@@ -803,14 +849,23 @@ class PocketOptionAsync:
                 yield item
 
         finally:
+            # Release the subscription explicitly and synchronously. Relying on the
+            # Rust object's `Drop` is not enough: the server streams at most a couple
+            # of symbols per session, so a stream that is still registered when the
+            # generator exits starves the next asset in a rotation. Unsubscribing a
+            # single subscription id (not by asset) keeps a concurrent stream for the
+            # same asset alive.
+            if stream is not None:
+                try:
+                    await stream.unsubscribe()
+                except Exception:  # noqa: BLE001 - teardown must never mask the real error
+                    pass
+                stream = None
             reader_task.cancel()
             try:
                 await reader_task
             except asyncio.CancelledError:
                 pass
-            # Do NOT call self.unsubscribe(asset) here - it removes ALL subscriptions for the asset.
-            # The temporary subscription created by subscribe_symbol() will be cleaned up
-            # when the stream variable goes out of scope (its Drop sends Unsubscribe for that specific ID).
 
     async def stream_candles(
         self,
@@ -889,14 +944,17 @@ class PocketOptionAsync:
             await asyncio.sleep(0.1)
         return await self.client.balance()
 
-    async def opened_deals(self) -> List[str]:
+    async def opened_deals(self) -> List[Dict]:
         """Retrieves a list of all currently open (active) deals.
 
-        This method returns all deals ids that are currently active/open on the account,
-        including both pending and executed trades that have not yet closed.
+        This method returns the deals themselves that are currently active/open on
+        the account, including both pending and executed trades that have not yet
+        closed.
 
         Returns:
-            List[str]: List of currently opened deals IDs in UUID format.
+            List[Dict]: One dictionary per open deal, ordered by deal id. Each
+            entry carries the deal fields, including `id` (UUID string), `asset`,
+            `amount`, `direction` and `open_price`.
 
         Raises:
             ConnectionError: If the client is not connected to the platform
@@ -906,29 +964,27 @@ class PocketOptionAsync:
             Basic usage:
             ```python
             async with PocketOptionAsync(ssid) as client:
-                open_deals_ids = await client.opened_deals()
-                open_deals = [await client.get_opened_deal(deal_id) for deal_id in open_deals_ids]
+                open_deals = await client.opened_deals()
                 for deal in open_deals:
                     print(f"Deal {deal['id']}: {deal['asset']} {deal['direction']}")
             ```
 
-            Filtering active deals:
+            Total exposure:
             ```python
             async def monitor_open_deals(client):
-                deals_ids = await client.opened_deals()
-                deals = [await client.get_opened_deal(deal_id) for deal_id in deals_ids]
+                deals = await client.opened_deals()
                 total_value = sum(d['amount'] for d in deals)
                 print(f"Open deals: {len(deals)}, Total exposure: {total_value}")
             ```
         """
         return json.loads(await self.client.opened_deals())
 
-    async def get_opened_deal(self, id: str) -> Optional[Trade]:
+    async def get_opened_deal(self, trade_id: str) -> Optional[Trade]:
         """
         Retrieves details of a specific opened deal by its ID.
 
         Args:
-            id (str): The unique identifier of the deal to retrieve
+            trade_id (str): The unique identifier of the deal to retrieve
 
         Returns:
             Optional[Trade]: A :class:`Trade` with the deal details if found,
@@ -957,7 +1013,7 @@ class PocketOptionAsync:
                     print("Deal not found")
             ```
         """
-        deal_json = await self.client.get_opened_deal(id)
+        deal_json = await self.client.get_opened_deal(trade_id)
         if deal_json is None:
             return None
         return Trade(json.loads(deal_json))
@@ -1055,14 +1111,16 @@ class PocketOptionAsync:
         result = await self.client.cancel_pending_orders(tickets)
         return json.loads(result)
 
-    async def closed_deals(self) -> List[str]:
-        """Retrieves a list of all closed/completed deals.
+    async def closed_deals(self) -> List[Dict]:
+        """Retrieves all closed/completed deals.
 
-        This method returns the ID of all deals that have been completed, including trades
-        that have expired and reached a final outcome (win, loss, or draw).
+        This method returns the deals that have reached a final outcome (win,
+        loss, or draw).
 
         Returns:
-            List[str]: A list of IDs, each representing a closed deal with details obtainable with the `get_closed_deal` method.:
+            List[Dict]: One dictionary per closed deal, ordered by deal id. Each
+            entry carries the deal fields, including `id` (UUID string), `asset`,
+            `amount`, `profit`, `result` and `close_price`.
 
         Raises:
             ConnectionError: If the client is not connected to the platform
@@ -1072,9 +1130,7 @@ class PocketOptionAsync:
             Basic usage:
             ```python
             async with PocketOptionAsync(ssid) as client:
-                closed = await client.closed_deals()
-                closed = [await client.get_closed_deal(deal_id) for deal_id in closed]
-                for deal in closed:
+                for deal in await client.closed_deals():
                     print(f"Deal {deal['id']}: {deal['result']} (profit: {deal['profit']})")
             ```
 
@@ -1082,8 +1138,7 @@ class PocketOptionAsync:
             ```python
             async def calculate_pnl():
                 async with PocketOptionAsync(ssid) as client:
-                    closed_ids = await client.closed_deals()
-                    closed = [await client.get_closed_deal(deal_id) for deal_id in closed_ids]
+                    closed = await client.closed_deals()
                     total_pnl = sum(d['profit'] for d in closed)
                     wins = sum(1 for d in closed if d['result'] == 'win')
                     print(f"Total P/L: {total_pnl}, Win rate: {wins}/{len(closed)}")
@@ -1091,12 +1146,12 @@ class PocketOptionAsync:
         """
         return json.loads(await self.client.closed_deals())
 
-    async def get_closed_deal(self, id: str) -> Optional[Trade]:
+    async def get_closed_deal(self, trade_id: str) -> Optional[Trade]:
         """
         Retrieves details of a specific closed deal by its ID.
 
         Args:
-            id (str): The unique identifier of the closed deal to retrieve
+            trade_id (str): The unique identifier of the closed deal to retrieve
 
         Returns:
             Optional[Trade]: The :class:`Trade` with the deal details if found,
@@ -1127,7 +1182,7 @@ class PocketOptionAsync:
                     print("Closed deal not found")
             ```
         """
-        deal_json = await self.client.get_closed_deal(id)
+        deal_json = await self.client.get_closed_deal(trade_id)
         if deal_json is None:
             return None
         return Trade(json.loads(deal_json))

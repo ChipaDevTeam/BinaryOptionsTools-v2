@@ -10,6 +10,10 @@
 //!
 //! [`Ssid::parse`] accepts that payload directly, so this module only has to mint
 //! a token the way the browser does.
+//!
+//! Note: as of October 2026 the demo servers accept the frame but never confirm
+//! the session, so [`crate::pocketoption::PocketOption::new_try_demo`] reports
+//! `NotAuthorized` instead of handing back a client the broker ignores.
 
 use rand::RngExt;
 

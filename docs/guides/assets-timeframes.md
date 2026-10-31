@@ -40,6 +40,16 @@ The API supports a wide range of assets across different categories:
 
 ### Forex Pairs (Currencies)
 
+> **Regular vs OTC availability.** The `_otc` variants trade around the clock and
+> are the safe default for bots. Non-OTC FX (for example `EURUSD`, `USDJPY`,
+> `GBPUSD`, `GBPJPY`, `EURJPY`, `AUDUSD`) follows the real market calendar: while
+> it is closed the platform reports `is_active = false` and gives a reopen time, so
+> candle/history/tick calls fail immediately with
+> ``Asset `EURUSD` is not active: its market is closed (reopens ...)`` instead of
+> waiting out a timeout. Check `asset["is_active"]` from `active_assets()` before
+> connecting a symbol to a strategy, and prefer the OTC symbol when you need
+> continuous data.
+
 #### Major Pairs
 
 - **EUR/USD** - Euro vs US Dollar (Symbols: `EURUSD`, `EURUSD_otc`)
@@ -174,4 +184,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 This documentation is for BinaryOptionsTools-v2. Features and supported assets may change in future releases.
 
-For the latest updates, check the [GitLab repository](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2).
+For the latest updates, check the [GitLab repository](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/synced/master).

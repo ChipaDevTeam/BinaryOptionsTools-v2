@@ -7,7 +7,7 @@ This directory contains examples for using the CloseOption trading platform inte
 To run these examples, you need:
 
 1. A valid CloseOption session ID (SSID) in the format: `token|sid|demo|public_code|hidden_code`
-2. Python 3.9+ with the BinaryOptionsToolsV2 package installed
+2. Python 3.10+ with the BinaryOptionsToolsV2 package installed
 
 ## Setting Up
 
@@ -42,13 +42,13 @@ $env:CLOSEOPTION_SSID="your_token|your_sid|true|your_public_code|your_hidden_cod
 
 ```bash
 # Run async basic example
-python examples/async/closeoption_basic.py
+python examples/python/async/closeoption_basic.py
 
 # Run sync advanced example
-python examples/sync/closeoption_advanced.py
+python examples/python/sync/closeoption_advanced.py
 
 # Run trading example (requires valid credentials)
-python examples/async/closeoption_trading.py
+python examples/python/async/closeoption_trading.py
 ```
 
 ## API Methods

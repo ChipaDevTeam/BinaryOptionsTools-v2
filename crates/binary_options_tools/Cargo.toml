@@ -1,6 +1,6 @@
 [package]
 name = "binary_options_tools"
-version = "0.2.16"
+version = "0.2.17"
 edition = "2021"
 authors = ["ChipaDevTeam"]
 description = "High-level library for binary options trading automation. Supports PocketOption and ExpertOption with real-time data streaming, WebSocket API access, and automated trading strategies."
@@ -8,7 +8,7 @@ license-file = "LICENSE"
 homepage = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2"
 repository = "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2"
 documentation = "https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2"
-readme = "Readme.md"
+readme = "README.md"
 keywords = ["binary-options", "pocketoption", "trading", "expertoption", "automation"]
 categories = ["api-bindings", "asynchronous"]
 [features]
@@ -21,18 +21,16 @@ closeoption = []
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
-# binary-options-tools-core = { path = "../core", version = "0.2.0" }
-# trading-macros = { path = "../macros" }
 futures-util = { workspace = true }
-reqwest = { version = "0.13.4", default-features = false, features = ["rustls-no-provider", "json", "socks"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "json", "socks"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 tokio-tungstenite = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
-binary-options-tools-core = { path = "../core", version = "0.2.13" }
-binary-options-tools-macros = { path = "../macros", version = "0.2.13" }
+binary-options-tools-core = { path = "../core", version = "0.2.17" }
+binary-options-tools-macros = { path = "../macros", version = "0.2.17" }
 rand = { workspace = true }
 regex = { workspace = true }
 kanal = { workspace = true }
@@ -43,14 +41,42 @@ ryu = "1.0"
 thiserror = { workspace = true }
 base64 = { workspace = true }
 http = { workspace = true }
- rustls = { version = "0.23.43", default-features = false, features = ["ring"] }
- rustls-native-certs = "0.8.4"
+ rustls = { version = "0.23.46", default-features = false, features = ["ring"] }
+ rustls-native-certs = "0.8.5"
  webpki-roots = "1"
  php_serde = "0.6.0"
- tokio-rustls = "0.26.4"
+ tokio-rustls = "0.26.6"
 
 [dev-dependencies]
 futures-util = { workspace = true }
 tracing-subscriber = { workspace = true }
 kanal = { workspace = true }
 
+# The Rust examples live in the repository-level `examples/rust/` directory (they are
+# documented from docs/examples/rust/), so their targets point outside this package.
+# Declaring them here is what makes `cargo build --examples` compile them, which is
+# how they stay working - before this, nothing built them and two had broken.
+# Consequence: these files are not part of the published crate tarball.
+[[example]]
+name = "doc_balance"
+path = "../../examples/rust/balance.rs"
+
+[[example]]
+name = "doc_basic"
+path = "../../examples/rust/basic.rs"
+
+[[example]]
+name = "doc_buy"
+path = "../../examples/rust/buy.rs"
+
+[[example]]
+name = "doc_check_win"
+path = "../../examples/rust/check_win.rs"
+
+[[example]]
+name = "doc_sell"
+path = "../../examples/rust/sell.rs"
+
+[[example]]
+name = "doc_subscribe_symbol"
+path = "../../examples/rust/subscribe_symbol.rs"

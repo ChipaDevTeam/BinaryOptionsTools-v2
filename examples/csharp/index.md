@@ -110,7 +110,7 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 
 ## Additional Resources
 
-- **Full Documentation**: [https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)
+- **Full Documentation**: [docs/api/reference.md](docs/api/reference.md)
 - **Discord Community**: [Join us](https://discord.gg/p7YyFqSmAz)
 
 ## ⚠️ Risk Warning
