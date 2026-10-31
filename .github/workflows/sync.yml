@@ -17,6 +17,26 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Protect GitHub from the GitLab mirror
+        env:
+          GITLAB_SYNC_TOKEN: ${{ secrets.GITLAB_SYNC_TOKEN }}
+        run: |
+          api="https://gitlab.chipatrade.com/api/v4/projects/chipadevorg%2FBinaryOptionsTools-v2"
+          code=$(curl -sS -o /tmp/mirrors.json -w '%{http_code}' \
+            --header "PRIVATE-TOKEN: $GITLAB_SYNC_TOKEN" "$api/remote_mirrors")
+          if [ "$code" != "200" ]; then
+            echo "::warning::Cannot read GitLab mirror settings (HTTP $code); leaving them unchanged."
+            exit 0
+          fi
+          jq -r '.[] | "mirror \(.id): \(.url | sub("://[^@]*@"; "://")) keep_divergent_refs=\(.keep_divergent_refs)"' /tmp/mirrors.json
+          # The GitLab -> GitHub push mirror rewound GitHub's master to GitLab's
+          # copy on every push, undoing merges. With divergent refs kept, a
+          # GitHub branch that is ahead is no longer overwritten.
+          for id in $(jq -r '.[].id' /tmp/mirrors.json); do
+            curl -sS -o /dev/null -w "mirror $id keep_divergent_refs: %{http_code}\n" \
+              --request PUT --header "PRIVATE-TOKEN: $GITLAB_SYNC_TOKEN" \
+              --data "keep_divergent_refs=true" "$api/remote_mirrors/$id"
+          done
       - name: Push to GitLab
         run: |
           git remote add gitlab https://oauth2:${{ secrets.GITLAB_SYNC_TOKEN }}@gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
