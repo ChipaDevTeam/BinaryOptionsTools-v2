@@ -16,8 +16,8 @@ generator to be set up again.
 
 ```
 docs/
+├── README.md             # Documentation index
 ├── intro.md              # Homepage
-├── OVERVIEW.md           # Documentation overview
 ├── ecosystem.md          # Chipa ecosystem
 ├── api/                  # API reference
 ├── guides/               # Trading guides
@@ -32,8 +32,8 @@ docs/
 ## Reading the docs without a site
 
 Every page is plain Markdown and reads correctly on its own — for example
-[`docs/OVERVIEW.md`](../OVERVIEW.md) or [`docs/api/reference.md`](../api/reference.md).
-Relative links between pages resolve in a checkout (GitHub, GitLab, or a local
+[`docs/README.md`](../README.md) (the index) or [`docs/api/reference.md`](../api/reference.md).
+Relative links between pages resolve in a checkout (GitHub or a local
 editor preview).
 
 ## Re-creating a site (optional)

@@ -38,6 +38,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Documentation restructured and corrected against the code.** `docs/` now has an
+  index (`docs/README.md`) with a task-to-page table; `docs/OVERVIEW.md` (which
+  contradicted itself by advertising a deployed site while its own History section
+  said the site was deleted in 0.2.15, and duplicated `docs/intro.md`) and
+  `docs/project/raw-handler-summary.md` (a stale "files I added" changelog whose
+  content is covered by `architecture/raw-module.md` and `guides/raw-handler.md`)
+  were removed. All internal links resolve — 4 were broken.
+- **`docs/api/python.md` rewritten from the implementation.** It documented methods
+  that do not exist (`result`, `trade`, `subscribe`, `get_opened_deals`,
+  `get_closed_deals`, `server_time`) and an awaited constructor. Corrected to the
+  real surface, including that `buy`/`sell` take `(asset, amount, time)` and return
+  `(trade_id, trade)`, that settlement is `check_win`, and that `candles_many`
+  returns `Dict[str, List[Dict]]`. Same fixes applied to the Python snippets in
+  `docs/api/reference.md` and `docs/guides/trading.md`, plus the argument-order
+  trap: Rust takes `(asset, time, amount)`, Node and Python `(asset, amount, time)`.
+- **Install instructions no longer describe packages that do not exist.** The
+  Kotlin, Swift, Go, Ruby and C# sections told readers to `dotnet add package`,
+  `gem install` and add a Swift package; none of those are published, and the
+  in-repo `uniffi-bindgen` emits only `kotlin`, `swift`, `python` and `ruby`. They
+  now describe generating the bindings, and the UniFFI README documents the
+  verified limitation that `--language kotlin` and `--language python` currently
+  fail with `Async primary constructors not supported but PocketOption has one`
+  (Swift and Ruby generate successfully).
+- **Repository links:** GitHub stays primary
+  (`github.com/ChipaDevTeam/BinaryOptionsTools-v2`) and GitLab is the mirror
+  (`gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/synced/master`);
+  stale links to the deleted documentation site and to `gitlab.chipatrade.com/...-/issues`
+  were repointed, and clone/pip URLs are shown GitHub-first with the GitLab
+  equivalent commented.
+
 - **Documentation brought in line with the code and the current version.** Every
   install snippet in `docs/api/reference.md`, `crates/bindings_uniffi/README.md`
   and `crates/binary_options_tools/README.md` still pinned 0.1.x/0.2.13, the Python
@@ -52,8 +82,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `place_order` (~45 lines), the candle/ticks request boilerplate is one helper
   (~55 lines), `HistoricalDataApiModule`'s two command arms are one `begin_request`
   (~30), frame formatting moved into `socketio_frame`, and the three
-  `GetCandlesHandle` literals are one constructor. `docs/project/simplification-plan.md`
-  records what was applied, what is queued and what was rejected.
+  `GetCandlesHandle` literals are one constructor. The CloseOption frame parser no
+  longer copies each frame into a `Vec<char>` before slicing it, and the Engine.IO
+  digit mapping now lives in one place shared by the parser and the encoder
+  (108 → 71 and 35 → 28 lines). `docs/project/simplification-plan.md` records what
+  was applied and the measurements that closed the rest.
 - `MultiPatternRule`/`DealsUpdateRule` accept any `IntoIterator<Item: ToString>`, so
   callers no longer wrap literals in `vec![...]`. `TradesApiModule::CommandResponse`
   is empty because nothing is ever sent on it.

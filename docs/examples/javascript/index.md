@@ -290,7 +290,7 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 
 ## Additional Resources
 
-- **Documentation**: [docs/api/reference.md](docs/api/reference.md)
+- **Documentation**: [docs/api/reference.md](../../api/reference.md)
 - **Discord**: [Join us](https://discord.gg/p7YyFqSmAz)
 
 ## ⚠️ Risk Warning

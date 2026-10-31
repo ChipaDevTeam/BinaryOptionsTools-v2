@@ -201,8 +201,7 @@ impl LogBuilder {
         self.build = true;
         let default = fmt::Layer::default().with_writer(NoneWriter).boxed();
         self.layers.push(default);
-        let layers = std::mem::take(&mut self
-            .layers);
+        let layers = std::mem::take(&mut self.layers);
 
         // Use try_init and ignore errors to prevent panics if already initialized
         let _ = tracing_subscriber::registry().with(layers).try_init();

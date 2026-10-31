@@ -1,4 +1,4 @@
-# Trading Guide - BinaryOptionsToolsUni
+# Trading Guide
 
 :::tip Build and backtest strategies visually
 This guide teaches the strategy patterns. **[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=guide-trading&utm_campaign=BinaryOptionsToolsV2)** lets you
@@ -10,7 +10,7 @@ Applying these same ideas to crypto? **[ChipaX](https://exchange.chipatrade.com/
 demo mode to practise risk-free.
 :::
 
-Complete guide to trading binary options using BinaryOptionsToolsUni across all supported languages.
+Complete guide to trading binary options with BinaryOptionsTools, across all supported languages.
 
 ## Table of Contents
 
@@ -183,7 +183,7 @@ async def martingale_strategy(client, asset, initial_amount=1.0, max_rounds=5):
         await asyncio.sleep(65)
 
         # Check result
-        result = await client.result(trade.id)
+        result = await client.check_win(trade.id)
 
         if result.profit > 0:
             print(f"✅ WIN! Profit: ${result.profit:.2f}")
@@ -254,7 +254,7 @@ async def multi_asset_trading(client, assets, amount=1.0):
     # Check results
     total_profit = 0
     for asset, action, trade in trades:
-        result = await client.result(trade.id)
+        result = await client.check_win(trade.id)
         total_profit += result.profit
         status = "WIN" if result.profit > 0 else "LOSS"
         print(f"{asset} ({action}): {status} ${result.profit:.2f}")
@@ -383,7 +383,7 @@ async def monitor_trade(client, trade_id, timeout=120):
 
         # Try to get result
         try:
-            result = await client.result(trade_id)
+            result = await client.check_win(trade_id)
             if result.profit != 0:  # Trade completed
                 return result
         except Exception as e:
@@ -592,7 +592,7 @@ class TradingBot:
         await asyncio.sleep(period + 5)
 
         # Get result
-        result = await self.client.result(trade.id)
+        result = await self.client.check_win(trade.id)
         self.daily_pnl += result.profit
 
         status = "WIN" if result.profit > 0 else "LOSS"
@@ -642,6 +642,6 @@ asyncio.run(main())
 ## Support
 
 - **Discord**: [Join our community](https://discord.gg/p7YyFqSmAz)
-- **GitLab Issues**: [Report problems](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
+- **GitHub Issues**: [Report problems](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
 
 **Remember**: Trading binary options involves significant risk. Never trade with money you cannot afford to lose.

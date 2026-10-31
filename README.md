@@ -86,7 +86,7 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 This project is mirrored and synchronized across both GitLab and GitHub, some synchronization errors may occur. Check the latest commit date to ensure you're up to date.
 
 - **GitHub (Primary)**: [https://github.com/ChipaDevTeam/BinaryOptionsTools-v2](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2)
-- **GitLab (Mirror)**: [https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
+- **GitLab (Mirror)**: [https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/synced/master](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/synced/master)
 
 ---
 
@@ -503,4 +503,4 @@ We welcome contributions!
 
 ---
 
-[API Reference](docs/api/reference.md) | [Python API](docs/api/python.md) | [Guides](docs/guides/trading.md) | [Agents & AI](AGENTS.md)
+[Docs index](docs/README.md) | [API Reference](docs/api/reference.md) | [Python API](docs/api/python.md) | [Trading guide](docs/guides/trading.md) | [Candle limits](docs/guides/candle-history-limits.md) | [Agents & AI](AGENTS.md)

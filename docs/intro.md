@@ -54,27 +54,21 @@ All documentation includes code examples in:
 - **Ruby** - Async Fiber support
 - **C#** - Task-based async/await
 
-## Modern Documentation
-
-The documentation ships as **plain Markdown** with Docusaurus-style frontmatter,
-so it reads correctly in a checkout and can be rendered by any Markdown viewer:
-
-- **Unified Content**: Every API method and concept lives in one tree.
-- **Language Tabs Ready**: Code blocks are labelled per language.
-- **Responsive Output**: Any Markdown preview adapts to desktop and mobile.
-- **Dark/Light Mode**: Provided by the viewer you use.
-- **Versioned Copies**: Each release keeps its own snapshot of these pages.
-
 ## Documentation Structure
+
+Everything lives in [docs/](README.md) as plain Markdown - it reads correctly in a
+checkout, on GitHub, or in any viewer:
 
 ```
 docs/
-├── api/             # API Reference (Multi-language & Python)
-├── guides/          # Trading guides and asset information
-├── architecture/    # Data flow and project structure
-├── project/         # Deployment and roadmap
-├── examples/        # Code examples for each language
-└── tutorials/       # Step-by-step tutorials
+├── README.md        # index: start here
+├── api/             # reference.md (7 languages), python.md
+├── guides/          # trading, raw handler, candle limits, assets, bot walkthrough
+├── architecture/    # structure.md, dataflow.md, raw-module.md
+├── examples/        # runnable examples per language
+├── project/         # deployment, 0.2.6 breaking changes
+├── ecosystem.md     # ChipaEditor and ChipaX
+└── tutorials/       # getting an SSID, screenshots, userscript
 ```
 
 ## The Chipa Ecosystem
@@ -95,7 +89,7 @@ BinaryOptionsTools V2 is one part of a larger toolkit. See the full
 - [API Reference](/api/reference)
 - [Python API](/api/python)
 - [Examples](/examples)
-- [GitLab Repository](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
+- [GitHub Repository](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/synced/master)
 - [Discord Community](https://discord.gg/p7YyFqSmAz)
 - [PyPI Package](https://pypi.org/project/BinaryOptionsToolsV2/)
 - [crates.io](https://crates.io/crates/binary_options_tools)

@@ -10,7 +10,8 @@ Example Go programs demonstrating the BinaryOptionsTools library.
 ## Prerequisites
 
 - Go 1.20+
-- BinaryOptionsTools Go bindings
+- Go bindings generated with the external `uniffi-bindgen-go` (not published as a
+  Go module; the in-repo generator emits kotlin, swift, python and ruby only)
 
 ## Getting Your SSID
 

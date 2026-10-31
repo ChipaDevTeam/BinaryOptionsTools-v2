@@ -35,11 +35,17 @@ it has buffered for that asset (at most 10,000 ticks, no older than five
 minutes). So an empty endpoint `data` array does **not** guarantee an empty
 returned list - buffered live ticks are compiled into candles too.
 
-> **`offset` is a window in seconds, not a candle count.** The server answers
-> with the candles that fit in `time - offset ..= time`, and a window shorter
-> than one period contains no candle: `get_candles("EURUSD_otc", 60, 10)`
-> therefore returns an empty list, while `get_candles("EURUSD_otc", 60, 3600)`
-> returns an hour of 60-second candles. Ask for at least `period * candles`.
+> **`get_candles_advanced`'s `offset` is a window in seconds, not a candle
+> count.** The server answers with the candles that fit in `time - offset ..=
+time`, so a window shorter than one period contains no candle:
+> `get_candles_advanced("EURUSD_otc", 60, 10, now)` returns an empty list, while
+> `get_candles_advanced("EURUSD_otc", 60, 3600, now)` returns an hour of
+> 60-second candles. Ask for at least `period * candles`.
+>
+> This applies **only** to `get_candles_advanced`. The deprecated
+> `get_candles(asset, period, offset)` takes a _count_ of periods, not seconds:
+> it multiplies `offset * period` to size its lookback window before delegating
+> to `get_candles_live()`.
 >
 > **One request is one page.** The page is capped by the server (the captures
 > from 2026-10-30 return ~150 OHLC rows per request), so longer windows need
@@ -173,4 +179,4 @@ fetches; they limit how many buffered live ticks can be appended to
 This documentation is for BinaryOptionsTools-v2. Limits may change in future
 releases; the constants named above are the authoritative source.
 
-For the latest updates, check the [GitLab repository](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2).
+For the latest updates, check the [GitLab repository](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/synced/master).

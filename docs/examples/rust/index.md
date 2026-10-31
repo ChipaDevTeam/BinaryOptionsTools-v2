@@ -168,7 +168,7 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 ## Additional Resources
 
 - **Crate Documentation**: [https://docs.rs/binary_options_tools](https://docs.rs/binary_options_tools)
-- **Full Documentation**: [docs/api/reference.md](docs/api/reference.md)
+- **Full Documentation**: [docs/api/reference.md](../../api/reference.md)
 - **Discord Community**: [Join us](https://discord.gg/p7YyFqSmAz)
 
 ## ⚠️ Risk Warning

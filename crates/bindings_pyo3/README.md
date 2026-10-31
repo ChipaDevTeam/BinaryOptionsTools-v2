@@ -41,7 +41,10 @@ Requires `git`, a C toolchain, and a Rust toolchain.
 ```bash
 uv venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@master#subdirectory=python"
+# Install via GitHub (primary)
+uv pip install "git+https://github.com/ChipaDevTeam/BinaryOptionsTools-v2.git@master#subdirectory=python"
+# Or install via GitLab (mirror)
+# uv pip install "git+https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git@master#subdirectory=python"
 ```
 
 ## Supported OS

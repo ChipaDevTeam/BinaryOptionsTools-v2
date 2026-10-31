@@ -37,16 +37,17 @@ swift Balance.swift
 
 ## Important
 
-Always wait 5 seconds after initialization:
+The initializer awaits the auth handshake, so no fixed delay is needed:
 
 ```swift
 let client = try await PocketOption(ssid: "your-session-id")
-try await Task.sleep(nanoseconds: 5_000_000_000)  // Critical!
+let balance = try await client.balance()
+print("Balance: \(balance)")
 ```
 
 ## SwiftUI Integration
 
-See the Swift README in `BinaryOptionsToolsUni/out/swift/` for SwiftUI examples.
+Generate the Swift sources with `uniffi-bindgen ... --language swift --out-dir out/swift` (see [`crates/bindings_uniffi/README.md`](../../../crates/bindings_uniffi/README.md)).
 
 ---
 

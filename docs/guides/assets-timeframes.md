@@ -184,4 +184,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 This documentation is for BinaryOptionsTools-v2. Features and supported assets may change in future releases.
 
-For the latest updates, check the [GitLab repository](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2).
+For the latest updates, check the [GitLab repository](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/synced/master).
