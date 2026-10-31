@@ -17,41 +17,25 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Protect GitHub from the GitLab mirror
-        env:
-          GITLAB_SYNC_TOKEN: ${{ secrets.GITLAB_SYNC_TOKEN }}
-        run: |
-          api="https://gitlab.chipatrade.com/api/v4/projects/chipadevorg%2FBinaryOptionsTools-v2"
-          code=$(curl -sS -o /tmp/mirrors.json -w '%{http_code}' \
-            --header "PRIVATE-TOKEN: $GITLAB_SYNC_TOKEN" "$api/remote_mirrors")
-          if [ "$code" != "200" ]; then
-            echo "::warning::Cannot read GitLab mirror settings (HTTP $code); leaving them unchanged."
-            exit 0
-          fi
-          jq -r '.[] | "mirror \(.id): \(.url | sub("://[^@]*@"; "://")) keep_divergent_refs=\(.keep_divergent_refs)"' /tmp/mirrors.json
-          # The GitLab -> GitHub push mirror rewound GitHub's master to GitLab's
-          # copy on every push, undoing merges. With divergent refs kept, a
-          # GitHub branch that is ahead is no longer overwritten.
-          for id in $(jq -r '.[].id' /tmp/mirrors.json); do
-            curl -sS -o /dev/null -w "mirror $id keep_divergent_refs: %{http_code}\n" \
-              --request PUT --header "PRIVATE-TOKEN: $GITLAB_SYNC_TOKEN" \
-              --data "keep_divergent_refs=true" "$api/remote_mirrors/$id"
-          done
       - name: Push to GitLab
         run: |
           git remote add gitlab https://oauth2:${{ secrets.GITLAB_SYNC_TOKEN }}@gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
-          # GitLab's own `master` was stale (ca1ad7a) and its tag pipelines kept
-          # force-pushing it back over GitHub, reverting merges. Move GitLab's
-          # `master` to the commit that triggered this run before mirroring
-          # anything else. Tag runs are skipped: an old tag's pipeline would
-          # otherwise rewind GitLab master to that old commit.
+          # GitLab has a push mirror that copies GitLab's `master` back over
+          # GitHub whenever anything is pushed to GitLab. GitLab master must
+          # therefore already contain GitHub's master, or the push below would
+          # undo the merge that triggered this run.
           if [ "$GITHUB_REF" = "refs/heads/master" ]; then
-            # GitLab protects `master`; the sync token is a Developer token and
-            # cannot push there. Try anyway (so a Maintainer-capable token keeps
-            # it current), but never abort the mirror over it.
-            if ! git push gitlab HEAD:refs/heads/master; then
-              echo "::warning::GitLab master is protected; fast-forward it manually to $GITHUB_SHA."
+            if git push --quiet gitlab HEAD:refs/heads/master 2>/dev/null; then
+              echo "GitLab master fast-forwarded to $GITHUB_SHA."
+            else
+              echo "::notice::GitLab master is protected; it must be fast-forwarded separately."
             fi
+          fi
+          github_master=$(git rev-parse --verify refs/remotes/origin/master 2>/dev/null || git rev-parse HEAD)
+          gitlab_master=$(git ls-remote --heads gitlab refs/heads/master | cut -f1)
+          if [ -z "$gitlab_master" ] || ! git merge-base --is-ancestor "$github_master" "$gitlab_master"; then
+            echo "::warning::GitLab master is behind GitHub; skipping the mirror push so the GitLab push mirror cannot rewind GitHub. Allow the sync token to push master, or disable/keep-divergent-refs on the GitLab push mirror, to resume."
+            exit 0
           fi
           # A branch literally named "synced" occupies refs/heads/synced and makes the
           # whole refs/heads/synced/* namespace unpushable ("refname conflict").
