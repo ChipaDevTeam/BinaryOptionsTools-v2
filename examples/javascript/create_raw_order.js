@@ -22,7 +22,10 @@ async function main(ssid) {
   try {
     const validator = Validator.regex('\\{"type":"signal","data":.*\\}');
     const handler = await api.createRawHandler(validator);
-    const response = await handler.sendAndWaitWithTimeout('42["signals/load"]', 5000);
+    const response = await handler.sendAndWaitWithTimeout(
+      '42["signals/load"]',
+      5000,
+    );
     console.log(`Raw order with timeout response: ${response}`);
   } catch (error) {
     // Timeouts are reported as `TimeoutError: ...`.

@@ -2,7 +2,7 @@ name: Sync to GitLab
 on:
   push:
     branches: [main, master]
-    tags: ['*']
+    tags: ["*"]
   workflow_dispatch:
 
 permissions:
@@ -20,4 +20,31 @@ jobs:
       - name: Push to GitLab
         run: |
           git remote add gitlab https://oauth2:${{ secrets.GITLAB_SYNC_TOKEN }}@gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
-          git push --force --prune gitlab +refs/heads/*:refs/heads/* +refs/tags/*:refs/tags/*
+          # A branch literally named "synced" occupies refs/heads/synced and makes the
+          # whole refs/heads/synced/* namespace unpushable ("refname conflict").
+          # This workflow never creates it, so drop it if it is still around.
+          if git ls-remote --exit-code --heads gitlab synced >/dev/null; then
+            echo "::warning::Deleting stray 'synced' branch on GitLab that blocks refs/heads/synced/*"
+            git push gitlab --delete synced
+          fi
+          # Push from remote-tracking refs, not local branches. On a tag push the checkout
+          # is a detached HEAD with no local branches, so "refs/heads/*" expands to nothing
+          # and --prune would then delete every synced/* branch on GitLab.
+          # "refs/remotes/origin/*" is always fully populated by checkout (fetch-depth: 0).
+          # origin/HEAD is a symref, not a real branch; drop it so we don't create synced/HEAD.
+          git remote set-head origin --delete >/dev/null 2>&1 || true
+          if [ -z "$(git for-each-ref --count=1 refs/remotes/origin/)" ]; then
+            echo "::error::No remote-tracking refs found; refusing to run --prune (it would delete every synced/* branch on GitLab)."
+            exit 1
+          fi
+          # Never mirror the mirror. Including refs/remotes/origin/synced/* re-uploads
+          # synced/master as synced/synced/master, then synced/synced/synced/master, ...
+          # Drop those remote-tracking refs first; --prune then deletes the stale nested
+          # synced/* copies that earlier runs already created on GitLab.
+          synced_refs=$(git for-each-ref --format='delete %(refname)' refs/remotes/origin/synced/)
+          if [ -n "$synced_refs" ]; then
+            printf '%s\n' "$synced_refs" | git update-ref --stdin
+          fi
+          # --atomic: either branches and tags both land, or nothing does. Without it a
+          # rejected branch still leaves tags force-updated (see the 2026-10-31 run).
+          git push --force --prune --atomic gitlab '+refs/remotes/origin/*:refs/heads/synced/*' '+refs/tags/*:refs/tags/*'

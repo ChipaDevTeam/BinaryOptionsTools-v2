@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // This will wait for the trade to complete (with 70 second timeout)
     println!("Waiting for trade result...");
-    let result2 = client.result_with_timeout(trade_id2, 70).await?;
+    let result2 = client.result_with_timeout(trade_id2, Duration::from_secs(70)).await?;
     println!("\n=== Trade Result (with timeout) ===");
     println!("{:#?}", result2);
     

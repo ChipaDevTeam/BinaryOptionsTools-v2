@@ -1,6 +1,6 @@
 # BinaryOptionsToolsV2 - Python Package
 
-> **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=python) — AI-powered algorithmic *trading strategy* builder: describe your edge, get working CHTL code, backtest it, deploy it. Free to start.**
+> **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=python) — AI-powered algorithmic _trading strategy_ builder: describe your edge, get working CHTL code, backtest it, deploy it. Free to start.**
 >
 > **📈 Trade crypto perps, spot & margin on [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
 
@@ -57,7 +57,7 @@ Currently supported on **Windows**, **Linux**, and **macOS**.
 
 ## Supported Python versions
 
-Supports **Python 3.8 to 3.13**.
+Supports **Python 3.10 to 3.13**.
 
 ## Docs
 
@@ -94,7 +94,7 @@ Key Features of PocketOptionAsync
   - `ticks()`: Fetches recent raw ticks for an asset.
   - `get_candles_live()`: Streams real-time gap-free candles (closed and currently forming) with historical backfill.
   - `get_candles()`: (Deprecated) Alias of `get_candles_live()`; returns the first list of closed candles.
-  - `history()`: Retrieves recent historical data for a specific asset through the dedicated history endpoint.
+  - `candles()`: returns the last N closed candles; `candles_many()` does the same for many symbols at once.
   - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
 - **Account Management**:
   - `balance()`: Returns the current account balance.
@@ -103,9 +103,9 @@ Key Features of PocketOptionAsync
   - `payouts()`: Returns the payout percentage of every asset.
   - `payout(asset)`: Returns the payout percentage of one asset, or `None` if it is unknown.
 - **Real-Time Data**:
-  - `subscribe_symbol()`: Provides an asynchronous iterator for real-time candle updates.
-  - `subscribe_symbol_timed()`: Provides an asynchronous iterator for timed real-time candle updates.
-  - `subscribe_symbol_chunked()`: Provides an asynchronous iterator for chunked real-time candle updates.
+  - `subscribe_symbol()`: yields raw ticks (not candles). The broker streams ~2 symbols per session, so use `candles_many()` for many-symbol candle snapshots.
+  - `subscribe_symbol_timed()`: (Deprecated) use `subscribe_ticks(asset, interval=...)`.
+  - `subscribe_symbol_chunked()`: (Deprecated) use `subscribe_ticks(asset, chunk_size=...)`.
 - **Pending Orders**:
   - `open_pending_order()`: Places a pending limit order.
   - `cancel_pending_order()`: Cancels a specific pending order by ticket ID.
@@ -168,8 +168,7 @@ Key Features of PocketOption
   - `check_win()`: Checks the trade outcome synchronously.
 - **Market Data**:
   - `get_candles_live()`: Streams real-time gap-free candles (closed and currently forming) with historical backfill.
-  - `candles()` / `get_candles()`: (Deprecated) Fetches historical candles (delegates to `get_candles_live`).
-  - `history()`: Retrieves recent historical data for a specific asset through the dedicated history endpoint.
+  - `candles()`: last N closed candles; `candles_many()` for many symbols. `get_candles()` is deprecated (delegates to `get_candles_live`, `offset` is seconds).
   - `compile_candles()`: Compiles custom-period candlesticks from base tick data using strict UTC boundaries.
 - **Account Management**:
   - `balance()`: Retrieves account balance.
@@ -326,42 +325,42 @@ if __name__ == "__main__":
 
 ### Retrieving Historical & Live Candles (Recommended)
 
- To fetch historical backfill and stream gap-free live candles in real-time, use `get_candles_live()`. This method is available in both async and sync clients. It buffers incoming ticks, merges historical data, and yields updated candles (both closed candles and the forming candle).
+To fetch historical backfill and stream gap-free live candles in real-time, use `get_candles_live()`. This method is available in both async and sync clients. It buffers incoming ticks, merges historical data, and yields updated candles (both closed candles and the forming candle).
 
- **Async Example:**
+**Async Example:**
 
- ```python
- from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
- import asyncio
- 
- async def main():
-     async with PocketOptionAsync(ssid="your-session-id") as client:
-         # Stream live candles (yields a tuple: closed_candles list, current_forming_candle dict)
-         async for closed, forming in client.get_candles_live("EURUSD_otc", period=60, hours=2.0, max_rows=100):
-             print(f"Closed candles count: {len(closed)}")
-             if forming:
-                 print(f"Forming Candle Close Price: {forming['close']}")
- 
- if __name__ == "__main__":
-     asyncio.run(main())
- ```
+```python
+from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+import asyncio
 
- **Sync Example:**
+async def main():
+    async with PocketOptionAsync(ssid="your-session-id") as client:
+        # Stream live candles (yields a tuple: closed_candles list, current_forming_candle dict)
+        async for closed, forming in client.get_candles_live("EURUSD_otc", period=60, hours=2.0, max_rows=100):
+            print(f"Closed candles count: {len(closed)}")
+            if forming:
+                print(f"Forming Candle Close Price: {forming['close']}")
 
- ```python
- from BinaryOptionsToolsV2.pocketoption import PocketOption
- 
- client = PocketOption(ssid="your-session-id")
- # Iterate over live candles
- for closed, forming in client.get_candles_live("EURUSD_otc", period=60, hours=2.0, max_rows=100):
-     print(f"Closed candles count: {len(closed)}")
-     if forming:
-         print(f"Forming Candle Close Price: {forming['close']}")
- ```
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**Sync Example:**
+
+```python
+from BinaryOptionsToolsV2.pocketoption import PocketOption
+
+client = PocketOption(ssid="your-session-id")
+# Iterate over live candles
+for closed, forming in client.get_candles_live("EURUSD_otc", period=60, hours=2.0, max_rows=100):
+    print(f"Closed candles count: {len(closed)}")
+    if forming:
+        print(f"Forming Candle Close Price: {forming['close']}")
+```
 
 ### Deprecated Candle Methods
 
- The duplicate candle functions `candles()` and `get_candles()` are **deprecated** and will be removed in a future release.
+The duplicate candle functions `candles()` and `get_candles()` are **deprecated** and will be removed in a future release.
 
 - **Reason**: They only fetch closed historical candles, can introduce gaps when called sequentially during live trading, and do not include the currently forming candle.
 - **Compatibility**: To preserve backward compatibility, these methods have been redirected to run `get_candles_live()` internally under the hood (returning the first yielded list of closed candles).
@@ -507,7 +506,7 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 ## 📚 Additional Resources
 
 - **Full Examples**: [docs/examples/python](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/examples/python)
-- **API Documentation**: [https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html)
+- **API Documentation**: [docs/api/python.md](docs/api/python.md)
 - **Discord Community**: [Join us](https://discord.gg/T3FGXcmd)
 
 ## ⚠️ Risk Warning
