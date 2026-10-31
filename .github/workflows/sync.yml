@@ -20,6 +20,14 @@ jobs:
       - name: Push to GitLab
         run: |
           git remote add gitlab https://oauth2:${{ secrets.GITLAB_SYNC_TOKEN }}@gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2.git
+          # GitLab's own `master` was stale (ca1ad7a) and its tag pipelines kept
+          # force-pushing it back over GitHub, reverting merges. Move GitLab's
+          # `master` to the commit that triggered this run before mirroring
+          # anything else. Tag runs are skipped: an old tag's pipeline would
+          # otherwise rewind GitLab master to that old commit.
+          if [ "$GITHUB_REF" = "refs/heads/master" ]; then
+            git push gitlab HEAD:refs/heads/master
+          fi
           # A branch literally named "synced" occupies refs/heads/synced and makes the
           # whole refs/heads/synced/* namespace unpushable ("refname conflict").
           # This workflow never creates it, so drop it if it is still around.
