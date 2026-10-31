@@ -26,7 +26,12 @@ jobs:
           # anything else. Tag runs are skipped: an old tag's pipeline would
           # otherwise rewind GitLab master to that old commit.
           if [ "$GITHUB_REF" = "refs/heads/master" ]; then
-            git push gitlab HEAD:refs/heads/master
+            # GitLab protects `master`; the sync token is a Developer token and
+            # cannot push there. Try anyway (so a Maintainer-capable token keeps
+            # it current), but never abort the mirror over it.
+            if ! git push gitlab HEAD:refs/heads/master; then
+              echo "::warning::GitLab master is protected; fast-forward it manually to $GITHUB_SHA."
+            fi
           fi
           # A branch literally named "synced" occupies refs/heads/synced and makes the
           # whole refs/heads/synced/* namespace unpushable ("refname conflict").
