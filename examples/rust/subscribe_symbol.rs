@@ -1,7 +1,6 @@
 // Example showing how to subscribe to real-time candle data
 use binary_options_tools::pocketoption::{PocketOption, candle::SubscriptionType};
 use std::time::Duration;
-use tokio_stream::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,14 +16,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Listening for real-time candles...");
     println!("Press Ctrl+C to stop\n");
     
-    // Process incoming candles
+    // Process incoming candles. `SubscriptionStream` is not a `Stream`; it yields
+    // completed candles through `receive()`.
     let mut count = 0;
-    while let Some(candle_result) = subscription.next().await {
-        match candle_result {
+    loop {
+        match subscription.receive().await {
             Ok(candle) => {
                 count += 1;
                 println!("=== Candle #{} ===", count);
-                println!("Time:  {}", candle.time);
+                println!("Time:  {}", candle.timestamp);
                 println!("Open:  {:.5}", candle.open);
                 println!("High:  {:.5}", candle.high);
                 println!("Low:   {:.5}", candle.low);

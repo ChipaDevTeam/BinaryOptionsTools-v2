@@ -52,3 +52,31 @@ futures-util = { workspace = true }
 tracing-subscriber = { workspace = true }
 kanal = { workspace = true }
 
+# The Rust examples live in the repository-level `examples/rust/` directory (they are
+# documented from docs/examples/rust/), so their targets point outside this package.
+# Declaring them here is what makes `cargo build --examples` compile them, which is
+# how they stay working - before this, nothing built them and two had broken.
+# Consequence: these files are not part of the published crate tarball.
+[[example]]
+name = "doc_balance"
+path = "../../examples/rust/balance.rs"
+
+[[example]]
+name = "doc_basic"
+path = "../../examples/rust/basic.rs"
+
+[[example]]
+name = "doc_buy"
+path = "../../examples/rust/buy.rs"
+
+[[example]]
+name = "doc_check_win"
+path = "../../examples/rust/check_win.rs"
+
+[[example]]
+name = "doc_sell"
+path = "../../examples/rust/sell.rs"
+
+[[example]]
+name = "doc_subscribe_symbol"
+path = "../../examples/rust/subscribe_symbol.rs"

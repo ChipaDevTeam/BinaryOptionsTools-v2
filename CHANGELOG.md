@@ -38,6 +38,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Two Rust examples and two Python examples did not work.** Nothing built the
+  files in `examples/rust/`, so `subscribe_symbol.rs` still imported `tokio_stream`
+  and called `.next()` on `SubscriptionStream` (not a `Stream` — it yields candles
+  through `receive()`), while `check_win.rs` passed `70` where
+  `result_with_timeout` takes a `Duration`. Both are fixed, and the six examples
+  are now declared as `[[example]]` targets of `binary_options_tools`, so
+  `cargo build --examples` compiles them and they cannot drift again. The matching
+  Rust snippet in `docs/api/reference.md` was rewritten and compile-checked, and
+  it now uses `SubscriptionType::time(..)` rather than the struct variant.
+- `examples/python/{async,sync}/raw_send.py` called `api.raw_send()`, which does
+  not exist (it is `send_raw()`), and never invoked `main()` — the async one built
+  a coroutine and exited without running it.
+
 - **Documentation restructured and corrected against the code.** `docs/` now has an
   index (`docs/README.md`) with a task-to-page table; `docs/OVERVIEW.md` (which
   contradicted itself by advertising a deployed site while its own History section

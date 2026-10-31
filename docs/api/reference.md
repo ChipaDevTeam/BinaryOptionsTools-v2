@@ -435,13 +435,23 @@ for await (const candle of subscription) {
 #### Rust
 
 ```rust
-// Subscribe to 60-second candles
-let subscription = client.subscribe("EURUSD_otc", 60).await?;
-println!("Subscribed to EURUSD_otc");
+use binary_options_tools::pocketoption::candle::SubscriptionType;
 
-// Receive candles
-while let Some(candle) = subscription.next().await {
-    println!("Candle: {:?}", candle);
+// Subscribe to 60-second candles
+let mut subscription = client
+    .subscribe("EURUSD_otc", SubscriptionType::time(Duration::from_secs(60)))
+    .await?;
+println!("Subscribed to {}", subscription.asset());
+
+// `SubscriptionStream` is not a `Stream`: it yields completed candles via receive()
+loop {
+    match subscription.receive().await {
+        Ok(candle) => println!("Candle {} -> {}", candle.timestamp, candle.close),
+        Err(e) => {
+            eprintln!("stream ended: {e}");
+            break;
+        }
+    }
 }
 ```
 
