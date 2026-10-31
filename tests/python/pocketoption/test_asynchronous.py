@@ -115,9 +115,13 @@ async def test_config_json_and_trades():
     async with PocketOption(ssid, config=config_json) as api:
         assert api.config.terminal_logging is False
 
-        # Test buy/sell without check_win to avoid skipping on real accounts (Line 274-279, 306-311)
-        # Note: This might still fail if account has no money or asset is closed,
-        # but it will cover the lines.
+        # Only trade on a demo account. This test used to call buy/sell
+        # unconditionally, which spends real money when the configured SSID is a
+        # funded live account. The buy/sell paths are covered by the demo-guarded
+        # tests in test_integration.py and by test_async_mocked.py.
+        if not api.is_demo():
+            pytest.skip("trade assertions skipped on a real account")
+
         await api.buy("EURUSD_otc", 1.0, 60, check_win=False)
         await api.sell("EURUSD_otc", 1.0, 60, check_win=False)
 
