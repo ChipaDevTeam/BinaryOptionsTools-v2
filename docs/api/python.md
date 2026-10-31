@@ -54,15 +54,20 @@ asset list to be populated.
 | Method                          | Description                        | Returns      |
 | ------------------------------- | ---------------------------------- | ------------ |
 | `balance()`                     | Account balance                    | `float`      |
-| `is_demo()`                     | Whether this is a demo account     | `bool`       |
-| `is_connected()`                | Socket is currently connected      | `bool`       |
-| `is_ssid_valid()`               | SSID was accepted                  | `bool`       |
+| `is_demo()` †                   | Whether this is a demo account     | `bool`       |
+| `is_connected()` †              | Socket is currently connected      | `bool`       |
+| `is_ssid_valid()` †             | SSID was accepted                  | `bool`       |
 | `get_server_time()`             | Broker clock, in seconds           | `int`        |
 | `wait_for_assets(timeout=60.0)` | Block until the asset list arrives | `None`       |
 | `active_assets()`               | Assets currently tradable          | `List[Dict]` |
 | `connect()` / `disconnect()`    | Open or drop the socket            | `None`       |
 | `reconnect()`                   | Reconnect and re-authenticate      | `None`       |
 | `shutdown()`                    | Close the client and its tasks     | `None`       |
+
+† These three are **synchronous** even on `PocketOptionAsync` — they read local
+state, so do not `await` them: `if client.is_demo(): ...` works, while `await
+client.is_demo()` raises `TypeError: 'bool' object can't be awaited`. Every other
+method in these tables is a coroutine.
 
 ### Trading
 
