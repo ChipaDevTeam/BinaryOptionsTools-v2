@@ -21,8 +21,6 @@ closeoption = []
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
-# binary-options-tools-core = { path = "../core", version = "0.2.0" }
-# trading-macros = { path = "../macros" }
 futures-util = { workspace = true }
 reqwest = { version = "0.13.4", default-features = false, features = ["rustls-no-provider", "json", "socks"] }
 serde = { workspace = true }
@@ -31,8 +29,8 @@ tokio = { workspace = true }
 tokio-tungstenite = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
-binary-options-tools-core = { path = "../core", version = "0.2.13" }
-binary-options-tools-macros = { path = "../macros", version = "0.2.13" }
+binary-options-tools-core = { path = "../core", version = "0.2.17" }
+binary-options-tools-macros = { path = "../macros", version = "0.2.17" }
 rand = { workspace = true }
 regex = { workspace = true }
 kanal = { workspace = true }

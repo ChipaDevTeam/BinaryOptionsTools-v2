@@ -1,6 +1,6 @@
 # BinaryOptionsToolsUni
 
-> **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=uniffi) — AI-powered algorithmic *trading strategy* builder: describe your edge, get working CHTL code, backtest it, deploy it. Free to start.**
+> **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=uniffi) — AI-powered algorithmic _trading strategy_ builder: describe your edge, get working CHTL code, backtest it, deploy it. Free to start.**
 >
 > **📈 Trade crypto perps, spot & margin on [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
 
@@ -34,7 +34,7 @@ go get gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/bindings/go
 
 ```gradle
 dependencies {
-    implementation 'com.chipadevteam:binaryoptionstoolsuni:0.1.0'
+    implementation 'com.chipadevteam:binaryoptionstoolsuni:0.2.17'
 }
 ```
 
@@ -55,7 +55,7 @@ gem install binaryoptionstoolsuni
 ```swift
 // Add to Package.swift
 dependencies: {
-    .package(url: "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2", from: "0.1.0")
+    .package(url: "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2", from: "0.2.17")
 }
 ```
 
@@ -189,10 +189,10 @@ Console.WriteLine($"Trade ID: {trade.Id}");
 
 Comprehensive API documentation with examples in all supported languages:
 
-- **[Full API Reference](docs/API_REFERENCE.md)** - Complete API documentation with multi-language examples
-- **[Trading Guide](docs/TRADING_GUIDE.md)** - Learn how to place trades and manage orders
-- **[Market Data Guide](docs/MARKET_DATA_GUIDE.md)** - Access real-time and historical data
-- **[Examples](docs/examples/)** - Working code examples for each language
+- **[API Reference](../../docs/api/reference.md)** - Complete API documentation with multi-language examples
+- **[Trading Guide](../../docs/guides/trading.md)** - Learn how to place trades and manage orders
+- **[Candle history limits](../../docs/guides/candle-history-limits.md)** - What the broker's history endpoint returns
+- **[Examples](../../examples/)** - Working code examples for each language
 
 ## ✨ Features
 
@@ -265,7 +265,7 @@ cd BinaryOptionsTools-v2/BinaryOptionsToolsUni
 cargo build --release
 
 # Generate bindings for your target language
-cargo run --bin uniffi-bindgen generate src/binary_options_tools_uni.udl \
+cargo run -p binary_options_tools_uni --bin uniffi-bindgen generate --library --language kotlin --out-dir out/kotlin
     --language <python|kotlin|swift|ruby> \
     --out-dir out/<language>
 ```
@@ -297,7 +297,7 @@ This software is provided "AS IS" without warranty. The authors and ChipaDevTeam
 Binary options trading carries significant risk. Use at your own risk.
 
 - **GitLab Issues**: [Report bugs](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
-- **Documentation**: [Full docs](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)
+- **Documentation**: [Full docs](docs/api/reference.md)
 
 ## 🔗 Related Projects
 

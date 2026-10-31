@@ -568,6 +568,18 @@ pub fn socketio_event_payload<'a>(value: &'a Value, event: &str) -> Option<&'a V
     }
 }
 
+/// Builds a `42["event", payload]` frame.
+///
+/// Every module that talks to the server wraps its payload by hand today; this is
+/// the one place that knows the framing, so a change to it cannot drift between
+/// modules.
+pub fn socketio_frame(event: &str, payload: &Value) -> String {
+    format!(
+        "42[{event},{payload}]",
+        event = serde_json::to_string(event).unwrap_or_default()
+    )
+}
+
 /// Reads the name of the first event in a Socket.IO text frame.
 ///
 /// The boolean reports whether the payload is a binary placeholder, i.e. whether
@@ -634,6 +646,23 @@ mod tests {
 
         // Bracket present but malformed JSON.
         assert!(parse_socketio_array("42[not-json").unwrap().is_err());
+    }
+
+    #[test]
+    fn socketio_frame_wraps_like_the_hand_written_callers() {
+        // The frames the server accepts are compared verbatim in several tests, so
+        // this must stay byte-identical to the previous hand-written form.
+        assert_eq!(
+            socketio_frame(
+                "changeSymbol",
+                &serde_json::json!({"asset":"EURUSD_otc","period":60})
+            ),
+            r#"42["changeSymbol",{"asset":"EURUSD_otc","period":60}]"#
+        );
+        assert_eq!(
+            socketio_frame("subfor", &serde_json::json!("EURUSD_otc")),
+            r#"42["subfor","EURUSD_otc"]"#
+        );
     }
 
     #[test]

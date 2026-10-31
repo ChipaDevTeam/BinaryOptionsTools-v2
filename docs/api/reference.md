@@ -5,7 +5,7 @@ sidebar_position: 1
 # BinaryOptionsTools API Reference
 
 :::tip Skip the boilerplate
-Everything on this page is the *manual* path: you wire up the client, the candles, the risk
+Everything on this page is the _manual_ path: you wire up the client, the candles, the risk
 checks and the deployment yourself. If you would rather go from idea to backtested strategy in an
 afternoon, **[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=api-reference&utm_campaign=BinaryOptionsToolsV2)** generates the strategy from a plain
 language description in **CHTL**, backtests it on historical data, and deploys it to a live broker
@@ -36,7 +36,7 @@ npm run build
 
 ```toml
 [dependencies]
-binary_options_tools = "0.1"
+binary_options_tools = "0.2.17"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 ```
@@ -45,7 +45,7 @@ tokio-stream = "0.1"
 
 ```gradle
 dependencies {
-    implementation 'com.chipadevteam:binaryoptionstools:0.1.0'
+    implementation 'com.chipadevteam:binaryoptionstools:0.2.17'
 }
 ```
 
@@ -55,7 +55,7 @@ Add to `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2", from: "0.1.0")
+    .package(url: "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2", from: "0.2.17")
 ]
 ```
 
@@ -119,16 +119,16 @@ client.shutdown()
 #### JavaScript
 
 ```javascript
-const { PocketOption } = require('binary-options-tools');
+const { PocketOption } = require("binary-options-tools");
 
 async function main() {
-    // The constructor connects in the background; every method awaits it.
-    const client = new PocketOption("your_ssid");
+  // The constructor connects in the background; every method awaits it.
+  const client = new PocketOption("your_ssid");
 
-    const balance = await client.balance();
-    console.log(`Balance: $${balance}`);
+  const balance = await client.balance();
+  console.log(`Balance: $${balance}`);
 
-    await client.shutdown();
+  await client.shutdown();
 }
 
 main();
@@ -230,7 +230,7 @@ print(f"Profit: ${result.profit}")
 ```javascript
 // Waits for the trade to settle, then reports it
 const result = await client.result(tradeId);
-console.log(`Result: ${result.profit > 0 ? 'WIN' : 'LOSS'}`);
+console.log(`Result: ${result.profit > 0 ? "WIN" : "LOSS"}`);
 console.log(`Profit: $${result.profit}`);
 ```
 
@@ -314,7 +314,7 @@ for deal in open_deals:
 const openDeals = await client.openedDeals();
 console.log(`Open trades: ${Object.keys(openDeals).length}`);
 for (const deal of Object.values(openDeals)) {
-    console.log(`  ${deal.asset}: $${deal.amount} (${deal.action})`);
+  console.log(`  ${deal.asset}: $${deal.amount} (${deal.action})`);
 }
 ```
 
@@ -347,8 +347,8 @@ for deal in closed_deals:
 const closedDeals = await client.closedDeals();
 console.log(`Closed trades: ${Object.keys(closedDeals).length}`);
 for (const deal of Object.values(closedDeals)) {
-    const result = deal.profit > 0 ? "WIN" : "LOSS";
-    console.log(`  ${deal.asset}: ${result} ($${deal.profit.toFixed(2)})`);
+  const result = deal.profit > 0 ? "WIN" : "LOSS";
+  console.log(`  ${deal.asset}: ${result} ($${deal.profit.toFixed(2)})`);
 }
 ```
 
@@ -387,8 +387,8 @@ for candle in candles[:5]:  # Show first 5
 // 60-second candles, looking back one hour
 const candles = await client.getCandles("EURUSD_otc", 60, 3600);
 console.log(`Retrieved ${candles.length} candles`);
-candles.slice(0, 5).forEach(candle => {
-    console.log(`  Time: ${candle.time}, Close: ${candle.close}`);
+candles.slice(0, 5).forEach((candle) => {
+  console.log(`  Time: ${candle.time}, Close: ${candle.close}`);
 });
 ```
 
@@ -453,7 +453,7 @@ console.log("Subscribed to EURUSD_otc");
 
 // Receive candles (async iterator)
 for await (const candle of subscription) {
-    console.log(`Candle: ${JSON.stringify(candle)}`);
+  console.log(`Candle: ${JSON.stringify(candle)}`);
 }
 ```
 
@@ -511,7 +511,7 @@ print("Reconnected to server")
 
 ```javascript
 await client.reconnect();
-await new Promise(resolve => setTimeout(resolve, 2000));
+await new Promise((resolve) => setTimeout(resolve, 2000));
 console.log("Reconnected to server");
 ```
 
@@ -567,15 +567,15 @@ except Exception as e:
 ### JavaScript
 
 ```javascript
-const { PocketOption } = require('binary-options-tools');
+const { PocketOption } = require("binary-options-tools");
 
 try {
-    const client = new PocketOption("invalid_ssid");
-    const balance = await client.balance();
+  const client = new PocketOption("invalid_ssid");
+  const balance = await client.balance();
 } catch (e) {
-    // The message is prefixed with the error kind, e.g.
-    // "PocketOptionError: ..." or "TimeoutError: ...".
-    console.log(`Error: ${e.message}`);
+  // The message is prefixed with the error kind, e.g.
+  // "PocketOptionError: ..." or "TimeoutError: ...".
+  console.log(`Error: ${e.message}`);
 }
 ```
 
@@ -650,25 +650,25 @@ See the [examples directory](/examples) for complete working examples in each la
 
 ## API Method Reference
 
-| Method | Description | Returns |
-| -------- | ------------- | --------- |
-| `PocketOption(ssid)` / `PocketOptionAsync(ssid)` | Initialize client with session ID | Client instance |
-| `new_with_url(ssid, url)` | Initialize with custom WebSocket URL | Client instance |
-| `balance()` | Get current account balance | Float |
-| `is_demo()` | Check if demo account | Boolean |
-| `buy(asset, time, amount)` | Place call trade | Deal object |
-| `sell(asset, time, amount)` | Place put trade | Deal object |
-| `result(id)` | Check trade result | Deal object |
-| `result_with_timeout(id, timeout)` | Check trade result with timeout | Deal object |
-| `get_opened_deals()` | Get list of open trades | List of Deals |
-| `get_closed_deals()` | Get list of closed trades | List of Deals |
-| `clear_closed_deals()` | Clear closed trades from memory | Void |
-| `get_candles(asset, period, offset)` | Get historical candles | List of Candles |
-| `server_time()` | Get server timestamp | Integer (Unix timestamp) |
-| `subscribe(asset, duration)` | Subscribe to real-time data | Subscription |
-| `unsubscribe(asset)` | Unsubscribe from asset | Void |
-| `reconnect()` | Reconnect to server | Void |
-| `shutdown()` | Shutdown client | Void |
+| Method                                           | Description                                                          | Returns                  |
+| ------------------------------------------------ | -------------------------------------------------------------------- | ------------------------ |
+| `PocketOption(ssid)` / `PocketOptionAsync(ssid)` | Initialize client with session ID                                    | Client instance          |
+| `new_with_url(ssid, url)`                        | Initialize with custom WebSocket URL                                 | Client instance          |
+| `balance()`                                      | Get current account balance                                          | Float                    |
+| `is_demo()`                                      | Check if demo account                                                | Boolean                  |
+| `buy(asset, time, amount)`                       | Place call trade                                                     | Deal object              |
+| `sell(asset, time, amount)`                      | Place put trade                                                      | Deal object              |
+| `result(id)`                                     | Check trade result                                                   | Deal object              |
+| `result_with_timeout(id, timeout)`               | Check trade result with timeout                                      | Deal object              |
+| `get_opened_deals()`                             | Get list of open trades                                              | List of Deals            |
+| `get_closed_deals()`                             | Get list of closed trades                                            | List of Deals            |
+| `clear_closed_deals()`                           | Clear closed trades from memory                                      | Void                     |
+| `get_candles(asset, period, offset)`             | Get historical candles (`offset` is a window in **seconds**)         | List of Candles          |
+| `server_time()`                                  | Get server timestamp                                                 | Integer (Unix timestamp) |
+| `subscribe(asset, duration)`                     | Subscribe to real-time data (the broker streams ~2 symbols at once)  | Subscription             |
+| `unsubscribe(asset)`                             | Release a subscription locally (the broker has no unsubscribe event) | Void                     |
+| `reconnect()`                                    | Reconnect to server                                                  | Void                     |
+| `shutdown()`                                     | Shutdown client                                                      | Void                     |
 
 ---
 
@@ -676,10 +676,10 @@ See the [examples directory](/examples) for complete working examples in each la
 
 - **Discord**: [Join our community](https://discord.gg/p7YyFqSmAz)
 - **GitLab Issues**: [Report bugs](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
-- **Documentation**: [Full docs](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)
+- **Documentation**: [Full docs](docs/api/reference.md)
 
 ---
 
-**Version**: 2.0.0  
+**Version**: 0.2.17  
 **Last Updated**: June 2026  
 **Platform Support**: PocketOption (Quick Trading)

@@ -19,7 +19,7 @@ use crate::pocketoption::candle::{
 use crate::pocketoption::error::{PocketError, PocketResult};
 use crate::pocketoption::state::State;
 use crate::pocketoption::types::MultiPatternRule;
-use crate::pocketoption::utils::{normalize_timestamp, parse_socketio_array};
+use crate::pocketoption::utils::{normalize_timestamp, parse_socketio_array, socketio_frame};
 
 const HISTORICAL_DATA_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_MISMATCH_RETRIES: usize = 5;
@@ -284,40 +284,10 @@ impl ApiModule<State> for HistoricalDataApiModule {
                         Ok(cmd) => {
                             match cmd {
                                 Command::GetTicks { asset, period, req_id } => {
-                                    if let Some((prev_id, _, _, _)) = self.pending_request.take() {
-                                        warn!(target: "HistoricalDataApiModule", "Overwriting pending request {} due to concurrent call", prev_id);
-                                        let _ = self.command_responder.send(CommandResponse::Error {
-                                            req_id: prev_id,
-                                            error: "Request superseded by another concurrent call".to_string(),
-                                        }).await;
-                                    }
-                                    self.latest_ticks.remove(&asset);
-                                    self.pending_request = Some((req_id, asset.clone(), period, RequestType::Ticks));
-                                    let payload = serde_json::json!(["changeSymbol", { "asset": asset, "period": period }]);
-                                    let msg = format!("42{}", serde_json::to_string(&payload)?);
-                                    if let Err(e) = self.to_ws_sender.send(Message::text(msg)).await {
-                                        warn!(target: "HistoricalDataApiModule", "Failed to send history request: {}", e);
-                                        self.pending_request = None;
-                                        let _ = self.command_responder.send(CommandResponse::Error { req_id, error: e.to_string() }).await;
-                                    }
+                                    self.begin_request(asset, period, req_id, RequestType::Ticks).await;
                                 }
                                 Command::GetCandles { asset, period, req_id } => {
-                                    if let Some((prev_id, _, _, _)) = self.pending_request.take() {
-                                        warn!(target: "HistoricalDataApiModule", "Overwriting pending request {} due to concurrent call", prev_id);
-                                        let _ = self.command_responder.send(CommandResponse::Error {
-                                            req_id: prev_id,
-                                            error: "Request superseded by another concurrent call".to_string(),
-                                        }).await;
-                                    }
-                                    self.latest_ticks.remove(&asset);
-                                    self.pending_request = Some((req_id, asset.clone(), period, RequestType::Candles));
-                                    let payload = serde_json::json!(["changeSymbol", { "asset": asset, "period": period }]);
-                                    let msg = format!("42{}", serde_json::to_string(&payload)?);
-                                    if let Err(e) = self.to_ws_sender.send(Message::text(msg)).await {
-                                        warn!(target: "HistoricalDataApiModule", "Failed to send history request: {}", e);
-                                        self.pending_request = None;
-                                        let _ = self.command_responder.send(CommandResponse::Error { req_id, error: e.to_string() }).await;
-                                    }
+                                    self.begin_request(asset, period, req_id, RequestType::Candles).await;
                                 }
                             }
                         }
@@ -533,6 +503,49 @@ impl HistoricalDataApiModule {
             }
         }
         None
+    }
+
+    /// Registers `req_id` as the pending request and asks the server for history.
+    ///
+    /// A concurrent call supersedes the previous pending request: the endpoint answers
+    /// one request per symbol change, so keeping more than one would leave a caller
+    /// waiting for a response that is never sent.
+    async fn begin_request(
+        &mut self,
+        asset: String,
+        period: u32,
+        req_id: Uuid,
+        request_type: RequestType,
+    ) {
+        if let Some((prev_id, _, _, _)) = self.pending_request.take() {
+            warn!(target: "HistoricalDataApiModule", "Overwriting pending request {} due to concurrent call", prev_id);
+            let _ = self
+                .command_responder
+                .send(CommandResponse::Error {
+                    req_id: prev_id,
+                    error: "Request superseded by another concurrent call".to_string(),
+                })
+                .await;
+        }
+
+        self.latest_ticks.remove(&asset);
+        self.pending_request = Some((req_id, asset.clone(), period, request_type));
+
+        let msg = socketio_frame(
+            "changeSymbol",
+            &serde_json::json!({ "asset": asset, "period": period }),
+        );
+        if let Err(e) = self.to_ws_sender.send(Message::text(msg)).await {
+            warn!(target: "HistoricalDataApiModule", "Failed to send history request: {}", e);
+            self.pending_request = None;
+            let _ = self
+                .command_responder
+                .send(CommandResponse::Error {
+                    req_id,
+                    error: e.to_string(),
+                })
+                .await;
+        }
     }
 
     async fn notify_waiters_module_stopped(&mut self) {

@@ -1,4 +1,4 @@
 {
   // Vendored dependencies and build artifacts are not repo content.
-  "ignores": [".venv/", "node_modules/", "target/", "dist/", "build/"]
+  "ignores": [".venv/", "node_modules/", "target/", "dist/", "build/"],
 }

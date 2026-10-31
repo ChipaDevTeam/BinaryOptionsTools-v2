@@ -6,7 +6,7 @@ import time
 import warnings
 from collections import deque
 from datetime import timedelta
-from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional, Tuple, Union, AsyncGenerator
+from typing import TYPE_CHECKING, AsyncGenerator, Awaitable, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from ..config import Config
 from ..validator import Validator
@@ -620,6 +620,49 @@ class PocketOptionAsync:
         candles = await self.client.get_candles_advanced(asset, period, offset=offset, time=time)
         return json.loads(candles)
 
+    async def candles_many(
+        self,
+        assets: Sequence[str],
+        period: int,
+        *,
+        count: int = 100,
+    ) -> Dict[str, List[Dict]]:
+        """Fetches the latest closed candles for many symbols in one call.
+
+        This is the right shape for "every minute, give me the last M1 candle of
+        each symbol": it polls snapshots instead of holding one live stream per
+        symbol, so it is not subject to the server's limit on how many symbols it
+        will stream at once (measured at about two per session). Requests are paced
+        and serialised by the client, so a dozen symbols are fetched reliably.
+
+        Args:
+            assets: Symbols to fetch (e.g. ``["EURUSD_otc", "GBPUSD_otc"]``).
+            period: Candle timeframe in seconds.
+            count: Candles to request per symbol. Only the last one is needed for
+                most bots, but a few extra make it easy to build indicators.
+
+        Returns:
+            Mapping of symbol to its candles, oldest first. Symbols that could not be
+            fetched are simply absent, so a closed market does not fail the batch.
+
+        Example:
+            ```python
+            async with PocketOptionAsync(ssid) as client:
+                feed = await client.candles_many(["EURUSD_otc", "GBPUSD_otc"], 60)
+                for symbol, candles in feed.items():
+                    print(symbol, candles[-1]["close"])
+            ```
+        """
+        results: Dict[str, List[Dict]] = {}
+        for asset in assets:
+            try:
+                candles = await self.candles(asset, period, count=count)
+            except Exception:  # noqa: BLE001 - one bad symbol must not fail the batch
+                continue
+            if candles:
+                results[asset] = candles
+        return results
+
     async def get_candles_live(
         self,
         asset: str,
@@ -648,6 +691,7 @@ class PocketOptionAsync:
                 - Optional[Dict]: The currently forming candle, containing 'time', 'open',
                   'high', 'low', 'close', or None if not yet started.
         """
+
         def bucket_start(timestamp: int, p: int) -> int:
             return (timestamp // p) * p
 
@@ -720,7 +764,7 @@ class PocketOptionAsync:
         # 1. Subscribe to ticks FIRST
         tick_buffer: List[Tuple[int, float]] = []
         buffering = True
-        stream = await self.subscribe_symbol(asset)
+        stream: Optional[AsyncSubscription] = await self.subscribe_symbol(asset)
 
         queue = asyncio.Queue()
 
@@ -805,14 +849,23 @@ class PocketOptionAsync:
                 yield item
 
         finally:
+            # Release the subscription explicitly and synchronously. Relying on the
+            # Rust object's `Drop` is not enough: the server streams at most a couple
+            # of symbols per session, so a stream that is still registered when the
+            # generator exits starves the next asset in a rotation. Unsubscribing a
+            # single subscription id (not by asset) keeps a concurrent stream for the
+            # same asset alive.
+            if stream is not None:
+                try:
+                    await stream.unsubscribe()
+                except Exception:  # noqa: BLE001 - teardown must never mask the real error
+                    pass
+                stream = None
             reader_task.cancel()
             try:
                 await reader_task
             except asyncio.CancelledError:
                 pass
-            # Do NOT call self.unsubscribe(asset) here - it removes ALL subscriptions for the asset.
-            # The temporary subscription created by subscribe_symbol() will be cleaned up
-            # when the stream variable goes out of scope (its Drop sends Unsubscribe for that specific ID).
 
     async def stream_candles(
         self,

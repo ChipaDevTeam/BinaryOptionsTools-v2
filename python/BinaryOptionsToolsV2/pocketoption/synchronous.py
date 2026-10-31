@@ -4,7 +4,7 @@ import threading
 import sys
 import warnings
 from datetime import timedelta
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 from ..config import Config
 from ..validator import Validator as Validator
 from .asynchronous import PocketOptionAsync as PocketOptionAsync
@@ -385,6 +385,38 @@ class PocketOption:
         )
         # The raw binding takes (asset, period, offset, time).
         return self._run(self._client.get_candles_advanced(asset, period, offset, time))
+
+    def candles_many(
+        self,
+        assets: Sequence[str],
+        period: int,
+        *,
+        count: int = 100,
+    ) -> Dict[str, List[Dict]]:
+        """Fetches the latest closed candles for many symbols in one call.
+
+        Polls snapshots instead of holding a live stream per symbol, so it is not
+        limited by how many symbols the server streams at once. Symbols that cannot
+        be fetched (closed market, unknown symbol) are absent from the result
+        instead of failing the whole batch.
+
+        Args:
+            assets: Symbols to fetch.
+            period: Candle timeframe in seconds.
+            count: Candles to request per symbol.
+
+        Returns:
+            Mapping of symbol to its candles, oldest first.
+        """
+        results: Dict[str, List[Dict]] = {}
+        for asset in assets:
+            try:
+                candles = self.candles(asset, period, count=count)
+            except Exception:  # noqa: BLE001 - one bad symbol must not fail the batch
+                continue
+            if candles:
+                results[asset] = candles
+        return results
 
     def candles(
         self,

@@ -2,7 +2,7 @@
 
 :::tip Build and backtest strategies visually
 This guide teaches the strategy patterns. **[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=guide-trading&utm_campaign=BinaryOptionsToolsV2)** lets you
-*run* them: describe an edge in plain language, get a working **CHTL** strategy, backtest it over
+_run_ them: describe an edge in plain language, get a working **CHTL** strategy, backtest it over
 historical data, and deploy it to a live broker — no infrastructure to maintain. Free tier, browser
 and Android. **[Start building →](https://chipaeditor.com/?utm_source=docs&utm_medium=guide-trading&utm_campaign=BinaryOptionsToolsV2&utm_content=cta)**
 
@@ -43,38 +43,33 @@ Here's a complete example of placing your first trade:
 
 ```python
 import asyncio
-from binaryoptionstoolsuni import PocketOption
+
+from BinaryOptionsToolsV2 import PocketOptionAsync
+
 
 async def first_trade():
-    # Initialize client
-    client = await PocketOption.init("your_ssid")
-    await asyncio.sleep(2)  # Wait for initialization
+    # The constructor connects and waits for the auth handshake.
+    client = PocketOptionAsync("your_ssid")
 
     # Check account type
     if not client.is_demo():
         print("⚠️ WARNING: Using REAL account!")
+        client.shutdown()
         return
 
     # Check balance
-    balance = await client.balance()
-    print(f"Balance: ${balance:.2f}")
+    print(f"Balance: ${await client.balance():.2f}")
 
-    # Place a small test trade
-    trade = await client.buy("EURUSD_otc", 60, 1.0)
-    print(f"Trade placed! ID: {trade.id}")
+    # Place a small test trade; `check_win=True` waits for the settlement and
+    # returns the settled trade instead of the opening order.
+    trade_id, trade = await client.buy("EURUSD_otc", 1.0, 60, check_win=True)
 
-    # Wait for result (60 seconds + buffer)
-    await asyncio.sleep(65)
+    profit = float(trade.profit)
+    outcome = "✅ WIN" if profit > 0 else "❌ LOSS"
+    print(f"{outcome} on {trade_id}: {profit:+.2f}")
 
-    # Check result
-    result = await client.result(trade.id)
-    if result.profit > 0:
-        print(f"✅ WIN! Profit: ${result.profit:.2f}")
-    else:
-        print(f"❌ LOSS! Loss: ${abs(result.profit):.2f}")
+    client.shutdown()
 
-    # Shutdown
-    await client.shutdown()
 
 asyncio.run(first_trade())
 ```
@@ -90,7 +85,7 @@ import kotlinx.coroutines.*
 
 suspend fun firstTrade() = coroutineScope {
     // Initialize client
-    val client = PocketOption.init("your_ssid")
+    val client = PocketOption.new("your_ssid")
     delay(2000)
 
     // Check account type
@@ -215,7 +210,7 @@ async def trend_following(client, asset, period=60):
     Follow the trend based on recent candles.
     """
     # Get recent candles
-    candles = await client.get_candles(asset, period, 10)
+    candles = await client.candles(asset, period, count=10)
 
     # Calculate trend
     closes = [c.close for c in candles]
@@ -243,7 +238,7 @@ async def multi_asset_trading(client, assets, amount=1.0):
 
     for asset in assets:
         # Analyze each asset
-        candles = await client.get_candles(asset, 60, 5)
+        candles = await client.candles(asset, 60, count=5)
 
         # Simple momentum strategy
         if candles[-1].close > candles[-2].close:
@@ -523,7 +518,9 @@ logging.basicConfig(level=logging.DEBUG)
 
 ```python
 import asyncio
-from binaryoptionstoolsuni import PocketOption
+
+from BinaryOptionsToolsV2 import PocketOptionAsync
+
 
 class TradingBot:
     def __init__(self, ssid, max_daily_loss=10.0, risk_per_trade=0.02):
@@ -535,8 +532,8 @@ class TradingBot:
 
     async def start(self):
         """Initialize the bot."""
-        self.client = await PocketOption.init(self.ssid)
-        await asyncio.sleep(2)
+        # The constructor connects and waits for the auth handshake.
+        self.client = PocketOptionAsync(self.ssid)
         print("✅ Bot started")
 
         # Verify demo account
@@ -565,7 +562,7 @@ class TradingBot:
 
     async def analyze_market(self, asset, period=60):
         """Simple market analysis."""
-        candles = await self.client.get_candles(asset, period, 5)
+        candles = await self.client.candles(asset, period, count=5)
 
         # Simple trend detection
         closes = [c.close for c in candles]

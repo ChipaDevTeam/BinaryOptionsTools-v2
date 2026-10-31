@@ -1,6 +1,6 @@
 # BinaryOptionsToolsV2 - Python Package
 
-> **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=pyo3) — AI-powered algorithmic *trading strategy* builder: describe your edge, get working CHTL code, backtest it, deploy it. Free to start.**
+> **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=pyo3) — AI-powered algorithmic _trading strategy_ builder: describe your edge, get working CHTL code, backtest it, deploy it. Free to start.**
 >
 > **📈 Trade crypto perps, spot & margin on [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
 
@@ -50,7 +50,7 @@ Currently supported on **Windows**, **Linux**, and **macOS**.
 
 ## Supported Python versions
 
-Supports **Python 3.8 to 3.13**.
+Supports **Python 3.10 to 3.13**.
 
 ## Docs
 
@@ -83,7 +83,7 @@ Key Features of PocketOptionAsync
   - `check_win()`: Checks the outcome of a trade ('win', 'draw', or 'loss').
 - **Market Data**:
   - `get_candles()`: Fetches historical candle data.
-  - `history()`: Retrieves recent data for a specific asset.
+  - `candles()`: returns the last N closed candles; `candles_many()` does the same for many symbols at once.
   - `compile_candles()`: Compiles custom-period candlesticks from base candle data.
 - **Account Management**:
   - `balance()`: Returns the current account balance.
@@ -91,9 +91,9 @@ Key Features of PocketOptionAsync
   - `closed_deals()`: Lists all closed trades.
   - `payout()`: Returns payout percentages.
 - **Real-Time Data**:
-  - `subscribe_symbol()`: Provides an asynchronous iterator for real-time candle updates.
-  - `subscribe_symbol_timed()`: Provides an asynchronous iterator for timed real-time candle updates.
-  - `subscribe_symbol_chunked()`: Provides an asynchronous iterator for chunked real-time candle updates.
+  - `subscribe_symbol()`: yields raw ticks (not candles). The broker streams ~2 symbols per session, so use `candles_many()` for many-symbol candle snapshots.
+  - `subscribe_symbol_timed()`: (Deprecated) use `subscribe_ticks(asset, interval=...)`.
+  - `subscribe_symbol_chunked()`: (Deprecated) use `subscribe_ticks(asset, chunk_size=...)`.
 - **Server Information**:
   - `server_time()`: Gets the current server time.
 - **Connection Management**:
@@ -146,7 +146,7 @@ Key Features of PocketOption
   - `check_win()`: Checks the trade outcome synchronously.
 - **Market Data**:
   - `get_candles()`: Fetches historical candle data.
-  - `history()`: Retrieves recent data for a specific asset.
+  - `candles()`: returns the last N closed candles; `candles_many()` does the same for many symbols at once.
   - `compile_candles()`: Compiles custom-period candlesticks from base candle data.
 - **Account Management**:
   - `balance()`: Retrieves account balance.
@@ -461,7 +461,7 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 ## 📚 Additional Resources
 
 - **Full Examples**: [docs/examples/python](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/master/docs/examples/python)
-- **API Documentation**: [https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/python.html)
+- **API Documentation**: [docs/api/python.md](docs/api/python.md)
 - **Discord Community**: [Join us](https://discord.gg/T3FGXcmd)
 
 ## ⚠️ Risk Warning

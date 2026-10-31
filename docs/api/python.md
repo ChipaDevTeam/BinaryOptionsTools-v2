@@ -26,26 +26,28 @@ await asyncio.sleep(2)  # Wait for initialization
 
 ### Methods
 
-| Method | Description | Returns |
-| -------- | ------------- | --------- |
-| `__init__(ssid)` | Initialize with session ID | Self |
-| `balance()` | Get account balance | `float` |
-| `is_demo()` | Check if demo account | `bool` |
-| `buy(asset, time, amount)` | Place call trade | `Deal` |
-| `sell(asset, time, amount)` | Place put trade | `Deal` |
-| `trade(asset, action, time, amount)` | Place trade with action | `Deal` |
-| `result(id)` | Check trade result | `Deal` |
-| `result_with_timeout(id, timeout)` | Check result with timeout | `Deal` |
-| `get_opened_deals()` | Get open trades | `List[Deal]` |
-| `get_closed_deals()` | Get closed trades | `List[Deal]` |
-| `clear_closed_deals()` | Clear closed trades | `None` |
-| `get_candles(asset, period, offset)` | Get historical candles | `List[Candle]` |
-| `server_time()` | Get server timestamp | `int` |
-| `subscribe(asset, duration)` | Subscribe to real-time data | `AsyncIterator[Candle]` |
-| `unsubscribe(asset)` | Unsubscribe from asset | `None` |
-| `reconnect()` | Reconnect to server | `None` |
-| `shutdown()` | Shutdown client | `None` |
-| `try_demo(token=None)` | Connect to a free guest demo session | `PocketOptionAsync` |
+| Method                                    | Description                                                          | Returns                   |
+| ----------------------------------------- | -------------------------------------------------------------------- | ------------------------- |
+| `__init__(ssid)`                          | Initialize with session ID                                           | Self                      |
+| `balance()`                               | Get account balance                                                  | `float`                   |
+| `is_demo()`                               | Check if demo account                                                | `bool`                    |
+| `buy(asset, time, amount)`                | Place call trade                                                     | `Deal`                    |
+| `sell(asset, time, amount)`               | Place put trade                                                      | `Deal`                    |
+| `trade(asset, action, time, amount)`      | Place trade with action                                              | `Deal`                    |
+| `result(id)`                              | Check trade result                                                   | `Deal`                    |
+| `result_with_timeout(id, timeout)`        | Check result with timeout                                            | `Deal`                    |
+| `get_opened_deals()`                      | Get open trades                                                      | `List[Deal]`              |
+| `get_closed_deals()`                      | Get closed trades                                                    | `List[Deal]`              |
+| `clear_closed_deals()`                    | Clear closed trades                                                  | `None`                    |
+| `candles(asset, period, count=100)`       | Last `count` closed candles                                          | `List[Candle]`            |
+| `candles_many(assets, period, count=100)` | Candles for many symbols in one call (not stream-limited)            | `Dict[str, List[Candle]]` |
+| `get_candles(asset, period, offset)`      | Get historical candles (`offset` is a window in **seconds**)         | `List[Candle]`            |
+| `server_time()`                           | Get server timestamp                                                 | `int`                     |
+| `subscribe(asset, duration)`              | Subscribe to real-time data (the broker streams ~2 symbols at once)  | `AsyncIterator[Candle]`   |
+| `unsubscribe(asset)`                      | Release a subscription locally (the broker has no unsubscribe event) | `None`                    |
+| `reconnect()`                             | Reconnect to server                                                  | `None`                    |
+| `shutdown()`                              | Shutdown client                                                      | `None`                    |
+| `try_demo(token=None)`                    | Connect to a free guest demo session                                 | `PocketOptionAsync`       |
 
 ## Sync Client
 
@@ -61,22 +63,24 @@ time.sleep(2)  # Wait for initialization
 
 ### Methods
 
-| Method | Description | Returns |
-| -------- | ------------- | --------- |
-| `__init__(ssid)` | Initialize with session ID | Self |
-| `balance()` | Get account balance | `float` |
-| `is_demo()` | Check if demo account | `bool` |
-| `buy(asset, time, amount)` | Place call trade | `Deal` |
-| `sell(asset, time, amount)` | Place put trade | `Deal` |
-| `result(id)` | Check trade result | `Deal` |
-| `get_opened_deals()` | Get open trades | `List[Deal]` |
-| `get_closed_deals()` | Get closed trades | `List[Deal]` |
-| `get_candles(asset, period, offset)` | Get historical candles | `List[Candle]` |
-| `subscribe(asset, duration)` | Subscribe to real-time data | `Iterator[Candle]` |
-| `unsubscribe(asset)` | Unsubscribe from asset | `None` |
-| `reconnect()` | Reconnect to server | `None` |
-| `shutdown()` | Shutdown client | `None` |
-| `try_demo(token=None)` | Connect to a free guest demo session | `PocketOption` |
+| Method                                    | Description                                                          | Returns                   |
+| ----------------------------------------- | -------------------------------------------------------------------- | ------------------------- |
+| `__init__(ssid)`                          | Initialize with session ID                                           | Self                      |
+| `balance()`                               | Get account balance                                                  | `float`                   |
+| `is_demo()`                               | Check if demo account                                                | `bool`                    |
+| `buy(asset, time, amount)`                | Place call trade                                                     | `Deal`                    |
+| `sell(asset, time, amount)`               | Place put trade                                                      | `Deal`                    |
+| `result(id)`                              | Check trade result                                                   | `Deal`                    |
+| `get_opened_deals()`                      | Get open trades                                                      | `List[Deal]`              |
+| `get_closed_deals()`                      | Get closed trades                                                    | `List[Deal]`              |
+| `candles(asset, period, count=100)`       | Last `count` closed candles                                          | `List[Candle]`            |
+| `candles_many(assets, period, count=100)` | Candles for many symbols in one call (not stream-limited)            | `Dict[str, List[Candle]]` |
+| `get_candles(asset, period, offset)`      | Get historical candles (`offset` is a window in **seconds**)         | `List[Candle]`            |
+| `subscribe(asset, duration)`              | Subscribe to real-time data (the broker streams ~2 symbols at once)  | `Iterator[Candle]`        |
+| `unsubscribe(asset)`                      | Release a subscription locally (the broker has no unsubscribe event) | `None`                    |
+| `reconnect()`                             | Reconnect to server                                                  | `None`                    |
+| `shutdown()`                              | Shutdown client                                                      | `None`                    |
+| `try_demo(token=None)`                    | Connect to a free guest demo session                                 | `PocketOption`            |
 
 ## Try Demo (guest) sessions
 
@@ -129,12 +133,12 @@ handler = RawHandler("your_ssid")
 
 ### Methods
 
-| Method | Description |
-| -------- | ------------- |
-| `connect()` | Connect to WebSocket |
-| `send(message)` | Send raw message |
-| `receive()` | Receive raw message |
-| `close()` | Close connection |
+| Method          | Description          |
+| --------------- | -------------------- |
+| `connect()`     | Connect to WebSocket |
+| `send(message)` | Send raw message     |
+| `receive()`     | Receive raw message  |
+| `close()`       | Close connection     |
 
 ## Validator
 
@@ -149,10 +153,10 @@ result = validator.validate_ssid("your_ssid")
 
 ### Methods
 
-| Method | Description | Returns |
-| -------- | ------------- | --------- |
-| `validate_ssid(ssid)` | Validate SSID format | `bool` |
-| `validate_credentials(email, password)` | Validate login credentials | `bool` |
+| Method                                  | Description                | Returns |
+| --------------------------------------- | -------------------------- | ------- |
+| `validate_ssid(ssid)`                   | Validate SSID format       | `bool`  |
+| `validate_credentials(email, password)` | Validate login credentials | `bool`  |
 
 ## Configuration
 
@@ -167,12 +171,12 @@ config.set("timeout", 30)
 
 ### Methods
 
-| Method | Description |
-| -------- | ------------- |
-| `set(key, value)` | Set configuration value |
-| `get(key)` | Get configuration value |
-| `load_from_file(path)` | Load config from file |
-| `save_to_file(path)` | Save config to file |
+| Method                 | Description             |
+| ---------------------- | ----------------------- |
+| `set(key, value)`      | Set configuration value |
+| `get(key)`             | Get configuration value |
+| `load_from_file(path)` | Load config from file   |
+| `save_to_file(path)`   | Save config to file     |
 
 ## Trading Examples
 
@@ -185,26 +189,26 @@ from BinaryOptionsToolsV2 import PocketOptionAsync
 async def basic_trade():
     client = await PocketOptionAsync("your_ssid")
     await asyncio.sleep(2)
-    
+
     # Check account type
     if not client.is_demo():
         print("⚠️ WARNING: Using REAL account!")
         return
-    
+
     # Place a call trade
     trade = await client.buy("EURUSD_otc", 60, 1.0)
     print(f"Trade ID: {trade.id}")
-    
+
     # Wait for result
     await asyncio.sleep(65)
-    
+
     # Check result
     result = await client.result(trade.id)
     if result.profit > 0:
         print(f"✅ WIN! Profit: ${result.profit:.2f}")
     else:
         print(f"❌ LOSS! Loss: ${abs(result.profit):.2f}")
-    
+
     await client.shutdown()
 
 asyncio.run(basic_trade())
@@ -216,23 +220,23 @@ asyncio.run(basic_trade())
 async def multiple_trades():
     client = await PocketOptionAsync("your_ssid")
     await asyncio.sleep(2)
-    
+
     assets = ["EURUSD_otc", "GBPUSD_otc", "USDJPY_otc"]
     trades = []
-    
+
     for asset in assets:
         trade = await client.buy(asset, 60, 1.0)
         trades.append(trade)
-    
+
     await asyncio.sleep(65)
-    
+
     total_profit = 0
     for trade in trades:
         result = await client.result(trade.id)
         total_profit += result.profit
         status = "WIN" if result.profit > 0 else "LOSS"
         print(f"{trade.asset}: {status} ${result.profit:.2f}")
-    
+
     print(f"Total Profit: ${total_profit:.2f}")
     await client.shutdown()
 ```
@@ -241,17 +245,27 @@ async def multiple_trades():
 
 ```python
 async def get_candles():
-    client = await PocketOptionAsync("your_ssid")
-    await asyncio.sleep(2)
-    
-    # Get last 100 candles
-    candles = await client.get_candles("EURUSD_otc", 60, 100)
+    # The constructor waits for the auth handshake; no sleep needed.
+    client = PocketOptionAsync("your_ssid")
+
+    # Last 100 closed M1 candles
+    candles = await client.candles("EURUSD_otc", 60, count=100)
     print(f"Retrieved {len(candles)} candles")
-    
+
     for candle in candles[:5]:
-        print(f"  Time: {candle.time}, O: {candle.open}, H: {candle.high}, L: {candle.low}, C: {candle.close}")
-    
-    await client.shutdown()
+        print(f"  Time: {candle['time']}, O: {candle['open']}, H: {candle['high']}, "
+              f"L: {candle['low']}, C: {candle['close']}")
+
+    client.shutdown()
+```
+
+Many symbols at once - polling snapshots is not limited by how many symbols the
+broker will stream:
+
+```python
+feed = await client.candles_many(["EURUSD_otc", "GBPUSD_otc", "USDJPY_otc"], 60, count=2)
+for symbol, candles in feed.items():
+    print(symbol, candles[-1]["close"])
 ```
 
 ## Error Handling
@@ -263,10 +277,10 @@ async def safe_trade():
     try:
         client = await PocketOptionAsync("your_ssid")
         await asyncio.sleep(2)
-        
+
         balance = await client.balance()
         print(f"Balance: ${balance:.2f}")
-        
+
     except PocketError as e:
         print(f"PocketOption Error: {e}")
     except Exception as e:
@@ -285,29 +299,29 @@ class SafeTrader:
         self.max_daily_loss = max_daily_loss
         self.risk_per_trade = risk_per_trade
         self.daily_pnl = 0.0
-    
+
     async def can_trade(self):
         return abs(self.daily_pnl) < self.max_daily_loss
-    
+
     async def safe_amount(self):
         balance = await self.client.balance()
         return balance * self.risk_per_trade
-    
+
     async def trade(self, asset, action, time, amount=None):
         if not await self.can_trade():
             raise Exception("Daily loss limit reached")
-        
+
         if amount is None:
             amount = await self.safe_amount()
-        
+
         if action == "call":
             trade = await self.client.buy(asset, time, amount)
         else:
             trade = await self.client.sell(asset, time, amount)
-        
+
         await asyncio.sleep(time + 5)
         result = await self.client.result(trade.id)
-        
+
         self.daily_pnl += result.profit
         return result
 ```

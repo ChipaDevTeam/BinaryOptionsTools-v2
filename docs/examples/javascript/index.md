@@ -11,22 +11,22 @@ everything below are in [`examples/javascript`](https://gitlab.chipatrade.com/ch
 
 ## Examples
 
-| File | Description |
-| ------ | ------------- |
-| `balance.js` | Get account balance |
-| `basic.js` | Connect, read the balance, disconnect |
-| `buy.js` | Place a buy trade |
-| `sell.js` | Place a sell trade |
-| `check_win.js` | Open a trade and wait for its result |
-| `get_candles.js` | Get candle data for a symbol |
-| `history.js` | Get candle history |
-| `payout.js` | Get payout information |
-| `subscribe_symbol.js` | Stream real-time candles |
-| `raw_send.js` | Send raw messages to the server |
-| `create_raw_order.js` | Send raw messages and wait for matching responses |
-| `create_raw_iterator.js` | Iterate over raw responses matching a validator |
-| `logs.js` | Write library logs to disk and to the terminal |
-| `validator.js` | Compose message validators |
+| File                     | Description                                       |
+| ------------------------ | ------------------------------------------------- |
+| `balance.js`             | Get account balance                               |
+| `basic.js`               | Connect, read the balance, disconnect             |
+| `buy.js`                 | Place a buy trade                                 |
+| `sell.js`                | Place a sell trade                                |
+| `check_win.js`           | Open a trade and wait for its result              |
+| `get_candles.js`         | Get candle data for a symbol                      |
+| `history.js`             | Get candle history                                |
+| `payout.js`              | Get payout information                            |
+| `subscribe_symbol.js`    | Stream real-time candles                          |
+| `raw_send.js`            | Send raw messages to the server                   |
+| `create_raw_order.js`    | Send raw messages and wait for matching responses |
+| `create_raw_iterator.js` | Iterate over raw responses matching a validator   |
+| `logs.js`                | Write library logs to disk and to the terminal    |
+| `validator.js`           | Compose message validators                        |
 
 ## Prerequisites
 
@@ -200,7 +200,9 @@ async function main(ssid) {
 
   console.log(`Closed trades: ${Object.keys(deals).length}`);
   for (const deal of Object.values(deals)) {
-    console.log(`  ${deal.asset}: ${deal.profit > 0 ? "WIN" : "LOSS"} ($${deal.profit})`);
+    console.log(
+      `  ${deal.asset}: ${deal.profit > 0 ? "WIN" : "LOSS"} ($${deal.profit})`,
+    );
   }
 
   await api.shutdown();
@@ -226,7 +228,7 @@ const api = await PocketOption.create(ssid);
 
 ```javascript
 if (!(await api.isDemo())) {
-    console.warn("WARNING: Using REAL account!");
+  console.warn("WARNING: Using REAL account!");
 }
 ```
 
@@ -236,9 +238,9 @@ Always shut the client down:
 
 ```javascript
 try {
-    // trading code
+  // trading code
 } finally {
-    await api.shutdown();
+  await api.shutdown();
 }
 ```
 
@@ -249,7 +251,7 @@ Subscriptions and raw handlers are async iterables:
 ```javascript
 const stream = await api.subscribe("EURUSD_otc", 60);
 for await (const candle of stream) {
-    console.log(candle);
+  console.log(candle);
 }
 await api.unsubscribe("EURUSD_otc");
 ```
@@ -288,7 +290,7 @@ Use `_otc` suffix for over-the-counter (24/7 available) assets.
 
 ## Additional Resources
 
-- **Documentation**: [https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)
+- **Documentation**: [docs/api/reference.md](docs/api/reference.md)
 - **Discord**: [Join us](https://discord.gg/p7YyFqSmAz)
 
 ## ⚠️ Risk Warning
@@ -301,6 +303,6 @@ Trading binary options involves substantial risk and may result in the loss of a
 
 - **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=examples-lang&utm_campaign=BinaryOptionsToolsV2)** — AI-powered algorithmic **trading strategy builder**: describe your
   edge, get a working **CHTL** strategy, backtest it on historical data, deploy it to a live broker.
-  Free tier, browser and Android. *(A trading platform — not a general-purpose code editor.)*
+  Free tier, browser and Android. _(A trading platform — not a general-purpose code editor.)_
 - **📈 [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** — hybrid crypto exchange: perpetuals, spot and margin, with demo mode.
 - **[Chipa Ecosystem overview](/ecosystem)** — how these fit together with this library.

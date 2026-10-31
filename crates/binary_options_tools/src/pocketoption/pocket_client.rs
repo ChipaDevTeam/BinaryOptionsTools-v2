@@ -526,6 +526,28 @@ impl PocketOption {
         Ok(history_stream.chain(live_stream))
     }
 
+    /// Rejects an asset that cannot produce data, before a request is sent.
+    ///
+    /// A closed market (weekend FX, outside stock hours) never answers, so without
+    /// this check every call waits out the full response timeout and then reports a
+    /// generic timeout - which looked like "the asset is not being retrieved".
+    /// Assets that have not loaded yet are allowed through: the caller may still be
+    /// initializing and the request itself is harmless.
+    async fn ensure_asset_streamable(&self, asset: &str) -> PocketResult<()> {
+        let state = &self.client.state;
+        let assets = state.assets.read().await;
+        let Some(assets) = assets.as_ref() else {
+            return Ok(());
+        };
+        match assets.get(asset) {
+            None => Err(PocketError::InvalidAsset(format!(
+                "Asset `{asset}` is not in the asset list (typos and delisted symbols land here)"
+            ))),
+            Some(a) if !a.is_active => Err(PocketError::InvalidAsset(a.inactive_reason())),
+            Some(_) => Ok(()),
+        }
+    }
+
     /// Validates if an asset is active and supports the given timeframe without cloning the entire assets map.
     pub async fn validate_asset(&self, asset: &str, time: u32) -> PocketResult<()> {
         let state = &self.client.state;
@@ -902,11 +924,23 @@ impl PocketOption {
             .await
             .ok_or_else(|| BinaryOptionsError::General("Assets not found".into()))?;
 
-        if assets.get(&asset.to_string()).is_some() {
-            handle.subscribe(asset.to_string(), sub_type).await
-        } else {
-            Err(PocketError::InvalidAsset(asset.to_string()))
+        drop(assets);
+        // A subscription is allowed on a closed market: bots are commonly started
+        // before the open and expect the stream to start once it reopens. Only the
+        // existence of the symbol is fatal here, and a one-off data call (which has
+        // no chance of ever being answered) fails fast instead - see
+        // `ensure_asset_streamable`.
+        match self.ensure_asset_streamable(&asset.to_string()).await {
+            Ok(()) => {}
+            Err(PocketError::InvalidAsset(reason)) if reason.contains("market is closed") => {
+                tracing::warn!(
+                    target: "PocketOption",
+                    "Subscribing to a closed market: {reason}. The stream starts when it reopens."
+                );
+            }
+            Err(e) => return Err(e),
         }
+        handle.subscribe(asset.to_string(), sub_type).await
     }
 
     /// Unsubscribes from a specific asset's real-time updates.
@@ -961,12 +995,7 @@ impl PocketOption {
             .require_handle::<GetCandlesApiModule>("GetCandlesApiModule")
             .await?;
 
-        if let Some(assets) = self.assets().await {
-            if assets.get(&asset.to_string()).is_none() {
-                return Err(PocketError::InvalidAsset(asset.to_string()));
-            }
-        }
-        // If assets are not loaded yet, still try to get candles
+        self.ensure_asset_streamable(&asset.to_string()).await?;
         handle
             .get_candles_advanced(asset, period, time, offset)
             .await
@@ -998,12 +1027,7 @@ impl PocketOption {
             .require_handle::<GetCandlesApiModule>("GetCandlesApiModule")
             .await?;
 
-        if let Some(assets) = self.assets().await {
-            if assets.get(&asset.to_string()).is_none() {
-                return Err(PocketError::InvalidAsset(asset.to_string()));
-            }
-        }
-        // If assets are not loaded yet, still try to get candles
+        self.ensure_asset_streamable(&asset.to_string()).await?;
         handle.get_candles(asset, period, offset).await
     }
 
@@ -1031,11 +1055,7 @@ impl PocketOption {
             ));
         }
 
-        if let Some(assets) = self.assets().await {
-            if assets.get(&asset_str).is_none() {
-                return Err(PocketError::InvalidAsset(asset_str.clone()));
-            }
-        }
+        self.ensure_asset_streamable(&asset_str).await?;
 
         // Use GetCandlesApiModule with loadHistoryPeriod for paginated tick fetching
         let handle = self
@@ -1116,12 +1136,7 @@ impl PocketOption {
             return Err(PocketError::InvalidPeriod(0));
         }
 
-        // Validate asset exists (if assets are loaded)
-        if let Some(assets) = self.assets().await {
-            if assets.get(&asset_str).is_none() {
-                return Err(PocketError::InvalidAsset(asset_str));
-            }
-        }
+        self.ensure_asset_streamable(&asset_str).await?;
 
         // Fetch raw tick data
         let ticks = self.ticks(asset_str.clone(), lookback_period).await?;
@@ -1584,6 +1599,7 @@ mod additional_tests {
                 symbol: "EURUSD_otc".to_string(),
                 is_otc: true,
                 is_active: true,
+                opens_at: None,
                 payout: 92,
                 allowed_candles: vec![],
                 asset_type: AssetType::Currency,

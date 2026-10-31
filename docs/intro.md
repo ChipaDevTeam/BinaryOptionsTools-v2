@@ -12,8 +12,8 @@ The most advanced binary options trading library for Python, JavaScript, and Rus
 strategy in plain language, get working **CHTL** code, **backtest it against historical data**, and
 deploy it to a live broker. Free to start, runs in the browser and on Android.
 
-*(ChipaEditor is a trading platform, not a general-purpose code editor — see the
-[Chipa Ecosystem](/ecosystem) page.)*
+_(ChipaEditor is a trading platform, not a general-purpose code editor — see the
+[Chipa Ecosystem](/ecosystem) page.)_
 
 Trading crypto too? **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** is our
 hybrid exchange for **perpetuals, spot and margin** — with demo mode so you can practise first.
@@ -82,10 +82,10 @@ docs/
 BinaryOptionsTools V2 is one part of a larger toolkit. See the full
 **[Chipa Ecosystem overview](/ecosystem)**:
 
-| Product | What it is |
-| :--- | :--- |
+| Product                                                                                                                          | What it is                                                                                                                                  |
+| :------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ |
 | **[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=intro&utm_campaign=BinaryOptionsToolsV2&utm_content=table)** | AI-powered algorithmic **trading strategy** builder — AI strategy generation, CHTL editor, backtesting, live broker integration. Free tier. |
-| **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** | Hybrid crypto exchange — perpetuals, spot, margin, leverage, TP/SL, demo mode, Academy, rewards. |
+| **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)**                                                             | Hybrid crypto exchange — perpetuals, spot, margin, leverage, TP/SL, demo mode, Academy, rewards.                                            |
 
 ## Quick Links
 

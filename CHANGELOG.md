@@ -26,11 +26,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`crates/binary_options_tools/tests/mod.rs` re-ran other test binaries.** The file declared `pub mod` for four test modules that Cargo already builds as their own binaries, so their tests ran twice in every workspace run. The file is removed.
 - **`requires-python` contradicted the built wheel.** `pyproject.toml` declared `>=3.9` and listed a Python 3.9 classifier while `crates/bindings_pyo3` builds with `abi3-py310`. The declared floor, the classifier and the Ruff `target-version` (now `py310`) all match the ABI, and `AGENTS.md`, `README.md` and `examples/README.md` now say Python 3.10+.
 
+- **Only about two symbols streamed at once, and `get_candles_live()` failures grew with each symbol.** Investigated against the live servers (2026-10-30): the session streams the `changeSymbol` chart symbol plus roughly one watchlist symbol, and there is no working unsubscribe - `42["unsubscribeSymbol", ...]` is ignored, so a released stream kept running until the session hit its ceiling and every new symbol timed out after 60 s. The client now tracks which symbol owns the chart stream, skips redundant `changeSymbol` frames (each one interrupted the stream), and hands a released stream to a symbol still subscribed, so rotating through assets keeps working. `SubscriptionCount` reports the observed ceiling instead of `usize::MAX`, and subscribing past it warns once with the rotation pattern instead of failing silently.
+- **Wide candle feeds timed out past ~6 assets.** The history endpoint throttles per session: requests spaced ~200 ms apart are answered every time (30/30 measured), while a burst of concurrent calls loses answers, and a hammered session degrades until _all_ requests time out (which is what made 12 symbols look broken while 6 worked). `GetCandlesHandle` now paces request starts by 200 ms and allows at most four in flight, so a 12-symbol feed completes reliably (12/12, verified three times in a row).
+- **Closed markets looked like missing assets.** `EURUSD`, `USDJPY`, `GBPUSD`, `GBPJPY`, `EURJPY` and `AUDUSD` are reported by the platform as `is_active: false` with a reopen timestamp whenever FX is closed, yet `validate_asset()` said only "Asset is not active" and `get_candles`/`ticks`/`candles()` still sent the request and waited out the full timeout. `Asset` now keeps the reopen time (`opens_at`) and the error reads ``Asset `EURUSD` is not active: its market is closed (reopens 2026-11-02 02:00 UTC)``; one-off data calls fail immediately instead of hanging. Subscriptions on a closed market are still allowed (with a warning) so a bot started before the open keeps working.
+- **`get_candles_live()` left its subscription registered when the generator exited.** Cleanup relied on the Rust object being garbage-collected, so a stream could outlive its consumer and starve the next asset in a rotation; the generator now unsubscribes explicitly in its `finally` block, by subscription id, so a concurrent stream for the same asset is unaffected.
+
 ### Added
 
+- `PocketOptionAsync.candles_many()` / `PocketOption.candles_many()` fetch the latest candles for many symbols in one call. Polling snapshots is not subject to the stream ceiling, so this is the supported way to watch a dozen or more instruments; symbols that cannot be fetched are omitted rather than failing the batch.
 - `crates/binary_options_tools/tests/protocol_regression_tests.rs` drives the client against an in-process fake broker that replays the current wire sequence from a live capture (assets pushed before auth, two-step `successauth` with an `{"id": ...}` payload, balance, `updateHistoryNewFast`, and `loadHistoryPeriodFast` answered only once a symbol is selected). It fails on the pre-fix code, where authentication was never detected and `get_candles` hung.
 
 ### Changed
+
+- **Documentation brought in line with the code and the current version.** Every
+  install snippet in `docs/api/reference.md`, `crates/bindings_uniffi/README.md`
+  and `crates/binary_options_tools/README.md` still pinned 0.1.x/0.2.13, the Python
+  bindings still claimed 3.8+, `CITATION.cff` said 0.2.13, links pointed at the
+  documentation site removed in 0.2.15, and `bindings_uniffi/README.md` referenced
+  four files and a UDL that do not exist. All corrected, and the Rust and Python
+  examples now match the real signatures (`buy(asset, duration, amount)`,
+  `PocketOptionAsync(...)`, `candles(count=...)`, `SubscriptionStream::receive()`)
+  instead of the `PocketOption.init()` / `get_candles(asset, period, 10)` forms that
+  never ran.
+- **Simplified without behaviour change**: `CloseOption::buy`/`sell` share one
+  `place_order` (~45 lines), the candle/ticks request boilerplate is one helper
+  (~55 lines), `HistoricalDataApiModule`'s two command arms are one `begin_request`
+  (~30), frame formatting moved into `socketio_frame`, and the three
+  `GetCandlesHandle` literals are one constructor. `docs/project/simplification-plan.md`
+  records what was applied, what is queued and what was rejected.
+- `MultiPatternRule`/`DealsUpdateRule` accept any `IntoIterator<Item: ToString>`, so
+  callers no longer wrap literals in `vec![...]`. `TradesApiModule::CommandResponse`
+  is empty because nothing is ever sent on it.
 
 - **Repository layout cleanup**: tracked files that sat outside the area they belong to were moved or removed, and the documentation that described them was corrected.
   - The CloseOption Python examples moved from the language-neutral `examples/async/` and `examples/sync/` into `examples/python/async/` and `examples/python/sync/`, next to the other Python examples. The run commands in `examples/README.md` point at the new paths.
