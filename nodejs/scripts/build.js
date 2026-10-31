@@ -27,7 +27,9 @@ const cargo = spawnSync(
 
 if (cargo.error) {
   console.error(`Failed to run cargo: ${cargo.error.message}`);
-  console.error("Install the Rust toolchain from https://rustup.rs and try again.");
+  console.error(
+    "Install the Rust toolchain from https://rustup.rs and try again.",
+  );
   process.exit(1);
 }
 if (cargo.status !== 0) {
@@ -36,7 +38,12 @@ if (cargo.status !== 0) {
 
 const suffix = { win32: ".dll", darwin: ".dylib" }[process.platform] || ".so";
 const prefix = process.platform === "win32" ? "" : "lib";
-const artifact = join(repoRoot, "target", release ? "release" : "debug", `${prefix}${CRATE}${suffix}`);
+const artifact = join(
+  repoRoot,
+  "target",
+  release ? "release" : "debug",
+  `${prefix}${CRATE}${suffix}`,
+);
 
 if (!existsSync(artifact)) {
   console.error(`cargo succeeded but ${artifact} is missing.`);

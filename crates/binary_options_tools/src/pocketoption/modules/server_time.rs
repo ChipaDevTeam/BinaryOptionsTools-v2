@@ -10,7 +10,7 @@ use tracing::debug;
 
 use crate::pocketoption::{
     state::State,
-    types::{StreamBatch, TwoStepRule},
+    types::{MultiPatternRule, StreamBatch},
 };
 
 pub struct ServerTimeModule {
@@ -81,7 +81,11 @@ impl LightweightModule<State> for ServerTimeModule {
     }
 
     /// Route only messages for which this returns true.
+    ///
+    /// `MultiPatternRule` handles both shapes of `updateStream`: the two-step
+    /// `451-["updateStream",{"_placeholder":true,...}]` + binary tick used by the
+    /// current servers, and the 1-step `42["updateStream",[...]]` variant.
     fn rule() -> Box<dyn Rule + Send + Sync> {
-        Box::new(TwoStepRule::new(r#"451-["updateStream","#))
+        Box::new(MultiPatternRule::new(vec!["updateStream"]))
     }
 }
