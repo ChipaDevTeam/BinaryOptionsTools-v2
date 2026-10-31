@@ -402,7 +402,11 @@ impl DealsUpdateRule {
     ///
     /// # Arguments
     /// * `patterns` - The string patterns to match against incoming messages
-    pub fn new(patterns: Vec<impl ToString>) -> Self {
+    pub fn new<I, P>(patterns: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: ToString,
+    {
         Self {
             valid: AtomicBool::new(false),
             patterns: patterns.into_iter().map(|p| p.to_string()).collect(),

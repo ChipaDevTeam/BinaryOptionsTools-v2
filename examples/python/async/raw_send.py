@@ -9,16 +9,16 @@ async def main(ssid: str):
         # Example of sending a raw message
         try:
             # Subscribe to signals
-            await api.send_raw_message('42["signals/subscribe"]')
+            await api.send_raw('42["signals/subscribe"]')
             print("Sent signals subscription message")
 
             # Subscribe to price updates
-            await api.send_raw_message('42["price/subscribe"]')
+            await api.send_raw('42["price/subscribe"]')
             print("Sent price subscription message")
 
             # Custom message example
             custom_message = '42["custom/event",{"param":"value"}]'
-            await api.send_raw_message(custom_message)
+            await api.send_raw(custom_message)
             print(f"Sent custom message: {custom_message}")
 
             # Multiple messages in sequence
@@ -29,7 +29,7 @@ async def main(ssid: str):
             ]
 
             for msg in messages:
-                await api.send_raw_message(msg)
+                await api.send_raw(msg)
                 print(f"Sent message: {msg}")
                 await asyncio.sleep(1)  # Small delay between messages
 
@@ -39,3 +39,4 @@ async def main(ssid: str):
 
 if __name__ == "__main__":
     ssid = input("Please enter your ssid: ")
+    asyncio.run(main(ssid))

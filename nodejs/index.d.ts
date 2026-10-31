@@ -109,7 +109,10 @@ export class RawHandler {
   sendAndWait(message: string): Promise<string>;
   send_and_wait(message: string): Promise<string>;
   sendAndWaitWithTimeout(message: string, timeoutMs: number): Promise<string>;
-  send_and_wait_with_timeout(message: string, timeoutMs: number): Promise<string>;
+  send_and_wait_with_timeout(
+    message: string,
+    timeoutMs: number,
+  ): Promise<string>;
   waitNext(): Promise<string>;
   wait_next(): Promise<string>;
   subscribe(): RawStream;
@@ -141,8 +144,14 @@ export class PocketOption {
   static create(ssid: string): Promise<PocketOption>;
   static createWithUrl(ssid: string, url: string): Promise<PocketOption>;
   static create_with_url(ssid: string, url: string): Promise<PocketOption>;
-  static createWithConfig(ssid: string, config: ClientConfig): Promise<PocketOption>;
-  static create_with_config(ssid: string, config: ClientConfig): Promise<PocketOption>;
+  static createWithConfig(
+    ssid: string,
+    config: ClientConfig,
+  ): Promise<PocketOption>;
+  static create_with_config(
+    ssid: string,
+    config: ClientConfig,
+  ): Promise<PocketOption>;
 
   /** Resolves when the initial connection succeeded, rejects otherwise. */
   ready(): Promise<void>;
@@ -171,13 +180,37 @@ export class PocketOption {
   history(asset: string, period: number): Promise<Candle[]>;
   getCandles(asset: string, period: number, offset: number): Promise<Candle[]>;
   get_candles(asset: string, period: number, offset: number): Promise<Candle[]>;
-  getCandlesAdvanced(asset: string, period: number, offset: number, time: number): Promise<Candle[]>;
-  get_candles_advanced(asset: string, period: number, offset: number, time: number): Promise<Candle[]>;
+  getCandlesAdvanced(
+    asset: string,
+    period: number,
+    offset: number,
+    time: number,
+  ): Promise<Candle[]>;
+  get_candles_advanced(
+    asset: string,
+    period: number,
+    offset: number,
+    time: number,
+  ): Promise<Candle[]>;
   /** Raw tick history as `[timestamp, price]` pairs. */
-  getTicks(asset: string, lookbackSeconds: number): Promise<Array<[number, number]>>;
-  get_ticks(asset: string, lookbackSeconds: number): Promise<Array<[number, number]>>;
-  compileCandles(asset: string, customPeriod: number, lookbackPeriod: number): Promise<Candle[]>;
-  compile_candles(asset: string, customPeriod: number, lookbackPeriod: number): Promise<Candle[]>;
+  getTicks(
+    asset: string,
+    lookbackSeconds: number,
+  ): Promise<Array<[number, number]>>;
+  get_ticks(
+    asset: string,
+    lookbackSeconds: number,
+  ): Promise<Array<[number, number]>>;
+  compileCandles(
+    asset: string,
+    customPeriod: number,
+    lookbackPeriod: number,
+  ): Promise<Candle[]>;
+  compile_candles(
+    asset: string,
+    customPeriod: number,
+    lookbackPeriod: number,
+  ): Promise<Candle[]>;
 
   /** Payout percentage of every currently active asset. */
   payout(): Promise<Record<string, number>>;
@@ -215,8 +248,12 @@ export class PocketOption {
     minPayout: number,
     command: number,
   ): Promise<unknown>;
-  cancelPendingOrder(ticket: string): Promise<{ ticket: string; status: string }>;
-  cancel_pending_order(ticket: string): Promise<{ ticket: string; status: string }>;
+  cancelPendingOrder(
+    ticket: string,
+  ): Promise<{ ticket: string; status: string }>;
+  cancel_pending_order(
+    ticket: string,
+  ): Promise<{ ticket: string; status: string }>;
   cancelPendingOrders(tickets: string[]): Promise<{ cancelled: string[] }>;
   cancel_pending_orders(tickets: string[]): Promise<{ cancelled: string[] }>;
 
@@ -231,26 +268,71 @@ export class PocketOption {
   subscribe(symbol: string, seconds?: number): Promise<CandleStream>;
   subscribeSymbol(symbol: string): Promise<CandleStream>;
   subscribe_symbol(symbol: string): Promise<CandleStream>;
-  subscribeSymbolChunked(symbol: string, chunkSize: number): Promise<CandleStream>;
-  subscribe_symbol_chunked(symbol: string, chunkSize: number): Promise<CandleStream>;
+  subscribeSymbolChunked(
+    symbol: string,
+    chunkSize: number,
+  ): Promise<CandleStream>;
+  subscribe_symbol_chunked(
+    symbol: string,
+    chunkSize: number,
+  ): Promise<CandleStream>;
   subscribeSymbolTimed(symbol: string, seconds: number): Promise<CandleStream>;
-  subscribe_symbol_timed(symbol: string, seconds: number): Promise<CandleStream>;
-  subscribeSymbolTimeAligned(symbol: string, seconds: number): Promise<CandleStream>;
-  subscribe_symbol_time_aligned(symbol: string, seconds: number): Promise<CandleStream>;
+  subscribe_symbol_timed(
+    symbol: string,
+    seconds: number,
+  ): Promise<CandleStream>;
+  subscribeSymbolTimeAligned(
+    symbol: string,
+    seconds: number,
+  ): Promise<CandleStream>;
+  subscribe_symbol_time_aligned(
+    symbol: string,
+    seconds: number,
+  ): Promise<CandleStream>;
   unsubscribe(asset: string): Promise<void>;
 
   rawHandle(): Promise<RawHandle>;
   raw_handle(): Promise<RawHandle>;
-  createRawHandler(validator: Validator, keepAlive?: string | null): Promise<RawHandler>;
-  create_raw_handler(validator: Validator, keepAlive?: string | null): Promise<RawHandler>;
+  createRawHandler(
+    validator: Validator,
+    keepAlive?: string | null,
+  ): Promise<RawHandler>;
+  create_raw_handler(
+    validator: Validator,
+    keepAlive?: string | null,
+  ): Promise<RawHandler>;
   createRawOrder(message: string, validator: Validator): Promise<string>;
   create_raw_order(message: string, validator: Validator): Promise<string>;
-  createRawOrderWithTimeout(message: string, validator: Validator, timeoutMs: number): Promise<string>;
-  create_raw_order_with_timeout(message: string, validator: Validator, timeoutMs: number): Promise<string>;
-  createRawOrderWithTimeoutAndRetry(message: string, validator: Validator, timeoutMs: number): Promise<string>;
-  create_raw_order_with_timeout_and_retry(message: string, validator: Validator, timeoutMs: number): Promise<string>;
-  createRawIterator(message: string, validator: Validator, timeoutMs?: number | null): Promise<RawStream>;
-  create_raw_iterator(message: string, validator: Validator, timeoutMs?: number | null): Promise<RawStream>;
+  createRawOrderWithTimeout(
+    message: string,
+    validator: Validator,
+    timeoutMs: number,
+  ): Promise<string>;
+  create_raw_order_with_timeout(
+    message: string,
+    validator: Validator,
+    timeoutMs: number,
+  ): Promise<string>;
+  createRawOrderWithTimeoutAndRetry(
+    message: string,
+    validator: Validator,
+    timeoutMs: number,
+  ): Promise<string>;
+  create_raw_order_with_timeout_and_retry(
+    message: string,
+    validator: Validator,
+    timeoutMs: number,
+  ): Promise<string>;
+  createRawIterator(
+    message: string,
+    validator: Validator,
+    timeoutMs?: number | null,
+  ): Promise<RawStream>;
+  create_raw_iterator(
+    message: string,
+    validator: Validator,
+    timeoutMs?: number | null,
+  ): Promise<RawStream>;
 
   serverTime(): Promise<number>;
   server_time(): Promise<number>;

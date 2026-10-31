@@ -568,6 +568,18 @@ pub fn socketio_event_payload<'a>(value: &'a Value, event: &str) -> Option<&'a V
     }
 }
 
+/// Builds a `42["event", payload]` frame.
+///
+/// Every module that talks to the server wraps its payload by hand today; this is
+/// the one place that knows the framing, so a change to it cannot drift between
+/// modules.
+pub fn socketio_frame(event: &str, payload: &Value) -> String {
+    format!(
+        "42[{event},{payload}]",
+        event = serde_json::to_string(event).unwrap_or_default()
+    )
+}
+
 /// Reads the name of the first event in a Socket.IO text frame.
 ///
 /// The boolean reports whether the payload is a binary placeholder, i.e. whether
@@ -579,6 +591,20 @@ pub fn socketio_event(text: &str) -> Option<(String, bool)> {
     let array = value.as_array()?;
     let name = array.first()?.as_str()?.to_string();
     Some((name, has_binary_placeholder(array)))
+}
+
+/// Flattens a deal map into a vector ordered by deal id.
+///
+/// The trading state keeps deals in a `HashMap`, but the public Python API
+/// documents `opened_deals()` and `closed_deals()` as lists of deals. Callers
+/// that serialise these collections for other languages use this so they emit a
+/// JSON array instead of an object, with an order that is stable between calls.
+pub fn deals_into_sorted_vec(
+    deals: std::collections::HashMap<uuid::Uuid, crate::pocketoption::types::Deal>,
+) -> Vec<crate::pocketoption::types::Deal> {
+    let mut deals: Vec<_> = deals.into_iter().collect();
+    deals.sort_by_key(|(id, _)| *id);
+    deals.into_iter().map(|(_, deal)| deal).collect()
 }
 
 #[cfg(test)]
@@ -623,6 +649,23 @@ mod tests {
     }
 
     #[test]
+    fn socketio_frame_wraps_like_the_hand_written_callers() {
+        // The frames the server accepts are compared verbatim in several tests, so
+        // this must stay byte-identical to the previous hand-written form.
+        assert_eq!(
+            socketio_frame(
+                "changeSymbol",
+                &serde_json::json!({"asset":"EURUSD_otc","period":60})
+            ),
+            r#"42["changeSymbol",{"asset":"EURUSD_otc","period":60}]"#
+        );
+        assert_eq!(
+            socketio_frame("subfor", &serde_json::json!("EURUSD_otc")),
+            r#"42["subfor","EURUSD_otc"]"#
+        );
+    }
+
+    #[test]
     fn test_has_binary_placeholder() {
         assert!(has_binary_placeholder(&[json!("event")]));
         assert!(has_binary_placeholder(&[
@@ -646,5 +689,64 @@ mod tests {
             Some(("successauth".to_string(), true))
         );
         assert_eq!(socketio_event("not json"), None);
+    }
+
+    #[test]
+    fn deals_into_sorted_vec_is_ordered_by_id() {
+        use crate::pocketoption::types::Deal;
+        use std::collections::HashMap;
+        use uuid::Uuid;
+
+        fn deal(id: Uuid, asset: &str) -> Deal {
+            Deal {
+                id,
+                open_time: "2026-01-01 10:00:00".to_string(),
+                close_time: "2026-01-01 10:01:00".to_string(),
+                open_timestamp: chrono::Utc::now(),
+                close_timestamp: chrono::Utc::now(),
+                refund_time: None,
+                refund_timestamp: None,
+                uid: 1,
+                request_id: None,
+                amount: rust_decimal::Decimal::from(10),
+                profit: rust_decimal::Decimal::from(5),
+                percent_profit: 50,
+                percent_loss: -100,
+                open_price: rust_decimal::Decimal::from(1),
+                close_price: rust_decimal::Decimal::from(1),
+                command: 0,
+                asset: asset.to_string(),
+                is_demo: 1,
+                copy_ticket: String::new(),
+                open_ms: 0,
+                close_ms: None,
+                option_type: 100,
+                is_rollover: None,
+                is_copy_signal: None,
+                is_ai: None,
+                currency: "USD".to_string(),
+                amount_usd: None,
+                amount_usd2: None,
+            }
+        }
+
+        // Insert in deliberately unsorted key order: the output must not depend
+        // on hash or insertion order, because callers compare runs.
+        let mut deals = HashMap::new();
+        for asset in ["GBPUSD_otc", "EURUSD_otc", "USDJPY_otc"] {
+            let id = Uuid::new_v4();
+            deals.insert(id, deal(id, asset));
+        }
+
+        let as_json = serde_json::to_value(deals_into_sorted_vec(deals)).unwrap();
+        let array = as_json
+            .as_array()
+            .expect("deals must serialise as an array");
+        assert_eq!(array.len(), 3);
+
+        let ids: Vec<&str> = array.iter().map(|d| d["id"].as_str().unwrap()).collect();
+        let mut sorted = ids.clone();
+        sorted.sort_unstable();
+        assert_eq!(ids, sorted, "deals are not ordered by id");
     }
 }

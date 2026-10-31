@@ -89,9 +89,16 @@ impl ServerTime {
 
     /// Get current estimated server time
     ///
+    /// Before the first tick arrives there is no offset to apply, so the local
+    /// clock is the best estimate. Reporting `last_server_time + elapsed` in that
+    /// state produced epoch timestamps (e.g. `1970-01-01T00:00:03Z`).
+    ///
     /// # Returns
     /// Current estimated server timestamp as i64
     pub fn get_server_time(&self) -> i64 {
+        if self.last_server_time == 0 {
+            return Utc::now().timestamp();
+        }
         let now = Utc::now();
         let elapsed = now.signed_duration_since(self.last_updated);
         self.last_server_time + elapsed.num_seconds()
@@ -315,7 +322,11 @@ impl MultiPatternRule {
     ///
     /// # Arguments
     /// * `patterns` - The string patterns to match against incoming messages
-    pub fn new(patterns: Vec<impl ToString>) -> Self {
+    pub fn new<I, P>(patterns: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: ToString,
+    {
         Self {
             valid: AtomicBool::new(false),
             patterns: patterns.into_iter().map(|p| p.to_string()).collect(),
@@ -402,6 +413,12 @@ pub struct Asset {
     pub payout: i32,
     pub allowed_candles: Vec<CandleLength>,
     pub asset_type: AssetType,
+    /// When a closed asset reopens (Unix seconds), as reported by the server.
+    ///
+    /// Weekend FX pairs and closed stocks report `is_active == false` together with
+    /// the time the market reopens, which is what makes "no data" actionable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opens_at: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -427,6 +444,29 @@ impl Asset {
         &self.allowed_candles
     }
 
+    /// Explains why an inactive asset cannot be used.
+    ///
+    /// Closed markets are the common case (weekend FX, outside stock hours), and
+    /// saying so is far more useful than the bare "not active" the client used to
+    /// report before a request timed out.
+    pub fn inactive_reason(&self) -> String {
+        match self.opens_at {
+            Some(ts) if ts > 0 => {
+                let reopen = chrono::DateTime::from_timestamp(ts, 0)
+                    .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
+                    .unwrap_or_else(|| ts.to_string());
+                format!(
+                    "Asset `{}` is not active: its market is closed (reopens {reopen})",
+                    self.symbol
+                )
+            }
+            _ => format!(
+                "Asset `{}` is not active: its market is closed",
+                self.symbol
+            ),
+        }
+    }
+
     /// Validates if the asset can be used for trading
     /// It checks if the asset is active.
     /// The error thrown allows users to understand why the asset is not valid for trading.
@@ -434,7 +474,7 @@ impl Asset {
     /// Note: Time validation has been removed to allow trading at any expiration time.
     pub fn validate(&self, time: u32) -> PocketResult<()> {
         if !self.is_active {
-            return Err(PocketError::InvalidAsset("Asset is not active".into()));
+            return Err(PocketError::InvalidAsset(self.inactive_reason()));
         }
         if time == 0 {
             return Err(PocketError::InvalidAsset(
@@ -471,7 +511,7 @@ impl<'de> Deserialize<'de> for Asset {
             Vec<CandleLength>,     // 15: allowed_candles (used)
             serde::de::IgnoredAny, // 16: unused
             serde::de::IgnoredAny, // 17: unused
-            serde::de::IgnoredAny, // 18: unused
+            Option<i64>,           // 18: reopen timestamp for closed assets (used)
         );
 
         let raw: AssetRawTuple = AssetRawTuple::deserialize(deserializer)?;
@@ -484,6 +524,7 @@ impl<'de> Deserialize<'de> for Asset {
             is_otc: raw.9 == 1,
             is_active: raw.14,
             allowed_candles: raw.15,
+            opens_at: raw.18,
         })
     }
 }
@@ -791,6 +832,23 @@ mod tests {
 
         assert!(serde_json::from_str::<StreamBatch>("[]").is_err());
         assert!(serde_json::from_str::<StreamBatch>(r#"[["A",1]]"#).is_err());
+    }
+
+    #[test]
+    fn server_time_falls_back_to_the_local_clock_before_the_first_tick() {
+        // No tick received yet: reporting `last_server_time + elapsed` produced
+        // epoch timestamps like 1970-01-01T00:00:03Z.
+        let unsynced = ServerTime::default();
+        let reported = unsynced.get_server_time();
+        assert!(
+            (reported - Utc::now().timestamp()).abs() <= 5,
+            "unsynced server time must be ~now, got {reported}"
+        );
+
+        // Once a tick arrives the server clock is reported as-is (plus elapsed).
+        let mut synced = ServerTime::default();
+        synced.update(1_791_932_536);
+        assert!((synced.get_server_time() - 1_791_932_536).abs() <= 5);
     }
 
     #[test]
