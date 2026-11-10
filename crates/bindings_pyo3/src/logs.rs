@@ -6,7 +6,7 @@ use futures_util::{
     StreamExt,
 };
 use pyo3::{pyclass, pyfunction, pymethods, Bound, Py, PyAny, PyResult, Python};
-use pyo3_async_runtimes::tokio::future_into_py;
+use pyaio_faq::tokio::future_into_py;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument, level_filters::LevelFilter, warn, Level};
 use tracing_subscriber::{

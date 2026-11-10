@@ -12,7 +12,7 @@ use binary_options_tools::validator::Validator;
 use futures_util::stream::{BoxStream, Fuse};
 use futures_util::StreamExt;
 use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python};
-use pyo3_async_runtimes::tokio::future_into_py;
+use pyaio_faq::tokio::future_into_py;
 use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
 
