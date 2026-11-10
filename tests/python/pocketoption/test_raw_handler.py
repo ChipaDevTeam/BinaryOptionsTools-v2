@@ -9,6 +9,12 @@ import pytest
 
 from BinaryOptionsToolsV2 import PocketOption, PocketOptionAsync
 
+# These tests open a real PocketOption session, so they need both a valid
+# POCKET_OPTION_SSID and a reachable broker. Marking the module keeps the
+# offline suite runnable with `-k "not integration"`, as documented in
+# pytest.ini.
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.asyncio
 async def test_async_connection_control():

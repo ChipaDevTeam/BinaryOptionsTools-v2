@@ -7,21 +7,21 @@ expected.
 
 ## The short answer
 
-| Method | Capped by this library? | Practical ceiling |
-| --- | --- | --- |
-| `get_candles_advanced(asset, period, offset, time)` | No | Everything the `loadHistoryPeriod` response yields, compiled into candles (often empty, see below) |
-| `candles(asset, period, count, end_time=...)` | Only without `end_time` | With `end_time`: the same endpoint response, compiled into candles. Without: 20,000 ticks |
-| `get_candles(asset, period, offset)` (deprecated) | Yes | Alias of `get_candles_live()`: 20,000 ticks |
-| `candles(asset, period)` | Yes | 20,000 ticks, so ~20,000 seconds of history |
-| `history(asset, period)` | Yes | Alias of `candles()` |
-| `compile_candles(asset, custom_period, lookback_period)` | Yes | Same 20,000-tick ceiling |
+| Method                                                   | Capped by this library? | Practical ceiling                                                                                  |
+| -------------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------- |
+| `get_candles_advanced(asset, period, offset, time)`      | No                      | Everything the `loadHistoryPeriod` response yields, compiled into candles (often empty, see below) |
+| `candles(asset, period, count, end_time=...)`            | Only without `end_time` | With `end_time`: the same endpoint response, compiled into candles. Without: 20,000 ticks          |
+| `get_candles(asset, period, offset)` (deprecated)        | Yes                     | Alias of `get_candles_live()`: 20,000 ticks                                                        |
+| `candles(asset, period)`                                 | Yes                     | 20,000 ticks, so ~20,000 seconds of history                                                        |
+| `history(asset, period)`                                 | Yes                     | Alias of `candles()`                                                                               |
+| `compile_candles(asset, custom_period, lookback_period)` | Yes                     | Same 20,000-tick ceiling                                                                           |
 
 ## Server-side: `get_candles_advanced`
 
 `get_candles_advanced(asset, period, offset, time)` sends a single
 `loadHistoryPeriod` request and returns the candles compiled from its response.
-There is no pagination and no client-side cap, so the limit is PocketOption's,
-not this library's.
+It is a single request, so the window is capped by what one page returns
+(about 150 OHLC rows in the captures from 2026-10-30).
 
 ```python
 candles = await api.get_candles_advanced("EURUSD_otc", 60, 3600, 1700000000)
@@ -35,12 +35,23 @@ it has buffered for that asset (at most 10,000 ticks, no older than five
 minutes). So an empty endpoint `data` array does **not** guarantee an empty
 returned list - buffered live ticks are compiled into candles too.
 
-> **It can still come back empty.** For demo sessions the server currently
-> answers `loadHistoryPeriod` with
-> `{"asset":"EURUSD_otc","index":N,"data":[],"period":60}`. With no OHLC
-> data and no buffered ticks for that asset, the call returns an empty list. If
-> the server does not answer at all, the call fails with a timeout instead of
-> hanging.
+> **`get_candles_advanced`'s `offset` is a window in seconds, not a candle
+> count.** The server answers with the candles that fit in `time - offset ..=
+time`, so a window shorter than one period contains no candle:
+> `get_candles_advanced("EURUSD_otc", 60, 10, now)` returns an empty list, while
+> `get_candles_advanced("EURUSD_otc", 60, 3600, now)` returns an hour of
+> 60-second candles. Ask for at least `period * candles`.
+>
+> This applies **only** to `get_candles_advanced`. The deprecated
+> `get_candles(asset, period, offset)` takes a _count_ of periods, not seconds:
+> it multiplies `offset * period` to size its lookback window before delegating
+> to `get_candles_live()`.
+>
+> **One request is one page.** The page is capped by the server (the captures
+> from 2026-10-30 return ~150 OHLC rows per request), so longer windows need
+> pagination - which is what `candles()` and `compile_candles()` do by walking
+> `time` backwards. If the server does not answer at all, the call fails with a
+> timeout instead of hanging.
 
 `get_candles(asset, period, offset)` is deprecated and does **not** call this
 endpoint: it delegates to `get_candles_live()`, which compiles candles from tick
@@ -74,14 +85,14 @@ that request only fits inside the 20,000-tick budget while `period` is 20
 seconds or less. Above that, the tick budget runs out before the window is
 covered:
 
-| `period` | Lookback requested | Ticks needed | Candles you actually get |
-| --- | --- | --- | --- |
-| 1s | 1,000s | ~1,000 | ~1000 |
-| 5s | 5,000s | ~5,000 | ~1000 |
-| 15s | 15,000s | ~15,000 | ~1000 |
-| 20s | 20,000s | ~20,000 | ~1000 (right at the limit) |
-| 60s | 60,000s | ~60,000 | **~333** |
-| 300s | 300,000s | ~300,000 | **~66** |
+| `period` | Lookback requested | Ticks needed | Candles you actually get   |
+| -------- | ------------------ | ------------ | -------------------------- |
+| 1s       | 1,000s             | ~1,000       | ~1000                      |
+| 5s       | 5,000s             | ~5,000       | ~1000                      |
+| 15s      | 15,000s            | ~15,000      | ~1000                      |
+| 20s      | 20,000s            | ~20,000      | ~1000 (right at the limit) |
+| 60s      | 60,000s            | ~60,000      | **~333**                   |
+| 300s     | 300,000s           | ~300,000     | **~66**                    |
 
 So `candles("EURUSD_otc", 60)` returns roughly a third of the 1000 candles the
 call implies, and the only signal is a `warn!` in the logs. This is a real
@@ -90,6 +101,34 @@ limitation, not a bug in your code.
 `compile_candles(asset, custom_period, lookback_period)` lets you set the
 lookback explicitly, but it goes through the same fetcher — asking for more
 than about 20,000 seconds (~5.5 hours) will not get you more data.
+
+## Watching many symbols at once
+
+Two separate broker limits decide this, both measured against the live servers on
+2026-10-30:
+
+| Limit                       | Measured behaviour                                                                                                                          | What to do                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Concurrent live streams     | A session streams the `changeSymbol` symbol plus about one watchlist symbol. Extra subscriptions never receive ticks.                       | Keep a small rotating pool, or poll snapshots instead of streaming. |
+| Concurrent history requests | Requests spaced ~200 ms apart are answered every time; a burst loses answers, and a hammered session degrades until _everything_ times out. | Nothing - the client paces requests for you.                        |
+
+`unsubscribeSymbol` is accepted but ignored by the server, so a released stream
+only actually stops when the chart moves to another symbol. The client tracks
+which symbol owns the chart stream and hands it to a symbol that is still
+subscribed, so rotating through assets keeps working; it also skips redundant
+`changeSymbol` frames, each of which interrupts the stream.
+
+For "give me the latest M1 candle of every symbol each minute", poll snapshots:
+
+```python
+feed = await client.candles_many(["EURUSD_otc", "GBPUSD_otc", "USDJPY_otc"], 60, count=2)
+for symbol, candles in feed.items():
+    print(symbol, candles[-1]["close"])
+```
+
+This is not subject to the stream ceiling and is the supported path for a dozen
+or more instruments. A 12-symbol batch completes reliably; streaming the same 12
+does not, because the server will only feed about two of them.
 
 ## Which to use
 
@@ -111,7 +150,7 @@ than about 20,000 seconds (~5.5 hours) will not get you more data.
 The tick-rate assumption is what turns "20,000 ticks" into "~20,000 seconds",
 and it is an approximation. Each page is requested with `period=1, offset=1000`,
 so how much wall-clock time a page spans depends on how actively the asset
-trades. A quiet asset produces sparser ticks, so a page covers *more* time and
+trades. A quiet asset produces sparser ticks, so a page covers _more_ time and
 the same budget reaches further back. Treat the numbers above as the busy-market
 case, which is the pessimistic one.
 
@@ -131,7 +170,7 @@ print(len(ticks), ticks[-1][0] - ticks[0][0])  # count vs seconds covered
   `candles()` choosing `1000 * period` as its lookback, and `compile_candles()`.
 
 `MAX_TICKS_PER_ASSET` and `MAX_TICK_AGE_SECS` in the same module bound the
-in-memory cache of *live* ticks from subscriptions. They do not cap historical
+in-memory cache of _live_ ticks from subscriptions. They do not cap historical
 fetches; they limit how many buffered live ticks can be appended to
 `get_candles_advanced` and `get_ticks` responses.
 
@@ -140,4 +179,4 @@ fetches; they limit how many buffered live ticks can be appended to
 This documentation is for BinaryOptionsTools-v2. Limits may change in future
 releases; the constants named above are the authoritative source.
 
-For the latest updates, check the [GitLab repository](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2).
+For the latest updates, check the [GitLab repository](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/synced/master).

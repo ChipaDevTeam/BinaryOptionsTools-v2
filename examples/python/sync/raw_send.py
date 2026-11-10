@@ -11,16 +11,16 @@ def main(ssid: str):
     # Example of sending a raw message
     try:
         # Subscribe to signals
-        api.raw_send('42["signals/subscribe"]')
+        api.send_raw('42["signals/subscribe"]')
         print("Sent signals subscription message")
 
         # Subscribe to price updates
-        api.raw_send('42["price/subscribe"]')
+        api.send_raw('42["price/subscribe"]')
         print("Sent price subscription message")
 
         # Custom message example
         custom_message = '42["custom/event",{"param":"value"}]'
-        api.raw_send(custom_message)
+        api.send_raw(custom_message)
         print(f"Sent custom message: {custom_message}")
 
     except Exception as e:
@@ -29,3 +29,4 @@ def main(ssid: str):
 
 if __name__ == "__main__":
     ssid = input("Please enter your ssid: ")
+    main(ssid)

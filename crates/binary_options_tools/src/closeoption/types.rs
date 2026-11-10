@@ -325,6 +325,37 @@ impl SocketIoMessageType {
     pub fn as_u8(&self) -> u8 {
         *self as u8
     }
+
+    /// The Engine.IO wire digit for a control packet (`0`..=`6`).
+    ///
+    /// This is the single source of truth for the digit mapping: the parser and the
+    /// encoder both go through it, so they cannot drift apart.
+    pub fn wire_code(self) -> Option<u8> {
+        match self {
+            SocketIoMessageType::EngineOpen => Some(0),
+            SocketIoMessageType::EngineClose => Some(1),
+            SocketIoMessageType::EnginePing => Some(2),
+            SocketIoMessageType::EnginePong => Some(3),
+            SocketIoMessageType::EngineMessage => Some(4),
+            SocketIoMessageType::EngineUpgrade => Some(5),
+            SocketIoMessageType::EngineNoop => Some(6),
+            _ => None,
+        }
+    }
+
+    /// Inverse of [`wire_code`](Self::wire_code).
+    pub fn from_wire_code(code: u8) -> Option<Self> {
+        match code {
+            0 => Some(SocketIoMessageType::EngineOpen),
+            1 => Some(SocketIoMessageType::EngineClose),
+            2 => Some(SocketIoMessageType::EnginePing),
+            3 => Some(SocketIoMessageType::EnginePong),
+            4 => Some(SocketIoMessageType::EngineMessage),
+            5 => Some(SocketIoMessageType::EngineUpgrade),
+            6 => Some(SocketIoMessageType::EngineNoop),
+            _ => None,
+        }
+    }
 }
 
 /// Socket.IO EIO=3 frame parser
@@ -332,109 +363,72 @@ pub mod socket_io {
     use crate::closeoption::error::CloseOptionError;
     pub use crate::closeoption::types::{SocketIoFrame, SocketIoMessageType};
     pub fn parse_frame(data: &str) -> Result<SocketIoFrame, CloseOptionError> {
-        if data.is_empty() {
-            return Err(CloseOptionError::Parse("Empty frame".to_string()));
-        }
-
-        let chars: Vec<char> = data.chars().collect();
-        if chars.is_empty() {
-            return Err(CloseOptionError::Parse("Empty frame".to_string()));
-        }
-
+        // Every byte inspected below is ASCII (digits and `/`), so the frame can be
+        // sliced by byte offset instead of being collected into a `Vec<char>`.
+        let first = data
+            .chars()
+            .next()
+            .ok_or_else(|| CloseOptionError::Parse("Empty frame".to_string()))?;
         // First digit is Engine.IO packet type
-        let engine_type = chars[0].to_digit(10).ok_or_else(|| {
-            CloseOptionError::Parse(format!("Invalid first character: {}", chars[0]))
-        })?;
+        let engine_type = first
+            .to_digit(10)
+            .ok_or_else(|| CloseOptionError::Parse(format!("Invalid first character: {first}")))?;
+        let rest = &data[1..];
 
         match engine_type {
-            // Engine.IO ping (2)
-            2 => {
-                let rest = &data[1..];
-                Ok(SocketIoFrame {
-                    message_type: SocketIoMessageType::EnginePing,
-                    namespace: None,
-                    data: rest.to_string(),
-                })
-            }
-            // Engine.IO pong (3)
-            3 => {
-                let rest = &data[1..];
-                Ok(SocketIoFrame {
-                    message_type: SocketIoMessageType::EnginePong,
-                    namespace: None,
-                    data: rest.to_string(),
-                })
-            }
-            // Engine.IO upgrade (5)
+            // Engine.IO upgrade (5) discards any trailing text.
             5 => Ok(SocketIoFrame {
                 message_type: SocketIoMessageType::EngineUpgrade,
                 namespace: None,
                 data: String::new(),
             }),
-            // Engine.IO message (4) - contains Socket.IO packet
+            // Engine.IO message (4) - contains the Socket.IO packet
             4 => {
-                let rest = &data[1..];
-                if rest.is_empty() {
-                    return Err(CloseOptionError::Parse(
-                        "Empty Socket.IO payload".to_string(),
-                    ));
-                }
-                let socket_io_chars: Vec<char> = rest.chars().collect();
-                let socket_io_type = socket_io_chars[0].to_digit(10).ok_or_else(|| {
+                let socket_first = rest.chars().next().ok_or_else(|| {
+                    CloseOptionError::Parse("Empty Socket.IO payload".to_string())
+                })?;
+                let socket_io_type = socket_first.to_digit(10).ok_or_else(|| {
                     CloseOptionError::Parse(format!(
-                        "Invalid Socket.IO type character: {}",
-                        socket_io_chars[0]
+                        "Invalid Socket.IO type character: {socket_first}"
                     ))
                 })?;
-
-                let msg_type =
+                let message_type =
                     SocketIoMessageType::from_u8(socket_io_type as u8).ok_or_else(|| {
                         CloseOptionError::Parse(format!(
-                            "Invalid Socket.IO message type: {}",
-                            socket_io_type
+                            "Invalid Socket.IO message type: {socket_io_type}"
                         ))
                     })?;
 
                 let payload = &rest[1..];
-
-                // Check for namespace (starts with '/')
-                let (namespace, payload) = if payload.starts_with('/') {
-                    let end = payload
-                        .find(',')
-                        .or_else(|| payload.find('['))
-                        .unwrap_or(payload.len());
-                    let ns = payload[1..end].to_string();
-                    (Some(ns), &payload[end..])
-                } else {
-                    (None, payload)
+                // An optional `/namespace` prefix runs up to the first `,` or `[`;
+                // the separator itself stays at the head of `data`.
+                let (namespace, payload) = match payload.strip_prefix('/') {
+                    Some(named) => {
+                        let end = named
+                            .find(',')
+                            .or_else(|| named.find('['))
+                            .unwrap_or(named.len());
+                        (Some(named[..end].to_string()), &named[end..])
+                    }
+                    None => (None, payload),
                 };
 
                 Ok(SocketIoFrame {
-                    message_type: msg_type,
+                    message_type,
                     namespace,
                     data: payload.to_string(),
                 })
             }
-            // Engine.IO open (0), close (1), noop (6)
-            0 => Ok(SocketIoFrame {
-                message_type: SocketIoMessageType::EngineOpen,
+            // Engine.IO control frames (open, close, ping, pong, noop) carry the rest
+            // of the frame through untouched. Anything else is rejected by
+            // `from_wire_code`, keeping the previous error message.
+            other => Ok(SocketIoFrame {
+                message_type: SocketIoMessageType::from_wire_code(other as u8).ok_or_else(
+                    || CloseOptionError::Parse(format!("Unknown Engine.IO packet type: {other}")),
+                )?,
                 namespace: None,
-                data: data[1..].to_string(),
+                data: rest.to_string(),
             }),
-            1 => Ok(SocketIoFrame {
-                message_type: SocketIoMessageType::EngineClose,
-                namespace: None,
-                data: data[1..].to_string(),
-            }),
-            6 => Ok(SocketIoFrame {
-                message_type: SocketIoMessageType::EngineNoop,
-                namespace: None,
-                data: data[1..].to_string(),
-            }),
-            _ => Err(CloseOptionError::Parse(format!(
-                "Unknown Engine.IO packet type: {}",
-                engine_type
-            ))),
         }
     }
 
@@ -456,18 +450,11 @@ pub mod socket_io {
                 result.push(',');
             }
         } else {
-            // Engine.IO packet types 10-16: emit single-digit wire code
-            let wire_code = match msg_type {
-                SocketIoMessageType::EngineOpen => '0',
-                SocketIoMessageType::EngineClose => '1',
-                SocketIoMessageType::EnginePing => '2',
-                SocketIoMessageType::EnginePong => '3',
-                SocketIoMessageType::EngineMessage => '4',
-                SocketIoMessageType::EngineUpgrade => '5',
-                SocketIoMessageType::EngineNoop => '6',
-                _ => unreachable!(),
-            };
-            result.push(wire_code);
+            // Engine.IO packet types 10-16: emit the single-digit wire code.
+            result.push(
+                char::from_digit(msg_type.wire_code().expect("engine type") as u32, 10)
+                    .expect("single digit"),
+            );
         }
         result.push_str(data);
         result
@@ -498,6 +485,151 @@ pub mod socket_io {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// Characterisation tests for the Engine.IO/Socket.IO frame parser.
+    ///
+    /// The parser is hand-rolled over raw text, so a change that shifts one byte of
+    /// `data` would silently corrupt every event and every handshake step. Each
+    /// frame shape the CloseOption stream uses is pinned here.
+    mod frame_parser {
+        use crate::closeoption::types::socket_io::parse_frame;
+        use crate::closeoption::types::SocketIoMessageType;
+
+        fn frame(input: &str) -> (SocketIoMessageType, Option<String>, String) {
+            let parsed = parse_frame(input).unwrap_or_else(|e| panic!("{input:?}: {e}"));
+            (parsed.message_type, parsed.namespace, parsed.data)
+        }
+
+        #[test]
+        fn engine_control_frames_keep_their_payload() {
+            // Handshake body is the payload; the leading `0` is consumed.
+            assert_eq!(
+                frame(r#"0{"sid":"abc","pingInterval":25000}"#),
+                (
+                    SocketIoMessageType::EngineOpen,
+                    None,
+                    r#"{"sid":"abc","pingInterval":25000}"#.to_string()
+                )
+            );
+            assert_eq!(
+                frame("1"),
+                (SocketIoMessageType::EngineClose, None, String::new())
+            );
+            assert_eq!(
+                frame("2probe"),
+                (SocketIoMessageType::EnginePing, None, "probe".to_string())
+            );
+            assert_eq!(
+                frame("3probe"),
+                (SocketIoMessageType::EnginePong, None, "probe".to_string())
+            );
+            assert_eq!(
+                frame("6"),
+                (SocketIoMessageType::EngineNoop, None, String::new())
+            );
+            // Upgrade deliberately discards any trailing text.
+            assert_eq!(
+                frame("5probe"),
+                (SocketIoMessageType::EngineUpgrade, None, String::new())
+            );
+        }
+
+        #[test]
+        fn socket_io_frames_without_namespace() {
+            assert_eq!(
+                frame("40"),
+                (SocketIoMessageType::Connect, None, String::new())
+            );
+            assert_eq!(
+                frame("41"),
+                (SocketIoMessageType::Disconnect, None, String::new())
+            );
+            assert_eq!(
+                frame(r#"42["getOrder","123"]"#),
+                (
+                    SocketIoMessageType::Event,
+                    None,
+                    r#"["getOrder","123"]"#.to_string()
+                )
+            );
+            // `4` = Engine.IO message, `3` = Socket.IO ack, `0` = the ack id that
+            // begins the payload.
+            assert_eq!(
+                frame("430[]"),
+                (SocketIoMessageType::Ack, None, "0[]".to_string())
+            );
+            assert_eq!(
+                frame("44"),
+                (SocketIoMessageType::Error, None, String::new())
+            );
+            // Binary packets keep the `2-` attachment marker in `data`.
+            assert_eq!(
+                frame(r#"452-["ev"]"#),
+                (
+                    SocketIoMessageType::BinaryEvent,
+                    None,
+                    r#"2-["ev"]"#.to_string()
+                )
+            );
+            assert_eq!(
+                frame(r#"462-["ev"]"#),
+                (
+                    SocketIoMessageType::BinaryAck,
+                    None,
+                    r#"2-["ev"]"#.to_string()
+                )
+            );
+            assert_eq!(
+                frame(r#"47["x"]"#),
+                (
+                    SocketIoMessageType::ConnectError,
+                    None,
+                    r#"["x"]"#.to_string()
+                )
+            );
+        }
+
+        #[test]
+        fn socket_io_frames_with_namespace() {
+            // The namespace is split off; the separator stays at the head of `data`.
+            assert_eq!(
+                frame(r#"42/admin,["event",1]"#),
+                (
+                    SocketIoMessageType::Event,
+                    Some("admin".to_string()),
+                    r#",["event",1]"#.to_string()
+                )
+            );
+            // Namespace immediately followed by the payload, with no comma.
+            assert_eq!(
+                frame(r#"42/ns["event"]"#),
+                (
+                    SocketIoMessageType::Event,
+                    Some("ns".to_string()),
+                    r#"["event"]"#.to_string()
+                )
+            );
+            // A bare namespace consumes the rest of the frame.
+            assert_eq!(
+                frame("42/admin"),
+                (
+                    SocketIoMessageType::Event,
+                    Some("admin".to_string()),
+                    String::new()
+                )
+            );
+        }
+
+        #[test]
+        fn malformed_frames_are_rejected_not_panicked() {
+            for bad in ["", "x", "9", "4", "4x", "48"] {
+                assert!(
+                    parse_frame(bad).is_err(),
+                    "{bad:?} must be rejected, not parsed"
+                );
+            }
+        }
+    }
 
     #[test]
     fn null_user_balance_deserializes_as_none() {

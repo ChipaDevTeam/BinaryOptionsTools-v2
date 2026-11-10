@@ -120,7 +120,7 @@ go run basic.go
 ruby basic.rb
 ```
 
-### C #
+### C
 
 ```bash
 dotnet run --project basic.csproj

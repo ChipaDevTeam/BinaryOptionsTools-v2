@@ -13,6 +13,12 @@ import asyncio
 import pytest
 import pytest_asyncio
 
+# These tests open a real PocketOption session, so they need both a valid
+# POCKET_OPTION_SSID and a reachable broker. Marking the module keeps the
+# offline suite runnable with `-k "not integration"`, as documented in
+# pytest.ini.
+pytestmark = pytest.mark.integration
+
 SSID = os.getenv("POCKET_OPTION_SSID")
 
 

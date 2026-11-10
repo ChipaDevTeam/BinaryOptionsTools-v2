@@ -233,25 +233,17 @@ impl PocketOption {
     }
 
     /// Creates a new PocketOption client with a custom WebSocket URL.
+    ///
+    /// Goes through [`PocketOption::new_with_config`] so the auth handshake is waited
+    /// for exactly like the other constructors.
     pub async fn new_with_url(ssid: impl ToString, url: String) -> PocketResult<Self> {
-        let parsed_ssid = Ssid::parse(ssid)?;
-        let state = StateBuilder::default()
-            .ssid(parsed_ssid)
-            .default_connection_url(url)
-            .build()?;
-        let builder = Self::configure_common_modules(ClientBuilder::new(PocketConnect, state));
-        let (client, mut runner) = builder.build().await?;
-
-        let _runner = tokio::spawn(async move { runner.run().await });
-
-        Self::await_connected(&client, Duration::from_secs(30)).await?;
-
-        Ok(Self {
-            client,
-            _runner: Arc::new(_runner),
-            config: Config::default(),
-            pending_trades_lock: Arc::new(tokio::sync::Mutex::new(())),
-        })
+        let url =
+            url::Url::parse(&url).map_err(|e| PocketError::General(format!("Invalid URL: {e}")))?;
+        let config = Config {
+            urls: vec![url],
+            ..Config::default()
+        };
+        Self::new_with_config(ssid, config).await
     }
 
     /// Creates a new PocketOption client with the provided configuration.
@@ -286,6 +278,26 @@ impl PocketOption {
 
         Self::await_connected(&client, config.connection_initialization_timeout).await?;
 
+        // Wait for the auth handshake so a client returned from the constructor can be
+        // used immediately: until `successauth` is processed the server has not selected
+        // the default symbol and would silently drop history requests until they time out.
+        // This is best-effort: a session that does not confirm still gets a usable client
+        // (explicit rejections are handled by `await_connected` above).
+        let confirmed = client
+            .state
+            .wait_for_session_confirmation(
+                config
+                    .connection_initialization_timeout
+                    .min(Duration::from_secs(10)),
+            )
+            .await;
+        if !confirmed {
+            tracing::debug!(
+                target: "PocketOption",
+                "Session was not confirmed before the client was returned; continuing without the initial snapshot"
+            );
+        }
+
         Ok(Self {
             client,
             _runner: Arc::new(_runner),
@@ -298,8 +310,13 @@ impl PocketOption {
     ///
     /// The guest token is generated locally, exactly like PocketOption's own
     /// "Try demo" client does, so there is no endpoint or credential involved.
-    /// The client connects to the demo server and waits for the asset list before
-    /// returning.
+    /// The client connects to the demo server and waits for the session to be
+    /// confirmed before returning.
+    ///
+    /// # Errors
+    /// Returns [`PocketError::NotAuthorized`] when the demo server ignores the guest
+    /// token (no `successauth` and no balance frame). Guest sessions never fail
+    /// silently: without a confirmed session every request would block until it timed out.
     ///
     /// Use [`PocketOption::new_try_demo_with_token`] to replay a token the browser
     /// already cached (`localStorage['po-td-token']`).
@@ -364,13 +381,35 @@ impl PocketOption {
         // the returned client immediately usable.
         client.wait_for_assets(timeout).await?;
 
-        // Guest sessions are not sent a balance frame (verified against the live
-        // demo servers), so seed the balance the session was opened with - the same
-        // value the platform's own client displays. A server-sent balance still
-        // overwrites this as soon as it arrives. Replayed tokens have no known
+        // Assets alone prove nothing: the demo servers push the asset list to
+        // sockets that never authenticated. Only the auth ack or a balance frame
+        // shows that the guest token was accepted, and a token the broker ignores
+        // otherwise yields a client whose every request hangs until it times out.
+        let state = &client.client.state;
+        // `new_with_config` already waited for the handshake; only top up briefly so a
+        // slow demo server still gets a chance without the constructor stalling twice.
+        if !state.is_session_confirmed()
+            && !state
+                .wait_for_session_confirmation(Duration::from_secs(2))
+                .await
+        {
+            // Do not leave a half-initialised session running in the background.
+            client.shutdown().await.ok();
+            return Err(PocketError::NotAuthorized(
+                "The demo server did not accept the guest session: it sent no auth \
+                 confirmation and no balance. PocketOption now appears to require guest \
+                 sessions to be created through its website, so locally generated \
+                 try-demo tokens are ignored. Use a session SSID from \
+                 `PocketOption::new(...)` instead."
+                    .to_string(),
+            ));
+        }
+
+        // Guest sessions are sent the same balance frame as account sessions. Seed the
+        // opening balance only when the server sent none, so the client reports the
+        // value the platform's own client displays. Replayed tokens have no known
         // opening balance, so nothing is seeded for them.
         if let Some(balance) = opening_balance {
-            let state = &client.client.state;
             if state.get_balance().await.is_none() {
                 state.set_balance(Decimal::from(balance)).await;
             }
@@ -399,9 +438,10 @@ impl PocketOption {
     /// This method waits up to 10 seconds for the balance to be populated from the server.
     /// If the balance cannot be retrieved within the timeout, it returns -1.0.
     ///
-    /// Guest ("try demo") sessions never receive a balance frame, so for them this
-    /// method returns immediately: the balance carried by their auth payload when
-    /// there is one, and -1.0 otherwise.
+    /// Guest ("try demo") sessions receive the same `successupdateBalance` frame as
+    /// account sessions after the initial sync, so they wait too. When no frame
+    /// arrives, the balance carried by their auth payload is reported instead (the
+    /// value the platform's own client displays), and -1.0 when there is none.
     ///
     /// # Returns
     /// The current balance as a `Decimal`, or `-1.0` if the balance is unknown.
@@ -413,18 +453,18 @@ impl PocketOption {
             return balance;
         }
 
-        // Guest sessions are never sent a balance frame, so waiting only burns the
-        // timeout. Report the balance their auth payload carries, if any.
-        if let Ssid::TryDemo(_) = &state.ssid {
-            return guest_session_balance(&state.ssid).unwrap_or_else(|| dec!(-1.0));
-        }
-
         // Wait for update
         if tokio::time::timeout(Duration::from_secs(10), state.balance_updated.notified())
             .await
             .is_ok()
         {
             if let Some(balance) = *state.balance.read().await {
+                return balance;
+            }
+        }
+
+        if let Ssid::TryDemo(_) = &state.ssid {
+            if let Some(balance) = guest_session_balance(&state.ssid) {
                 return balance;
             }
         }
@@ -484,6 +524,28 @@ impl PocketOption {
         let history_stream = iter(history.into_iter().map(Ok));
 
         Ok(history_stream.chain(live_stream))
+    }
+
+    /// Rejects an asset that cannot produce data, before a request is sent.
+    ///
+    /// A closed market (weekend FX, outside stock hours) never answers, so without
+    /// this check every call waits out the full response timeout and then reports a
+    /// generic timeout - which looked like "the asset is not being retrieved".
+    /// Assets that have not loaded yet are allowed through: the caller may still be
+    /// initializing and the request itself is harmless.
+    async fn ensure_asset_streamable(&self, asset: &str) -> PocketResult<()> {
+        let state = &self.client.state;
+        let assets = state.assets.read().await;
+        let Some(assets) = assets.as_ref() else {
+            return Ok(());
+        };
+        match assets.get(asset) {
+            None => Err(PocketError::InvalidAsset(format!(
+                "Asset `{asset}` is not in the asset list (typos and delisted symbols land here)"
+            ))),
+            Some(a) if !a.is_active => Err(PocketError::InvalidAsset(a.inactive_reason())),
+            Some(_) => Ok(()),
+        }
     }
 
     /// Validates if an asset is active and supports the given timeframe without cloning the entire assets map.
@@ -862,11 +924,23 @@ impl PocketOption {
             .await
             .ok_or_else(|| BinaryOptionsError::General("Assets not found".into()))?;
 
-        if assets.get(&asset.to_string()).is_some() {
-            handle.subscribe(asset.to_string(), sub_type).await
-        } else {
-            Err(PocketError::InvalidAsset(asset.to_string()))
+        drop(assets);
+        // A subscription is allowed on a closed market: bots are commonly started
+        // before the open and expect the stream to start once it reopens. Only the
+        // existence of the symbol is fatal here, and a one-off data call (which has
+        // no chance of ever being answered) fails fast instead - see
+        // `ensure_asset_streamable`.
+        match self.ensure_asset_streamable(&asset.to_string()).await {
+            Ok(()) => {}
+            Err(PocketError::InvalidAsset(reason)) if reason.contains("market is closed") => {
+                tracing::warn!(
+                    target: "PocketOption",
+                    "Subscribing to a closed market: {reason}. The stream starts when it reopens."
+                );
+            }
+            Err(e) => return Err(e),
         }
+        handle.subscribe(asset.to_string(), sub_type).await
     }
 
     /// Unsubscribes from a specific asset's real-time updates.
@@ -897,8 +971,11 @@ impl PocketOption {
     /// # Arguments
     /// * `asset` - Trading symbol (e.g., "EURUSD_otc")
     /// * `period` - Time period for each candle in seconds
-    /// * `time` - Current time timestamp
-    /// * `offset` - Number of periods to offset from current time
+    /// * `time` - End of the requested window (Unix seconds)
+    /// * `offset` - Length of the requested window in **seconds**, not periods.
+    ///   The server answers with the candles that fit inside `time - offset ..= time`,
+    ///   so a window shorter than `period` yields no data (asking for 10 with a
+    ///   60s period returns an empty vector). Use at least `period * candles_wanted`.
     ///
     /// # Returns
     /// A vector of Candle objects containing historical price data
@@ -918,12 +995,7 @@ impl PocketOption {
             .require_handle::<GetCandlesApiModule>("GetCandlesApiModule")
             .await?;
 
-        if let Some(assets) = self.assets().await {
-            if assets.get(&asset.to_string()).is_none() {
-                return Err(PocketError::InvalidAsset(asset.to_string()));
-            }
-        }
-        // If assets are not loaded yet, still try to get candles
+        self.ensure_asset_streamable(&asset.to_string()).await?;
         handle
             .get_candles_advanced(asset, period, time, offset)
             .await
@@ -934,7 +1006,9 @@ impl PocketOption {
     /// # Arguments
     /// * `asset` - Trading symbol (e.g., "EURUSD_otc")
     /// * `period` - Time period for each candle in seconds
-    /// * `offset` - Number of periods to offset from current time
+    /// * `offset` - Length of the requested window in **seconds** (see
+    ///   [`PocketOption::get_candles_advanced`]); a window shorter than `period`
+    ///   returns no candles.
     ///
     /// # Returns
     /// A vector of Candle objects containing historical price data
@@ -953,12 +1027,7 @@ impl PocketOption {
             .require_handle::<GetCandlesApiModule>("GetCandlesApiModule")
             .await?;
 
-        if let Some(assets) = self.assets().await {
-            if assets.get(&asset.to_string()).is_none() {
-                return Err(PocketError::InvalidAsset(asset.to_string()));
-            }
-        }
-        // If assets are not loaded yet, still try to get candles
+        self.ensure_asset_streamable(&asset.to_string()).await?;
         handle.get_candles(asset, period, offset).await
     }
 
@@ -986,11 +1055,7 @@ impl PocketOption {
             ));
         }
 
-        if let Some(assets) = self.assets().await {
-            if assets.get(&asset_str).is_none() {
-                return Err(PocketError::InvalidAsset(asset_str.clone()));
-            }
-        }
+        self.ensure_asset_streamable(&asset_str).await?;
 
         // Use GetCandlesApiModule with loadHistoryPeriod for paginated tick fetching
         let handle = self
@@ -1071,12 +1136,7 @@ impl PocketOption {
             return Err(PocketError::InvalidPeriod(0));
         }
 
-        // Validate asset exists (if assets are loaded)
-        if let Some(assets) = self.assets().await {
-            if assets.get(&asset_str).is_none() {
-                return Err(PocketError::InvalidAsset(asset_str));
-            }
-        }
+        self.ensure_asset_streamable(&asset_str).await?;
 
         // Fetch raw tick data
         let ticks = self.ticks(asset_str.clone(), lookback_period).await?;
@@ -1189,6 +1249,32 @@ mod tests {
     use super::{guest_session_balance, PocketOption};
     use crate::pocketoption::ssid::Ssid;
 
+    /// These tests drive a real PocketOption session rather than a mock. They
+    /// are opt-in via `POCKET_OPTION_SSID`, and both a missing session id and an
+    /// unreachable broker are skip conditions: a machine without credentials or
+    /// network access must not report a failure for something it cannot exercise.
+    fn live_ssid(test_name: &str) -> Option<String> {
+        match std::env::var("POCKET_OPTION_SSID") {
+            Ok(ssid) if !ssid.trim().is_empty() => Some(ssid),
+            _ => {
+                println!("Skipping {test_name}: POCKET_OPTION_SSID not set");
+                None
+            }
+        }
+    }
+
+    /// Connects to the live broker, or reports a skip if it cannot be reached.
+    async fn live_client(test_name: &str) -> Option<PocketOption> {
+        let ssid = live_ssid(test_name)?;
+        match PocketOption::new(ssid).await {
+            Ok(api) => Some(api),
+            Err(error) => {
+                println!("Skipping {test_name}: cannot reach the broker ({error})");
+                None
+            }
+        }
+    }
+
     #[test]
     fn guest_session_balance_comes_from_the_auth_payload_only() {
         let fresh = crate::pocketoption::try_demo::generate_try_demo_ssid(1_000).unwrap();
@@ -1209,14 +1295,16 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_tester() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_tester: POCKET_OPTION_SSID not set");
+        let Some(ssid) = live_ssid("test_pocket_option_tester") else {
+            return;
+        };
+        let mut tester = match PocketOption::new_testing_wrapper(ssid).await {
+            Ok(tester) => tester,
+            Err(error) => {
+                println!("Skipping test_pocket_option_tester: cannot reach the broker ({error})");
                 return;
             }
         };
-        let mut tester = PocketOption::new_testing_wrapper(ssid).await.unwrap();
         tester.start().await.unwrap();
         tokio::time::sleep(Duration::from_secs(120)).await; // Wait for 2 minutes to allow the client to run and process messages
         println!("{}", tester.stop().await.unwrap().summary());
@@ -1225,14 +1313,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_balance() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_balance: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_balance").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         // Wait for assets as a proxy for full initialization
         if tokio::time::timeout(
             Duration::from_secs(15),
@@ -1252,14 +1335,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_server_time() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_server_time: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_server_time").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
@@ -1282,14 +1360,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_buy_sell() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_buy_sell: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_buy_sell").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
@@ -1325,14 +1398,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_result() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_result: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_result").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
@@ -1379,14 +1447,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_subscription() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_subscription: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_subscription").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
@@ -1433,14 +1496,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_get_candles() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_get_candles: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_get_candles").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
@@ -1486,14 +1544,9 @@ mod tests {
     #[tokio::test]
     async fn test_pocket_option_history() {
         let _ = tracing_subscriber::fmt::try_init();
-        let ssid = match std::env::var("POCKET_OPTION_SSID") {
-            Ok(s) => s,
-            Err(_) => {
-                println!("Skipping test_pocket_option_history: POCKET_OPTION_SSID not set");
-                return;
-            }
+        let Some(api) = live_client("test_pocket_option_history").await else {
+            return;
         };
-        let api = PocketOption::new(ssid).await.unwrap();
         if tokio::time::timeout(
             Duration::from_secs(15),
             api.wait_for_assets(Duration::from_secs(15)),
@@ -1546,6 +1599,7 @@ mod additional_tests {
                 symbol: "EURUSD_otc".to_string(),
                 is_otc: true,
                 is_active: true,
+                opens_at: None,
                 payout: 92,
                 allowed_candles: vec![],
                 asset_type: AssetType::Currency,

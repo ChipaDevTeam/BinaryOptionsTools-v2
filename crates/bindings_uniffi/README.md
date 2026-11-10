@@ -1,6 +1,6 @@
 # BinaryOptionsToolsUni
 
-> **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=uniffi) — AI-powered algorithmic *trading strategy* builder: describe your edge, get working CHTL code, backtest it, deploy it. Free to start.**
+> **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=uniffi) — AI-powered algorithmic _trading strategy_ builder: describe your edge, get working CHTL code, backtest it, deploy it. Free to start.**
 >
 > **📈 Trade crypto perps, spot & margin on [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
 
@@ -11,188 +11,100 @@ Cross-platform library for binary options trading automation using UniFFI. Provi
 - **C#** (.NET/Mono)
 - **Go**
 - **Kotlin** (JVM/Android)
-- **Python** (3.8+)
+- **Python** (3.10+)
 - **Ruby** (2.7+)
 - **Swift** (iOS/macOS)
 
 ## 📦 Installation
 
-### C# (.NET)
+None of these bindings are published to a package registry — there is no NuGet,
+Maven, RubyGems, Go module or Swift package to install. Every language is
+generated from this crate with `uniffi-bindgen` (proc-macro based, no `.udl`):
 
 ```bash
-# Coming soon - NuGet package
-dotnet add package BinaryOptionsToolsUni
+# generate the bindings for one language
+cargo run -p binary_options_tools_uni --bin uniffi-bindgen generate \
+    --library --language kotlin --out-dir out/kotlin
+
+# available: kotlin, swift, python, ruby
+# then build the shared library and add it to your project
+cargo build --release -p binary_options_tools_uni
 ```
 
-### Go
+The in-repo generator emits `kotlin`, `swift`, `python` and `ruby` only. Go and C#
+need their community bindgens (`uniffi-bindgen-go`, `uniffi-bindgen-cs`) run against
+the same compiled library.
 
-```bash
-go get gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/bindings/go
-```
-
-### Kotlin
-
-```gradle
-dependencies {
-    implementation 'com.chipadevteam:binaryoptionstoolsuni:0.1.0'
-}
-```
-
-### Python
-
-```bash
-pip install binaryoptionstoolsuni
-```
-
-### Ruby
-
-```bash
-gem install binaryoptionstoolsuni
-```
-
-### Swift
-
-```swift
-// Add to Package.swift
-dependencies: {
-    .package(url: "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2", from: "0.1.0")
-}
-```
+If you only need Python, use the published wheel instead
+(`pip install binaryoptionstoolsv2`, Python 3.10+) — it is not built from this
+crate.
 
 ## 🚀 Quick Start
 
-All languages follow the same API structure. Here's a quick example in each supported language:
+> **Known limitation (verified 2026-10-31):** the **Kotlin and Python** generators
+> currently fail with `Async primary constructors not supported but PocketOption
+has one`, because `PocketOption::new` is an `async` `#[uniffi::constructor]`.
+> Swift and Ruby generate successfully. Use `new_with_url` / `new_with_config`
+> (below) as the entry point, or a language whose generator succeeds.
 
-### Python
+The constructor is asynchronous — it returns only after the auth handshake, so a
+fixed `sleep` is not required. Generated names differ per language; these are the
+actual emitted signatures:
 
-```python
-import asyncio
-from binaryoptionstoolsuni import PocketOption
-
-async def main():
-    client = await PocketOption.init("your_ssid")
-    await asyncio.sleep(2)  # Wait for initialization
-
-    balance = await client.balance()
-    print(f"Balance: ${balance}")
-
-    # Place a trade
-    trade = await client.buy("EURUSD_otc", 60, 1.0)
-    print(f"Trade ID: {trade.id}")
-
-asyncio.run(main())
-```
-
-### Kotlin
-
-```kotlin
-import com.chipadevteam.binaryoptionstoolsuni.*
-import kotlinx.coroutines.*
-
-suspend fun main() = coroutineScope {
-    val client = PocketOption.init("your_ssid")
-    delay(2000) // Wait for initialization
-
-    val balance = client.balance()
-    println("Balance: $$balance")
-
-    // Place a trade
-    val trade = client.buy("EURUSD_otc", 60u, 1.0)
-    println("Trade ID: ${trade.id}")
-}
-```
+| Language | Construct                                                                      |
+| -------- | ------------------------------------------------------------------------------ |
+| Swift    | `try await PocketOption(ssid: "...")`                                          |
+| Ruby     | `PocketOption.new_with_url(ssid, url)` or `.new_with_config(ssid, urls, secs)` |
+| Kotlin   | not generated yet (see limitation above)                                       |
+| Python   | not generated yet (see limitation above)                                       |
 
 ### Swift
 
 ```swift
-import BinaryOptionsToolsUni
+import binary_options_tools_uni
 
-Task {
-    let client = try await PocketOption.init(ssid: "your_ssid")
-    try await Task.sleep(nanoseconds: 2_000_000_000) // Wait for initialization
+let client = try await PocketOption(ssid: "your_ssid")
+let balance = try await client.balance()
+print("Balance: \(balance)")
 
-    let balance = await client.balance()
-    print("Balance: $\(balance)")
-
-    // Place a trade
-    let trade = try await client.buy(asset: "EURUSD_otc", time: 60, amount: 1.0)
-    print("Trade ID: \(trade.id)")
-}
+let trade = try await client.buy(asset: "EURUSD_otc", time: 60, amount: 1.0)
+print("Trade ID: \(trade.id)")
+try await client.shutdown()
 ```
 
-### Go
-
-```go
-package main
-
-import (
-    "fmt"
-    "time"
-    bot "binaryoptionstoolsuni"
-)
-
-func main() {
-    client, err := bot.PocketOptionInit("your_ssid")
-    if err != nil {
-        panic(err)
-    }
-    time.Sleep(2 * time.Second) // Wait for initialization
-
-    balance := client.Balance()
-    fmt.Printf("Balance: $%.2f\n", balance)
-
-    // Place a trade
-    trade, err := client.Buy("EURUSD_otc", 60, 1.0)
-    if err != nil {
-        panic(err)
-    }
-    fmt.Printf("Trade ID: %s\n", trade.Id)
-}
-```
+Note the argument order for `buy`: `(asset, time, amount)` — `amount` last, unlike
+the Python and Node bindings.
 
 ### Ruby
 
 ```ruby
-require 'binaryoptionstoolsuni'
+require 'binary_options_tools_uni'
 require 'async'
 
 Async do
-  client = BinaryOptionsToolsUni::PocketOption.init('your_ssid')
-  sleep 2 # Wait for initialization
+  client = PocketOption.new_with_config('your_ssid', ['wss://api-eu.po.market/socket.io/?EIO=4&transport=websocket'], 30)
+  puts "Balance: $#{client.balance}"
 
-  balance = client.balance
-  puts "Balance: $#{balance}"
-
-  # Place a trade
   trade = client.buy('EURUSD_otc', 60, 1.0)
   puts "Trade ID: #{trade.id}"
 end
 ```
 
-### C
+### Go and C#
 
-```csharp
-using BinaryOptionsToolsUni;
-
-var client = await PocketOption.InitAsync("your_ssid");
-await Task.Delay(2000); // Wait for initialization
-
-var balance = await client.BalanceAsync();
-Console.WriteLine($"Balance: ${balance}");
-
-// Place a trade
-var trade = await client.BuyAsync("EURUSD_otc", 60, 1.0);
-Console.WriteLine($"Trade ID: {trade.Id}");
-```
+Both need an external bindgen (`uniffi-bindgen-go`, `uniffi-bindgen-cs`) run
+against the compiled `binary_options_tools_uni` library; nothing is published.
+Their generated naming follows the same pattern (`NewPocketOption`, `Balance`,
+`Buy`).
 
 ## 📚 Documentation
 
 Comprehensive API documentation with examples in all supported languages:
 
-- **[Full API Reference](docs/API_REFERENCE.md)** - Complete API documentation with multi-language examples
-- **[Trading Guide](docs/TRADING_GUIDE.md)** - Learn how to place trades and manage orders
-- **[Market Data Guide](docs/MARKET_DATA_GUIDE.md)** - Access real-time and historical data
-- **[Examples](docs/examples/)** - Working code examples for each language
+- **[API Reference](../../docs/api/reference.md)** - Complete API documentation with multi-language examples
+- **[Trading Guide](../../docs/guides/trading.md)** - Learn how to place trades and manage orders
+- **[Candle history limits](../../docs/guides/candle-history-limits.md)** - What the broker's history endpoint returns
+- **[Examples](../../examples/)** - Working code examples for each language
 
 ## ✨ Features
 
@@ -265,7 +177,7 @@ cd BinaryOptionsTools-v2/BinaryOptionsToolsUni
 cargo build --release
 
 # Generate bindings for your target language
-cargo run --bin uniffi-bindgen generate src/binary_options_tools_uni.udl \
+cargo run -p binary_options_tools_uni --bin uniffi-bindgen generate --library --language kotlin --out-dir out/kotlin
     --language <python|kotlin|swift|ruby> \
     --out-dir out/<language>
 ```
@@ -296,8 +208,8 @@ This software is provided "AS IS" without warranty. The authors and ChipaDevTeam
 
 Binary options trading carries significant risk. Use at your own risk.
 
-- **GitLab Issues**: [Report bugs](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
-- **Documentation**: [Full docs](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)
+- **GitHub Issues**: [Report bugs](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
+- **Documentation**: [Full docs](docs/api/reference.md)
 
 ## 🔗 Related Projects
 

@@ -1,9 +1,15 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 #![allow(unused_imports)]
-// Illustrative macro usage examples referenced from `docs/macro_proposals.md`.
-// These are non-compiling placeholders (attributes are commented out) to show intent
-// and avoid breaking builds. Replace with real macro invocations once implemented.
+// Illustrative usage examples for the repository's procedural macros.
+// Implemented today: `#[timeout]`, `RegionImpl` and `ActionImpl` in `crates/macros`;
+// `#[Rule]` with its `#[rule(...)]` payload in `crates/core/macros`; and `#[uniffi_doc]`
+// in `crates/bindings_uniffi/bo2_macros`.
+// Everything else below is a proposal: non-compiling placeholders (attributes are
+// commented out) to show intent and avoid breaking builds. Replace with real macro
+// invocations once implemented.
+// Kept out of the crate's `examples/` directory on purpose: Cargo would compile it,
+// and it depends on crates this package does not have.
 
 use rust_decimal::Decimal;
 use std::sync::Arc;
@@ -45,10 +51,10 @@ struct StreamData {
 struct Deal;
 
 // -----------------------------------------------------------------------------
-// #[uniffi_doc] example (commented macro)
+// #[uniffi_doc] example (implemented in `crates/bindings_uniffi/bo2_macros`)
 // -----------------------------------------------------------------------------
 #[allow(unused)]
-// #[uniffi_doc(name = "Test", path = "BinaryOptionsToolsUni/docs_json/test.json")]
+// #[uniffi_doc(name = "Test", path = "crates/bindings_uniffi/docs_json/test.json")]
 pub struct Test {
     // ...
 }
@@ -68,7 +74,9 @@ mod lightweight_example {
         Ok(())
     }
 
-    // Expanded style is shown in macro_proposals.md
+    // Still unimplemented: `crates/core/macros/src/modules/lightweight.rs` only defines a
+    // crate-private `zyn::element` that expands to nothing. For a macro that is actually
+    // implemented, see `crates/core/macros/src/lib.rs` (`#[Rule]`) and its documented expansion.
 }
 
 // -----------------------------------------------------------------------------
@@ -91,20 +99,18 @@ mod api_module_example {
 }
 
 // -----------------------------------------------------------------------------
-// #[action_rule] example (commented macro)
+// #[Rule] / #[rule(...)] example (implemented in `crates/core/macros`)
 // -----------------------------------------------------------------------------
-mod action_rule_example {
+mod rule_example {
     use super::*;
 
-    // #[action_rule(patterns = ["successopenOrder", "failopenOrder"])]
+    // #[Rule]
+    // #[rule({ contains("successopenOrder") | contains("failopenOrder") })]
     pub struct TradeRule;
 
-    impl Rule for TradeRule {
-        fn call(&self, _msg: &Message) -> bool {
-            false
-        }
-        fn reset(&self) {}
-    }
+    // `#[Rule]` generates both `TradeRule::new()` and the `Rule` impl, so neither is
+    // written by hand here. The DSL and the expansion are documented in
+    // `crates/core/macros/src/lib.rs`.
 }
 
 // -----------------------------------------------------------------------------
@@ -155,12 +161,14 @@ mod pyo3_async_json_example {
 }
 
 // -----------------------------------------------------------------------------
-// uni_err! example (commented macro)
+// error conversion example (no `uni_err!` macro exists in this repo)
 // -----------------------------------------------------------------------------
-mod uni_err_example {
+mod error_conversion_example {
     use super::*;
     fn demo(result: Result<Deal, String>) -> Result<Deal, String> {
-        // let deal = uni_err!(self.inner.result(uuid).await)?;
+        // Conversions go through the `UniError` `From` impls, as in
+        // `crates/bindings_uniffi/src/error.rs`:
+        // let deal = self.inner.result(uuid).await.map_err(UniError::from)?;
         result
     }
 }

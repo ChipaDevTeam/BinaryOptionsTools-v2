@@ -105,3 +105,4 @@ site
 logs_fail
 wheels/
 config.toml
+websocket_export.csv

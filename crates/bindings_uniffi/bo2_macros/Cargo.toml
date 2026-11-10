@@ -1,11 +1,11 @@
 [package]
 name = "bo2_macros"
-version = "0.2.16"
+version = "0.2.17"
 edition = "2024"
 
 [lib]
 proc-macro = true
 
 [dependencies]
-serde_json = "1.0.151"
+serde_json = "1.0.154"
 zyn = "0.5.4"

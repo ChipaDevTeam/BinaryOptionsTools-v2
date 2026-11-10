@@ -37,17 +37,13 @@ pub enum Command {
     },
 }
 
-/// CommandResponse enum for the `TradesApiModule`.
-/// Kept for trait compatibility but mostly unused in the new oneshot pattern.
+/// Response channel for the `TradesApiModule`.
+///
+/// Every order is answered through the `oneshot` carried by
+/// [`Command::OpenOrder`], so this type only exists to satisfy
+/// [`ApiModule`]; nothing is ever sent on it.
 #[derive(Debug)]
-pub enum CommandResponse {
-    /// Response for an `OpenOrder` command.
-    Success {
-        req_id: Uuid,
-        deal: Box<Deal>,
-    },
-    Error(Box<FailOpenOrder>),
-}
+pub enum CommandResponse {}
 
 #[derive(Deserialize)]
 #[serde(untagged)]

@@ -22,14 +22,24 @@ console.log(`None validator: ${none.check("hello")} (Expected: true)`);
 console.log(`Regex validator: ${regex.check("Hello")} (Expected: true)`);
 console.log(`Regex validator: ${regex.check("hello")} (Expected: false)`);
 
-console.log(`Starts_with validator: ${start.check("Hello World")} (Expected: true)`);
-console.log(`Starts_with validator: ${start.check("hi World")} (Expected: false)`);
+console.log(
+  `Starts_with validator: ${start.check("Hello World")} (Expected: true)`,
+);
+console.log(
+  `Starts_with validator: ${start.check("hi World")} (Expected: false)`,
+);
 
 console.log(`Ends_with validator: ${end.check("Hello Bye")} (Expected: true)`);
-console.log(`Ends_with validator: ${end.check("Hello there")} (Expected: false)`);
+console.log(
+  `Ends_with validator: ${end.check("Hello there")} (Expected: false)`,
+);
 
-console.log(`Contains validator: ${contains.check("Hello World")} (Expected: true)`);
-console.log(`Contains validator: ${contains.check("Hello there")} (Expected: false)`);
+console.log(
+  `Contains validator: ${contains.check("Hello World")} (Expected: true)`,
+);
+console.log(
+  `Contains validator: ${contains.check("Hello there")} (Expected: false)`,
+);
 
 console.log(`Not validator: ${negated.check("Hello World")} (Expected: false)`);
 console.log(`Not validator: ${negated.check("Hello there")} (Expected: true)`);

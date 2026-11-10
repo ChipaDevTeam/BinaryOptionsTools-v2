@@ -19,16 +19,23 @@ use std::time::Duration;
 
 use binary_options_tools::pocketoption::{candle::SubscriptionType, PocketOption};
 
-/// Demo SSID for testing — read from POCKET_OPTION_SSID env var
-fn demo_ssid() -> String {
+/// Demo SSID for testing — read from POCKET_OPTION_SSID env var.
+///
+/// Returns `None` when no session is configured so the suite skips instead of
+/// failing on a machine without broker credentials (see AGENTS.md).
+fn demo_ssid() -> Option<String> {
     std::env::var("POCKET_OPTION_SSID")
-        .expect("POCKET_OPTION_SSID must be set. Run: POCKET_OPTION_SSID='42[...]' cargo test")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
 }
 
 /// Helper function to create and initialize a PocketOption client
 async fn create_test_client() -> Result<PocketOption, Box<dyn std::error::Error>> {
     let _ = tracing_subscriber::fmt::try_init();
-    let api = PocketOption::new(demo_ssid()).await?;
+    let Some(ssid) = demo_ssid() else {
+        return Err("POCKET_OPTION_SSID is not set; skipping the live PocketOption suite".into());
+    };
+    let api = PocketOption::new(ssid).await?;
 
     // Wait for assets to be loaded (indicates full initialization)
     tokio::time::timeout(

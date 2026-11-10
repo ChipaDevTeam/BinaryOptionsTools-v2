@@ -17,7 +17,7 @@ use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
     types::{FailOpenOrder, MultiPatternRule, OpenPendingOrder, PendingOrder},
-    utils::SocketIoFrame,
+    utils::{socketio_frame, SocketIoFrame},
 };
 
 const PENDING_ORDER_TIMEOUT: Duration = Duration::from_secs(30);
@@ -396,13 +396,19 @@ impl ApiModule<State> for PendingTradesApiModule {
                                 }
                                 Command::CancelPendingOrder { ticket, req_id } => {
                                     self.pending_cancel_requests.push_back((req_id, ticket.clone()));
-                                    let cancel_msg = serde_json::json!(["cancelPendingOrder", { "ticket": ticket }]);
-                                    self.send_to_ws(Message::text(format!("42{}", cancel_msg)), "cancel order").await?;
+                                    let frame = socketio_frame(
+                                        "cancelPendingOrder",
+                                        &serde_json::json!({ "ticket": ticket }),
+                                    );
+                                    self.send_to_ws(Message::text(frame), "cancel order").await?;
                                 }
                                 Command::CancelPendingOrders { tickets, req_id } => {
                                     self.pending_cancel_multiple_requests.push_back((req_id, tickets.clone()));
-                                    let cancel_msg = serde_json::json!(["cancelPendingOrders", { "tickets": tickets }]);
-                                    self.send_to_ws(Message::text(format!("42{}", cancel_msg)), "batch cancel").await?;
+                                    let frame = socketio_frame(
+                                        "cancelPendingOrders",
+                                        &serde_json::json!({ "tickets": tickets }),
+                                    );
+                                    self.send_to_ws(Message::text(frame), "batch cancel").await?;
                                 }
                             }
                         }

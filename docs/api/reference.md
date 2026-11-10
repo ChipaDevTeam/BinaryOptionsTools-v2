@@ -5,7 +5,7 @@ sidebar_position: 1
 # BinaryOptionsTools API Reference
 
 :::tip Skip the boilerplate
-Everything on this page is the *manual* path: you wire up the client, the candles, the risk
+Everything on this page is the _manual_ path: you wire up the client, the candles, the risk
 checks and the deployment yourself. If you would rather go from idea to backtested strategy in an
 afternoon, **[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=api-reference&utm_campaign=BinaryOptionsToolsV2)** generates the strategy from a plain
 language description in **CHTL**, backtests it on historical data, and deploys it to a live broker
@@ -36,44 +36,30 @@ npm run build
 
 ```toml
 [dependencies]
-binary_options_tools = "0.1"
+binary_options_tools = "0.2.17"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 ```
 
-### Kotlin
+### Kotlin, Swift, Go, Ruby, C# (UniFFI)
 
-```gradle
-dependencies {
-    implementation 'com.chipadevteam:binaryoptionstools:0.1.0'
-}
-```
-
-### Swift
-
-Add to `Package.swift`:
-
-```swift
-dependencies: [
-dependencies: {
-    .package(url: "https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2", from: "0.1.0")
-}
+These bindings are **not published to any package registry** — there is no Maven,
+NuGet, RubyGems or Go module to install, and no Swift package. They are generated
+from this repository with `uniffi-bindgen` (proc-macro based, no `.udl` file):
 
 ```bash
-go get gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/bindings/go
+# supported languages: kotlin, swift, python, ruby
+cargo run -p binary_options_tools_uni --bin uniffi-bindgen generate --library --language kotlin --out-dir out/kotlin
+cargo run -p binary_options_tools_uni --bin uniffi-bindgen generate --library --language swift  --out-dir out/swift
+
+# then add the generated sources plus the compiled library to your project
+cargo build --release -p binary_options_tools_uni
 ```
 
-### Ruby
-
-```bash
-gem install binaryoptionstoolsv2
-```
-
-### C#
-
-```bash
-dotnet add package BinaryOptionsToolsV2
-```
+Go and C# are not supported by the in-repo generator; use the community
+`uniffi-bindgen-go` / `uniffi-bindgen-cs` against the same compiled library. See
+[`crates/bindings_uniffi/README.md`](../../crates/bindings_uniffi/README.md) for the
+per-language build notes and [the examples](../examples/index.md) for the API shape.
 
 ---
 
@@ -88,13 +74,9 @@ import asyncio
 from BinaryOptionsToolsV2 import PocketOptionAsync
 
 async def main():
-    client = await PocketOptionAsync("your_ssid")
-    await asyncio.sleep(2)  # Wait for API to initialize
-
-    balance = await client.balance()
-    print(f"Balance: ${balance}")
-
-    await client.shutdown()
+    async with PocketOptionAsync("your_ssid") as client:
+        balance = await client.balance()
+        print(f"Balance: ${balance}")
 
 asyncio.run(main())
 ```
@@ -104,29 +86,24 @@ asyncio.run(main())
 ```python
 from BinaryOptionsToolsV2 import PocketOption
 
-client = PocketOption("your_ssid")
-import time
-time.sleep(2)
-
-balance = client.balance()
-print(f"Balance: ${balance}")
-
-client.shutdown()
+with PocketOption("your_ssid") as client:
+    balance = client.balance()
+    print(f"Balance: ${balance}")
 ```
 
 #### JavaScript
 
 ```javascript
-const { PocketOption } = require('binary-options-tools');
+const { PocketOption } = require("binary-options-tools");
 
 async function main() {
-    // The constructor connects in the background; every method awaits it.
-    const client = new PocketOption("your_ssid");
+  // The constructor connects in the background; every method awaits it.
+  const client = new PocketOption("your_ssid");
 
-    const balance = await client.balance();
-    console.log(`Balance: $${balance}`);
+  const balance = await client.balance();
+  console.log(`Balance: $${balance}`);
 
-    await client.shutdown();
+  await client.shutdown();
 }
 
 main();
@@ -160,7 +137,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```python
 # Place a $1 call trade on EURUSD_otc for 60 seconds
-trade = await client.buy("EURUSD_otc", 60, 1.0)
+trade_id, trade = await client.buy("EURUSD_otc", 1.0, 60)
 print(f"Trade ID: {trade.id}")
 print(f"Asset: {trade.asset}")
 print(f"Amount: ${trade.amount}")
@@ -192,7 +169,7 @@ println!("Amount: ${}", trade.amount);
 
 ```python
 # Place a $1 put trade on EURUSD_otc for 60 seconds
-trade = await client.sell("EURUSD_otc", 60, 1.0)
+trade_id, trade = await client.sell("EURUSD_otc", 1.0, 60)
 print(f"Trade ID: {trade.id}")
 ```
 
@@ -218,7 +195,7 @@ println!("Trade ID: {}", trade.id);
 
 ```python
 # Check if a trade won or lost
-result = await client.result(trade.id)
+result = await client.check_win(trade_id)
 print(f"Result: {'WIN' if result.profit > 0 else 'LOSS'}")
 print(f"Profit: ${result.profit}")
 ```
@@ -228,7 +205,7 @@ print(f"Profit: ${result.profit}")
 ```javascript
 // Waits for the trade to settle, then reports it
 const result = await client.result(tradeId);
-console.log(`Result: ${result.profit > 0 ? 'WIN' : 'LOSS'}`);
+console.log(`Result: ${result.profit > 0 ? "WIN" : "LOSS"}`);
 console.log(`Profit: $${result.profit}`);
 ```
 
@@ -299,7 +276,7 @@ println!("Account type: {}", account_type);
 #### Python
 
 ```python
-open_deals = await client.get_opened_deals()
+open_deals = await client.opened_deals()
 print(f"Open trades: {len(open_deals)}")
 for deal in open_deals:
     print(f"  {deal.asset}: ${deal.amount} ({deal.action})")
@@ -312,7 +289,7 @@ for deal in open_deals:
 const openDeals = await client.openedDeals();
 console.log(`Open trades: ${Object.keys(openDeals).length}`);
 for (const deal of Object.values(openDeals)) {
-    console.log(`  ${deal.asset}: $${deal.amount} (${deal.action})`);
+  console.log(`  ${deal.asset}: $${deal.amount} (${deal.action})`);
 }
 ```
 
@@ -331,7 +308,7 @@ for deal in open_deals {
 #### Python
 
 ```python
-closed_deals = await client.get_closed_deals()
+closed_deals = await client.closed_deals()
 print(f"Closed trades: {len(closed_deals)}")
 for deal in closed_deals:
     result = "WIN" if deal.profit > 0 else "LOSS"
@@ -345,8 +322,8 @@ for deal in closed_deals:
 const closedDeals = await client.closedDeals();
 console.log(`Closed trades: ${Object.keys(closedDeals).length}`);
 for (const deal of Object.values(closedDeals)) {
-    const result = deal.profit > 0 ? "WIN" : "LOSS";
-    console.log(`  ${deal.asset}: ${result} ($${deal.profit.toFixed(2)})`);
+  const result = deal.profit > 0 ? "WIN" : "LOSS";
+  console.log(`  ${deal.asset}: ${result} ($${deal.profit.toFixed(2)})`);
 }
 ```
 
@@ -385,8 +362,8 @@ for candle in candles[:5]:  # Show first 5
 // 60-second candles, looking back one hour
 const candles = await client.getCandles("EURUSD_otc", 60, 3600);
 console.log(`Retrieved ${candles.length} candles`);
-candles.slice(0, 5).forEach(candle => {
-    console.log(`  Time: ${candle.time}, Close: ${candle.close}`);
+candles.slice(0, 5).forEach((candle) => {
+  console.log(`  Time: ${candle.time}, Close: ${candle.close}`);
 });
 ```
 
@@ -406,7 +383,7 @@ for candle in candles.iter().take(5) {
 #### Python
 
 ```python
-server_time = await client.server_time()
+server_time = await client.get_server_time()
 print(f"Server timestamp: {server_time}")
 ```
 
@@ -434,7 +411,7 @@ println!("Server timestamp: {}", server_time);
 
 ```python
 # Subscribe to 60-second candles
-subscription = await client.subscribe("EURUSD_otc", 60)
+subscription = await client.subscribe_symbol("EURUSD_otc")
 print("Subscribed to EURUSD_otc")
 
 # Iterate over candles
@@ -451,20 +428,30 @@ console.log("Subscribed to EURUSD_otc");
 
 // Receive candles (async iterator)
 for await (const candle of subscription) {
-    console.log(`Candle: ${JSON.stringify(candle)}`);
+  console.log(`Candle: ${JSON.stringify(candle)}`);
 }
 ```
 
 #### Rust
 
 ```rust
-// Subscribe to 60-second candles
-let subscription = client.subscribe("EURUSD_otc", 60).await?;
-println!("Subscribed to EURUSD_otc");
+use binary_options_tools::pocketoption::candle::SubscriptionType;
 
-// Receive candles
-while let Some(candle) = subscription.next().await {
-    println!("Candle: {:?}", candle);
+// Subscribe to 60-second candles
+let mut subscription = client
+    .subscribe("EURUSD_otc", SubscriptionType::time(Duration::from_secs(60)))
+    .await?;
+println!("Subscribed to {}", subscription.asset());
+
+// `SubscriptionStream` is not a `Stream`: it yields completed candles via receive()
+loop {
+    match subscription.receive().await {
+        Ok(candle) => println!("Candle {} -> {}", candle.timestamp, candle.close),
+        Err(e) => {
+            eprintln!("stream ended: {e}");
+            break;
+        }
+    }
 }
 ```
 
@@ -509,7 +496,7 @@ print("Reconnected to server")
 
 ```javascript
 await client.reconnect();
-await new Promise(resolve => setTimeout(resolve, 2000));
+await new Promise((resolve) => setTimeout(resolve, 2000));
 console.log("Reconnected to server");
 ```
 
@@ -565,15 +552,15 @@ except Exception as e:
 ### JavaScript
 
 ```javascript
-const { PocketOption } = require('binary-options-tools');
+const { PocketOption } = require("binary-options-tools");
 
 try {
-    const client = new PocketOption("invalid_ssid");
-    const balance = await client.balance();
+  const client = new PocketOption("invalid_ssid");
+  const balance = await client.balance();
 } catch (e) {
-    // The message is prefixed with the error kind, e.g.
-    // "PocketOptionError: ..." or "TimeoutError: ...".
-    console.log(`Error: ${e.message}`);
+  // The message is prefixed with the error kind, e.g.
+  // "PocketOptionError: ..." or "TimeoutError: ...".
+  console.log(`Error: ${e.message}`);
 }
 ```
 
@@ -630,7 +617,7 @@ Use try-catch blocks to handle connection errors and invalid operations.
 For time-sensitive operations, use `result_with_timeout()`:
 
 ```python
-result = await client.result_with_timeout(trade.id, 120)  # 120 seconds
+result = await client.check_win(trade_id, timeout_seconds=120)
 ```
 
 ---
@@ -646,38 +633,40 @@ See the [examples directory](/examples) for complete working examples in each la
 
 ---
 
-## API Method Reference
+## Method naming by language
 
-| Method | Description | Returns |
-| -------- | ------------- | --------- |
-| `PocketOption(ssid)` / `PocketOptionAsync(ssid)` | Initialize client with session ID | Client instance |
-| `new_with_url(ssid, url)` | Initialize with custom WebSocket URL | Client instance |
-| `balance()` | Get current account balance | Float |
-| `is_demo()` | Check if demo account | Boolean |
-| `buy(asset, time, amount)` | Place call trade | Deal object |
-| `sell(asset, time, amount)` | Place put trade | Deal object |
-| `result(id)` | Check trade result | Deal object |
-| `result_with_timeout(id, timeout)` | Check trade result with timeout | Deal object |
-| `get_opened_deals()` | Get list of open trades | List of Deals |
-| `get_closed_deals()` | Get list of closed trades | List of Deals |
-| `clear_closed_deals()` | Clear closed trades from memory | Void |
-| `get_candles(asset, period, offset)` | Get historical candles | List of Candles |
-| `server_time()` | Get server timestamp | Integer (Unix timestamp) |
-| `subscribe(asset, duration)` | Subscribe to real-time data | Subscription |
-| `unsubscribe(asset)` | Unsubscribe from asset | Void |
-| `reconnect()` | Reconnect to server | Void |
-| `shutdown()` | Shutdown client | Void |
+The Rust core is the source of truth; the bindings rename a few methods. Python
+optically renamed the trade-result and deal accessors, which is why a Python
+snippet cannot be pasted into the other examples:
+
+| Concept       | Rust / UniFFI              | Node                                   | Python                                |
+| ------------- | -------------------------- | -------------------------------------- | ------------------------------------- |
+| Place a trade | `buy(asset, time, amount)` | `buy(asset, amount, time)`             | `buy(asset, amount, time)`            |
+| Trade settled | `result(id)`               | `result(id)`                           | `check_win(id, timeout_seconds=None)` |
+| Open trades   | `get_opened_deals()`       | `openedDeals()` / `get_opened_deals()` | `opened_deals()`                      |
+| Closed trades | `get_closed_deals()`       | `closedDeals()` / `get_closed_deals()` | `closed_deals()`                      |
+| Broker clock  | `server_time()`            | `serverTime()` / `server_time()`       | `get_server_time()`                   |
+| Subscribe     | `subscribe(asset)`         | `subscribe(asset)`                     | `subscribe_symbol(asset)`             |
+
+**The time/amount order differs between Rust and Node/Python** — the most common
+porting mistake. Node also exposes snake_case aliases for its camelCase methods
+(`getOpenedDeals()` / `get_opened_deals()`, `checkWin()` / `check_win()`), all
+documented in `nodejs/index.d.ts`.
+
+For the complete, current list per language see
+[Python API](python.md), [`nodejs/index.d.ts`](../../nodejs/index.d.ts) and the
+[`PocketOption` impl](../../crates/binary_options_tools/src/pocketoption/pocket_client.rs).
 
 ---
 
 ## Support
 
 - **Discord**: [Join our community](https://discord.gg/p7YyFqSmAz)
-- **GitLab Issues**: [Report bugs](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
-- **Documentation**: [Full docs](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/)
+- **GitHub Issues**: [Report bugs](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/issues)
+- **Documentation**: [Docs index](../README.md)
 
 ---
 
-**Version**: 2.0.0  
-**Last Updated**: June 2026  
+**Version**: 0.2.17  
+**Last Updated**: October 2026  
 **Platform Support**: PocketOption (Quick Trading)

@@ -460,6 +460,10 @@ impl RawPocketOption {
         let client = self.client.clone();
         future_into_py(py, async move {
             let deals = client.get_closed_deals().await;
+            // The state keeps deals in a map, but the Python API is documented as
+            // a list of deals (`List[Deal]`), so serialise the values as an array.
+            // Sorting by id keeps the order stable between calls.
+            let deals = binary_options_tools::pocketoption::utils::deals_into_sorted_vec(deals);
             Python::attach(|py| {
                 serde_json::to_string(&deals)
                     .map_err(BinaryErrorPy::from)?
@@ -497,6 +501,8 @@ impl RawPocketOption {
         let client = self.client.clone();
         future_into_py(py, async move {
             let deals = client.get_opened_deals().await;
+            // See `closed_deals`: the documented shape is a list, not a map.
+            let deals = binary_options_tools::pocketoption::utils::deals_into_sorted_vec(deals);
             let res = serde_json::to_string(&deals).map_err(BinaryErrorPy::from)?;
             Ok(res)
         })

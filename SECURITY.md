@@ -1,7 +1,7 @@
 # Security Policy
 
 ## Supported Versions
- 
+
 We release patches for security vulnerabilities in the following versions:
 
 | Version | Supported          |

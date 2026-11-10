@@ -14,7 +14,14 @@ const {
 } = require("..");
 
 test("exports the documented surface", () => {
-  for (const value of [PocketOption, Validator, RawHandle, RawHandler, CandleStream, RawStream]) {
+  for (const value of [
+    PocketOption,
+    Validator,
+    RawHandle,
+    RawHandler,
+    CandleStream,
+    RawStream,
+  ]) {
     assert.equal(typeof value, "function");
   }
   assert.equal(typeof startLogs, "function");
@@ -62,9 +69,18 @@ test("snake_case aliases resolve to the camelCase methods", () => {
   assert.equal(Validator.starts_with, Validator.startsWith);
   assert.equal(Validator.ends_with, Validator.endsWith);
   assert.equal(PocketOption.create_with_url, PocketOption.createWithUrl);
-  assert.equal(PocketOption.prototype.get_candles, PocketOption.prototype.getCandles);
-  assert.equal(PocketOption.prototype.check_win, PocketOption.prototype.checkWin);
-  assert.equal(RawHandler.prototype.send_and_wait, RawHandler.prototype.sendAndWait);
+  assert.equal(
+    PocketOption.prototype.get_candles,
+    PocketOption.prototype.getCandles,
+  );
+  assert.equal(
+    PocketOption.prototype.check_win,
+    PocketOption.prototype.checkWin,
+  );
+  assert.equal(
+    RawHandler.prototype.send_and_wait,
+    RawHandler.prototype.sendAndWait,
+  );
 });
 
 test("streams are async iterable", () => {
@@ -75,7 +91,10 @@ test("streams are async iterable", () => {
 test("the constructor does not block and surfaces connection errors", async () => {
   const started = Date.now();
   const api = new PocketOption("not-a-session");
-  assert.ok(Date.now() - started < 1000, "the constructor must return immediately");
+  assert.ok(
+    Date.now() - started < 1000,
+    "the constructor must return immediately",
+  );
 
   await assert.rejects(api.balance(), /Failed to parse ssid/);
   // The same failed connection attempt is reused by every method.

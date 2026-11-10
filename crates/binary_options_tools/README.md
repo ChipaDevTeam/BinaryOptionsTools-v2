@@ -1,6 +1,6 @@
 # Binary Options Tools (Rust)
 
-> **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=rust_core) — AI-powered algorithmic *trading strategy* builder: describe your edge, get working CHTL code, backtest it, deploy it. Free to start.**
+> **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=rust_core) — AI-powered algorithmic _trading strategy_ builder: describe your edge, get working CHTL code, backtest it, deploy it. Free to start.**
 >
 > **📈 Trade crypto perps, spot & margin on [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
 
@@ -60,13 +60,14 @@ Add the crate to your `Cargo.toml` dependencies:
 
 ```toml
 [dependencies]
-binary_options_tools = "0.1.7"
+binary_options_tools = "0.2.17"
 ```
 
 ## Quick Start
 
 ```rust
-use binary_options_tools::PocketOption;
+use binary_options_tools::pocketoption::PocketOption;
+use rust_decimal_macros::dec;
 use std::time::Duration;
 
 #[tokio::main]
@@ -75,14 +76,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = PocketOption::new("your_session_id").await?;
 
     // IMPORTANT: Wait for connection to establish
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    // No sleep needed: `new` returns after the auth handshake.
 
     // Get account balance
     let balance = client.balance().await;
     println!("Current balance: ${}", balance);
 
     // Place a buy trade on EURUSD for 60 seconds with $1
-    let (trade_id, deal) = client.buy("EURUSD_otc", 60, 1.0).await?;
+    // Signature: buy(asset, duration_seconds, amount)
+    let (trade_id, deal) = client.buy("EURUSD_otc", 60, dec!(1.0)).await?;
     println!("Trade placed with ID: {}", trade_id);
     println!("Deal data: {:?}", deal);
 
@@ -102,25 +104,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Basic Trading Operations
 
 ```rust
-use binary_options_tools::PocketOption;
+use binary_options_tools::pocketoption::PocketOption;
+use rust_decimal_macros::dec;
 use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize client
     let client = PocketOption::new("your_session_id").await?;
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    // No sleep needed: `new` returns after the auth handshake.
 
     // Get account balance
     let balance = client.balance().await;
     println!("Current Balance: ${}", balance);
 
     // Place a buy trade
-    let (buy_id, buy_deal) = client.buy("EURUSD_otc", 60, 1.0).await?;
+    let (buy_id, buy_deal) = client.buy("EURUSD_otc", 60, dec!(1.0)).await?;
     println!("Buy Trade ID: {}", buy_id);
 
     // Place a sell trade
-    let (sell_id, sell_deal) = client.sell("EURUSD_otc", 60, 1.0).await?;
+    let (sell_id, sell_deal) = client.sell("EURUSD_otc", 60, dec!(1.0)).await?;
     println!("Sell Trade ID: {}", sell_id);
 
     // Wait for trades to complete
@@ -140,32 +143,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Real-Time Data Subscription
 
 ```rust
-use binary_options_tools::{PocketOption, SubscriptionType};
+use binary_options_tools::pocketoption::{candle::SubscriptionType, PocketOption};
 use std::time::Duration;
-use tokio_stream::StreamExt;
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize client
     let client = PocketOption::new("your_session_id").await?;
-    tokio::time::sleep(Duration::from_secs(5)).await;
 
-    // Subscribe to real-time candle data
-    let mut subscription = client.subscribe("EURUSD_otc", SubscriptionType::None).await?;
+    // Aggregate ticks into 60-second candles.
+    let mut subscription = client
+        .subscribe(
+            "EURUSD_otc",
+            SubscriptionType::Time {
+                start_time: None,
+                duration: Duration::from_secs(60),
+                candle: Default::default(),
+            },
+        )
+        .await?;
 
     println!("Listening for real-time candles...");
-    while let Some(candle) = subscription.next().await {
-        match candle {
-            Ok(candle_data) => {
-                println!("New Candle:");
-                println!("  Time: {}", candle_data.time);
-                println!("  Open: {}", candle_data.open);
-                println!("  High: {}", candle_data.high);
-                println!("  Low: {}", candle_data.low);
-                println!("  Close: {}", candle_data.close);
-                println!("---");
+    loop {
+        // `receive()` waits for the next completed candle; there is no `Stream`
+        // implementation on `SubscriptionStream`.
+        match subscription.receive().await {
+            Ok(candle) => {
+                println!(
+                    "New candle at {}: O={} H={} L={} C={}",
+                    candle.timestamp, candle.open, candle.high, candle.low, candle.close
+                );
             }
-            Err(e) => eprintln!("Error receiving candle: {:?}", e),
+            Err(e) => {
+                eprintln!("Error receiving candle: {e}");
+                break;
+            }
         }
     }
 
@@ -176,14 +186,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Checking Opened Deals
 
 ```rust
-use binary_options_tools::PocketOption;
+use binary_options_tools::pocketoption::PocketOption;
+use rust_decimal_macros::dec;
 use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize client
     let client = PocketOption::new("your_session_id").await?;
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    // No sleep needed: `new` returns after the auth handshake.
 
     // Get all opened deals
     let opened_deals = client.opened().await?;
@@ -207,14 +218,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Advanced: Multiple Concurrent Operations
 
 ```rust
-use binary_options_tools::PocketOption;
+use binary_options_tools::pocketoption::PocketOption;
+use rust_decimal_macros::dec;
 use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize client
     let client = PocketOption::new("your_session_id").await?;
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    // No sleep needed: `new` returns after the auth handshake.
 
     // Execute multiple operations concurrently
     let (balance, opened_deals, server_time) = tokio::try_join!(
@@ -239,7 +251,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```rust
 let client = PocketOption::new("your_session_id").await?;
-tokio::time::sleep(Duration::from_secs(5)).await;  // Critical!
+// No sleep needed: `new` returns after the auth handshake.
 ```
 
 ### Getting Your SSID

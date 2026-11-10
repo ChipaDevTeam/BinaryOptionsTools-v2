@@ -141,6 +141,7 @@ mod tests {
             payout: 50,
             is_otc: false,
             is_active: true,
+            opens_at: None,
             allowed_candles: vec![CandleLength::new(60)],
         };
         let asset2 = Asset {
@@ -151,6 +152,7 @@ mod tests {
             payout: 50,
             is_otc: false,
             is_active: false,
+            opens_at: None,
             allowed_candles: vec![CandleLength::new(60)],
         };
         let asset3 = Asset {
@@ -161,6 +163,7 @@ mod tests {
             payout: 50,
             is_otc: false,
             is_active: true,
+            opens_at: None,
             allowed_candles: vec![CandleLength::new(60)],
         };
         let asset4 = Asset {
@@ -171,6 +174,7 @@ mod tests {
             payout: 50,
             is_otc: false,
             is_active: false,
+            opens_at: None,
             allowed_candles: vec![CandleLength::new(60)],
         };
 
@@ -222,6 +226,7 @@ mod tests {
             payout: 50,
             is_otc: false,
             is_active: true,
+            opens_at: None,
             allowed_candles: vec![CandleLength::new(60)],
         };
         let mut map = std::collections::HashMap::new();
@@ -243,6 +248,7 @@ mod tests {
             payout: 50,
             is_otc: false,
             is_active: false,
+            opens_at: None,
             allowed_candles: vec![CandleLength::new(60)],
         };
         let mut map = std::collections::HashMap::new();

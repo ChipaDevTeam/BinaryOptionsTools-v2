@@ -80,8 +80,12 @@ sync:github:
     - git config --global user.name "GitLab CI"
     - git config --global user.email "ci@gitlab.chipatrade.com"
     - git remote add github https://${GITHUB_SYNC_USER}:${GITHUB_SYNC_TOKEN}@github.com/ChipaDevTeam/BinaryOptionsTools-v2.git || true
-    - git fetch origin "+refs/heads/*:refs/heads/*" "+refs/tags/*:refs/tags/*"
-    - git push --force --prune github "+refs/heads/*:refs/heads/*" "+refs/tags/*:refs/tags/*"
+    - git fetch origin "+refs/tags/*:refs/tags/*"
+    # GitHub is the primary repository (README.md); GitLab is its mirror.
+    # Do not push refs/heads/* back: GitLab's `master` lags behind, so that
+    # force-updated github.com/ChipaDevTeam/master with stale content and
+    # reverted merges made on GitHub (--prune also deleted GitHub-only
+    # branches). Branch mirroring is one-way, GitHub -> GitLab.
+    - git push --force --atomic github "+refs/tags/*:refs/tags/*"
   rules:
-    - if: $CI_COMMIT_BRANCH == "master"
     - if: $CI_COMMIT_TAG

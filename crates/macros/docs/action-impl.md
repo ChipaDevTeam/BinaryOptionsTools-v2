@@ -8,7 +8,7 @@ The `ActionImpl` derive macro automatically implements the `ActionName` trait fo
 
 ```rust
 use binary_options_tools_macros::ActionImpl;
-use your_crate::expertoptions::action::ActionName;  // Import the trait
+use binary_options_tools::expertoptions::action::ActionName; // Import the trait
 ```
 
 1. **Add the derive macro to your struct or enum:**
@@ -108,6 +108,7 @@ fn main() {
 - The `#[action = "action_name"]` attribute is required
 - The action name must be a string literal
 - The type must be a struct or enum
+- The type must implement `serde::Serialize`, since `ActionName` requires it
 
 ## Error Handling
 
@@ -128,5 +129,7 @@ impl ActionName for YourType {
     }
 }
 ```
+
+The macro also emits a companion rule type named `<TypeName>Rule` that implements `binary_options_tools_core::traits::Rule`, matching messages that begin with `{"action":"<name>"` (see `crates/macros/src/action.rs`).
 
 This allows you to call `.name()` on any instance of your action types to get their string identifier.
