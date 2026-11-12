@@ -20,6 +20,8 @@ class MockRawClient:
     def __init__(self, *args, **kwargs):
         self._closed = False
         self._connected = True
+        self._responsive = True
+        self._frame_age = 0.5
 
     async def buy(self, asset, amount, time):
         return "trade_123", json.dumps(
@@ -182,6 +184,12 @@ class MockRawClient:
 
     def is_connected(self):
         return self._connected
+
+    def is_responsive(self, max_silence):
+        return self._connected and self._responsive and self._frame_age <= max_silence
+
+    def seconds_since_last_frame(self):
+        return self._frame_age if self._connected else None
 
     async def disconnect(self):
         self._connected = False
@@ -1136,6 +1144,41 @@ class TestCandlesMany:
         mock_raw_pocketoption.compile_candles.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_timeout_cancels_the_underlying_call(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """The deadline must reach the engine, not just stop the caller waiting."""
+        cancelled = asyncio.Event()
+
+        async def compile_candles(asset, period, lookback):
+            try:
+                await asyncio.sleep(30)
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+            return json.dumps([])
+
+        mock_raw_pocketoption.compile_candles = AsyncMock(side_effect=compile_candles)
+
+        with pytest.raises(TimeoutError, match="candles_many"):
+            await async_client.candles_many(["EURUSD_otc"], 60, count=1, timeout=0.05)
+
+        assert cancelled.is_set()
+        assert async_client._candles_many_cache == {}
+
+    @pytest.mark.asyncio
+    async def test_non_positive_timeout_raises(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A zero timeout is a caller error, not an instant empty batch."""
+        mock_raw_pocketoption.compile_candles = AsyncMock()
+
+        with pytest.raises(ValueError, match="timeout"):
+            await async_client.candles_many(["EURUSD_otc"], 60, count=1, timeout=0)
+
+        mock_raw_pocketoption.compile_candles.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_reconnect_clears_cache(self, async_client, mock_raw_pocketoption):
         """A reconnect drops snapshots taken on the previous session."""
         mock_raw_pocketoption.compile_candles = AsyncMock(
@@ -1490,6 +1533,48 @@ class TestPayout:
 
         assert payouts == {"EURUSD_otc": 85, "GBPUSD_otc": 82}
         mock_raw_pocketoption.payout.assert_awaited_once_with(None)
+
+    @pytest.mark.asyncio
+    async def test_payouts_timeout(self, async_client, mock_raw_pocketoption):
+        """A stalled payout read can be abandoned without holding the caller."""
+
+        async def slow_payout(assets=None):
+            await asyncio.sleep(30)
+            return "{}"
+
+        mock_raw_pocketoption.payout = AsyncMock(side_effect=slow_payout)
+
+        with pytest.raises(TimeoutError, match="payouts"):
+            await async_client.payouts(timeout=0.05)
+
+
+class TestLiveness:
+    """Tests for the non-blocking responsiveness check."""
+
+    @pytest.mark.asyncio
+    async def test_is_responsive_tracks_frame_age(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Silence longer than max_silence marks the session unresponsive."""
+        assert async_client.is_responsive() is True
+
+        mock_raw_pocketoption._frame_age = 120.0
+        assert async_client.is_responsive(60.0) is False
+        assert async_client.is_responsive(300.0) is True
+
+    @pytest.mark.asyncio
+    async def test_is_responsive_requires_a_connection(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A disconnected client is never responsive, however fresh the frame."""
+        mock_raw_pocketoption._connected = False
+        assert async_client.is_responsive() is False
+
+    @pytest.mark.asyncio
+    async def test_seconds_since_last_frame(self, async_client, mock_raw_pocketoption):
+        """The raw frame age is exposed for logging."""
+        mock_raw_pocketoption._frame_age = 12.5
+        assert async_client.seconds_since_last_frame() == 12.5
 
 
 class TestActiveAssets:

@@ -45,6 +45,8 @@ class MockPocketOptionAsync:
             self._closed = False
         if "_connected" not in self.__dict__:
             self._connected = True
+        if "_frame_age" not in self.__dict__:
+            self._frame_age = 0.5
         # Process config
         config = kwargs.get("config")
         url = kwargs.get("url")
@@ -173,7 +175,7 @@ class MockPocketOptionAsync:
     async def clear_closed_deals(self):
         pass
 
-    async def payouts(self, assets=None):
+    async def payouts(self, assets=None, *, timeout=None):
         payouts = {"EURUSD_otc": 85, "GBPUSD_otc": 82, "BTCUSD_otc": 78}
         if assets is not None:
             payouts = {
@@ -181,10 +183,10 @@ class MockPocketOptionAsync:
             }
         return payouts
 
-    async def payout(self, asset):
+    async def payout(self, asset, *, timeout=None):
         return 85 if asset == "EURUSD_otc" else None
 
-    async def candles_many(self, assets, period, *, count=100):
+    async def candles_many(self, assets, period, *, count=100, timeout=None):
         candle = {"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}
         return {asset: [candle] for asset in dict.fromkeys(assets)}
 
@@ -251,6 +253,12 @@ class MockPocketOptionAsync:
 
     def is_connected(self):
         return self._connected
+
+    def is_responsive(self, max_silence=60.0):
+        return self._connected and self._frame_age <= max_silence
+
+    def seconds_since_last_frame(self):
+        return self._frame_age if self._connected else None
 
     async def disconnect(self):
         self._connected = False
@@ -726,7 +734,7 @@ class TestCandles:
 
         assert feed == {"EURUSD_otc": [candle]}
         mock_pocketoption_async.candles_many.assert_awaited_once_with(
-            ["EURUSD_otc", "GBPUSD_otc"], 60, count=2
+            ["EURUSD_otc", "GBPUSD_otc"], 60, count=2, timeout=None
         )
 
 
@@ -946,7 +954,7 @@ class TestPayout:
 
         assert payouts == {"EURUSD_otc": 85}
         mock_pocketoption_async.payouts.assert_awaited_once_with(
-            ["EURUSD_otc", "INVALID_ASSET"]
+            ["EURUSD_otc", "INVALID_ASSET"], timeout=None
         )
 
     def test_payout_uses_the_single_symbol_path(
@@ -959,7 +967,9 @@ class TestPayout:
         )
 
         assert sync_client.payout("EURUSD_otc") == 85
-        mock_pocketoption_async.payout.assert_awaited_once_with("EURUSD_otc")
+        mock_pocketoption_async.payout.assert_awaited_once_with(
+            "EURUSD_otc", timeout=None
+        )
 
 
 class TestActiveAssets:
@@ -1091,6 +1101,11 @@ class TestConnectionMethods:
         """Test reconnect."""
         sync_client.reconnect()
         assert sync_client.client._connected is True
+
+    def test_is_responsive_is_a_local_read(self, sync_client):
+        """The liveness check must not go through the shared event loop."""
+        assert sync_client.is_responsive(60) is True
+        assert sync_client.seconds_since_last_frame() == 0.5
 
 
 class TestUnsubscribe:

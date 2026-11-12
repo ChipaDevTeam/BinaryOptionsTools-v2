@@ -225,6 +225,31 @@ impl RawPocketOption {
         self.client.is_connected()
     }
 
+    /// True when the socket is connected and a frame arrived within
+    /// `max_silence` seconds.
+    ///
+    /// Unlike a round-trip health check this only reads local state, so it
+    /// cannot block — use it to detect a wedged/half-dead session from another
+    /// thread without risking another stuck call.
+    #[pyo3(signature = (max_silence=None))]
+    pub fn is_responsive(&self, max_silence: Option<f64>) -> bool {
+        // `Duration::from_secs_f64` panics on negative, NaN and infinite input,
+        // and this method is documented as one that cannot fail.
+        let secs = max_silence.unwrap_or(60.0);
+        let secs = if secs.is_finite() {
+            secs.clamp(0.0, 86_400.0)
+        } else {
+            60.0
+        };
+        self.client.is_responsive(Duration::from_secs_f64(secs))
+    }
+
+    /// Seconds since the last inbound WebSocket frame, or `None` if no frame has
+    /// ever been received. Local read; never blocks.
+    pub fn seconds_since_last_frame(&self) -> Option<f64> {
+        self.client.seconds_since_last_frame()
+    }
+
     pub fn buy<'py>(
         &self,
         py: Python<'py>,

@@ -193,6 +193,14 @@ impl<S: AppState> Client<S> {
         self.signal.is_connected()
     }
 
+    /// Milliseconds since the last inbound WebSocket frame.
+    ///
+    /// `None` means no frame has ever been received (the client has never
+    /// connected). This is a local read and never blocks.
+    pub fn millis_since_last_frame(&self) -> Option<u64> {
+        self.signal.millis_since_last_frame()
+    }
+
     /// Retrieves a clonable, typed handle to an already-registered module.
     pub async fn get_handle<M: ApiModule<S>>(&self) -> Option<M::Handle> {
         let handles = self.module_handles.read().await;
@@ -495,8 +503,14 @@ impl<S: AppState> ClientRunner<S> {
             let reader_task = tokio::spawn({
                 let to_ws_sender = self.to_ws_sender.clone();
                 let router = Arc::clone(&self.router);
+                let signal = self.signal.clone();
                 async move {
                     while let Some(Ok(msg)) = ws_reader.next().await {
+                        // Any inbound frame, including an Engine.IO ping, proves
+                        // the connection is still being serviced. `is_responsive`
+                        // reads this timestamp, so it must be updated before the
+                        // message is routed (routing can be slow or fail).
+                        signal.mark_frame();
                         if let Err(e) = router.route(Arc::new(msg), &to_ws_sender).await {
                             warn!(target: "Router", "Error routing message: {:?}", e);
                         }

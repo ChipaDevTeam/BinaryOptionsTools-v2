@@ -152,8 +152,16 @@ sweep per minute no matter how often it is polled.
 ### Recovering from a stalled session
 
 A session that stops answering does not start returning data on its own, and
-`candles_many` will not paper over it with an empty result. Treat
-`ConnectionError` as the signal to rebuild the connection:
+`candles_many` will not paper over it with an empty result. Two tools make the
+failure detectable and recoverable without restarting the process:
+
+- `client.is_responsive(max_silence=...)` (synchronous on both clients) reports
+  whether the socket is connected **and** a frame — including the broker's
+  Engine.IO ping — arrived recently. It reads local state, so it cannot block,
+  even from a worker thread that is otherwise waiting on the same client.
+- `candles_many(..., timeout=...)` (and `payout` / `payouts`) cancels the request
+  inside the engine when the deadline expires, releasing its history slot instead
+  of leaving the work running behind the caller.
 
 ```python
 from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
@@ -161,9 +169,15 @@ from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
 
 async def poll(client, symbols, period, retries=2):
     for attempt in range(retries + 1):
+        if not client.is_responsive(max_silence=90):
+            # Connected but silent: a request would only queue behind the dead
+            # ones. Rebuild first, then try.
+            await client.reconnect()
         try:
-            return await client.candles_many(symbols, period, count=2)
-        except ConnectionError:
+            return await client.candles_many(
+                symbols, period, count=2, timeout=60
+            )
+        except (ConnectionError, TimeoutError):
             # `reconnect()` re-authenticates over the same client and drops the
             # cached snapshots; give up after the last retry and restart the task.
             if attempt == retries:

@@ -336,6 +336,31 @@ def _is_channel_closed_error(error: BaseException) -> bool:
     return any(marker in text for marker in _CHANNEL_CLOSED_MARKERS)
 
 
+async def _with_timeout(awaitable: Awaitable, timeout: Optional[float], what: str):
+    """Await ``awaitable`` with a deadline that cancels the underlying call.
+
+    Cancelling the awaited PyO3 future drops the Rust future, which abandons the
+    pending broker request and releases its history-request slot, so a timed-out
+    call does not leave work running behind the caller. That is the difference
+    between this and wrapping the call in ``asyncio.wait_for`` yourself: the
+    cancellation has to reach the engine, not just the caller.
+    """
+    if timeout is None:
+        return await awaitable
+    if timeout <= 0:
+        # Refuse before awaiting, but do not leave the caller's task/coroutine
+        # dangling: a gather would otherwise keep its child tasks running.
+        if isinstance(awaitable, asyncio.Future):
+            awaitable.cancel()
+        else:
+            awaitable.close()
+        raise ValueError("timeout must be a positive number of seconds")
+    try:
+        return await asyncio.wait_for(awaitable, timeout)
+    except asyncio.TimeoutError:
+        raise TimeoutError(f"{what} did not finish within {timeout:g}s") from None
+
+
 class PocketOptionAsync:
     def __init__(self, ssid: str, url: Optional[str] = None, config: Optional[Union[Config, dict, str]] = None, **_):
         """
@@ -716,6 +741,7 @@ class PocketOptionAsync:
         period: int,
         *,
         count: int = 100,
+        timeout: Optional[float] = None,
     ) -> Dict[str, List[Dict]]:
         """Fetches the latest closed candles for many symbols in one call.
 
@@ -748,6 +774,10 @@ class PocketOptionAsync:
                 pages at 1000 ticks per request, so the default of 100 can cost
                 several requests per symbol on a 60 second timeframe: pass
                 ``count=2`` when you only poll the latest closed candle.
+            timeout: Optional deadline in seconds for the whole batch. On expiry
+                the in-flight requests are cancelled in the engine rather than
+                left running behind the caller; snapshots that already completed
+                stay cached.
 
         Returns:
             Mapping of symbol to its candles, oldest first. Symbols that could not
@@ -757,7 +787,9 @@ class PocketOptionAsync:
             ConnectionError: If the client is not connected, the connection drops
                 mid-batch, or the engine reports a closed channel. A dead
                 connection must not look like an empty market.
-            ValueError: If ``period`` is not a positive integer.
+            TimeoutError: If ``timeout`` expires before the batch finishes.
+            ValueError: If ``period`` is not a positive integer, or ``timeout`` is
+                not positive.
 
         Example:
             ```python
@@ -836,7 +868,11 @@ class PocketOptionAsync:
                     self._candles_many_cache.popitem(last=False)
                 return asset, [dict(candle) for candle in stored], None
 
-        pairs = await asyncio.gather(*(get(asset) for asset in unique))
+        pairs = await _with_timeout(
+            asyncio.gather(*(get(asset) for asset in unique)),
+            timeout,
+            "candles_many()",
+        )
 
         errors = [error for _, _, error in pairs if error is not None]
 
@@ -1401,7 +1437,12 @@ class PocketOptionAsync:
         """
         await self.client.clear_closed_deals()
 
-    async def payouts(self, assets: Optional[Sequence[str]] = None) -> Dict[str, int]:
+    async def payouts(
+        self,
+        assets: Optional[Sequence[str]] = None,
+        *,
+        timeout: Optional[float] = None,
+    ) -> Dict[str, int]:
         """Current payout percentage for every asset, keyed by symbol.
 
         Args:
@@ -1409,11 +1450,17 @@ class PocketOptionAsync:
                 default) returns every active asset. When a watchlist is given,
                 only those symbols are read and serialised, so polling a few
                 instruments does not pay for the whole catalog.
+            timeout: Optional deadline in seconds. When it expires the call is
+                cancelled in the engine, not merely abandoned.
 
         Returns:
             Mapping of asset symbol to payout percentage, e.g.
             ``{"EURUSD_otc": 85, "GBPUSD_otc": 82}``. Unknown and inactive
             symbols are omitted.
+
+        Raises:
+            TimeoutError: If ``timeout`` expires.
+            ValueError: If ``timeout`` is not positive.
 
         Example:
             ```python
@@ -1425,9 +1472,9 @@ class PocketOptionAsync:
             requested: Optional[List[str]] = [assets]
         else:
             requested = None if assets is None else list(assets)
-        return json.loads(await self.client.payout(requested))
+        return json.loads(await _with_timeout(self.client.payout(requested), timeout, "payouts()"))
 
-    async def payout(self, asset: str) -> Optional[int]:
+    async def payout(self, asset: str, *, timeout: Optional[float] = None) -> Optional[int]:
         """Current payout percentage for a single asset.
 
         This is a single-symbol lookup: it neither serialises nor parses the
@@ -1435,15 +1482,20 @@ class PocketOptionAsync:
 
         Args:
             asset: Asset symbol (e.g. ``"EURUSD_otc"``).
+            timeout: Optional deadline in seconds, cancelled in the engine.
 
         Returns:
             The payout percentage, or ``None`` if the asset is unknown or not
             currently active.
 
+        Raises:
+            TimeoutError: If ``timeout`` expires.
+            ValueError: If ``timeout`` is not positive.
+
         See Also:
             :meth:`payouts` for the payout of every asset at once.
         """
-        return await self.client.payout_for(asset)
+        return await _with_timeout(self.client.payout_for(asset), timeout, "payout()")
 
     async def active_assets(self) -> List[Dict]:
         """
@@ -1830,6 +1882,42 @@ class PocketOptionAsync:
             bool: True if connected, False otherwise
         """
         return self.client.is_connected()
+
+    def is_responsive(self, max_silence: float = 60.0) -> bool:
+        """Whether the session is connected *and* still receiving frames.
+
+        ``is_connected()`` reports the socket state the runner last observed: a
+        half-dead connection (no close frame, server silently stopping) keeps it
+        ``True`` while every request hangs. This checks that a frame — including
+        the broker's periodic Engine.IO ping — arrived within ``max_silence``
+        seconds.
+
+        This is a **synchronous** method that reads local state only. It cannot
+        block, so it is safe to call to decide whether a call has stalled, even
+        from a thread that is otherwise waiting on this client.
+
+        Args:
+            max_silence: Seconds without any inbound frame before the session is
+                considered wedged.
+
+        Returns:
+            bool: True if connected and a frame arrived recently.
+
+        Example:
+            ```python
+            if not client.is_responsive(max_silence=90):
+                await client.reconnect()
+            ```
+        """
+        return self.client.is_responsive(max_silence)
+
+    def seconds_since_last_frame(self) -> Optional[float]:
+        """Seconds since the last inbound WebSocket frame, or ``None``.
+
+        ``None`` means no frame has ever been received (the client never
+        connected). Local read; never blocks.
+        """
+        return self.client.seconds_since_last_frame()
 
     def is_ssid_valid(self) -> bool:
         """Returns whether the SSID passed basic format validation during init."""

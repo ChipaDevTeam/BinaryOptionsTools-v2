@@ -56,23 +56,31 @@ asset list to be populated.
 
 ### Account and session
 
-| Method                          | Description                        | Returns      |
-| ------------------------------- | ---------------------------------- | ------------ |
-| `balance()`                     | Account balance                    | `float`      |
-| `is_demo()` †                   | Whether this is a demo account     | `bool`       |
-| `is_connected()` †              | Socket is currently connected      | `bool`       |
-| `is_ssid_valid()` †             | SSID was accepted                  | `bool`       |
-| `get_server_time()`             | Broker clock, in seconds           | `int`        |
-| `wait_for_assets(timeout=60.0)` | Block until the asset list arrives | `None`       |
-| `active_assets()`               | Assets currently tradable          | `List[Dict]` |
-| `connect()` / `disconnect()`    | Open or drop the socket            | `None`       |
-| `reconnect()`                   | Reconnect and re-authenticate      | `None`       |
-| `shutdown()`                    | Close the client and its tasks     | `None`       |
+| Method                           | Description                        | Returns           |
+| -------------------------------- | ---------------------------------- | ----------------- |
+| `balance()`                      | Account balance                    | `float`           |
+| `is_demo()` †                    | Whether this is a demo account     | `bool`            |
+| `is_connected()` †               | Socket is currently connected      | `bool`            |
+| `is_responsive(max_silence=60)` † | Connected *and* receiving frames  | `bool`            |
+| `seconds_since_last_frame()` †   | Age of the last inbound frame      | `Optional[float]` |
+| `is_ssid_valid()` †              | SSID was accepted                  | `bool`            |
+| `get_server_time()`              | Broker clock, in seconds           | `int`             |
+| `wait_for_assets(timeout=60.0)`  | Block until the asset list arrives | `None`            |
+| `active_assets()`                | Assets currently tradable          | `List[Dict]`      |
+| `connect()` / `disconnect()`     | Open or drop the socket            | `None`            |
+| `reconnect()`                    | Reconnect and re-authenticate      | `None`            |
+| `shutdown()`                     | Close the client and its tasks     | `None`            |
 
-† These three are **synchronous** even on `PocketOptionAsync` — they read local
+† These five are **synchronous** even on `PocketOptionAsync` — they read local
 state, so do not `await` them: `if client.is_demo(): ...` works, while `await
 client.is_demo()` raises `TypeError: 'bool' object can't be awaited`. Every other
 method in these tables is a coroutine.
+
+`is_connected()` reports the socket state the runner last saw, so a half-dead
+connection (no close frame, server silently stopping) still reads `True`.
+`is_responsive(max_silence)` additionally requires an inbound frame — including
+the broker's Engine.IO ping — within the window, so it is the cheap check to run
+before deciding a call has wedged. Both read local state and cannot block.
 
 ### Trading
 
@@ -125,6 +133,14 @@ print(await client.payout("EURUSD_otc"))  # 85
 Unknown and inactive symbols are omitted from `payouts()` and make
 `payout(asset)` return `None`.
 
+Both accept `timeout=` (keyword-only) in seconds. Unlike a caller-side
+`wait_for`, expiry cancels the future inside the engine, so the pending request
+and its slot are released instead of running on behind the caller:
+
+```python
+payout = await client.payout("EURUSD_otc", timeout=5)
+```
+
 ### Market data
 
 | Method                                                     | Description                                           | Returns                                                   |
@@ -172,6 +188,12 @@ Because `count` multiplies the lookback window and `compile_candles()` pages at
 1,000 ticks per request, pass `count=2` when you only need the latest closed
 candle — the default of 100 can cost several requests per symbol on a 60 s
 timeframe.
+
+`candles_many(..., timeout=seconds)` bounds the whole batch. Expiry cancels the
+in-flight requests in the engine (not just the caller's wait), so the history
+slots are released; snapshots that already completed remain cached for the next
+poll. It raises `TimeoutError`, which — like `ConnectionError` — means the feed
+needs attention rather than that the market was empty.
 
 There is no multi-symbol history endpoint on the broker, so the call still sends
 one history request per symbol. Requests start about 200 ms apart and at most four
@@ -247,8 +269,9 @@ The sync methods are `candles`, `candles_many`, `get_candles`,
 `get_opened_deal`, `get_closed_deal`, `get_pending_deals`, `clear_closed_deals`,
 `open_pending_order`, `cancel_pending_order`, `cancel_pending_orders`, `payout`,
 `payouts`, `active_assets`, `get_server_time`, `wait_for_assets`, `is_demo`,
-`is_connected`, `is_ssid_valid`, `connect`, `disconnect`, `reconnect`, `shutdown`,
-and the `subscribe_symbol*` / `subscribe_ticks` / `subscribe_raw` family.
+`is_connected`, `is_responsive`, `seconds_since_last_frame`, `is_ssid_valid`,
+`connect`, `disconnect`, `reconnect`, `shutdown`, and the `subscribe_symbol*` /
+`subscribe_ticks` / `subscribe_raw` family.
 
 ## Try demo (guest) sessions
 

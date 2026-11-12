@@ -492,6 +492,30 @@ impl PocketOption {
         self.client.is_connected()
     }
 
+    /// Whether the session is connected *and* still receiving frames.
+    ///
+    /// `is_connected` only reports the socket state the runner last observed: a
+    /// half-dead connection (no FIN, server silently stopping) keeps it `true`
+    /// while every request hangs. This checks that a frame — including the
+    /// broker's periodic Engine.IO ping — arrived within `max_silence`; it reads
+    /// local state only, so it cannot block or hang the caller.
+    pub fn is_responsive(&self, max_silence: Duration) -> bool {
+        if !self.client.is_connected() {
+            return false;
+        }
+        self.client
+            .millis_since_last_frame()
+            .is_some_and(|age| age <= max_silence.as_millis() as u64)
+    }
+
+    /// Seconds since the last inbound WebSocket frame, or `None` if no frame has
+    /// ever been received. Local read; never blocks.
+    pub fn seconds_since_last_frame(&self) -> Option<f64> {
+        self.client
+            .millis_since_last_frame()
+            .map(|ms| ms as f64 / 1000.0)
+    }
+
     /// Subscribes to an asset's stream and prepends historical data.
     ///
     /// This is a QoL helper for bot developers who need to "warm up" their indicators.

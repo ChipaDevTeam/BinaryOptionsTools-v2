@@ -402,6 +402,7 @@ class PocketOption:
         period: int,
         *,
         count: int = 100,
+        timeout: Optional[float] = None,
     ) -> Dict[str, List[Dict]]:
         """Fetches the latest closed candles for many symbols in one call.
 
@@ -419,6 +420,8 @@ class PocketOption:
         Raises:
             ConnectionError: If the client is not connected or the channel closed
                 during the batch.
+            TimeoutError: If ``timeout`` expires; the in-flight requests are
+                cancelled in the engine, so the worker thread is not held.
 
         The broker has no multi-symbol history request, so each symbol costs its
         own ``loadHistoryPeriod`` round-trip. The client starts history requests
@@ -431,11 +434,12 @@ class PocketOption:
             assets: Symbols to fetch.
             period: Candle timeframe in seconds.
             count: Candles to request per symbol.
+            timeout: Optional deadline in seconds for the whole batch.
 
         Returns:
             Mapping of symbol to its candles, oldest first.
         """
-        return self._run(self._client.candles_many(assets, period, count=count))
+        return self._run(self._client.candles_many(assets, period, count=count, timeout=timeout))
 
     def candles(
         self,
@@ -674,7 +678,12 @@ class PocketOption:
         """Clear the list of closed deals from local storage."""
         self._run(self._client.clear_closed_deals())
 
-    def payouts(self, assets: Optional[Sequence[str]] = None) -> Dict[str, int]:
+    def payouts(
+        self,
+        assets: Optional[Sequence[str]] = None,
+        *,
+        timeout: Optional[float] = None,
+    ) -> Dict[str, int]:
         """Get the current payout percentage for every asset.
 
         Args:
@@ -682,14 +691,19 @@ class PocketOption:
                 default) returns every active asset. When a watchlist is given,
                 only those symbols are read and serialised, so polling a few
                 instruments does not pay for the whole catalog.
+            timeout: Optional deadline in seconds; the call is cancelled in the
+                engine when it expires, so the worker thread is released.
 
         Returns:
             Mapping of asset symbol to payout percentage. Unknown and inactive
             symbols are omitted.
-        """
-        return self._run(self._client.payouts(assets))
 
-    def payout(self, asset: str) -> Optional[int]:
+        Raises:
+            TimeoutError: If ``timeout`` expires.
+        """
+        return self._run(self._client.payouts(assets, timeout=timeout))
+
+    def payout(self, asset: str, *, timeout: Optional[float] = None) -> Optional[int]:
         """Get the current payout percentage for a single asset.
 
         This is a single-symbol lookup: it neither serialises nor parses the
@@ -697,15 +711,20 @@ class PocketOption:
 
         Args:
             asset: Asset symbol (e.g. ``"EURUSD_otc"``).
+            timeout: Optional deadline in seconds; the call is cancelled in the
+                engine when it expires, so the worker thread is released.
 
         Returns:
             The payout percentage, or ``None`` if the asset is unknown or not
             currently active.
 
+        Raises:
+            TimeoutError: If ``timeout`` expires.
+
         See Also:
             :meth:`payouts` for the payout of every asset at once.
         """
-        return self._run(self._client.payout(asset))
+        return self._run(self._client.payout(asset, timeout=timeout))
 
     def history(self, asset: str, period: int) -> List[Dict]:
         """Get historical trade data for an asset.
@@ -915,6 +934,31 @@ class PocketOption:
             True if connected, False otherwise.
         """
         return self._client.is_connected()
+
+    def is_responsive(self, max_silence: float = 60.0) -> bool:
+        """Check whether the session is connected and still receiving frames.
+
+        Unlike :meth:`is_connected`, this notices a half-dead connection: if no
+        frame (not even the broker's Engine.IO ping) arrived within
+        ``max_silence`` seconds, the session is reported as unresponsive. The
+        check reads local state only and cannot block, so it is safe to call
+        from a worker that suspects another call has stalled.
+
+        Args:
+            max_silence: Seconds without an inbound frame before the session is
+                considered wedged.
+
+        Returns:
+            True if connected and a frame arrived recently, False otherwise.
+        """
+        return self._client.is_responsive(max_silence)
+
+    def seconds_since_last_frame(self) -> Optional[float]:
+        """Seconds since the last inbound WebSocket frame, or ``None``.
+
+        ``None`` means no frame has ever been received. Local read; never blocks.
+        """
+        return self._client.seconds_since_last_frame()
 
     def is_ssid_valid(self) -> bool:
         """Check whether the SSID passed format validation at construction time.
