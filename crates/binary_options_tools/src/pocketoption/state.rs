@@ -77,8 +77,13 @@ pub struct State {
     pub tls_cipher_suites: Option<Vec<String>>,
     pub tls_alpn: Option<Vec<String>>,
     pub raw_subscribers: RwLock<Vec<AsyncSender<Arc<Message>>>>,
-    /// Reason the server rejected authentication, if it did (e.g. `NotAuthorized`).
+    /// Asset the server's chart stream is currently pointed at.
     ///
+    /// The server streams ticks for the chart symbol only, so this is the thing
+    /// that actually decides which symbol produces data. It belongs to one
+    /// connection: a new socket has no chart until `changeSymbol` is sent again.
+    pub chart_symbol: SyncRwLock<Option<String>>,
+    /// Reason the server rejected authentication, if it did (e.g. `NotAuthorized`).
     /// Set by the init module so that client construction can report the real cause
     /// instead of a generic connection timeout.
     pub auth_error: SyncRwLock<Option<String>>,
@@ -214,6 +219,7 @@ impl StateBuilder {
             tls_cipher_suites: self.tls_cipher_suites,
             tls_alpn: self.tls_alpn,
             raw_subscribers: RwLock::new(Vec::new()),
+            chart_symbol: SyncRwLock::new(None),
             auth_error: SyncRwLock::new(None),
             session_confirmed: std::sync::atomic::AtomicBool::new(false),
             session_confirmed_notice: Arc::new(tokio::sync::Notify::new()),
@@ -237,9 +243,30 @@ impl AppState for State {
 
         // Mark subscriptions as requiring re-subscription
         self.active_subscriptions.write().await.clear();
+        // The chart stream belongs to the connection that pointed it: a new
+        // socket charts nothing until `changeSymbol` is sent again, so the
+        // pointer must not survive and suppress that re-send.
+        *self.chart_symbol.write().unwrap_or_else(|e| e.into_inner()) = None;
+        // Raw handlers own their state for their whole lifetime, not for the
+        // connection's. Their sinks, validators and keep-alives must survive a
+        // reconnect -- the module re-sends the keep-alives and the handlers keep
+        // matching -- so nothing here is cleared. `RawApiModule::drop` cleans up.
 
-        // Clear raw validators
-        self.clear_raw_validators();
+        // Confirmation and rejection describe one connection, not the client:
+        // a new socket has not yet been accepted (or refused) by the server.
+        // Keeping a stale `true` here lets construction skip the handshake and
+        // hand back a client whose snapshots were never sent.
+        self.session_confirmed
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        if let Ok(mut guard) = self.auth_error.write() {
+            *guard = None;
+        }
+
+        // The clock offset belongs to the server we were just talking to. A
+        // reconnect can land on a region with a different clock, so the next
+        // live tick has to re-measure it instead of inheriting the old shift.
+        self.broker_clock_offset
+            .store(0, std::sync::atomic::Ordering::SeqCst);
 
         // Note: We don't clear server time as it's useful to maintain
         // time synchronization across reconnections
@@ -614,6 +641,45 @@ mod tests {
         state.update_server_time(Utc::now().timestamp()).await;
         assert!(state.broker_clock_offset().abs() <= 2);
         assert!((state.normalize_stream_timestamp(1_791_932_536) - 1_791_932_536).abs() <= 2);
+    }
+
+    #[tokio::test]
+    async fn teardown_forgets_state_that_belonged_to_the_old_session() {
+        let state = test_state();
+        state.mark_session_confirmed();
+        state.set_auth_error("NotAuthorized");
+        *state
+            .chart_symbol
+            .write()
+            .unwrap_or_else(|e| e.into_inner()) = Some("EURUSD_otc".to_string());
+        state
+            .update_server_time(Utc::now().timestamp() + 7_200)
+            .await;
+        assert!(state.broker_clock_offset() != 0);
+
+        state.clear_temporal_data().await;
+
+        assert!(
+            !state.is_session_confirmed(),
+            "a new socket has not been accepted yet"
+        );
+        assert!(
+            state.auth_error().is_none(),
+            "the rejection belonged to the previous socket"
+        );
+        assert_eq!(
+            state.broker_clock_offset(),
+            0,
+            "the next connection re-measures the clock"
+        );
+        assert!(
+            state
+                .chart_symbol
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .is_none(),
+            "a new socket charts nothing until changeSymbol is sent again"
+        );
     }
 
     #[test]

@@ -961,10 +961,13 @@ class PocketOption:
         return self._client.seconds_since_last_frame()
 
     def is_ssid_valid(self) -> bool:
-        """Check whether the SSID passed format validation at construction time.
+        """Whether the server has accepted this session.
+
+        Delegates to the async client, so it reports the live session state
+        rather than the construction-time format check.
 
         Returns:
-            True if the SSID was valid, False otherwise.
+            True if the session is confirmed and not rejected, False otherwise.
         """
         return self._client.is_ssid_valid()
 

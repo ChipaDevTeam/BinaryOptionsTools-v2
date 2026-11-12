@@ -1,4 +1,3 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -10,6 +9,7 @@ use binary_options_tools_core::{
 use tracing::{debug, warn};
 
 use crate::pocketoption::state::State;
+use crate::pocketoption::types::ExpectedBinaries;
 use crate::pocketoption::utils::socketio_event;
 
 /// Socket.IO event names the server emits when it refuses the auth payload.
@@ -317,13 +317,13 @@ impl LightweightModule<State> for InitModule {
 }
 
 struct InitRule {
-    valid: AtomicBool,
+    expected: ExpectedBinaries,
 }
 
 impl InitRule {
     fn new() -> Self {
         Self {
-            valid: AtomicBool::new(false),
+            expected: ExpectedBinaries::new(),
         }
     }
 }
@@ -343,13 +343,15 @@ impl Rule for InitRule {
                 // Check for successauth in a Socket.IO array
                 if let Some((event_name, is_placeholder)) = socketio_event(text) {
                     if event_name == SUCCESS_AUTH {
-                        // The header is routed even when it is only a placeholder: the module
-                        // treats it as the confirmation, and `valid` makes it receive the
-                        // binary half as well. Before this, the binary half was the only
-                        // routed frame and its payload no longer carries `serverName`, so
-                        // authentication was never detected and the initial snapshot was
-                        // never requested.
-                        self.valid.store(is_placeholder, Ordering::SeqCst);
+                        // The header is routed even when it is only a placeholder: the
+                        // module treats it as the confirmation, and the queued
+                        // expectation makes it receive the binary half as well. Before
+                        // this, the binary half was the only routed frame and its
+                        // payload no longer carries `serverName`, so authentication was
+                        // never detected and the initial snapshot was never requested.
+                        if is_placeholder {
+                            self.expected.push(event_name);
+                        }
                         return true;
                     }
                     if AUTH_REJECTED_EVENTS.contains(&event_name.as_str()) {
@@ -360,27 +362,28 @@ impl Rule for InitRule {
                     return false;
                 }
 
-                if self.valid.load(Ordering::SeqCst) {
-                    self.valid.store(false, Ordering::SeqCst);
+                // A non-matching text may be the second half in text form.
+                if self.expected.claim().is_some() {
                     return true;
                 }
                 false
             }
-            Message::Binary(_) => {
-                if self.valid.load(Ordering::SeqCst) {
-                    self.valid.store(false, Ordering::SeqCst);
-                    true
-                } else {
+            // Only a binary that answers a queued `successauth` header may confirm
+            // the session: an unrelated single-key binary used to mark it confirmed.
+            Message::Binary(_) => match self.expected.claim() {
+                Some(_) => true,
+                None => {
+                    debug!(target: "InitRule", "Rejected a binary that no successauth header asked for.");
                     false
                 }
-            }
+            },
             Message::Close(_) => true,
             _ => false,
         }
     }
 
     fn reset(&self) {
-        self.valid.store(false, Ordering::SeqCst)
+        self.expected.reset()
     }
 }
 

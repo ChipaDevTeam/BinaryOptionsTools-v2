@@ -411,25 +411,25 @@ class PocketOptionAsync:
         from ..tracing import Logger, LogBuilder
 
         self.logger = Logger()
-        self._ssid_valid = True
+        self._ssid_format_valid = True
         self._guest_session = False
 
         if ssid is not None:
             ssid = sanitize_and_validate_ssid(ssid, self.logger)
             if not ssid.startswith("42["):
-                self._ssid_valid = False
+                self._ssid_format_valid = False
             else:
                 try:
                     payload = json.loads(ssid[2:])
                     if not isinstance(payload, list) or len(payload) < 2:
-                        self._ssid_valid = False
+                        self._ssid_format_valid = False
                     elif isinstance(payload[1], dict):
                         self._guest_session = _is_guest_auth_payload(payload[1])
                 except json.JSONDecodeError:
-                    self._ssid_valid = False
+                    self._ssid_format_valid = False
         else:
             self.logger.warn("SSID is None, connection will likely fail")
-            self._ssid_valid = False
+            self._ssid_format_valid = False
 
         if config is not None:
             if isinstance(config, dict):
@@ -481,7 +481,7 @@ class PocketOptionAsync:
 
         self = cls.__new__(cls)
         self.logger = Logger()
-        self._ssid_valid = True
+        self._ssid_format_valid = True
         self._guest_session = True
         self.config = Config()
         self.client = await RawPocketOption.create_try_demo(token)
@@ -1920,8 +1920,24 @@ class PocketOptionAsync:
         return self.client.seconds_since_last_frame()
 
     def is_ssid_valid(self) -> bool:
-        """Returns whether the SSID passed basic format validation during init."""
-        return self._ssid_valid
+        """Whether the server has accepted this session.
+
+        Format validation only proves the string is well-formed — a syntactically
+        perfect SSID the broker rejects looks identical, and a demo session is
+        only proven once the server answers. This reports what the connection
+        actually did: ``False`` while unconnected, after a rejection, and until
+        the server confirms the session. The construction-time parse result is
+        kept as ``_ssid_format_valid``.
+        """
+        client = getattr(self, "client", None)
+        if client is None:
+            return False
+        try:
+            if client.auth_error():
+                return False
+            return bool(client.is_session_confirmed())
+        except Exception:  # pragma: no cover - defensive: never raise from a query
+            return False
 
     async def disconnect(self) -> None:
         """

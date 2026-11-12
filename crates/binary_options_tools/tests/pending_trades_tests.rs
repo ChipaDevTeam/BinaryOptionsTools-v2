@@ -52,6 +52,7 @@ mod tests {
             histories: tokio::sync::RwLock::new(Vec::new()),
             raw_sinks: tokio::sync::RwLock::new(HashMap::new()),
             raw_keep_alive: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            chart_symbol: std::sync::RwLock::new(None),
             urls: Vec::new(),
             proxy: None,
             origin: None,

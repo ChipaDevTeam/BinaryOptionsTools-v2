@@ -1,8 +1,11 @@
 use core::fmt;
 use std::hash::Hash;
 use std::{
-    collections::HashMap,
-    sync::atomic::{AtomicBool, Ordering},
+    collections::{HashMap, VecDeque},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Mutex,
+    },
 };
 
 use binary_options_tools_core::{reimports::Message, traits::Rule};
@@ -229,10 +232,84 @@ impl StreamData {
 /// using a read-write lock for concurrent access.
 pub type ServerTimeState = tokio::sync::RwLock<ServerTime>;
 
+/// How many binary halves the server may legitimately owe at once.
+///
+/// The real pairing never exceeds a handful; the bound only stops a broken
+/// stream from growing the queue without limit.
+const MAX_EXPECTED_BINARIES: usize = 8;
+
+/// The headers of two-step Socket.IO messages whose binary half is still owed.
+///
+/// A single `AtomicBool` cannot count. The server may keep several placeholders
+/// outstanding at once (`updateOpenedDeals` next to `updateClosedDeals`), and one
+/// flag meant each new header overwrote the pending one, so a binary was handed
+/// to the wrong parser — or to no parser at all. This keeps them in send order and
+/// refuses binaries nothing asked for.
+pub(crate) struct ExpectedBinaries {
+    queue: Mutex<VecDeque<ExpectedBinary>>,
+    epoch: AtomicU64,
+}
+
+#[derive(Clone, Debug)]
+struct ExpectedBinary {
+    event: String,
+    /// Connection the header arrived on; a reconnect invalidates it.
+    epoch: u64,
+}
+
+impl ExpectedBinaries {
+    pub(crate) fn new() -> Self {
+        Self {
+            queue: Mutex::new(VecDeque::new()),
+            epoch: AtomicU64::new(0),
+        }
+    }
+
+    /// Records that `event` announced a binary half.
+    pub(crate) fn push(&self, event: impl Into<String>) {
+        let epoch = self.epoch.load(Ordering::SeqCst);
+        let mut queue = self.queue.lock().unwrap_or_else(|e| e.into_inner());
+        if queue.len() >= MAX_EXPECTED_BINARIES {
+            // Nothing legitimate leaves this many outstanding, so the oldest is
+            // stale by definition.
+            queue.pop_front();
+        }
+        queue.push_back(ExpectedBinary {
+            event: event.into(),
+            epoch,
+        });
+    }
+
+    /// Consumes the oldest owed binary half, returning the event it belongs to.
+    ///
+    /// `None` means the binary is unpaired: it belongs to no outstanding header,
+    /// so accepting it would hand a payload to a parser that never asked.
+    pub(crate) fn claim(&self) -> Option<String> {
+        let epoch = self.epoch.load(Ordering::SeqCst);
+        let mut queue = self.queue.lock().unwrap_or_else(|e| e.into_inner());
+        queue.retain(|expected| expected.epoch == epoch);
+        queue.pop_front().map(|expected| expected.event)
+    }
+
+    /// Whether a binary half is still owed.
+    #[cfg(test)]
+    pub(crate) fn is_pending(&self) -> bool {
+        let epoch = self.epoch.load(Ordering::SeqCst);
+        let queue = self.queue.lock().unwrap_or_else(|e| e.into_inner());
+        queue.iter().any(|expected| expected.epoch == epoch)
+    }
+
+    /// Drops every outstanding expectation; called when the connection changes.
+    pub(crate) fn reset(&self) {
+        self.epoch.fetch_add(1, Ordering::SeqCst);
+        self.queue.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    }
+}
+
 /// Simple rule implementation for when the websocket data is sent using 2 messages
 /// The first one telling which message type it is, and the second one containing the actual data.
 pub struct TwoStepRule {
-    valid: AtomicBool,
+    expected: ExpectedBinaries,
     pattern: String,
 }
 
@@ -243,7 +320,7 @@ impl TwoStepRule {
     /// * `pattern` - The string pattern to match against incoming messages
     pub fn new(pattern: impl ToString) -> Self {
         Self {
-            valid: AtomicBool::new(false),
+            expected: ExpectedBinaries::new(),
             pattern: pattern.to_string(),
         }
     }
@@ -258,41 +335,44 @@ impl Rule for TwoStepRule {
                     // Check for binary placeholder in Socket.IO format
                     let has_placeholder = text.contains(r#""_placeholder":true"#);
 
-                    // If it has a placeholder, we MUST wait for the next (binary) message
+                    // If it has a placeholder, the binary half is owed: queue it
+                    // so a second placeholder cannot overwrite this one.
                     if has_placeholder {
-                        tracing::debug!(target: "TwoStepRule", "Detected binary placeholder for pattern '{}'. Waiting for next message.", self.pattern);
-                        self.valid.store(true, Ordering::SeqCst);
+                        tracing::debug!(target: "TwoStepRule", "Detected binary placeholder for pattern '{}'. Waiting for the binary half.", self.pattern);
+                        self.expected.push(self.pattern.clone());
                         return false;
                     }
 
                     // Check if it's a 1-step message (ends with ']') or contains other JSON data '{'
                     if text.ends_with(']') || text.contains('{') {
                         tracing::debug!(target: "TwoStepRule", "1-step message matched pattern '{}'! Allowing through.", self.pattern);
-                        self.valid.store(false, Ordering::SeqCst);
                         return true;
                     }
 
                     tracing::debug!(target: "TwoStepRule", "Pattern '{}' matched! Next message will be accepted.", self.pattern);
-                    self.valid.store(true, Ordering::SeqCst);
+                    self.expected.push(self.pattern.clone());
                     return false;
                 }
 
-                if self.valid.load(Ordering::SeqCst) {
-                    self.valid.store(false, Ordering::SeqCst);
+                // A non-matching text may be the second half in text form.
+                if self.expected.claim().is_some() {
                     return true;
                 }
                 false
             }
-            Message::Binary(_) if self.valid.load(Ordering::SeqCst) => {
-                self.valid.store(false, Ordering::SeqCst);
-                true
-            }
+            Message::Binary(_) => match self.expected.claim() {
+                Some(_) => true,
+                None => {
+                    tracing::debug!(target: "TwoStepRule", "Rejected a binary that no '{}' header asked for.", self.pattern);
+                    false
+                }
+            },
             _ => false,
         }
     }
 
     fn reset(&self) {
-        self.valid.store(false, Ordering::SeqCst)
+        self.expected.reset()
     }
 }
 
@@ -313,7 +393,7 @@ impl Rule for TwoStepRule {
 ///   after this flag is set will be considered part of the two-step message and allowed
 ///   to pass through (by returning `true` from `call`). All other messages will be filtered.
 pub struct MultiPatternRule {
-    valid: AtomicBool,
+    expected: ExpectedBinaries,
     pub patterns: Vec<String>,
 }
 
@@ -328,7 +408,7 @@ impl MultiPatternRule {
         P: ToString,
     {
         Self {
-            valid: AtomicBool::new(false),
+            expected: ExpectedBinaries::new(),
             patterns: patterns.into_iter().map(|p| p.to_string()).collect(),
         }
     }
@@ -341,32 +421,39 @@ impl Rule for MultiPatternRule {
                 if let Some((event_name, is_placeholder)) = socketio_event(text) {
                     if self.patterns.iter().any(|p| p == &event_name) {
                         if is_placeholder {
-                            // Two-step message: wait for the binary half.
-                            self.valid.store(true, Ordering::SeqCst);
+                            // Two-step message: queue the header so the binary
+                            // half is matched to *this* event, not to whatever
+                            // header happened to arrive last.
+                            self.expected.push(event_name);
                             return false;
                         }
                         // 1-step message, allow it through
-                        self.valid.store(false, Ordering::SeqCst);
                         return true;
                     }
                 }
 
-                if self.valid.load(Ordering::SeqCst) {
-                    self.valid.store(false, Ordering::SeqCst);
+                // A non-matching text may be the second half in text form.
+                if self.expected.claim().is_some() {
                     return true;
                 }
                 false
             }
-            Message::Binary(_) if self.valid.load(Ordering::SeqCst) => {
-                self.valid.store(false, Ordering::SeqCst);
-                true
-            }
+            Message::Binary(_) => match self.expected.claim() {
+                Some(event) => {
+                    tracing::debug!(target: "MultiPatternRule", "Routed a binary as the payload of '{}'.", event);
+                    true
+                }
+                None => {
+                    tracing::debug!(target: "MultiPatternRule", "Rejected a binary that no matched header asked for.");
+                    false
+                }
+            },
             _ => false,
         }
     }
 
     fn reset(&self) {
-        self.valid.store(false, Ordering::SeqCst)
+        self.expected.reset()
     }
 }
 
@@ -937,8 +1024,8 @@ mod tests {
             rule.call(&msg),
             "Rule should accept 1-step messages containing data"
         );
-        // State should remain invalid (ready for another 1-step or start of 2-step)
-        assert!(!rule.valid.load(Ordering::SeqCst));
+        // Nothing is owed: a 1-step message asks for no binary half.
+        assert!(!rule.expected.is_pending());
     }
 
     #[test]
@@ -950,17 +1037,67 @@ mod tests {
         let msg1 = Message::Text(pattern.to_string().into());
         assert!(
             !rule.call(&msg1),
-            "Step 1 should return false and set valid flag"
+            "Step 1 should return false and owe a binary half"
         );
-        assert!(rule.valid.load(Ordering::SeqCst));
+        assert!(rule.expected.is_pending());
 
         // Step 2: The binary data message
         let msg2 = Message::Binary(vec![1, 2, 3].into());
         assert!(
             rule.call(&msg2),
-            "Step 2 should return true and clear valid flag"
+            "Step 2 should return true and clear the debt"
         );
-        assert!(!rule.valid.load(Ordering::SeqCst));
+        assert!(!rule.expected.is_pending());
+    }
+
+    #[test]
+    fn two_outstanding_placeholders_each_get_their_own_binary() {
+        let rule = MultiPatternRule::new(["updateOpenedDeals", "updateClosedDeals"]);
+        let header_a = Message::Text(r#"451-["updateOpenedDeals",{"_placeholder":true}]"#.into());
+        let header_b = Message::Text(r#"451-["updateClosedDeals",{"_placeholder":true}]"#.into());
+
+        assert!(
+            !rule.call(&header_a),
+            "a placeholder asks for the binary half"
+        );
+        assert!(
+            !rule.call(&header_b),
+            "a second placeholder must not overwrite the first"
+        );
+        assert!(
+            rule.call(&Message::Binary(vec![1].into())),
+            "first binary answers the first header"
+        );
+        assert!(
+            rule.call(&Message::Binary(vec![2].into())),
+            "second binary answers the second header"
+        );
+        assert!(!rule.expected.is_pending(), "both debts are paid");
+    }
+
+    #[test]
+    fn a_binary_no_header_asked_for_is_rejected() {
+        let rule = TwoStepRule::new(r#"451-["successupdateBalance","#);
+        assert!(
+            !rule.call(&Message::Binary(vec![1, 2, 3].into())),
+            "an unpaired binary must not be routed as a payload"
+        );
+        assert!(!rule.call(&Message::Binary(vec![4].into())));
+    }
+
+    #[test]
+    fn reset_forgets_outstanding_headers() {
+        let rule = MultiPatternRule::new(["updateOpenedDeals"]);
+        let header = Message::Text(r#"451-["updateOpenedDeals",{"_placeholder":true}]"#.into());
+        assert!(!rule.call(&header));
+        assert!(rule.expected.is_pending());
+
+        rule.reset();
+        assert!(!rule.expected.is_pending());
+        assert!(
+            !rule.call(&Message::Binary(vec![1].into())),
+            "a binary arriving after a reconnect belongs to no header we know"
+        );
     }
 
     #[test]

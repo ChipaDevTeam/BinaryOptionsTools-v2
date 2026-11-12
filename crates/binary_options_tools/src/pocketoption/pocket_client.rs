@@ -481,6 +481,22 @@ impl PocketOption {
         state.ssid.demo()
     }
 
+    /// Whether the server has confirmed this session.
+    ///
+    /// A session is confirmed by the auth ack or by a balance frame — the two
+    /// things an unauthenticated socket never receives. Local read; never blocks.
+    pub fn is_session_confirmed(&self) -> bool {
+        self.client.state.is_session_confirmed()
+    }
+
+    /// The reason the server rejected authentication, if it did.
+    ///
+    /// Cleared when the connection is torn down, so it always describes the
+    /// current socket rather than every socket that came before it.
+    pub fn auth_error(&self) -> Option<String> {
+        self.client.state.auth_error()
+    }
+
     /// Checks if the client is currently connected to the WebSocket server.
     ///
     /// Use this before performing operations to avoid "channel closed" errors

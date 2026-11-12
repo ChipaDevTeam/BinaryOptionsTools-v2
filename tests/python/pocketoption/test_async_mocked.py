@@ -1988,19 +1988,19 @@ class TestSsidValidation:
         """A well-formed SSID with all required fields passes validation."""
         ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":1,"platform":2}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_valid_ssid_with_optional_fields(self):
         """SSID with optional fields like isFastHistory and isOptimized passes."""
         ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":1,"platform":2,"isFastHistory":true,"isOptimized":true}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_guest_token_payload_skips_session_validation(self):
         """A token-only guest payload is valid even without session/uid."""
         ssid = '42["auth",{"token":"9PRxPzq6mQ","balance":50000,"isFastHistory":true}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
         assert client._guest_session is True
 
     def test_account_ssid_is_not_marked_as_guest(self):
@@ -2038,67 +2038,104 @@ class TestSsidValidation:
         ssid = '42["auth",{"session":"!!!","uid":69982301}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
         # Should not raise, just warn
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_negative_uid_warns_but_proceeds(self):
         """A negative uid emits a warning but does not raise."""
         ssid = '42["auth",{"session":"abc123def456","uid":-1}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_non_integer_uid_warns_but_proceeds(self):
         """A non-integer uid emits a warning but does not raise."""
         ssid = '42["auth",{"session":"abc123def456","uid":"not_a_number"}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_invalid_is_demo_warns_but_proceeds(self):
         """An isDemo value that is not 0 or 1 emits a warning but does not raise."""
         ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":5}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_invalid_platform_warns_but_proceeds(self):
         """A platform value that is not 1 or 2 emits a warning but does not raise."""
         ssid = '42["auth",{"session":"abc123def456","uid":69982301,"platform":99}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_non_42_prefix_returns_unchanged(self):
         """An SSID not starting with 42[ is returned as-is with validation skipped."""
         ssid = "not_a_valid_ssid"
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is False
+        assert client._ssid_format_valid is False
 
     def test_invalid_json_returns_unchanged(self):
         """An SSID with invalid JSON after 42[ is returned as-is with validation skipped."""
         ssid = "42[not valid json"
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is False
+        assert client._ssid_format_valid is False
 
     def test_ssid_with_single_quotes_normalized(self):
         """An SSID using single quotes around 'auth' is normalized to double quotes."""
         ssid = '42[\'auth\',{"session":"abc123def456","uid":69982301,"isDemo":1}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_shell_stripped_auth_normalized(self):
         """An SSID where auth lost its quotes due to shell expansion is normalized."""
         ssid = '42[auth,{"session":"abc123def456","uid":69982301,"isDemo":1}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_payload_not_array_warns(self):
         """A payload that is not a [event, data] array is handled gracefully."""
         ssid = '42[{"session":"abc123def456","uid":69982301}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
         # Payload is a dict, not an array — warns but proceeds
-        assert client.is_ssid_valid() is False
+        assert client._ssid_format_valid is False
 
     def test_none_ssid_skips_validation(self):
         """A None SSID skips validation and marks as invalid."""
         client = PocketOptionAsync(None, config={"terminal_logging": False})
+        assert client._ssid_format_valid is False
+
+
+class TestSsidValidityFromSession:
+    """`is_ssid_valid()` reports the live session, not the construction string."""
+
+    @staticmethod
+    def _client_with(inner):
+        # Bypass __init__: these cases are about the query, not the constructor.
+        client = object.__new__(PocketOptionAsync)
+        client.client = inner
+        return client
+
+    def test_unconnected_client_is_not_valid(self):
+        """A well-formed SSID proves nothing until the server accepts it."""
+        client = self._client_with(None)
         assert client.is_ssid_valid() is False
+
+    def test_rejected_session_is_not_valid(self):
+        """A rejection wins even if a stale confirmation were still set."""
+        inner = MagicMock()
+        inner.auth_error.return_value = "NotAuthorized"
+        inner.is_session_confirmed.return_value = True
+        assert self._client_with(inner).is_ssid_valid() is False
+
+    def test_unconfirmed_session_is_not_valid(self):
+        """Connected but never acked (the grace path) is not a valid session."""
+        inner = MagicMock()
+        inner.auth_error.return_value = None
+        inner.is_session_confirmed.return_value = False
+        assert self._client_with(inner).is_ssid_valid() is False
+
+    def test_confirmed_session_is_valid(self):
+        """The auth ack / balance frame is what makes the session valid."""
+        inner = MagicMock()
+        inner.auth_error.return_value = None
+        inner.is_session_confirmed.return_value = True
+        assert self._client_with(inner).is_ssid_valid() is True
 
 
 class TestAsynchronousExtraCoverage:
@@ -2108,7 +2145,7 @@ class TestAsynchronousExtraCoverage:
         # auth_data is not a dict
         ssid = '42["auth", "not-a-dict"]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     @pytest.mark.asyncio
     async def test_async_config_url_insert(self):

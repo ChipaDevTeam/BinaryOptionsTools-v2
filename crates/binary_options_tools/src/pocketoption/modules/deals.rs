@@ -1,11 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use binary_options_tools_core::{
@@ -22,7 +15,7 @@ use uuid::Uuid;
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
-    types::Deal,
+    types::{Deal, ExpectedBinaries},
     utils::{socketio_event, SocketIoFrame},
 };
 
@@ -393,7 +386,7 @@ impl ApiModule<State> for DealsApiModule {
 /// Create a new custom rule that matches the specific patterns and also returns true for strings
 /// that starts with any of the patterns
 struct DealsUpdateRule {
-    valid: AtomicBool,
+    expected: ExpectedBinaries,
     patterns: Vec<String>,
 }
 
@@ -408,7 +401,7 @@ impl DealsUpdateRule {
         P: ToString,
     {
         Self {
-            valid: AtomicBool::new(false),
+            expected: ExpectedBinaries::new(),
             patterns: patterns.into_iter().map(|p| p.to_string()).collect(),
         }
     }
@@ -429,10 +422,11 @@ impl Rule for DealsUpdateRule {
                             || has_placeholder;
 
                         if is_header_only {
-                            self.valid.store(true, Ordering::SeqCst);
+                            // The binary half is owed; queue it in send order so
+                            // two outstanding headers cannot collapse into one.
+                            self.expected.push(pattern.clone());
                             return true;
                         } else {
-                            self.valid.store(false, Ordering::SeqCst);
                             return true;
                         }
                     }
@@ -444,21 +438,24 @@ impl Rule for DealsUpdateRule {
                     return false;
                 }
 
-                if self.valid.load(Ordering::SeqCst) {
-                    self.valid.store(false, Ordering::SeqCst);
+                // A non-matching text may be the second half in text form.
+                if self.expected.claim().is_some() {
                     return true;
                 }
                 false
             }
-            Message::Binary(_) if self.valid.load(Ordering::SeqCst) => {
-                self.valid.store(false, Ordering::SeqCst);
-                true
-            }
+            Message::Binary(_) => match self.expected.claim() {
+                Some(_) => true,
+                None => {
+                    tracing::debug!(target: "DealsUpdateRule", "Rejected a binary that no deals header asked for.");
+                    false
+                }
+            },
             _ => false,
         }
     }
 
     fn reset(&self) {
-        self.valid.store(false, Ordering::SeqCst)
+        self.expected.reset()
     }
 }

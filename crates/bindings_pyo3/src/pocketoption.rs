@@ -10,8 +10,8 @@ use binary_options_tools::validator::Validator as CrateValidator;
 use binary_options_tools::validator::Validator;
 use futures_util::stream::{BoxStream, Fuse};
 use futures_util::StreamExt;
-use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python};
 use pyaio_faq::tokio::future_into_py;
+use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python};
 use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
 
@@ -218,6 +218,20 @@ impl RawPocketOption {
 
     pub fn is_demo(&self) -> bool {
         self.client.is_demo()
+    }
+
+    /// True once the server confirmed the session (auth ack or a balance frame).
+    ///
+    /// Assets are pushed to unauthenticated sockets too, so neither `is_connected`
+    /// nor the asset list proves anything; this is the only local signal that the
+    /// credentials were actually accepted.
+    pub fn is_session_confirmed(&self) -> bool {
+        self.client.is_session_confirmed()
+    }
+
+    /// The server's authentication rejection reason, if it rejected the session.
+    pub fn auth_error(&self) -> Option<String> {
+        self.client.auth_error()
     }
 
     /// Returns true if the client is currently connected to the WebSocket server.

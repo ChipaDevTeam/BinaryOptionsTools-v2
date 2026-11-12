@@ -365,13 +365,21 @@ impl<S: AppState> ClientRunner<S> {
                 self.teardown_session(writer_task, reader_task, true).await;
                 false
             }
+            RunnerCommand::Connect | RunnerCommand::Reconnect => {
+                // Documented as "disconnect and reconnect", and callable in any
+                // state: tear the live session down (without holding) so the
+                // loop re-enters through `connect()` instead of swallowing the
+                // command as if it had been handled.
+                debug!(target: "Runner", "Connect/Reconnect command received while a session is active; tearing down first.");
+                self.teardown_session(writer_task, reader_task, false).await;
+                false
+            }
             RunnerCommand::Shutdown => {
                 debug!(target: "Runner", "Shutdown command received.");
                 self.teardown_session(writer_task, reader_task, false).await;
                 self.shutdown_requested = true;
                 false
             }
-            _ => true,
         }
     }
 
@@ -419,6 +427,12 @@ impl<S: AppState> ClientRunner<S> {
                 Ok(stream) => stream,
                 Err(e) => {
                     self.reconnect_attempts += 1;
+                    // Let middleware see the failure: without this the stack's
+                    // counters and `is_connected` never reflect reality.
+                    self.router
+                        .middleware_stack
+                        .record_connection_failure(&middleware_context, Some(e.to_string()))
+                        .await;
 
                     if self.max_allowed_loops > 0
                         && self.reconnect_attempts >= self.max_allowed_loops
@@ -445,7 +459,6 @@ impl<S: AppState> ClientRunner<S> {
                         if self.max_allowed_loops > 0 { self.max_allowed_loops.to_string() } else { "∞".to_string() },
                         delay);
                     tokio::time::sleep(delay).await;
-                    self.is_hard_disconnect = false;
                     continue;
                 }
             };
