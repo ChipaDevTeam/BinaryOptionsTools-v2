@@ -13,7 +13,6 @@ use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::select;
@@ -27,16 +26,13 @@ use crate::pocketoption::candle::{
     compile_candles_from_ticks, BaseCandle, HistoryItem, SubscriptionType,
 };
 use crate::pocketoption::error::PocketError;
-use crate::pocketoption::types::{MultiPatternRule, StreamData as RawCandle, SubscriptionEvent};
+use crate::pocketoption::types::{MultiPatternRule, StreamBatch, SubscriptionEvent};
 use crate::pocketoption::utils::SocketIoFrame;
 use crate::pocketoption::{
     candle::Candle, // Assuming this exists in your types
     error::PocketResult,
     state::State,
 };
-
-/// Default maximum cached subscriptions, mirrors [`State`] default `max_subscriptions`.
-const DEFAULT_CACHED_MAX: usize = 4;
 
 /// Internal router to distribute command responses to multiple waiters.
 pub struct ResponseRouter {
@@ -83,7 +79,12 @@ impl ResponseRouter {
 
     pub async fn register(&self, id: Uuid) -> oneshot::Receiver<CommandResponse> {
         let (tx, rx) = oneshot::channel();
-        self.pending.lock().await.insert(id, tx);
+        let mut pending = self.pending.lock().await;
+        // A caller that times out leaves its sender behind: nothing removes it
+        // because no response ever arrived. Drop those dead entries on the way
+        // in so a long session does not accumulate them.
+        pending.retain(|_, tx| !tx.is_closed());
+        pending.insert(id, tx);
         rx
     }
 }
@@ -122,7 +123,7 @@ pub struct History {
 #[serde(untagged)]
 pub enum ServerResponse {
     History(History),
-    Candle(RawCandle),
+    Candle(StreamBatch),
 }
 
 impl fmt::Display for ChangeSymbol {
@@ -135,7 +136,18 @@ impl fmt::Display for ChangeSymbol {
     }
 }
 
-const MAX_CHANNEL_CAPACITY: usize = 64;
+/// Per-stream buffer. Ticks for a symbol arrive every few hundred milliseconds
+/// and aggregated subscriptions (e.g. 60s+ candles) only drain the buffer when
+/// the consumer polls, so this must tolerate a consumer that is busy elsewhere.
+const MAX_CHANNEL_CAPACITY: usize = 1024;
+/// Symbols the server will stream at the same time, as measured on the live demo
+/// servers (2026-10-30): the `changeSymbol` chart symbol plus one watchlist symbol.
+///
+/// The connection is not refused past this point - the extra subscriptions simply
+/// never receive ticks, which used to surface as "Subscription stream timed out
+/// after 60s" with no hint about why. Subscribing past it now warns once.
+pub const OBSERVED_CONCURRENT_STREAM_LIMIT: usize = 2;
+
 const RECONNECT_INITIAL_DELAY: Duration = Duration::from_secs(2);
 const SUBSCRIBE_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_RECEIVE_TIMEOUT: Duration = Duration::from_secs(60);
@@ -277,7 +289,6 @@ impl ReconnectCallback<State> for SubscriptionCallback {
 pub struct SubscriptionsHandle {
     sender: AsyncSender<Command>,
     router: Arc<ResponseRouter>,
-    cached_max: Arc<AtomicUsize>,
 }
 
 /// Cancels the module-side pending history request for `(asset, period)` if the
@@ -450,10 +461,10 @@ impl SubscriptionsHandle {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "Response router channel closed".to_string(),
             })? {
-            CommandResponse::SubscriptionCount { count, max, .. } => {
-                self.cached_max.store(max, Ordering::Relaxed);
-                Ok(count)
-            }
+            // The server also reports its own maximum; it is deliberately not
+            // retained, because nothing enforced it and advertising a limit
+            // that subscriptions could exceed was misleading.
+            CommandResponse::SubscriptionCount { count, .. } => Ok(count),
             CommandResponse::Shutdown { .. } => Err(PocketError::ModuleStopped {
                 module_name: "SubscriptionsApiModule".to_string(),
                 context: "SubscriptionsApiModule stopped during request".to_string(),
@@ -533,6 +544,13 @@ pub struct SubscriptionsApiModule {
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
+    // The chart pointer lives in `State::chart_symbol` because it belongs to a
+    // connection, not to the module: teardown has to clear it so the next
+    // subscription re-sends `changeSymbol`. PocketOption streams the
+    // `changeSymbol` symbol plus a small number of watchlist symbols per
+    // session; there is no working "unsubscribe" event (verified against the
+    // live server: `unsubscribeSymbol` is ignored), so the only way to free a
+    // stream is to point the chart at another symbol.
 }
 
 #[async_trait]
@@ -565,7 +583,6 @@ impl ApiModule<State> for SubscriptionsApiModule {
         SubscriptionsHandle {
             sender,
             router: ResponseRouter::new(receiver),
-            cached_max: Arc::new(AtomicUsize::new(DEFAULT_CACHED_MAX)),
         }
     }
 
@@ -602,7 +619,18 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                 continue;
                             }
 
-                            if let Err(e) = self.send_subscribe_message(&asset, period).await {
+                            if let Err(e) = self.point_chart_at(&asset, period).await {
+                                let _ = self.remove_subscription(&asset, Some(subscription_id)).await;
+                                if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionFailed {
+                                    command_id,
+                                    error: Box::new(e.into()),
+                                }).await {
+                                    warn!(target: "SubscriptionsApiModule", "Failed to send SubscriptionFailed (chart) response: {}", e);
+                                }
+                                continue;
+                            }
+
+                            if let Err(e) = self.send_subfor(&asset).await {
                                 let _ = self.remove_subscription(&asset, Some(subscription_id)).await;
                                 if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionFailed {
                                     command_id,
@@ -612,6 +640,8 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                 }
                                 continue;
                             }
+
+                            self.warn_if_over_stream_limit().await;
 
                             if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionSuccess {
                                 command_id,
@@ -625,6 +655,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             match self.remove_subscription(&asset, subscription_id).await {
                                 Ok(b) => {
                                     if b {
+                                        self.repoint_released_chart(&asset).await;
                                         if let Err(e) = self.command_responder.send(CommandResponse::UnsubscriptionSuccess { command_id }).await {
                                             warn!(target: "SubscriptionsApiModule", "Failed to send UnsubscriptionSuccess response: {}", e);
                                         }
@@ -653,7 +684,7 @@ impl ApiModule<State> for SubscriptionsApiModule {
                             if let Err(e) = self.command_responder.send(CommandResponse::SubscriptionCount {
                                 command_id,
                                 count,
-                                max: usize::MAX,
+                                max: OBSERVED_CONCURRENT_STREAM_LIMIT,
                             }).await {
                                 warn!(target: "SubscriptionsApiModule", "Failed to send SubscriptionCount response: {}", e);
                             }
@@ -737,8 +768,13 @@ impl ApiModule<State> for SubscriptionsApiModule {
                     if let Some(response) = response {
                         match response {
                             ServerResponse::Candle(data) => {
-                                if let Err(e) = self.forward_data_to_stream(&data.symbol, data.price, data.timestamp).await {
-                                    warn!(target: "SubscriptionsApiModule", "Failed to forward data: {}", e);
+                                // Live ticks carry the broker's wall clock; history is UTC, so
+                                // each tick is normalised before it reaches the aggregators.
+                                for tick in data.0 {
+                                    let timestamp = self.state.normalize_stream_timestamp(tick.timestamp);
+                                    if let Err(e) = self.forward_data_to_stream(&tick.symbol, tick.price, timestamp).await {
+                                        warn!(target: "SubscriptionsApiModule", "Failed to forward data: {}", e);
+                                    }
                                 }
                             },
                             ServerResponse::History(data) => {
@@ -759,6 +795,13 @@ impl ApiModule<State> for SubscriptionsApiModule {
                                             .collect::<Result<Vec<_>, _>>()
                                             .map_err(|e| PocketError::General(e.to_string()))
                                     } else if let Some(history) = data.history {
+                                        // `updateHistoryNewFast` is stamped with the broker's
+                                        // wall clock, while ticks compiled from `loadHistoryPeriod`
+                                        // follow the UTC `time` we send. Shift it onto UTC so both
+                                        // history paths agree.
+                                        let delta = -self.state.broker_clock_offset();
+                                        let history: Vec<HistoryItem> =
+                                            history.into_iter().map(|item| item.shifted(delta)).collect();
                                         Ok(compile_candles_from_ticks(&history, data.period, &symbol))
                                     } else {
                                         Ok(Vec::new())
@@ -934,8 +977,17 @@ impl SubscriptionsApiModule {
             timestamp,
         };
 
+        // Never await on a stream's channel here: this loop serves every
+        // subscription, so one consumer that stops polling would otherwise stall
+        // the ticks of all the others until they time out.
         for stream_sender in senders {
-            let _ = stream_sender.send(update.clone()).await;
+            match stream_sender.as_sync().try_send(update.clone()) {
+                Ok(true) => {}
+                Ok(false) => {
+                    warn!(target: "SubscriptionsApiModule", "Stream buffer full for {asset}; dropping tick (consumer is not keeping up)");
+                }
+                Err(_) => {} // receiver dropped; cleanup happens through Unsubscribe
+            }
         }
         Ok(())
     }
@@ -1038,9 +1090,16 @@ impl SubscriptionStream {
             .sub_type
             .update(&BaseCandle::from((timestamp, price_f64)))?
         {
-            Ok(Some(Candle::try_from((c, asset)).map_err(|e| {
-                PocketError::General(format!("Failed to convert candle: {e}"))
-            })?))
+            let mut candle = Candle::try_from((c, asset))
+                .map_err(|e| PocketError::General(format!("Failed to convert candle: {e}")))?;
+            // `update` only yields a candle once an aggregation window is
+            // complete, so what reaches the consumer here is final. The
+            // pass-through `None` type forwards raw ticks and never closes a
+            // window, so it keeps the flag as `false`.
+            if !matches!(self.sub_type, SubscriptionType::None) {
+                candle.close_candle();
+            }
+            Ok(Some(candle))
         } else {
             Ok(None)
         }
@@ -1117,10 +1176,243 @@ impl Drop for SubscriptionStream {
     }
 }
 
+impl SubscriptionsApiModule {
+    /// Warns once when more symbols are subscribed than the server will stream.
+    ///
+    /// This is guidance, not enforcement: the extra streams may still arrive if the
+    /// server has spare capacity, but in practice they starve, and a user who knows
+    /// the ceiling can rotate instead of waiting out a timeout per symbol.
+    async fn warn_if_over_stream_limit(&self) {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        static WARNED: AtomicBool = AtomicBool::new(false);
+
+        let distinct = {
+            let subscriptions = self.state.active_subscriptions.read().await;
+            subscriptions.len()
+        };
+        if distinct > OBSERVED_CONCURRENT_STREAM_LIMIT && !WARNED.swap(true, Ordering::Relaxed) {
+            warn!(
+                target: "SubscriptionsApiModule",
+                "{distinct} symbols are subscribed, but the server was measured streaming only \
+                 ~{OBSERVED_CONCURRENT_STREAM_LIMIT} at a time; the extra ones will receive no \
+                 ticks. Rotate a small pool of subscriptions, or poll `candles()` for snapshot \
+                 data instead of holding a stream per symbol."
+            );
+        }
+    }
+
+    /// Adds `asset` to the server-side watchlist that is streamed alongside the chart.
+    async fn send_subfor(&self, asset: &str) -> CoreResult<()> {
+        self.to_ws_sender
+            .send(Message::text(format!(r#"42["subfor","{asset}"]"#)))
+            .await
+            .map_err(CoreError::from)
+    }
+
+    /// Points the server's chart stream at `asset`, which is what actually starts
+    /// (and stops) a per-symbol tick stream.
+    async fn point_chart_at(&mut self, asset: &str, period: u32) -> CoreResult<()> {
+        let current = self
+            .state
+            .chart_symbol
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        if current.as_deref() == Some(asset) {
+            return Ok(());
+        }
+        self.to_ws_sender
+            .send(Message::text(
+                ChangeSymbol {
+                    asset: asset.to_string(),
+                    period: period as i64,
+                }
+                .to_string(),
+            ))
+            .await
+            .map_err(CoreError::from)?;
+        *self
+            .state
+            .chart_symbol
+            .write()
+            .unwrap_or_else(|e| e.into_inner()) = Some(asset.to_string());
+        Ok(())
+    }
+
+    /// Hands a released stream to a symbol that is still subscribed.
+    ///
+    /// Called when the chart symbol is unsubscribed: the server keeps streaming it
+    /// until the chart moves, so anything else we are still serving would starve.
+    async fn repoint_released_chart(&mut self, released: &str) {
+        let current = self
+            .state
+            .chart_symbol
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        if current.as_deref() != Some(released) {
+            return;
+        }
+        let next = {
+            let subscriptions = self.state.active_subscriptions.read().await;
+            subscriptions.keys().next().cloned()
+        };
+        match next {
+            Some(asset) => {
+                let period = self
+                    .state
+                    .active_subscriptions
+                    .read()
+                    .await
+                    .get(&asset)
+                    .and_then(|entries| {
+                        entries
+                            .iter()
+                            .find_map(|(_, sub_type, _)| sub_type.period_secs())
+                    })
+                    .unwrap_or(1);
+                if let Err(e) = self.point_chart_at(&asset, period).await {
+                    warn!(target: "SubscriptionsApiModule", "Failed to move the chart stream to {asset}: {}", e);
+                }
+            }
+            None => {
+                *self
+                    .state
+                    .chart_symbol
+                    .write()
+                    .unwrap_or_else(|e| e.into_inner()) = None;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use binary_options_tools_core::reimports::bounded_async;
+
+    /// Builds a module whose only observable side effect is what it sends on the wire.
+    async fn test_module() -> (SubscriptionsApiModule, AsyncReceiver<Message>) {
+        let ssid = crate::pocketoption::ssid::Ssid::parse(
+            r#"42["auth",{"session":"dummy","isDemo":1,"uid":1,"platform":2}]"#,
+        )
+        .unwrap();
+        let state = Arc::new(
+            crate::pocketoption::state::StateBuilder::default()
+                .ssid(ssid)
+                .build()
+                .unwrap(),
+        );
+        let (cmd_tx, cmd_rx) = bounded_async::<Command>(8);
+        let (resp_tx, _resp_rx) = bounded_async::<CommandResponse>(8);
+        let (_msg_tx, msg_rx) = bounded_async::<Arc<Message>>(8);
+        let (ws_tx, ws_rx) = bounded_async::<Message>(32);
+        let (runner_tx, _runner_rx) = bounded_async::<RunnerCommand>(4);
+        let module = SubscriptionsApiModule::new(state, cmd_rx, resp_tx, msg_rx, ws_tx, runner_tx);
+        drop(cmd_tx);
+        (module, ws_rx)
+    }
+
+    fn time_subscription(secs: u64) -> SubscriptionType {
+        SubscriptionType::Time {
+            start_time: None,
+            duration: Duration::from_secs(secs),
+            candle: Default::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn pointing_the_chart_sends_change_symbol_once() {
+        let (mut module, ws_rx) = test_module().await;
+
+        module.point_chart_at("EURUSD_otc", 5).await.unwrap();
+        module.point_chart_at("EURUSD_otc", 5).await.unwrap();
+        module.point_chart_at("GBPUSD_otc", 5).await.unwrap();
+
+        // Re-pointing at the symbol already streaming must not resend: every
+        // redundant `changeSymbol` interrupts the stream the server is sending.
+        assert_eq!(
+            ws_rx.recv().await.unwrap(),
+            Message::text(r#"42["changeSymbol",{"asset":"EURUSD_otc","period":5}]"#)
+        );
+        assert_eq!(
+            ws_rx.recv().await.unwrap(),
+            Message::text(r#"42["changeSymbol",{"asset":"GBPUSD_otc","period":5}]"#)
+        );
+        // `Ok(None)` is kanal's "nothing queued".
+        assert!(
+            matches!(ws_rx.try_recv(), Ok(None)),
+            "only real chart moves may be sent"
+        );
+    }
+
+    #[tokio::test]
+    async fn releasing_the_chart_symbol_hands_the_stream_to_a_live_subscription() {
+        let (mut module, ws_rx) = test_module().await;
+
+        // Two symbols are subscribed; the server only streams the chart symbol.
+        let (eur_tx, _eur_rx) = bounded_async::<SubscriptionEvent>(4);
+        let (gbp_tx, _gbp_rx) = bounded_async::<SubscriptionEvent>(4);
+        module
+            .add_subscription(
+                "EURUSD_otc".to_string(),
+                time_subscription(5),
+                eur_tx,
+                Uuid::new_v4(),
+            )
+            .await
+            .unwrap();
+        module
+            .add_subscription(
+                "GBPUSD_otc".to_string(),
+                time_subscription(60),
+                gbp_tx,
+                Uuid::new_v4(),
+            )
+            .await
+            .unwrap();
+
+        module.point_chart_at("EURUSD_otc", 5).await.unwrap();
+        assert_eq!(
+            ws_rx.recv().await.unwrap(),
+            Message::text(r#"42["changeSymbol",{"asset":"EURUSD_otc","period":5}]"#)
+        );
+
+        // Dropping the chart symbol must move the stream instead of leaving it
+        // parked on a symbol nobody consumes: the server ignores `unsubscribeSymbol`.
+        module
+            .remove_subscription("EURUSD_otc", None)
+            .await
+            .unwrap();
+        module.repoint_released_chart("EURUSD_otc").await;
+
+        match ws_rx.recv().await.unwrap() {
+            Message::Text(text) => {
+                assert!(
+                    text.contains(r#""asset":"GBPUSD_otc""#),
+                    "the stream should move to the remaining subscription, got {text}"
+                );
+                assert!(
+                    text.contains(r#""period":60"#),
+                    "the remaining subscription's period should be used, got {text}"
+                );
+            }
+            other => panic!("expected a changeSymbol frame, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn releasing_a_non_chart_symbol_leaves_the_stream_alone() {
+        let (mut module, ws_rx) = test_module().await;
+        module.point_chart_at("EURUSD_otc", 5).await.unwrap();
+        ws_rx.recv().await.unwrap();
+
+        module.repoint_released_chart("GBPUSD_otc").await;
+        assert!(
+            matches!(ws_rx.try_recv(), Ok(None)),
+            "releasing a symbol that is not the chart must not move the chart"
+        );
+    }
 
     #[tokio::test]
     async fn dropping_armed_history_guard_cancels_pending_request() {

@@ -10,7 +10,7 @@ use rust_decimal::prelude::ToPrimitive;
 use serde::Deserialize;
 use tokio::sync::Mutex;
 use tokio::{select, time::timeout};
-use tracing::warn;
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::pocketoption::candle::{
@@ -19,7 +19,7 @@ use crate::pocketoption::candle::{
 use crate::pocketoption::error::{PocketError, PocketResult};
 use crate::pocketoption::state::State;
 use crate::pocketoption::types::MultiPatternRule;
-use crate::pocketoption::utils::{normalize_timestamp, parse_socketio_array};
+use crate::pocketoption::utils::{normalize_timestamp, parse_socketio_array, socketio_frame};
 
 const HISTORICAL_DATA_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_MISMATCH_RETRIES: usize = 5;
@@ -231,7 +231,7 @@ impl HistoricalDataHandle {
 }
 
 pub struct HistoricalDataApiModule {
-    _state: Arc<State>,
+    state: Arc<State>,
     command_receiver: AsyncReceiver<Command>,
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
@@ -255,7 +255,7 @@ impl ApiModule<State> for HistoricalDataApiModule {
         _: AsyncSender<RunnerCommand>,
     ) -> Self {
         Self {
-            _state: shared_state,
+            state: shared_state,
             command_receiver,
             command_responder,
             message_receiver,
@@ -284,40 +284,10 @@ impl ApiModule<State> for HistoricalDataApiModule {
                         Ok(cmd) => {
                             match cmd {
                                 Command::GetTicks { asset, period, req_id } => {
-                                    if let Some((prev_id, _, _, _)) = self.pending_request.take() {
-                                        warn!(target: "HistoricalDataApiModule", "Overwriting pending request {} due to concurrent call", prev_id);
-                                        let _ = self.command_responder.send(CommandResponse::Error {
-                                            req_id: prev_id,
-                                            error: "Request superseded by another concurrent call".to_string(),
-                                        }).await;
-                                    }
-                                    self.latest_ticks.remove(&asset);
-                                    self.pending_request = Some((req_id, asset.clone(), period, RequestType::Ticks));
-                                    let payload = serde_json::json!(["changeSymbol", { "asset": asset, "period": period }]);
-                                    let msg = format!("42{}", serde_json::to_string(&payload)?);
-                                    if let Err(e) = self.to_ws_sender.send(Message::text(msg)).await {
-                                        warn!(target: "HistoricalDataApiModule", "Failed to send history request: {}", e);
-                                        self.pending_request = None;
-                                        let _ = self.command_responder.send(CommandResponse::Error { req_id, error: e.to_string() }).await;
-                                    }
+                                    self.begin_request(asset, period, req_id, RequestType::Ticks).await;
                                 }
                                 Command::GetCandles { asset, period, req_id } => {
-                                    if let Some((prev_id, _, _, _)) = self.pending_request.take() {
-                                        warn!(target: "HistoricalDataApiModule", "Overwriting pending request {} due to concurrent call", prev_id);
-                                        let _ = self.command_responder.send(CommandResponse::Error {
-                                            req_id: prev_id,
-                                            error: "Request superseded by another concurrent call".to_string(),
-                                        }).await;
-                                    }
-                                    self.latest_ticks.remove(&asset);
-                                    self.pending_request = Some((req_id, asset.clone(), period, RequestType::Candles));
-                                    let payload = serde_json::json!(["changeSymbol", { "asset": asset, "period": period }]);
-                                    let msg = format!("42{}", serde_json::to_string(&payload)?);
-                                    if let Err(e) = self.to_ws_sender.send(Message::text(msg)).await {
-                                        warn!(target: "HistoricalDataApiModule", "Failed to send history request: {}", e);
-                                        self.pending_request = None;
-                                        let _ = self.command_responder.send(CommandResponse::Error { req_id, error: e.to_string() }).await;
-                                    }
+                                    self.begin_request(asset, period, req_id, RequestType::Candles).await;
                                 }
                             }
                         }
@@ -344,12 +314,14 @@ impl ApiModule<State> for HistoricalDataApiModule {
                             if response.is_none() {
                                 if let Message::Text(text) = &*msg {
                                     if let Some((symbol, timestamp, price)) = Self::parse_update_stream(text) {
+                                        let timestamp = self.state.normalize_stream_timestamp(timestamp);
                                         self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
                                         continue;
                                     }
                                 } else if let Message::Binary(data) = &*msg {
                                     if let Ok(text) = std::str::from_utf8(data) {
                                         if let Some((symbol, timestamp, price)) = Self::parse_update_stream(text) {
+                                            let timestamp = self.state.normalize_stream_timestamp(timestamp);
                                             self.latest_ticks.entry(symbol).or_default().push((timestamp, price));
                                             continue;
                                         }
@@ -399,7 +371,16 @@ impl ApiModule<State> for HistoricalDataApiModule {
                                                         if let Ok(c) = Candle::try_from((bc, symbol.clone())) { candles.push(c); }
                                                     }
                                                 }
-                                                let mut h_items = history_response.history.unwrap_or_default();
+                                                // Chart history arrives on the broker's wall clock;
+                                                // move it onto UTC before merging with the ticks
+                                                // buffered from `updateStream`.
+                                                let delta = -self.state.broker_clock_offset();
+                                                let mut h_items: Vec<HistoryItem> = history_response
+                                                    .history
+                                                    .unwrap_or_default()
+                                                    .into_iter()
+                                                    .map(|item| item.shifted(delta))
+                                                    .collect();
                                                 if let Some(s_ticks) = self.latest_ticks.get(&symbol) {
                                                     for &(ts, price) in s_ticks {
                                                         h_items.push(HistoryItem::Tick([serde_json::Value::from(ts as f64), serde_json::Value::from(price)]));
@@ -446,11 +427,15 @@ impl ApiModule<State> for HistoricalDataApiModule {
 
 impl HistoricalDataApiModule {
     /// Parses a binary frame as a `ServerResponse`.
+    ///
+    /// Most binary frames this module sees are `updateStream` ticks, which are not
+    /// a `ServerResponse`; they are handled by `parse_update_stream` right after, so
+    /// the mismatch is logged at debug level instead of warning on every tick.
     fn parse_binary_response(data: &[u8]) -> Option<ServerResponse> {
         match serde_json::from_slice::<ServerResponse>(data) {
             Ok(res) => Some(res),
             Err(e) => {
-                warn!(target: "HistoricalDataApiModule", "Failed to parse binary ServerResponse: {}", e);
+                debug!(target: "HistoricalDataApiModule", "Binary frame is not a ServerResponse: {}", e);
                 None
             }
         }
@@ -502,14 +487,11 @@ impl HistoricalDataApiModule {
     fn parse_update_stream(text: &str) -> Option<(String, i64, f64)> {
         let arr = parse_socketio_array(text)?.ok()?;
         let outer = arr.as_array()?;
-        let data = if let Some(first) = outer.first() {
-            if first.is_string() && outer.len() >= 2 {
-                outer.get(1)?.as_array()?
-            } else {
-                outer
-            }
+        let first = outer.first()?;
+        let data = if first.is_string() && outer.len() >= 2 {
+            outer.get(1)?.as_array()?
         } else {
-            return None;
+            outer
         };
         if let Some(inner) = data.first().and_then(|v| v.as_array()) {
             if inner.len() >= 3 {
@@ -521,6 +503,49 @@ impl HistoricalDataApiModule {
             }
         }
         None
+    }
+
+    /// Registers `req_id` as the pending request and asks the server for history.
+    ///
+    /// A concurrent call supersedes the previous pending request: the endpoint answers
+    /// one request per symbol change, so keeping more than one would leave a caller
+    /// waiting for a response that is never sent.
+    async fn begin_request(
+        &mut self,
+        asset: String,
+        period: u32,
+        req_id: Uuid,
+        request_type: RequestType,
+    ) {
+        if let Some((prev_id, _, _, _)) = self.pending_request.take() {
+            warn!(target: "HistoricalDataApiModule", "Overwriting pending request {} due to concurrent call", prev_id);
+            let _ = self
+                .command_responder
+                .send(CommandResponse::Error {
+                    req_id: prev_id,
+                    error: "Request superseded by another concurrent call".to_string(),
+                })
+                .await;
+        }
+
+        self.latest_ticks.remove(&asset);
+        self.pending_request = Some((req_id, asset.clone(), period, request_type));
+
+        let msg = socketio_frame(
+            "changeSymbol",
+            &serde_json::json!({ "asset": asset, "period": period }),
+        );
+        if let Err(e) = self.to_ws_sender.send(Message::text(msg)).await {
+            warn!(target: "HistoricalDataApiModule", "Failed to send history request: {}", e);
+            self.pending_request = None;
+            let _ = self
+                .command_responder
+                .send(CommandResponse::Error {
+                    req_id,
+                    error: e.to_string(),
+                })
+                .await;
+        }
     }
 
     async fn notify_waiters_module_stopped(&mut self) {

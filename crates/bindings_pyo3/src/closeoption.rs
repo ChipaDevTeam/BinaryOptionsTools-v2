@@ -1,6 +1,6 @@
 use binary_options_tools::closeoption::CloseOption;
 use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, PyAny, PyErr, PyResult, Python};
-use pyo3_async_runtimes::tokio::future_into_py;
+use pyaio_faq::tokio::future_into_py;
 use std::time::Duration;
 
 use crate::error::BinaryErrorPy;

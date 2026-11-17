@@ -20,6 +20,8 @@ class MockRawClient:
     def __init__(self, *args, **kwargs):
         self._closed = False
         self._connected = True
+        self._responsive = True
+        self._frame_age = 0.5
 
     async def buy(self, asset, amount, time):
         return "trade_123", json.dumps(
@@ -110,8 +112,16 @@ class MockRawClient:
     async def clear_closed_deals(self):
         pass
 
-    async def payout(self):
-        return json.dumps({"EURUSD_otc": 85, "GBPUSD_otc": 82, "BTCUSD_otc": 78})
+    async def payout(self, assets=None):
+        payouts = {"EURUSD_otc": 85, "GBPUSD_otc": 82, "BTCUSD_otc": 78}
+        if assets is not None:
+            payouts = {
+                symbol: payouts[symbol] for symbol in assets if symbol in payouts
+            }
+        return json.dumps(payouts)
+
+    async def payout_for(self, asset):
+        return {"EURUSD_otc": 85, "GBPUSD_otc": 82, "BTCUSD_otc": 78}.get(asset)
 
     async def active_assets(self):
         return json.dumps(
@@ -171,6 +181,15 @@ class MockRawClient:
 
     def is_demo(self):
         return True
+
+    def is_connected(self):
+        return self._connected
+
+    def is_responsive(self, max_silence):
+        return self._connected and self._responsive and self._frame_age <= max_silence
+
+    def seconds_since_last_frame(self):
+        return self._frame_age if self._connected else None
 
     async def disconnect(self):
         self._connected = False
@@ -761,6 +780,455 @@ class TestCandles:
         assert isinstance(forming, (dict, type(None)))
 
 
+class TestCandlesMany:
+    """Tests for the batched candle snapshot helper."""
+
+    @pytest.mark.asyncio
+    async def test_compiles_closed_snapshots_without_subscriptions(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """candles_many() snapshots ticks for each symbol and skips the forming candle."""
+        rows = json.dumps(
+            [
+                {
+                    "timestamp": 1000,
+                    "open": 1.1,
+                    "high": 1.2,
+                    "low": 1.0,
+                    "close": 1.15,
+                    "is_closed": True,
+                },
+                {
+                    "timestamp": 1060,
+                    "open": 1.15,
+                    "high": 1.25,
+                    "low": 1.1,
+                    "close": 1.2,
+                    "is_closed": False,
+                },
+            ]
+        )
+        mock_raw_pocketoption.compile_candles = AsyncMock(return_value=rows)
+        # A live subscription per symbol is exactly what this method must avoid.
+        async_client.candles = AsyncMock(
+            side_effect=AssertionError("candles_many must not open live streams")
+        )
+
+        feed = await async_client.candles_many(
+            ["EURUSD_otc", "GBPUSD_otc", "EURUSD_otc"], 60, count=5
+        )
+
+        assert set(feed) == {"EURUSD_otc", "GBPUSD_otc"}
+        assert feed["EURUSD_otc"] == [
+            {"time": 1000, "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15}
+        ]
+        # Duplicate symbols collapse into one request per symbol.
+        assert mock_raw_pocketoption.compile_candles.await_count == 2
+        mock_raw_pocketoption.compile_candles.assert_any_await("EURUSD_otc", 60, 300)
+        mock_raw_pocketoption.compile_candles.assert_any_await("GBPUSD_otc", 60, 300)
+
+    @pytest.mark.asyncio
+    async def test_one_bad_symbol_does_not_fail_the_batch(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A closed market or unknown symbol is omitted, not raised."""
+
+        async def compile_candles(asset, period, lookback):
+            if asset == "CLOSED":
+                raise ValueError("Asset `CLOSED` is not active")
+            return json.dumps(
+                [
+                    {
+                        "timestamp": 1000,
+                        "open": 1.1,
+                        "high": 1.2,
+                        "low": 1.0,
+                        "close": 1.15,
+                        "is_closed": True,
+                    }
+                ]
+            )
+
+        mock_raw_pocketoption.compile_candles = AsyncMock(side_effect=compile_candles)
+
+        feed = await async_client.candles_many(["EURUSD_otc", "CLOSED"], 60, count=1)
+
+        assert set(feed) == {"EURUSD_otc"}
+
+    @pytest.mark.asyncio
+    async def test_empty_or_non_positive_count_makes_no_requests(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Degenerate batches return immediately."""
+        mock_raw_pocketoption.compile_candles = AsyncMock()
+
+        assert await async_client.candles_many([], 60) == {}
+        assert await async_client.candles_many(["EURUSD_otc"], 60, count=0) == {}
+        mock_raw_pocketoption.compile_candles.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_repeated_call_within_candle_is_cached(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A second poll inside the same candle period reuses the snapshot."""
+        mock_raw_pocketoption.compile_candles = AsyncMock(
+            return_value=json.dumps(
+                [
+                    {
+                        "time": 1699999920,
+                        "open": 1.1,
+                        "high": 1.2,
+                        "low": 1.0,
+                        "close": 1.15,
+                    }
+                ]
+            )
+        )
+
+        first = await async_client.candles_many(["EURUSD_otc"], 60, count=1)
+        second = await async_client.candles_many(["EURUSD_otc"], 60, count=1)
+
+        assert first == second
+        assert first["EURUSD_otc"][-1]["time"] == 1699999920
+        mock_raw_pocketoption.compile_candles.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_cache_invalidates_after_boundary(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Crossing a candle boundary refetches instead of serving a stale snapshot."""
+        mock_raw_pocketoption.get_server_time = AsyncMock(
+            side_effect=[1700000000, 1700000060]
+        )
+        mock_raw_pocketoption.compile_candles = AsyncMock(
+            side_effect=[
+                json.dumps(
+                    [
+                        {
+                            "time": 1699999920,
+                            "open": 1.1,
+                            "high": 1.2,
+                            "low": 1.0,
+                            "close": 1.15,
+                        }
+                    ]
+                ),
+                json.dumps(
+                    [
+                        {
+                            "time": 1699999980,
+                            "open": 1.15,
+                            "high": 1.25,
+                            "low": 1.1,
+                            "close": 1.2,
+                        }
+                    ]
+                ),
+            ]
+        )
+
+        await async_client.candles_many(["EURUSD_otc"], 60, count=1)
+        second = await async_client.candles_many(["EURUSD_otc"], 60, count=1)
+
+        assert second["EURUSD_otc"][-1]["time"] == 1699999980
+        assert mock_raw_pocketoption.compile_candles.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_existing_stale_entry_is_not_served(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A cached row older than the current boundary is refetched, not returned.
+
+        The cache is seeded directly with a poisoned snapshot so this fails on any
+        cache that never invalidates, without needing a first call to populate it.
+        """
+        async_client._candles_many_cache[("EURUSD_otc", 60, 1)] = (
+            1699999920,
+            [{"time": 1699999920, "open": 0.0, "high": 0.0, "low": 0.0, "close": 0.0}],
+        )
+        mock_raw_pocketoption.get_server_time = AsyncMock(return_value=1700000060)
+        mock_raw_pocketoption.compile_candles = AsyncMock(
+            return_value=json.dumps(
+                [
+                    {
+                        "time": 1699999980,
+                        "open": 1.15,
+                        "high": 1.25,
+                        "low": 1.1,
+                        "close": 1.2,
+                    }
+                ]
+            )
+        )
+
+        feed = await async_client.candles_many(["EURUSD_otc"], 60, count=1)
+
+        assert feed["EURUSD_otc"][-1]["time"] == 1699999980
+        assert feed["EURUSD_otc"][-1]["close"] == 1.2
+        mock_raw_pocketoption.compile_candles.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_cache_evicts_oldest_entry(
+        self, async_client, mock_raw_pocketoption, monkeypatch
+    ):
+        """The cache stays bounded by dropping the least recently used snapshot."""
+        import BinaryOptionsToolsV2.pocketoption.asynchronous as async_module
+
+        monkeypatch.setattr(async_module, "CANDLES_MANY_CACHE_MAX_ENTRIES", 2)
+        mock_raw_pocketoption.compile_candles = AsyncMock(
+            return_value=json.dumps(
+                [
+                    {
+                        "time": 1699999920,
+                        "open": 1.1,
+                        "high": 1.2,
+                        "low": 1.0,
+                        "close": 1.15,
+                    }
+                ]
+            )
+        )
+
+        for asset in ("EURUSD_otc", "GBPUSD_otc", "USDJPY_otc"):
+            await async_client.candles_many([asset], 60, count=1)
+
+        assert list(async_client._candles_many_cache) == [
+            ("GBPUSD_otc", 60, 1),
+            ("USDJPY_otc", 60, 1),
+        ]
+        assert mock_raw_pocketoption.compile_candles.await_count == 3
+
+    @pytest.mark.asyncio
+    async def test_concurrent_calls_share_one_fetch(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Concurrent callers for one key single-flight into a single request."""
+
+        async def compile_candles(asset, period, lookback):
+            await asyncio.sleep(0.05)
+            return json.dumps(
+                [
+                    {
+                        "time": 1699999920,
+                        "open": 1.1,
+                        "high": 1.2,
+                        "low": 1.0,
+                        "close": 1.15,
+                    }
+                ]
+            )
+
+        mock_raw_pocketoption.compile_candles = AsyncMock(side_effect=compile_candles)
+
+        results = await asyncio.gather(
+            async_client.candles_many(["EURUSD_otc"], 60, count=1),
+            async_client.candles_many(["EURUSD_otc"], 60, count=1),
+        )
+
+        assert results[0] == results[1]
+        assert set(results[0]) == {"EURUSD_otc"}
+        mock_raw_pocketoption.compile_candles.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_disconnected_client_raises_without_fetch(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A dead connection must not look like an empty market."""
+        mock_raw_pocketoption.compile_candles = AsyncMock()
+        mock_raw_pocketoption._connected = False
+
+        with pytest.raises(ConnectionError, match="not connected"):
+            await async_client.candles_many(["EURUSD_otc"], 60, count=1)
+
+        mock_raw_pocketoption.compile_candles.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_connection_lost_mid_batch_raises(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A connection that dies during the batch fails it, even if rows came back."""
+        mock_raw_pocketoption.is_connected = MagicMock(side_effect=[True, False])
+        mock_raw_pocketoption.compile_candles = AsyncMock(
+            return_value=json.dumps(
+                [
+                    {
+                        "time": 1699999920,
+                        "open": 1.1,
+                        "high": 1.2,
+                        "low": 1.0,
+                        "close": 1.15,
+                    }
+                ]
+            )
+        )
+
+        with pytest.raises(ConnectionError, match="connection was lost"):
+            await async_client.candles_many(["EURUSD_otc"], 60, count=1)
+
+    @pytest.mark.asyncio
+    async def test_channel_closed_error_raises(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """The runner's channel-receiver error surfaces as ConnectionError."""
+        mock_raw_pocketoption.compile_candles = AsyncMock(
+            side_effect=RuntimeError("Core error: Channel receiver error: Closed")
+        )
+
+        with pytest.raises(ConnectionError, match="channel closed"):
+            await async_client.candles_many(["EURUSD_otc"], 60, count=1)
+
+        assert async_client._candles_many_cache == {}
+
+    @pytest.mark.asyncio
+    async def test_cached_lists_are_copied(self, async_client, mock_raw_pocketoption):
+        """Mutating a returned candle cannot corrupt the cached snapshot."""
+        mock_raw_pocketoption.compile_candles = AsyncMock(
+            return_value=json.dumps(
+                [
+                    {
+                        "time": 1699999920,
+                        "open": 1.1,
+                        "high": 1.2,
+                        "low": 1.0,
+                        "close": 1.15,
+                    }
+                ]
+            )
+        )
+
+        first = await async_client.candles_many(["EURUSD_otc"], 60, count=1)
+        first["EURUSD_otc"][0]["close"] = 999.0
+        second = await async_client.candles_many(["EURUSD_otc"], 60, count=1)
+
+        assert second["EURUSD_otc"][0]["close"] == 1.15
+        mock_raw_pocketoption.compile_candles.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_failed_fetch_is_not_cached(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A per-symbol failure is retried on the next poll."""
+        mock_raw_pocketoption.compile_candles = AsyncMock(
+            side_effect=[
+                ValueError("Asset `EURUSD_otc` is not active"),
+                json.dumps(
+                    [
+                        {
+                            "time": 1699999920,
+                            "open": 1.1,
+                            "high": 1.2,
+                            "low": 1.0,
+                            "close": 1.15,
+                        }
+                    ]
+                ),
+            ]
+        )
+
+        assert await async_client.candles_many(["EURUSD_otc"], 60, count=1) == {}
+        second = await async_client.candles_many(["EURUSD_otc"], 60, count=1)
+
+        assert set(second) == {"EURUSD_otc"}
+        assert mock_raw_pocketoption.compile_candles.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_non_positive_period_raises(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A zero or negative period is a caller error, not an empty batch."""
+        mock_raw_pocketoption.compile_candles = AsyncMock()
+
+        with pytest.raises(ValueError, match="period"):
+            await async_client.candles_many(["EURUSD_otc"], 0)
+
+        mock_raw_pocketoption.compile_candles.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_timeout_cancels_the_underlying_call(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """The deadline must reach the engine, not just stop the caller waiting."""
+        cancelled = asyncio.Event()
+
+        async def compile_candles(asset, period, lookback):
+            try:
+                await asyncio.sleep(30)
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+            return json.dumps([])
+
+        mock_raw_pocketoption.compile_candles = AsyncMock(side_effect=compile_candles)
+
+        with pytest.raises(TimeoutError, match="candles_many"):
+            await async_client.candles_many(["EURUSD_otc"], 60, count=1, timeout=0.05)
+
+        assert cancelled.is_set()
+        assert async_client._candles_many_cache == {}
+
+    @pytest.mark.asyncio
+    async def test_non_positive_timeout_raises(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A zero timeout is a caller error, not an instant empty batch."""
+        mock_raw_pocketoption.compile_candles = AsyncMock()
+
+        with pytest.raises(ValueError, match="timeout"):
+            await async_client.candles_many(["EURUSD_otc"], 60, count=1, timeout=0)
+
+        mock_raw_pocketoption.compile_candles.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_reconnect_clears_cache(self, async_client, mock_raw_pocketoption):
+        """A reconnect drops snapshots taken on the previous session."""
+        mock_raw_pocketoption.compile_candles = AsyncMock(
+            return_value=json.dumps(
+                [
+                    {
+                        "time": 1699999920,
+                        "open": 1.1,
+                        "high": 1.2,
+                        "low": 1.0,
+                        "close": 1.15,
+                    }
+                ]
+            )
+        )
+
+        await async_client.candles_many(["EURUSD_otc"], 60, count=1)
+        assert async_client._candles_many_cache
+
+        await async_client.reconnect()
+
+        assert async_client._candles_many_cache == {}
+        assert mock_raw_pocketoption.compile_candles.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_shutdown_clears_cache(self, async_client, mock_raw_pocketoption):
+        """Shutdown drops cached snapshots and their locks."""
+        mock_raw_pocketoption.compile_candles = AsyncMock(
+            return_value=json.dumps(
+                [
+                    {
+                        "time": 1699999920,
+                        "open": 1.1,
+                        "high": 1.2,
+                        "low": 1.0,
+                        "close": 1.15,
+                    }
+                ]
+            )
+        )
+
+        await async_client.candles_many(["EURUSD_otc"], 60, count=1)
+        assert async_client._candles_many_cache
+
+        await async_client.shutdown()
+
+        assert async_client._candles_many_cache == {}
+        assert async_client._candles_many_locks == {}
+
+
 class TestTicks:
     """Tests for the ticks method."""
 
@@ -1010,6 +1478,103 @@ class TestPayout:
     async def test_payout_invalid_asset(self, async_client):
         """Test payout for an unknown asset returns None."""
         assert await async_client.payout("INVALID_ASSET") is None
+
+    @pytest.mark.asyncio
+    async def test_payout_uses_the_single_symbol_binding(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """payout(asset) must not fetch (and parse) the whole catalog."""
+        mock_raw_pocketoption.payout_for = AsyncMock(return_value=85)
+        mock_raw_pocketoption.payout = AsyncMock(
+            side_effect=AssertionError("payout() must not fetch the catalog")
+        )
+
+        assert await async_client.payout("EURUSD_otc") == 85
+        mock_raw_pocketoption.payout_for.assert_awaited_once_with("EURUSD_otc")
+
+    @pytest.mark.asyncio
+    async def test_payouts_filters_to_the_watchlist(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """payouts(assets) forwards the filter instead of asking for everything."""
+        mock_raw_pocketoption.payout = AsyncMock(
+            return_value=json.dumps({"EURUSD_otc": 85})
+        )
+
+        payouts = await async_client.payouts(["EURUSD_otc", "INVALID_ASSET"])
+
+        assert payouts == {"EURUSD_otc": 85}
+        mock_raw_pocketoption.payout.assert_awaited_once_with(
+            ["EURUSD_otc", "INVALID_ASSET"]
+        )
+
+    @pytest.mark.asyncio
+    async def test_payouts_accepts_a_single_symbol(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A bare string must be one symbol, not an iterable of characters."""
+        mock_raw_pocketoption.payout = AsyncMock(
+            return_value=json.dumps({"EURUSD_otc": 85})
+        )
+
+        assert await async_client.payouts("EURUSD_otc") == {"EURUSD_otc": 85}
+        mock_raw_pocketoption.payout.assert_awaited_once_with(["EURUSD_otc"])
+
+    @pytest.mark.asyncio
+    async def test_payouts_without_filter_requests_the_full_catalog(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """The default keeps the old all-assets behaviour."""
+        mock_raw_pocketoption.payout = AsyncMock(
+            return_value=json.dumps({"EURUSD_otc": 85, "GBPUSD_otc": 82})
+        )
+
+        payouts = await async_client.payouts()
+
+        assert payouts == {"EURUSD_otc": 85, "GBPUSD_otc": 82}
+        mock_raw_pocketoption.payout.assert_awaited_once_with(None)
+
+    @pytest.mark.asyncio
+    async def test_payouts_timeout(self, async_client, mock_raw_pocketoption):
+        """A stalled payout read can be abandoned without holding the caller."""
+
+        async def slow_payout(assets=None):
+            await asyncio.sleep(30)
+            return "{}"
+
+        mock_raw_pocketoption.payout = AsyncMock(side_effect=slow_payout)
+
+        with pytest.raises(TimeoutError, match="payouts"):
+            await async_client.payouts(timeout=0.05)
+
+
+class TestLiveness:
+    """Tests for the non-blocking responsiveness check."""
+
+    @pytest.mark.asyncio
+    async def test_is_responsive_tracks_frame_age(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """Silence longer than max_silence marks the session unresponsive."""
+        assert async_client.is_responsive() is True
+
+        mock_raw_pocketoption._frame_age = 120.0
+        assert async_client.is_responsive(60.0) is False
+        assert async_client.is_responsive(300.0) is True
+
+    @pytest.mark.asyncio
+    async def test_is_responsive_requires_a_connection(
+        self, async_client, mock_raw_pocketoption
+    ):
+        """A disconnected client is never responsive, however fresh the frame."""
+        mock_raw_pocketoption._connected = False
+        assert async_client.is_responsive() is False
+
+    @pytest.mark.asyncio
+    async def test_seconds_since_last_frame(self, async_client, mock_raw_pocketoption):
+        """The raw frame age is exposed for logging."""
+        mock_raw_pocketoption._frame_age = 12.5
+        assert async_client.seconds_since_last_frame() == 12.5
 
 
 class TestActiveAssets:
@@ -1423,19 +1988,19 @@ class TestSsidValidation:
         """A well-formed SSID with all required fields passes validation."""
         ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":1,"platform":2}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_valid_ssid_with_optional_fields(self):
         """SSID with optional fields like isFastHistory and isOptimized passes."""
         ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":1,"platform":2,"isFastHistory":true,"isOptimized":true}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_guest_token_payload_skips_session_validation(self):
         """A token-only guest payload is valid even without session/uid."""
         ssid = '42["auth",{"token":"9PRxPzq6mQ","balance":50000,"isFastHistory":true}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
         assert client._guest_session is True
 
     def test_account_ssid_is_not_marked_as_guest(self):
@@ -1473,67 +2038,104 @@ class TestSsidValidation:
         ssid = '42["auth",{"session":"!!!","uid":69982301}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
         # Should not raise, just warn
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_negative_uid_warns_but_proceeds(self):
         """A negative uid emits a warning but does not raise."""
         ssid = '42["auth",{"session":"abc123def456","uid":-1}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_non_integer_uid_warns_but_proceeds(self):
         """A non-integer uid emits a warning but does not raise."""
         ssid = '42["auth",{"session":"abc123def456","uid":"not_a_number"}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_invalid_is_demo_warns_but_proceeds(self):
         """An isDemo value that is not 0 or 1 emits a warning but does not raise."""
         ssid = '42["auth",{"session":"abc123def456","uid":69982301,"isDemo":5}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_invalid_platform_warns_but_proceeds(self):
         """A platform value that is not 1 or 2 emits a warning but does not raise."""
         ssid = '42["auth",{"session":"abc123def456","uid":69982301,"platform":99}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_non_42_prefix_returns_unchanged(self):
         """An SSID not starting with 42[ is returned as-is with validation skipped."""
         ssid = "not_a_valid_ssid"
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is False
+        assert client._ssid_format_valid is False
 
     def test_invalid_json_returns_unchanged(self):
         """An SSID with invalid JSON after 42[ is returned as-is with validation skipped."""
         ssid = "42[not valid json"
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is False
+        assert client._ssid_format_valid is False
 
     def test_ssid_with_single_quotes_normalized(self):
         """An SSID using single quotes around 'auth' is normalized to double quotes."""
         ssid = '42[\'auth\',{"session":"abc123def456","uid":69982301,"isDemo":1}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_shell_stripped_auth_normalized(self):
         """An SSID where auth lost its quotes due to shell expansion is normalized."""
         ssid = '42[auth,{"session":"abc123def456","uid":69982301,"isDemo":1}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     def test_payload_not_array_warns(self):
         """A payload that is not a [event, data] array is handled gracefully."""
         ssid = '42[{"session":"abc123def456","uid":69982301}]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
         # Payload is a dict, not an array — warns but proceeds
-        assert client.is_ssid_valid() is False
+        assert client._ssid_format_valid is False
 
     def test_none_ssid_skips_validation(self):
         """A None SSID skips validation and marks as invalid."""
         client = PocketOptionAsync(None, config={"terminal_logging": False})
+        assert client._ssid_format_valid is False
+
+
+class TestSsidValidityFromSession:
+    """`is_ssid_valid()` reports the live session, not the construction string."""
+
+    @staticmethod
+    def _client_with(inner):
+        # Bypass __init__: these cases are about the query, not the constructor.
+        client = object.__new__(PocketOptionAsync)
+        client.client = inner
+        return client
+
+    def test_unconnected_client_is_not_valid(self):
+        """A well-formed SSID proves nothing until the server accepts it."""
+        client = self._client_with(None)
         assert client.is_ssid_valid() is False
+
+    def test_rejected_session_is_not_valid(self):
+        """A rejection wins even if a stale confirmation were still set."""
+        inner = MagicMock()
+        inner.auth_error.return_value = "NotAuthorized"
+        inner.is_session_confirmed.return_value = True
+        assert self._client_with(inner).is_ssid_valid() is False
+
+    def test_unconfirmed_session_is_not_valid(self):
+        """Connected but never acked (the grace path) is not a valid session."""
+        inner = MagicMock()
+        inner.auth_error.return_value = None
+        inner.is_session_confirmed.return_value = False
+        assert self._client_with(inner).is_ssid_valid() is False
+
+    def test_confirmed_session_is_valid(self):
+        """The auth ack / balance frame is what makes the session valid."""
+        inner = MagicMock()
+        inner.auth_error.return_value = None
+        inner.is_session_confirmed.return_value = True
+        assert self._client_with(inner).is_ssid_valid() is True
 
 
 class TestAsynchronousExtraCoverage:
@@ -1543,7 +2145,7 @@ class TestAsynchronousExtraCoverage:
         # auth_data is not a dict
         ssid = '42["auth", "not-a-dict"]'
         client = PocketOptionAsync(ssid, config={"terminal_logging": False})
-        assert client.is_ssid_valid() is True
+        assert client._ssid_format_valid is True
 
     @pytest.mark.asyncio
     async def test_async_config_url_insert(self):

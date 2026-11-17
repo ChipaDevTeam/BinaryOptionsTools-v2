@@ -10,7 +10,11 @@ async function main(ssid) {
   const validator = Validator.contains('"signals"');
 
   // Sends the message, then yields matching responses for 10 seconds.
-  const stream = await api.createRawIterator('42["signals/subscribe"]', validator, 10_000);
+  const stream = await api.createRawIterator(
+    '42["signals/subscribe"]',
+    validator,
+    10_000,
+  );
 
   for await (const message of stream) {
     console.log(`Received: ${message}`);

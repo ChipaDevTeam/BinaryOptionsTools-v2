@@ -14,7 +14,9 @@ async function main(ssid) {
   for (const offset of offsets) {
     for (const frame of timeFrames) {
       const candles = await api.getCandles("EURUSD_otc", frame, offset);
-      console.log(`Offset ${offset}s, timeframe ${frame}s: ${candles.length} candles`);
+      console.log(
+        `Offset ${offset}s, timeframe ${frame}s: ${candles.length} candles`,
+      );
     }
   }
 

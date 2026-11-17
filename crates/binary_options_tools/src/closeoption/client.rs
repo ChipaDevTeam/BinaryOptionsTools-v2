@@ -364,27 +364,7 @@ impl CloseOption {
         amount: f64,
         duration: u32,
     ) -> Result<OrderResult, CloseOptionError> {
-        let time_intervals = Self::duration_to_time_intervals(duration)?;
-        let acc_type = self.state().acc_type().to_string();
-
-        let request = SetOrderRequest {
-            token: self.state().token.clone(),
-            time_intervals,
-            amount,
-            order_type: "call".to_string(),
-            public_code: self.state().public_code.clone(),
-            hidden_code: self.state().hidden_code.clone(),
-            acc_type,
-            pair: asset.to_string(),
-            contest_type: "".to_string(),
-        };
-
-        match self.send_and_wait(Outgoing::SetOrder(request)).await? {
-            SubscriptionEvent::SetOrderResult(result) => Ok(result),
-            _ => Err(CloseOptionError::General(
-                "Unexpected response type".to_string(),
-            )),
-        }
+        self.place_order(asset, amount, duration, "call").await
     }
 
     /// Place a SELL (PUT) order
@@ -394,19 +374,28 @@ impl CloseOption {
         amount: f64,
         duration: u32,
     ) -> Result<OrderResult, CloseOptionError> {
-        let time_intervals = Self::duration_to_time_intervals(duration)?;
-        let acc_type = self.state().acc_type().to_string();
+        self.place_order(asset, amount, duration, "put").await
+    }
 
+    /// Places an order of `order_type` (`"call"` for buy, `"put"` for sell).
+    async fn place_order(
+        &self,
+        asset: &str,
+        amount: f64,
+        duration: u32,
+        order_type: &str,
+    ) -> Result<OrderResult, CloseOptionError> {
+        let state = self.state();
         let request = SetOrderRequest {
-            token: self.state().token.clone(),
-            time_intervals,
+            token: state.token.clone(),
+            time_intervals: Self::duration_to_time_intervals(duration)?,
             amount,
-            order_type: "put".to_string(),
-            public_code: self.state().public_code.clone(),
-            hidden_code: self.state().hidden_code.clone(),
-            acc_type,
+            order_type: order_type.to_string(),
+            public_code: state.public_code.clone(),
+            hidden_code: state.hidden_code.clone(),
+            acc_type: state.acc_type().to_string(),
             pair: asset.to_string(),
-            contest_type: "".to_string(),
+            contest_type: String::new(),
         };
 
         match self.send_and_wait(Outgoing::SetOrder(request)).await? {

@@ -11,7 +11,7 @@ authors = [
 ]
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = ["binary options", "trading", "pocketoption", "finance", "async"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -20,7 +20,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -60,4 +59,4 @@ testpaths = ["../tests/python"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py39"
+target-version = "py310"

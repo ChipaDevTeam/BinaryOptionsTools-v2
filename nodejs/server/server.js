@@ -66,7 +66,10 @@ function describeError(error) {
   const match = /^([A-Za-z]+Error): (.*)$/s.exec(message);
   if (match) return { name: match[1], message: match[2] };
   console.error("[unhandled]", error);
-  return { name: "InternalError", message: "Something went wrong on the server. Check its log." };
+  return {
+    name: "InternalError",
+    message: "Something went wrong on the server. Check its log.",
+  };
 }
 
 function send(res, status, body, headers) {
@@ -79,28 +82,38 @@ function send(res, status, body, headers) {
   res.end(payload);
 }
 
-const fail = (res, status, name, message) => send(res, status, { error: { name, message } });
+const fail = (res, status, name, message) =>
+  send(res, status, { error: { name, message } });
 
 async function readJson(req) {
   const chunks = [];
   let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 1_000_000) throw apiError("InvalidParameterError", "The request body is too large.");
+    if (size > 1_000_000)
+      throw apiError("InvalidParameterError", "The request body is too large.");
     chunks.push(chunk);
   }
   if (!chunks.length) return {};
   try {
     return JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch {
-    throw apiError("InvalidParameterError", "The request body is not valid JSON.");
+    throw apiError(
+      "InvalidParameterError",
+      "The request body is not valid JSON.",
+    );
   }
 }
 
 function requireSession(res, id) {
   const session = sessions.get(id);
   if (!session) {
-    fail(res, 404, "NoSuchSession", "That session has expired or never existed. Connect again.");
+    fail(
+      res,
+      404,
+      "NoSuchSession",
+      "That session has expired or never existed. Connect again.",
+    );
     return null;
   }
   session.touched = Date.now();
@@ -115,7 +128,10 @@ function requireSession(res, id) {
  */
 function buildValidator(spec) {
   if (!spec || typeof spec !== "object") {
-    throw apiError("InvalidParameterError", "A validator spec must be an object.");
+    throw apiError(
+      "InvalidParameterError",
+      "A validator spec must be an object.",
+    );
   }
   switch (spec.type) {
     case "none":
@@ -143,7 +159,8 @@ function buildValidator(spec) {
 }
 
 const isPublic = (key) =>
-  !["constructor", "prototype", "length", "name"].includes(key) && !key.includes("_");
+  !["constructor", "prototype", "length", "name"].includes(key) &&
+  !key.includes("_");
 
 function describeClass(Class) {
   const members = (target) =>
@@ -156,7 +173,8 @@ function describeClass(Class) {
 // --- routes ---------------------------------------------------------------
 
 const routes = [];
-const route = (method, pattern, handler) => routes.push({ method, pattern, handler });
+const route = (method, pattern, handler) =>
+  routes.push({ method, pattern, handler });
 
 route("GET", /^\/api\/health$/, async (req, res) => {
   let addon = null;
@@ -178,7 +196,14 @@ route("GET", /^\/api\/health$/, async (req, res) => {
 });
 
 route("GET", /^\/api\/surface$/, async (req, res) => {
-  const classes = ["PocketOption", "Validator", "RawHandle", "RawHandler", "CandleStream", "RawStream"];
+  const classes = [
+    "PocketOption",
+    "Validator",
+    "RawHandle",
+    "RawHandler",
+    "CandleStream",
+    "RawStream",
+  ];
   send(res, 200, {
     classes: classes.map((name) => ({ name, ...describeClass(lib[name]) })),
     functions: ["startLogs"],
@@ -188,7 +213,12 @@ route("GET", /^\/api\/surface$/, async (req, res) => {
 route("POST", /^\/api\/validator$/, async (req, res) => {
   const body = await readJson(req);
   if (typeof body.message !== "string") {
-    return fail(res, 400, "InvalidParameterError", "Send a `message` string to check.");
+    return fail(
+      res,
+      400,
+      "InvalidParameterError",
+      "Send a `message` string to check.",
+    );
   }
   const validator = buildValidator(body.validator);
   send(res, 200, { matches: validator.check(body.message) });
@@ -197,9 +227,17 @@ route("POST", /^\/api\/validator$/, async (req, res) => {
 route("POST", /^\/api\/session$/, async (req, res) => {
   const body = await readJson(req);
   const ssid = typeof body.ssid === "string" ? body.ssid.trim() : "";
-  if (!ssid) return fail(res, 400, "InvalidParameterError", "Send your PocketOption `ssid`.");
+  if (!ssid)
+    return fail(
+      res,
+      400,
+      "InvalidParameterError",
+      "Send your PocketOption `ssid`.",
+    );
 
-  const client = body.url ? PocketOption.withUrl(ssid, String(body.url)) : new PocketOption(ssid);
+  const client = body.url
+    ? PocketOption.withUrl(ssid, String(body.url))
+    : new PocketOption(ssid);
   await client.ready();
 
   const id = crypto.randomUUID();
@@ -220,7 +258,8 @@ route("GET", /^\/api\/session\/([\w-]+)$/, async (req, res, [id]) => {
 
 route("DELETE", /^\/api\/session\/([\w-]+)$/, async (req, res, [id]) => {
   const session = sessions.get(id);
-  if (!session) return fail(res, 404, "NoSuchSession", "That session has already gone.");
+  if (!session)
+    return fail(res, 404, "NoSuchSession", "That session has already gone.");
   sessions.delete(id);
   await session.client.shutdown().catch(() => {});
   send(res, 200, { closed: true });
@@ -239,23 +278,41 @@ route("GET", /^\/api\/session\/([\w-]+)\/payout$/, async (req, res, [id]) => {
   send(res, 200, { payouts: await session.client.payout() });
 });
 
-route("GET", /^\/api\/session\/([\w-]+)\/candles$/, async (req, res, [id], url) => {
-  const session = requireSession(res, id);
-  if (!session) return;
-  const asset = url.searchParams.get("asset") || "EURUSD_otc";
-  const period = Number(url.searchParams.get("period") || 60);
-  const candles = await session.client.candles(asset, period);
-  send(res, 200, { asset, period, count: candles.length, candles: candles.slice(-120) });
-});
+route(
+  "GET",
+  /^\/api\/session\/([\w-]+)\/candles$/,
+  async (req, res, [id], url) => {
+    const session = requireSession(res, id);
+    if (!session) return;
+    const asset = url.searchParams.get("asset") || "EURUSD_otc";
+    const period = Number(url.searchParams.get("period") || 60);
+    const candles = await session.client.candles(asset, period);
+    send(res, 200, {
+      asset,
+      period,
+      count: candles.length,
+      candles: candles.slice(-120),
+    });
+  },
+);
 
-route("GET", /^\/api\/session\/([\w-]+)\/ticks$/, async (req, res, [id], url) => {
-  const session = requireSession(res, id);
-  if (!session) return;
-  const asset = url.searchParams.get("asset") || "EURUSD_otc";
-  const seconds = Number(url.searchParams.get("seconds") || 300);
-  const ticks = await session.client.getTicks(asset, seconds);
-  send(res, 200, { asset, seconds, count: ticks.length, ticks: ticks.slice(-500) });
-});
+route(
+  "GET",
+  /^\/api\/session\/([\w-]+)\/ticks$/,
+  async (req, res, [id], url) => {
+    const session = requireSession(res, id);
+    if (!session) return;
+    const asset = url.searchParams.get("asset") || "EURUSD_otc";
+    const seconds = Number(url.searchParams.get("seconds") || 300);
+    const ticks = await session.client.getTicks(asset, seconds);
+    send(res, 200, {
+      asset,
+      seconds,
+      count: ticks.length,
+      ticks: ticks.slice(-500),
+    });
+  },
+);
 
 route("GET", /^\/api\/session\/([\w-]+)\/deals$/, async (req, res, [id]) => {
   const session = requireSession(res, id);
@@ -268,7 +325,12 @@ route("GET", /^\/api\/session\/([\w-]+)\/deals$/, async (req, res, [id]) => {
 
 route("POST", /^\/api\/session\/([\w-]+)\/trade$/, async (req, res, [id]) => {
   if (!ALLOW_TRADING) {
-    return fail(res, 403, "NotAllowedError", "Trading is off. Restart the server with ALLOW_TRADING=1 to place orders.");
+    return fail(
+      res,
+      403,
+      "NotAllowedError",
+      "Trading is off. Restart the server with ALLOW_TRADING=1 to place orders.",
+    );
   }
   const session = requireSession(res, id);
   if (!session) return;
@@ -278,53 +340,73 @@ route("POST", /^\/api\/session\/([\w-]+)\/trade$/, async (req, res, [id]) => {
   const amount = Number(body.amount);
   const seconds = Number(body.seconds || 60);
   if (!Number.isFinite(amount) || amount <= 0) {
-    return fail(res, 400, "InvalidParameterError", "`amount` must be a positive number.");
+    return fail(
+      res,
+      400,
+      "InvalidParameterError",
+      "`amount` must be a positive number.",
+    );
   }
-  const [dealId, deal] = await session.client[direction](asset, amount, seconds);
+  const [dealId, deal] = await session.client[direction](
+    asset,
+    amount,
+    seconds,
+  );
   send(res, 201, { dealId, deal });
 });
 
-route("GET", /^\/api\/session\/([\w-]+)\/result\/([\w-]+)$/, async (req, res, [id, dealId]) => {
-  const session = requireSession(res, id);
-  if (!session) return;
-  send(res, 200, { deal: await session.client.result(dealId) });
-});
+route(
+  "GET",
+  /^\/api\/session\/([\w-]+)\/result\/([\w-]+)$/,
+  async (req, res, [id, dealId]) => {
+    const session = requireSession(res, id);
+    if (!session) return;
+    send(res, 200, { deal: await session.client.result(dealId) });
+  },
+);
 
 /** Server-sent events: one message per candle, until the client disconnects. */
-route("GET", /^\/api\/session\/([\w-]+)\/stream$/, async (req, res, [id], url) => {
-  const session = requireSession(res, id);
-  if (!session) return;
-  const asset = url.searchParams.get("asset") || "EURUSD_otc";
-  const seconds = url.searchParams.get("seconds");
+route(
+  "GET",
+  /^\/api\/session\/([\w-]+)\/stream$/,
+  async (req, res, [id], url) => {
+    const session = requireSession(res, id);
+    if (!session) return;
+    const asset = url.searchParams.get("asset") || "EURUSD_otc";
+    const seconds = url.searchParams.get("seconds");
 
-  const stream = seconds
-    ? await session.client.subscribe(asset, Number(seconds))
-    : await session.client.subscribeSymbol(asset);
+    const stream = seconds
+      ? await session.client.subscribe(asset, Number(seconds))
+      : await session.client.subscribeSymbol(asset);
 
-  res.writeHead(200, {
-    "content-type": "text/event-stream",
-    "cache-control": "no-store",
-    connection: "keep-alive",
-  });
-  res.write(`event: open\ndata: ${JSON.stringify({ asset })}\n\n`);
+    res.writeHead(200, {
+      "content-type": "text/event-stream",
+      "cache-control": "no-store",
+      connection: "keep-alive",
+    });
+    res.write(`event: open\ndata: ${JSON.stringify({ asset })}\n\n`);
 
-  let live = true;
-  req.on("close", () => {
-    live = false;
-    session.client.unsubscribe(asset).catch(() => {});
-  });
+    let live = true;
+    req.on("close", () => {
+      live = false;
+      session.client.unsubscribe(asset).catch(() => {});
+    });
 
-  try {
-    for await (const candle of stream) {
-      if (!live) break;
-      session.touched = Date.now();
-      res.write(`data: ${JSON.stringify(candle)}\n\n`);
+    try {
+      for await (const candle of stream) {
+        if (!live) break;
+        session.touched = Date.now();
+        res.write(`data: ${JSON.stringify(candle)}\n\n`);
+      }
+    } catch (error) {
+      if (live)
+        res.write(
+          `event: error\ndata: ${JSON.stringify(describeError(error))}\n\n`,
+        );
     }
-  } catch (error) {
-    if (live) res.write(`event: error\ndata: ${JSON.stringify(describeError(error))}\n\n`);
-  }
-  res.end();
-});
+    res.end();
+  },
+);
 
 // --- static files ---------------------------------------------------------
 
@@ -340,8 +422,11 @@ function serveStatic(req, res, pathname) {
   const file = path.join(PUBLIC_DIR, rel);
   if (!file.startsWith(PUBLIC_DIR)) return fail(res, 403, "Forbidden", "No.");
   fs.readFile(file, (error, data) => {
-    if (error) return fail(res, 404, "NotFound", `No route or file for ${pathname}.`);
-    res.writeHead(200, { "content-type": TYPES[path.extname(file)] || "application/octet-stream" });
+    if (error)
+      return fail(res, 404, "NotFound", `No route or file for ${pathname}.`);
+    res.writeHead(200, {
+      "content-type": TYPES[path.extname(file)] || "application/octet-stream",
+    });
     res.end(data);
   });
 }
@@ -355,7 +440,8 @@ const server = http.createServer(async (req, res) => {
   if (!pathname.startsWith("/api/")) return serveStatic(req, res, pathname);
 
   if (AUTH_TOKEN) {
-    const supplied = url.searchParams.get("token") || req.headers["x-auth-token"];
+    const supplied =
+      url.searchParams.get("token") || req.headers["x-auth-token"];
     if (supplied !== AUTH_TOKEN) {
       return fail(res, 401, "Unauthorized", "Wrong or missing token.");
     }
@@ -364,7 +450,8 @@ const server = http.createServer(async (req, res) => {
   for (const { method, pattern, handler } of routes) {
     const match = pattern.exec(pathname);
     if (!match) continue;
-    if (req.method !== method) return fail(res, 405, "MethodNotAllowed", `Use ${method} here.`);
+    if (req.method !== method)
+      return fail(res, 405, "MethodNotAllowed", `Use ${method} here.`);
     try {
       return await handler(req, res, match.slice(1), url);
     } catch (error) {
@@ -385,18 +472,32 @@ const server = http.createServer(async (req, res) => {
 const LOOPBACK = ["127.0.0.1", "::1", "localhost"];
 if (!LOOPBACK.includes(HOST) && !AUTH_TOKEN && !ALLOW_NO_AUTH) {
   console.error(`Refusing to listen on ${HOST} without AUTH_TOKEN.`);
-  console.error("Anyone who can reach this port could drive any session opened on it.");
-  console.error("Set AUTH_TOKEN=<a long random string>, or ALLOW_NO_AUTH=1 if the network is genuinely trusted.");
+  console.error(
+    "Anyone who can reach this port could drive any session opened on it.",
+  );
+  console.error(
+    "Set AUTH_TOKEN=<a long random string>, or ALLOW_NO_AUTH=1 if the network is genuinely trusted.",
+  );
   process.exit(1);
 }
 
 server.listen(PORT, HOST, () => {
   console.log(`binary-options-tools API on http://${HOST}:${PORT}`);
   if (HOST === "127.0.0.1") {
-    console.log("Bound to localhost. To reach it from a phone, run with HOST=0.0.0.0");
+    console.log(
+      "Bound to localhost. To reach it from a phone, run with HOST=0.0.0.0",
+    );
   } else {
-    console.log("Reachable from your network. Anyone who can reach this port can use any");
-    console.log("session you open here, so set AUTH_TOKEN unless the network is trusted.");
+    console.log(
+      "Reachable from your network. Anyone who can reach this port can use any",
+    );
+    console.log(
+      "session you open here, so set AUTH_TOKEN unless the network is trusted.",
+    );
   }
-  console.log(ALLOW_TRADING ? "Trading is ENABLED — orders placed here are real." : "Trading is off (set ALLOW_TRADING=1 to enable).");
+  console.log(
+    ALLOW_TRADING
+      ? "Trading is ENABLED — orders placed here are real."
+      : "Trading is off (set ALLOW_TRADING=1 to enable).",
+  );
 });

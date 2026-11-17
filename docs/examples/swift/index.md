@@ -37,16 +37,17 @@ swift Balance.swift
 
 ## Important
 
-Always wait 5 seconds after initialization:
+The initializer awaits the auth handshake, so no fixed delay is needed:
 
 ```swift
 let client = try await PocketOption(ssid: "your-session-id")
-try await Task.sleep(nanoseconds: 5_000_000_000)  // Critical!
+let balance = try await client.balance()
+print("Balance: \(balance)")
 ```
 
 ## SwiftUI Integration
 
-See the Swift README in `BinaryOptionsToolsUni/out/swift/` for SwiftUI examples.
+Generate the Swift sources with `uniffi-bindgen ... --language swift --out-dir out/swift` (see [`crates/bindings_uniffi/README.md`](../../../crates/bindings_uniffi/README.md)).
 
 ---
 
@@ -54,6 +55,6 @@ See the Swift README in `BinaryOptionsToolsUni/out/swift/` for SwiftUI examples.
 
 - **✨ [ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=examples-lang&utm_campaign=BinaryOptionsToolsV2)** — AI-powered algorithmic **trading strategy builder**: describe your
   edge, get a working **CHTL** strategy, backtest it on historical data, deploy it to a live broker.
-  Free tier, browser and Android. *(A trading platform — not a general-purpose code editor.)*
+  Free tier, browser and Android. _(A trading platform — not a general-purpose code editor.)_
 - **📈 [ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** — hybrid crypto exchange: perpetuals, spot and margin, with demo mode.
 - **[Chipa Ecosystem overview](/ecosystem)** — how these fit together with this library.

@@ -1,4 +1,8 @@
-use std::{fmt::Debug, sync::Arc, time::Duration};
+use std::{
+    fmt::Debug,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use async_trait::async_trait;
 use binary_options_tools_core::{
@@ -10,14 +14,14 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tokio::{select, time::timeout};
-use tracing::warn;
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::pocketoption::{
     error::{PocketError, PocketResult},
     state::State,
     types::{FailOpenOrder, MultiPatternRule, OpenPendingOrder, PendingOrder},
-    utils::SocketIoFrame,
+    utils::{socketio_frame, SocketIoFrame},
 };
 
 const PENDING_ORDER_TIMEOUT: Duration = Duration::from_secs(30);
@@ -343,9 +347,11 @@ pub struct PendingTradesApiModule {
     command_responder: AsyncSender<CommandResponse>,
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
-    pending_open_requests: std::collections::VecDeque<Uuid>,
-    pending_cancel_requests: std::collections::VecDeque<(Uuid, String)>,
-    pending_cancel_multiple_requests: std::collections::VecDeque<(Uuid, Vec<String>)>,
+    /// Requests awaiting a response, each stamped with the moment it was sent.
+    /// The stamp is what lets a response be recognised as too late to answer.
+    pending_open_requests: std::collections::VecDeque<(Uuid, Instant)>,
+    pending_cancel_requests: std::collections::VecDeque<(Uuid, String, Instant)>,
+    pending_cancel_multiple_requests: std::collections::VecDeque<(Uuid, Vec<String>, Instant)>,
 }
 
 #[async_trait]
@@ -390,19 +396,25 @@ impl ApiModule<State> for PendingTradesApiModule {
                         Ok(cmd) => {
                             match cmd {
                                 Command::OpenPendingOrder { open_type, amount, asset, open_time, open_price, timeframe, min_payout, command, req_id } => {
-                                    self.pending_open_requests.push_back(req_id);
+                                    self.pending_open_requests.push_back((req_id, Instant::now()));
                                     let order = OpenPendingOrder::new(open_type, amount, asset, open_time, open_price, timeframe, min_payout, command);
                                     self.send_to_ws(Message::text(order.to_string()), "order").await?;
                                 }
                                 Command::CancelPendingOrder { ticket, req_id } => {
-                                    self.pending_cancel_requests.push_back((req_id, ticket.clone()));
-                                    let cancel_msg = serde_json::json!(["cancelPendingOrder", { "ticket": ticket }]);
-                                    self.send_to_ws(Message::text(format!("42{}", cancel_msg)), "cancel order").await?;
+                                    self.pending_cancel_requests.push_back((req_id, ticket.clone(), Instant::now()));
+                                    let frame = socketio_frame(
+                                        "cancelPendingOrder",
+                                        &serde_json::json!({ "ticket": ticket }),
+                                    );
+                                    self.send_to_ws(Message::text(frame), "cancel order").await?;
                                 }
                                 Command::CancelPendingOrders { tickets, req_id } => {
-                                    self.pending_cancel_multiple_requests.push_back((req_id, tickets.clone()));
-                                    let cancel_msg = serde_json::json!(["cancelPendingOrders", { "tickets": tickets }]);
-                                    self.send_to_ws(Message::text(format!("42{}", cancel_msg)), "batch cancel").await?;
+                                    self.pending_cancel_multiple_requests.push_back((req_id, tickets.clone(), Instant::now()));
+                                    let frame = socketio_frame(
+                                        "cancelPendingOrders",
+                                        &serde_json::json!({ "tickets": tickets }),
+                                    );
+                                    self.send_to_ws(Message::text(frame), "batch cancel").await?;
                                 }
                             }
                         }
@@ -511,13 +523,14 @@ impl PendingTradesApiModule {
 
     /// Records an `openPendingOrder` response and answers the oldest queued request.
     async fn handle_open_response(&mut self, response: ServerResponse) {
+        self.discard_abandoned_requests();
         if let ServerResponse::Success(ref pending_order) = response {
             self.state
                 .trade_state
                 .add_pending_deal(*pending_order.clone())
                 .await;
         }
-        let Some(req_id) = self.pending_open_requests.pop_front() else {
+        let Some((req_id, _)) = self.pending_open_requests.pop_front() else {
             return;
         };
         let response = match response {
@@ -532,7 +545,14 @@ impl PendingTradesApiModule {
 
     /// Answers the oldest single-cancel request with `cancel_res`.
     async fn handle_cancel_response(&mut self, cancel_res: CancelServerResponse) {
-        if let Some((req_id, _ticket)) = self.pending_cancel_requests.pop_front() {
+        self.discard_abandoned_requests();
+        // Only an accepted cancel means the broker dropped the order.
+        let cancelled: Vec<String> = match &cancel_res {
+            CancelServerResponse::SingleSuccess { ticket } => vec![ticket.clone()],
+            _ => Vec::new(),
+        };
+        if let Some((req_id, _queued_ticket, _)) = self.pending_cancel_requests.pop_front() {
+            self.forget_cancelled_orders(&cancelled).await;
             let _ = self
                 .command_responder
                 .send(cancel_response(cancel_res, req_id))
@@ -542,7 +562,13 @@ impl PendingTradesApiModule {
 
     /// Answers the oldest batch-cancel request with `cancel_res`.
     async fn handle_batch_cancel_response(&mut self, cancel_res: CancelServerResponse) {
-        if let Some((req_id, _tickets)) = self.pending_cancel_multiple_requests.pop_front() {
+        self.discard_abandoned_requests();
+        let cancelled: Vec<String> = match &cancel_res {
+            CancelServerResponse::BatchSuccess { cancelled } => cancelled.clone(),
+            _ => Vec::new(),
+        };
+        if let Some((req_id, _tickets, _)) = self.pending_cancel_multiple_requests.pop_front() {
+            self.forget_cancelled_orders(&cancelled).await;
             let _ = self
                 .command_responder
                 .send(cancel_response(cancel_res, req_id))
@@ -550,23 +576,59 @@ impl PendingTradesApiModule {
         }
     }
 
+    /// Drops requests whose waiter has already given up.
+    ///
+    /// `PendingTradesHandle` abandons a request after `PENDING_ORDER_TIMEOUT`.
+    /// Pairing a later response with that abandoned id would deliver the answer
+    /// to a receiver nobody holds and leave the *next* request off by one, so
+    /// entries older than the handle's patience are discarded first.
+    fn discard_abandoned_requests(&mut self) {
+        let now = Instant::now();
+        let abandoned =
+            |queued_at: &Instant| now.duration_since(*queued_at) >= PENDING_ORDER_TIMEOUT;
+        self.pending_open_requests.retain(|(_, at)| !abandoned(at));
+        self.pending_cancel_requests
+            .retain(|(_, _, at)| !abandoned(at));
+        self.pending_cancel_multiple_requests
+            .retain(|(_, _, at)| !abandoned(at));
+    }
+
+    /// Removes locally tracked pending orders the server confirmed as cancelled.
+    async fn forget_cancelled_orders(&self, tickets: &[String]) {
+        for ticket in tickets {
+            match Uuid::parse_str(ticket) {
+                Ok(id) => {
+                    let removed = self.state.trade_state.remove_pending_deal(&id).await;
+                    debug!(
+                        target: "PendingTradesApiModule",
+                        "Cancelled pending order {} removed locally: {}", ticket, removed.is_some()
+                    );
+                }
+                Err(_) => warn!(
+                    target: "PendingTradesApiModule",
+                    "Cancelled pending order reports a non-UUID ticket: {}", ticket
+                ),
+            }
+        }
+    }
+
     async fn notify_waiters_module_stopped(&mut self) {
         let open_waiters = std::mem::take(&mut self.pending_open_requests);
-        for req_id in open_waiters {
+        for (req_id, _) in open_waiters {
             let _ = self
                 .command_responder
                 .send(CommandResponse::Shutdown { req_id })
                 .await;
         }
         let cancel_waiters = std::mem::take(&mut self.pending_cancel_requests);
-        for (req_id, _ticket) in cancel_waiters {
+        for (req_id, _ticket, _) in cancel_waiters {
             let _ = self
                 .command_responder
                 .send(CommandResponse::Shutdown { req_id })
                 .await;
         }
         let cancel_multi_waiters = std::mem::take(&mut self.pending_cancel_multiple_requests);
-        for (req_id, _tickets) in cancel_multi_waiters {
+        for (req_id, _tickets, _) in cancel_multi_waiters {
             let _ = self
                 .command_responder
                 .send(CommandResponse::Shutdown { req_id })
@@ -578,21 +640,21 @@ impl PendingTradesApiModule {
 impl Drop for PendingTradesApiModule {
     fn drop(&mut self) {
         let open_waiters = std::mem::take(&mut self.pending_open_requests);
-        for req_id in &open_waiters {
+        for (req_id, _) in &open_waiters {
             let _ = self
                 .command_responder
                 .as_sync()
                 .try_send(CommandResponse::Shutdown { req_id: *req_id });
         }
         let cancel_waiters = std::mem::take(&mut self.pending_cancel_requests);
-        for (req_id, _) in &cancel_waiters {
+        for (req_id, _, _) in &cancel_waiters {
             let _ = self
                 .command_responder
                 .as_sync()
                 .try_send(CommandResponse::Shutdown { req_id: *req_id });
         }
         let cancel_multi_waiters = std::mem::take(&mut self.pending_cancel_multiple_requests);
-        for (req_id, _) in &cancel_multi_waiters {
+        for (req_id, _, _) in &cancel_multi_waiters {
             let _ = self
                 .command_responder
                 .as_sync()

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
 use std::time::Duration;
@@ -11,8 +10,8 @@ use binary_options_tools::validator::Validator as CrateValidator;
 use binary_options_tools::validator::Validator;
 use futures_util::stream::{BoxStream, Fuse};
 use futures_util::StreamExt;
+use pyaio_faq::tokio::future_into_py;
 use pyo3::{pyclass, pymethods, Bound, IntoPyObjectExt, Py, PyAny, PyResult, Python};
-use pyo3_async_runtimes::tokio::future_into_py;
 use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
 
@@ -221,9 +220,48 @@ impl RawPocketOption {
         self.client.is_demo()
     }
 
+    /// True once the server confirmed the session (auth ack or a balance frame).
+    ///
+    /// Assets are pushed to unauthenticated sockets too, so neither `is_connected`
+    /// nor the asset list proves anything; this is the only local signal that the
+    /// credentials were actually accepted.
+    pub fn is_session_confirmed(&self) -> bool {
+        self.client.is_session_confirmed()
+    }
+
+    /// The server's authentication rejection reason, if it rejected the session.
+    pub fn auth_error(&self) -> Option<String> {
+        self.client.auth_error()
+    }
+
     /// Returns true if the client is currently connected to the WebSocket server.
     pub fn is_connected(&self) -> bool {
         self.client.is_connected()
+    }
+
+    /// True when the socket is connected and a frame arrived within
+    /// `max_silence` seconds.
+    ///
+    /// Unlike a round-trip health check this only reads local state, so it
+    /// cannot block — use it to detect a wedged/half-dead session from another
+    /// thread without risking another stuck call.
+    #[pyo3(signature = (max_silence=None))]
+    pub fn is_responsive(&self, max_silence: Option<f64>) -> bool {
+        // `Duration::from_secs_f64` panics on negative, NaN and infinite input,
+        // and this method is documented as one that cannot fail.
+        let secs = max_silence.unwrap_or(60.0);
+        let secs = if secs.is_finite() {
+            secs.clamp(0.0, 86_400.0)
+        } else {
+            60.0
+        };
+        self.client.is_responsive(Duration::from_secs_f64(secs))
+    }
+
+    /// Seconds since the last inbound WebSocket frame, or `None` if no frame has
+    /// ever been received. Local read; never blocks.
+    pub fn seconds_since_last_frame(&self) -> Option<f64> {
+        self.client.seconds_since_last_frame()
     }
 
     pub fn buy<'py>(
@@ -460,6 +498,10 @@ impl RawPocketOption {
         let client = self.client.clone();
         future_into_py(py, async move {
             let deals = client.get_closed_deals().await;
+            // The state keeps deals in a map, but the Python API is documented as
+            // a list of deals (`List[Deal]`), so serialise the values as an array.
+            // Sorting by id keeps the order stable between calls.
+            let deals = binary_options_tools::pocketoption::utils::deals_into_sorted_vec(deals);
             Python::attach(|py| {
                 serde_json::to_string(&deals)
                     .map_err(BinaryErrorPy::from)?
@@ -497,6 +539,8 @@ impl RawPocketOption {
         let client = self.client.clone();
         future_into_py(py, async move {
             let deals = client.get_opened_deals().await;
+            // See `closed_deals`: the documented shape is a list, not a map.
+            let deals = binary_options_tools::pocketoption::utils::deals_into_sorted_vec(deals);
             let res = serde_json::to_string(&deals).map_err(BinaryErrorPy::from)?;
             Ok(res)
         })
@@ -519,22 +563,22 @@ impl RawPocketOption {
         })
     }
 
-    pub fn payout<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    /// Returns the payout percentages of the active assets as a JSON object.
+    ///
+    /// `assets` restricts the result to those symbols (unknown and inactive ones
+    /// are omitted); `None` returns every active asset. Filtering happens while
+    /// the cached catalog is read, so a watchlist poll does not serialise the
+    /// whole catalog.
+    #[pyo3(signature = (assets=None))]
+    pub fn payout<'py>(
+        &self,
+        py: Python<'py>,
+        assets: Option<Vec<String>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
         let client = self.client.clone();
         future_into_py(py, async move {
-            match client.assets().await {
-                Some(assets) => {
-                    let payouts: HashMap<&String, i32> = assets
-                        .0
-                        .iter()
-                        .filter_map(|(asset, symbol)| {
-                            if symbol.is_active {
-                                Some((asset, symbol.payout))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
+            match client.payouts(assets.as_deref()).await {
+                Some(payouts) => {
                     let res = serde_json::to_string(&payouts).map_err(BinaryErrorPy::from)?;
                     Ok(res)
                 }
@@ -543,6 +587,16 @@ impl RawPocketOption {
                 }
             }
         })
+    }
+
+    /// Returns the payout percentage of a single asset, or `None` when the
+    /// symbol is unknown or inactive.
+    ///
+    /// Unlike [`Self::payout`] this never serialises a map: it is the cheap path
+    /// for a per-order payout check.
+    pub fn payout_for<'py>(&self, py: Python<'py>, asset: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.client.clone();
+        future_into_py(py, async move { Ok(client.payout(&asset).await) })
     }
 
     pub fn active_assets<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {

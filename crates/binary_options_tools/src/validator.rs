@@ -49,6 +49,12 @@ impl Validator {
         Validator::Contains(substring)
     }
 
+    /// Match with a compiled regex.
+    ///
+    /// Patterns use the `regex-lite` syntax: no look-around, no backreferences and
+    /// no Unicode character classes (`\p{...}`). `\d`, `\w` and `\s` match ASCII
+    /// only. Unsupported syntax fails at `Regex::new` rather than producing a
+    /// validator that never matches.
     pub fn regex(regex: Regex) -> Self {
         Validator::Regex(regex)
     }
@@ -172,6 +178,22 @@ mod tests {
         let v = Validator::regex(re);
         assert!(v.call("12345"));
         assert!(!v.call("abc123"));
+    }
+
+    #[test]
+    fn test_validator_regex_is_ascii_only() {
+        // The workspace builds against regex-lite, where \d is [0-9]. Pin it so a
+        // future engine change cannot silently widen what a validator accepts.
+        let v = Validator::regex(Regex::new(r"^\d+$").unwrap());
+        assert!(v.call("12345"));
+        assert!(!v.call("\u{661}\u{662}\u{663}"), "Arabic-Indic digits are not \\d");
+    }
+
+    #[test]
+    fn test_validator_regex_unicode_classes_are_rejected() {
+        // Capability the regex crate had and regex-lite does not: callers get a
+        // construction error instead of a validator that matches nothing.
+        assert!(Regex::new(r"^\p{L}+$").is_err());
     }
 
     #[test]

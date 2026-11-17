@@ -216,7 +216,6 @@ pub struct RawApiModule {
     to_ws_sender: AsyncSender<Message>,
     #[allow(clippy::type_complexity)]
     sinks: Arc<RwLock<HashMap<Uuid, Arc<AsyncSender<Arc<Message>>>>>>,
-    keep_alive_msgs: Arc<RwLock<HashMap<Uuid, Outgoing>>>,
 }
 
 pub struct RawRule {
@@ -236,7 +235,7 @@ impl Rule for RawRule {
             .raw_validators
             .read()
             .unwrap_or_else(|e| e.into_inner());
-        for (_id, v) in validators.iter() {
+        for v in validators.values() {
             if v.call(msg_str.as_str()) {
                 return true;
             }
@@ -270,7 +269,6 @@ impl ApiModule<State> for RawApiModule {
             message_receiver,
             to_ws_sender,
             sinks: Arc::new(RwLock::new(HashMap::new())),
-            keep_alive_msgs: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -292,7 +290,10 @@ impl ApiModule<State> for RawApiModule {
                                     let id = Uuid::new_v4();
                                     self.state.add_raw_validator(id, validator);
                                     if let Some(msg) = keep_alive.clone() {
-                                        self.keep_alive_msgs.write().await.insert(id, msg);
+                                        // The reconnect callback re-sends from shared
+                                        // state, so this is the only copy: a private
+                                        // duplicate left the advertised re-send dead.
+                                        self.state.raw_keep_alive.write().await.insert(id, msg);
                                     }
                                     let (tx, rx) = bounded_async(64);
                                     self.sinks.write().await.insert(id, Arc::new(tx));
@@ -301,7 +302,7 @@ impl ApiModule<State> for RawApiModule {
                                 Command::Remove { id, command_id } => {
                                     let existed_state = self.state.remove_raw_validator(&id);
                                     let existed_sink = self.sinks.write().await.remove(&id).is_some();
-                                    self.keep_alive_msgs.write().await.remove(&id);
+                                    self.state.raw_keep_alive.write().await.remove(&id);
                                     let _ = self.command_responder.send(CommandResponse::Removed { command_id, id, existed: existed_state || existed_sink }).await;
                                 }
                                 Command::Send(Outgoing::Text(text)) => {
@@ -423,7 +424,7 @@ impl Drop for RawApiModule {
         if let Ok(mut sinks) = self.sinks.try_write() {
             sinks.clear();
         }
-        if let Ok(mut keep_alive) = self.keep_alive_msgs.try_write() {
+        if let Ok(mut keep_alive) = self.state.raw_keep_alive.try_write() {
             keep_alive.clear();
         }
         // Remove all raw validators from shared state

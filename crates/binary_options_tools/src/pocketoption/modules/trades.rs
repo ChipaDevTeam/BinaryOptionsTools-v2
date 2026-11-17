@@ -2,6 +2,7 @@ use std::{
     collections::{HashMap, VecDeque},
     fmt::Debug,
     sync::Arc,
+    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -23,6 +24,9 @@ use crate::pocketoption::{
     utils::SocketIoFrame,
 };
 
+/// How long a caller waits for its order to be answered.
+const TRADE_TIMEOUT: Duration = Duration::from_secs(60);
+
 /// Command enum for the `TradesApiModule`.
 #[derive(Debug)]
 pub enum Command {
@@ -35,19 +39,20 @@ pub enum Command {
         req_id: Uuid,
         responder: oneshot::Sender<PocketResult<Deal>>,
     },
+    /// Forget a request whose caller has stopped waiting for it.
+    ///
+    /// The caller is gone, so the entry must not answer it later; leaving it
+    /// behind would also skew failure correlation for the orders still in flight.
+    Cancel { req_id: Uuid },
 }
 
-/// CommandResponse enum for the `TradesApiModule`.
-/// Kept for trait compatibility but mostly unused in the new oneshot pattern.
+/// Response channel for the `TradesApiModule`.
+///
+/// Every order is answered through the `oneshot` carried by
+/// [`Command::OpenOrder`], so this type only exists to satisfy
+/// [`ApiModule`]; nothing is ever sent on it.
 #[derive(Debug)]
-pub enum CommandResponse {
-    /// Response for an `OpenOrder` command.
-    Success {
-        req_id: Uuid,
-        deal: Box<Deal>,
-    },
-    Error(Box<FailOpenOrder>),
-}
+pub enum CommandResponse {}
 
 #[derive(Deserialize)]
 #[serde(untagged)]
@@ -87,6 +92,7 @@ impl TradesHandle {
         req_id: Uuid,
     ) -> PocketResult<Deal> {
         let (tx, rx) = oneshot::channel();
+        let asset_for_error = asset.clone();
 
         self.sender
             .send(Command::OpenOrder {
@@ -100,11 +106,23 @@ impl TradesHandle {
             .await
             .map_err(CoreError::from)?;
 
-        match rx.await {
-            Ok(result) => result,
-            Err(_) => Err(PocketError::General(
+        // A dropped `failopenOrder` used to wedge the caller forever: the oneshot
+        // only resolved when the module itself died. Give the wait a deadline and
+        // tell the module to forget the request, so nothing answers a caller that
+        // has already given up.
+        match tokio::time::timeout(TRADE_TIMEOUT, rx).await {
+            Ok(Ok(result)) => result,
+            Ok(Err(_)) => Err(PocketError::General(
                 "TradesApiModule responder dropped".into(),
             )),
+            Err(_) => {
+                let _ = self.sender.send(Command::Cancel { req_id }).await;
+                Err(PocketError::Timeout {
+                    task: "trade_with_id".to_string(),
+                    context: format!("{} {} {:?}", asset_for_error, amount, action),
+                    duration: TRADE_TIMEOUT,
+                })
+            }
         }
     }
 
@@ -134,20 +152,29 @@ pub struct TradesApiModule {
     message_receiver: AsyncReceiver<Arc<Message>>,
     to_ws_sender: AsyncSender<Message>,
     pending_orders: HashMap<Uuid, PendingOrderTracker>,
-    // Secondary index for matching failures (which lack UUID)
-    // Map of (Asset, Amount, RequestUUID) -> Queue of UUIDs (each entry typically has 1 element)
-    /// A heuristic-based mapping for correlating server-side failures to client requests.
+    /// In-flight orders keyed by `(asset, amount)`, oldest first.
     ///
-    /// Since the PocketOption protocol does not return a `request_id` for `failopenOrder`
-    /// messages, we use a map keyed by (Asset, Amount, RequestUUID) to disambiguate
-    /// between multiple identical trades in flight.
-    ///
-    /// Each request gets its own entry keyed by its UUID as a nonce, preventing
-    /// race conditions when identical trades are executed simultaneously.
-    failure_matching: HashMap<(String, Decimal, Uuid), VecDeque<Uuid>>,
+    /// `failopenOrder` carries no `request_id`, so the only defensible
+    /// correlation is send order: the broker answers in the order it received.
+    /// Keying every request separately and then picking an arbitrary entry (as
+    /// this used to) could hand a failure to a caller whose own order was fine.
+    failure_matching: HashMap<(String, Decimal), VecDeque<Uuid>>,
 }
 
 impl TradesApiModule {
+    /// Forgets `req_id` as an in-flight order, leaving the rest of the queue.
+    fn forget_in_flight(&mut self, asset: &str, amount: Decimal, req_id: Uuid) {
+        let key = (asset.to_string(), amount);
+        if let Some(queue) = self.failure_matching.get_mut(&key) {
+            if let Some(pos) = queue.iter().position(|id| *id == req_id) {
+                queue.remove(pos);
+            }
+            if queue.is_empty() {
+                self.failure_matching.remove(&key);
+            }
+        }
+    }
+
     fn notify_waiters_module_stopped(&mut self) {
         let pending = std::mem::take(&mut self.pending_orders);
         if !pending.is_empty() {
@@ -221,8 +248,9 @@ impl ApiModule<State> for TradesApiModule {
                           };
                           self.pending_orders.insert(req_id, tracker);
 
-                          // Add to failure matching queue (keyed with req_id as nonce for disambiguation)
-                          let key = (asset.clone(), amount, req_id);
+                          // Track send order: this is the only thing `failopenOrder`
+                          // can be matched against.
+                          let key = (asset.clone(), amount);
                           self.failure_matching.entry(key).or_default().push_back(req_id);
 
                           // Create OpenOrder and send to WebSocket.
@@ -232,9 +260,22 @@ impl ApiModule<State> for TradesApiModule {
                               if let Some(tracker) = self.pending_orders.remove(&req_id) {
                                   let _ = tracker.responder.send(Err(CoreError::from(e).into()));
                               }
-                              let key = (asset_for_error, amount, req_id);
-                              self.failure_matching.remove(&key);
+                              self.forget_in_flight(&asset_for_error, amount, req_id);
                           }
+                      }
+                      Ok(Command::Cancel { req_id }) => {
+                          // The caller stopped waiting: drop the tracker (which
+                          // closes its responder) and every index entry for it.
+                          let tracker = self.pending_orders.remove(&req_id);
+                          if let Some(tracker) = tracker {
+                              self.forget_in_flight(&tracker.asset, tracker.amount, req_id);
+                          }
+                          self.state
+                              .trade_state
+                              .pending_market_orders
+                              .write()
+                              .await
+                              .remove(&req_id);
                       }
                       Err(_) => {
                           self.notify_waiters_module_stopped();
@@ -299,9 +340,9 @@ impl ApiModule<State> for TradesApiModule {
                                   if let Some(tracker) = self.pending_orders.remove(&id) {
                                       let _ = tracker.responder.send(Ok(*deal.clone()));
 
-                                      // Remove the specific failure_matching entry for this request
-                                      let key = (tracker.asset, tracker.amount, id);
-                                      self.failure_matching.remove(&key);
+                                      // This order is answered; it must no longer
+                                      // absorb a later failure meant for another.
+                                      self.forget_in_flight(&tracker.asset, tracker.amount, id);
                                   } else {
                                       warn!(target: "TradesApiModule", "Received success for unknown request ID: {}", id);
                                   }
@@ -313,18 +354,23 @@ impl ApiModule<State> for TradesApiModule {
                               let asset = fail.asset.clone();
                               let amount = fail.amount;
 
-                              // Find any entry in failure_matching matching this (asset, amount)
-                              // The triple key includes req_id as nonce for disambiguation
-                              let found_req_id = {
-                                  let matching: Vec<Uuid> = self.failure_matching.keys()
-                                      .filter(|(a, am, _)| a == &asset && *am == amount)
-                                      .map(|(_, _, req_id)| *req_id)
-                                      .collect();
-                                  matching.first().copied()
-                              };
+                              // The oldest still-unanswered order for this
+                              // (asset, amount) is the one the broker is
+                              // reporting: it answers in the order it received.
+                              let key = (asset.clone(), amount);
+                              let found_req_id = self
+                                  .failure_matching
+                                  .get_mut(&key)
+                                  .and_then(|queue| queue.pop_front());
+                              if self
+                                  .failure_matching
+                                  .get(&key)
+                                  .is_some_and(|queue| queue.is_empty())
+                              {
+                                  self.failure_matching.remove(&key);
+                              }
 
                               if let Some(req_id) = found_req_id {
-                                  self.failure_matching.remove(&(asset.clone(), amount, req_id));
 
                                   // Clean up pending_market_orders in state
                                   self.state.trade_state.pending_market_orders.write().await.remove(&req_id);

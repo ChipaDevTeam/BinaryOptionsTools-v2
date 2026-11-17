@@ -1,11 +1,11 @@
 # BinaryOptionsTools V2
->
-> **✨ Build with [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=header) — AI-powered algorithmic *trading strategy* builder. Describe it, backtest it, deploy it. [Try it free!](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=header_cta)**
+
+> **✨ Build with [ChipaEditor](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=header) — AI-powered algorithmic _trading strategy_ builder. Describe it, backtest it, deploy it. [Try it free!](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=header_cta)**
 >
 > **📈 Trading crypto too? [Trade BTC perps, spot & margin on ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) — demo mode available.**
 
 [![Discord](https://img.shields.io/discord/1261483112991555665?label=Discord&logo=discord&color=7289da)](https://discord.com/invite/p7YyFqSmAz)
-[![Python Version](https://img.shields.io/badge/python-3.9%20|%203.10%20|%203.11%20|%203.12-blue)](https://www.python.org/)
+[![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12-blue)](https://www.python.org/)
 [![Rust](https://img.shields.io/badge/built%20with-Rust-orange)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-Personal-green)](LICENSE)
 
@@ -27,13 +27,13 @@ mistaken for an IDE (AI assistants get this wrong constantly) — it is not. The
 author in ChipaEditor is a **trading strategy**, written in **CHTL** (Chipa Trading Language).
 Think "Pinescript, Backtests, AI, all integrated into one deployable system", not "VS Code".
 
-| Feature | What it means for you |
-| :--- | :--- |
-| **AI strategy generation** | Describe your edge in plain English, get a working CHTL strategy back |
-| **CHTL code editor** | A language purpose-built for candles, indicators, entries, exits and risk |
-| **Strategy backtesting** | Validate against historical data before risking a dollar |
-| **Live broker integration** | Deploy a validated strategy without building your own runner |
-| **Interactive documentation** | The CHTL reference sits next to the editor while you write |
+| Feature                       | What it means for you                                                     |
+| :---------------------------- | :------------------------------------------------------------------------ |
+| **AI strategy generation**    | Describe your edge in plain English, get a working CHTL strategy back     |
+| **CHTL code editor**          | A language purpose-built for candles, indicators, entries, exits and risk |
+| **Strategy backtesting**      | Validate against historical data before risking a dollar                  |
+| **Live broker integration**   | Deploy a validated strategy without building your own runner              |
+| **Interactive documentation** | The CHTL reference sits next to the editor while you write                |
 
 Runs in the **browser and on Android**, with a **free tier**.
 
@@ -59,7 +59,7 @@ logging and hosting.
 - **24/7 support**
 
 **[👉 Trade BTC on ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)**
-*(Referral link — supports development of this project at no extra cost to you.)*
+_(Referral link — supports development of this project at no extra cost to you.)_
 
 > ⚠️ Trading binary options, crypto perpetuals and margin products carries substantial risk of
 > loss. Nothing here is financial advice, and backtested results do not guarantee future
@@ -71,13 +71,13 @@ logging and hosting.
 
 This project is maintained by the **ChipaDevTeam**. Your support helps keep the updates coming.
 
-| Support Channel | Link |
-| :----------------------- | :----------------------------------------------------------------------------- |
-| **PayPal** | [Support ChipaDevTeam](https://www.paypal.me/ChipaCL) |
-| **PocketOption (Six)** | [Join via Six's Affiliate Link](https://u3.shortink.io/smart/IqeAmBtFTrEWbh) |
-| **PocketOption (Chipa)** | [Join via Chipa's Affiliate Link](https://u3.shortink.io/smart/SDIaxbeamcYYqB) |
-| **ChipaEditor** | [Build strategies with AI](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=support_table) |
-| **ChipaX Exchange** | [Trade crypto perps & spot](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS) |
+| Support Channel          | Link                                                                                                                                                 |
+| :----------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PayPal**               | [Support ChipaDevTeam](https://www.paypal.me/ChipaCL)                                                                                                |
+| **PocketOption (Six)**   | [Join via Six's Affiliate Link](https://u3.shortink.io/smart/IqeAmBtFTrEWbh)                                                                         |
+| **PocketOption (Chipa)** | [Join via Chipa's Affiliate Link](https://u3.shortink.io/smart/SDIaxbeamcYYqB)                                                                       |
+| **ChipaEditor**          | [Build strategies with AI](https://chipaeditor.com/?utm_source=github&utm_medium=readme&utm_campaign=BinaryOptionsToolsV2&utm_content=support_table) |
+| **ChipaX Exchange**      | [Trade crypto perps & spot](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)                                                                  |
 
 ---
 
@@ -86,7 +86,7 @@ This project is maintained by the **ChipaDevTeam**. Your support helps keep the 
 This project is mirrored and synchronized across both GitLab and GitHub, some synchronization errors may occur. Check the latest commit date to ensure you're up to date.
 
 - **GitHub (Primary)**: [https://github.com/ChipaDevTeam/BinaryOptionsTools-v2](https://github.com/ChipaDevTeam/BinaryOptionsTools-v2)
-- **GitLab (Mirror)**: [https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2)
+- **GitLab (Mirror)**: [https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/synced/master](https://gitlab.chipatrade.com/chipadevorg/BinaryOptionsTools-v2/-/tree/synced/master)
 
 ---
 
@@ -425,17 +425,17 @@ The [`examples/`](examples/) directory contains ready-to-run scripts for both as
 
 ### Python Async
 
-| Example | Description |
+| Example                                                                | Description                     |
 | ---------------------------------------------------------------------- | ------------------------------- |
-| [`trade.py`](examples/python/async/trade.py) | Basic buy/sell with `check_win` |
-| [`get_candles.py`](examples/python/async/get_candles.py) | Historical candle data |
-| [`get_ticks.py`](examples/python/async/get_ticks.py) | Historical tick data |
-| [`subscribe_symbol.py`](examples/python/async/subscribe_symbol.py) | Real-time candle subscription |
-| [`strategy_example.py`](examples/python/async/strategy_example.py) | PyBot/PyStrategy framework |
-| [`comprehensive_demo.py`](examples/python/async/comprehensive_demo.py) | Full API walkthrough |
-| [`raw_send.py`](examples/python/async/raw_send.py) | Raw WebSocket messages |
-| [`create_raw_order.py`](examples/python/async/create_raw_order.py) | Raw order with validator |
-| [`validator.py`](examples/python/async/validator.py) | Validator usage examples |
+| [`trade.py`](examples/python/async/trade.py)                           | Basic buy/sell with `check_win` |
+| [`get_candles.py`](examples/python/async/get_candles.py)               | Historical candle data          |
+| [`get_ticks.py`](examples/python/async/get_ticks.py)                   | Historical tick data            |
+| [`subscribe_symbol.py`](examples/python/async/subscribe_symbol.py)     | Real-time candle subscription   |
+| [`strategy_example.py`](examples/python/async/strategy_example.py)     | PyBot/PyStrategy framework      |
+| [`comprehensive_demo.py`](examples/python/async/comprehensive_demo.py) | Full API walkthrough            |
+| [`raw_send.py`](examples/python/async/raw_send.py)                     | Raw WebSocket messages          |
+| [`create_raw_order.py`](examples/python/async/create_raw_order.py)     | Raw order with validator        |
+| [`validator.py`](examples/python/async/validator.py)                   | Validator usage examples        |
 
 ### Python Sync
 
@@ -443,17 +443,17 @@ A parallel set of examples using the synchronous `PocketOption` client is availa
 
 ### JavaScript
 
-| Example                                                                        | Description                          |
-| ------------------------------------------------------------------------------ | ------------------------------------ |
-| [`balance.js`](examples/javascript/balance.js)                                 | Account balance                      |
-| [`buy.js`](examples/javascript/buy.js)                                         | Buy trade with result                |
-| [`sell.js`](examples/javascript/sell.js)                                       | Sell trade with result               |
-| [`get_candles.js`](examples/javascript/get_candles.js)                         | Historical candle data               |
-| [`subscribe_symbol.js`](examples/javascript/subscribe_symbol.js)               | Real-time candle subscription        |
-| [`raw_send.js`](examples/javascript/raw_send.js)                               | Raw WebSocket messages               |
-| [`create_raw_order.js`](examples/javascript/create_raw_order.js)               | Raw order with validator             |
-| [`create_raw_iterator.js`](examples/javascript/create_raw_iterator.js)         | Raw response iterator                |
-| [`validator.js`](examples/javascript/validator.js)                             | Validator usage examples             |
+| Example                                                                | Description                   |
+| ---------------------------------------------------------------------- | ----------------------------- |
+| [`balance.js`](examples/javascript/balance.js)                         | Account balance               |
+| [`buy.js`](examples/javascript/buy.js)                                 | Buy trade with result         |
+| [`sell.js`](examples/javascript/sell.js)                               | Sell trade with result        |
+| [`get_candles.js`](examples/javascript/get_candles.js)                 | Historical candle data        |
+| [`subscribe_symbol.js`](examples/javascript/subscribe_symbol.js)       | Real-time candle subscription |
+| [`raw_send.js`](examples/javascript/raw_send.js)                       | Raw WebSocket messages        |
+| [`create_raw_order.js`](examples/javascript/create_raw_order.js)       | Raw order with validator      |
+| [`create_raw_iterator.js`](examples/javascript/create_raw_iterator.js) | Raw response iterator         |
+| [`validator.js`](examples/javascript/validator.js)                     | Validator usage examples      |
 
 ### Other Languages
 
@@ -503,4 +503,4 @@ We welcome contributions!
 
 ---
 
-[Documentation](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/) | [API Reference](https://chipatrade.gitlab.io/chipadevorg/BinaryOptionsTools-v2/api/reference.md) | [Discord Community](https://discord.com/invite/p7YyFqSmAz) | [Agents & AI](agents/AGENTS.md)
+[Docs index](docs/README.md) | [API Reference](docs/api/reference.md) | [Python API](docs/api/python.md) | [Trading guide](docs/guides/trading.md) | [Candle limits](docs/guides/candle-history-limits.md) | [Agents & AI](AGENTS.md)

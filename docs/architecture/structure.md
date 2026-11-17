@@ -19,7 +19,7 @@ BinaryOptionsTools-v2/
 │   ├── bindings_napi/            # N-API (napi-rs) Node.js bindings
 │   └── macros/                   # Procedural macros for the rule system
 ├── python/
-│   └── BinaryOptionsToolsV2/     # Python package
+│   └── BinaryOptionsToolsV2/     # Python package (high-level wrappers + built extension)
 ├── nodejs/                       # Node.js package wrapping the N-API addon
 ├── examples/
 │   ├── python/                   # Python examples (async & sync)
@@ -30,7 +30,7 @@ BinaryOptionsTools-v2/
 │   ├── go/                       # Go examples
 │   ├── ruby/                     # Ruby examples
 │   └── csharp/                   # C# examples
-├── docs/                         # Documentation (MkDocs)
+├── docs/                         # Documentation (plain Markdown; no site generator)
 ├── tests/                        # Integration tests
 ├── .github/workflows/            # CI/CD pipelines
 └── Cargo.toml                    # Rust workspace root
@@ -154,6 +154,28 @@ src/
 └── logs.rs                   # Logging setup
 ```
 
+### `python/BinaryOptionsToolsV2`
+
+The Python package is layered on top of the PyO3 extension. Parsing, validation
+and ergonomic wrappers belong in `asynchronous.py`; `synchronous.py` only bridges
+coroutines onto the client's background loop. See
+[Python API Layers](python-api-layers.md) before adding a method.
+
+```
+python/BinaryOptionsToolsV2/
+├── __init__.py               # Re-exports PocketOptionAsync, PocketOption, ...
+├── BinaryOptionsToolsV2.pyd  # Built extension (not tracked)
+├── config.py                 # Config wrapper
+├── validator.py              # Validator wrapper
+├── tracing.py                # Logging setup
+└── pocketoption/
+    ├── asynchronous.py       # Supported async client (the implementation)
+    ├── synchronous.py        # Thread bridge over asynchronous.py
+    ├── models.py             # Trade / TradeResult dict helpers
+    ├── __init__.py           # Package exports
+    └── tools/login.py        # SSID login helpers
+```
+
 ### `crates/macros`
 
 Procedural macros for the rule system.
@@ -207,7 +229,7 @@ WebSocket --> Connector --> Runner --> Middleware (inbound) --> Router rules
                                    Callbacks                 Background Tasks            Commands + Responses
 ```
 
-See [Data Flow](/architecture/dataflow) for detailed diagrams.
+See [Data Flow](dataflow.md) for detailed diagrams.
 
 ## Build System
 
@@ -223,3 +245,10 @@ See [Data Flow](/architecture/dataflow) for detailed diagrams.
 - Python tests in `tests/python/`
 - Node.js smoke tests in `nodejs/test/` (`npm test`)
 - Examples serve as functional tests
+
+## Related pages
+
+- [Data Flow](dataflow.md)
+- [Python API Layers](python-api-layers.md)
+- [Deals, Trades and Pending Orders](deals-and-trades.md)
+- [Raw Handler Module](raw-module.md)

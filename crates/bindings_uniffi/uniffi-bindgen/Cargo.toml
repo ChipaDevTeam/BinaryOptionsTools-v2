@@ -1,0 +1,15 @@
+[package]
+name = "bo2-uniffi-bindgen"
+version = "0.2.18"
+edition = "2021"
+publish = false
+license-file = "../../../LICENSE"
+
+# Lives in its own crate so that uniffi/cli (askama, goblin, clap, cargo_metadata)
+# is only built when bindings are regenerated, not when the cdylib is compiled.
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/main.rs"
+
+[dependencies]
+uniffi = { workspace = true, features = ["cli"] }

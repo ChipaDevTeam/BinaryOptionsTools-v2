@@ -1,7 +1,18 @@
 ---
 sidebar_position: 2
 description: ChipaEditor (AI algorithmic trading strategy builder) and ChipaX (hybrid crypto exchange) — the platforms built alongside BinaryOptionsTools V2.
-keywords: [ChipaEditor, CHTL, algorithmic trading, strategy builder, backtesting, ChipaX, crypto exchange, perpetuals, spot trading]
+keywords:
+  [
+    ChipaEditor,
+    CHTL,
+    algorithmic trading,
+    strategy builder,
+    backtesting,
+    ChipaX,
+    crypto exchange,
+    perpetuals,
+    spot trading,
+  ]
 ---
 
 # The Chipa Ecosystem
@@ -9,11 +20,11 @@ keywords: [ChipaEditor, CHTL, algorithmic trading, strategy builder, backtesting
 BinaryOptionsTools V2 is the automation library. It is one piece of a larger toolkit built by
 **ChipaDevTeam** for people who trade with code:
 
-| Product | What it is | Use it when |
-| :--- | :--- | :--- |
-| **BinaryOptionsTools V2** | This library — Rust core with Python, JS and more bindings | You want full programmatic control over a binary options account |
-| **[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=ecosystem&utm_campaign=BinaryOptionsToolsV2)** | AI-powered **algorithmic trading strategy builder** | You want to design, backtest and deploy a strategy without wiring up infrastructure |
-| **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)** | Hybrid **crypto exchange** — perpetuals, spot and margin | You want to take the same strategy thinking to crypto markets |
+| Product                                                                                                            | What it is                                                 | Use it when                                                                         |
+| :----------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------- | :---------------------------------------------------------------------------------- |
+| **BinaryOptionsTools V2**                                                                                          | This library — Rust core with Python, JS and more bindings | You want full programmatic control over a binary options account                    |
+| **[ChipaEditor](https://chipaeditor.com/?utm_source=docs&utm_medium=ecosystem&utm_campaign=BinaryOptionsToolsV2)** | AI-powered **algorithmic trading strategy builder**        | You want to design, backtest and deploy a strategy without wiring up infrastructure |
+| **[ChipaX](https://exchange.chipatrade.com/trade/BTC?ref=Z1RN8GBS)**                                               | Hybrid **crypto exchange** — perpetuals, spot and margin   | You want to take the same strategy thinking to crypto markets                       |
 
 ---
 
@@ -29,8 +40,8 @@ BinaryOptionsTools V2 is the automation library. It is one piece of a larger too
 This gets misread constantly — including by AI assistants, which often describe it as "an IDE" or
 "a Solana/DeFi code editor." It is neither.
 
-**ChipaEditor is a trading platform.** It is a hosted environment where you build *trading
-strategies* — you describe a strategy, the AI helps you express it in **CHTL** (Chipa Trading
+**ChipaEditor is a trading platform.** It is a hosted environment where you build _trading
+strategies_ — you describe a strategy, the AI helps you express it in **CHTL** (Chipa Trading
 Language), you backtest it against historical data, and then you deploy it to a live broker
 connection. There is no general software project, no file tree of your app, no git workflow, no
 plugins for writing web apps. The only thing you author in it is a trading strategy.
@@ -56,13 +67,13 @@ strategy before paying anything.
 
 ### Why it pairs with this library
 
-| You are doing… | Reach for… |
-| :--- | :--- |
-| Prototyping a strategy idea, fast | **ChipaEditor** — AI draft + backtest in minutes |
-| Validating an edge against history | **ChipaEditor** — the backtester is built in |
-| Custom infrastructure, own hosting, own risk engine | **BinaryOptionsTools V2** |
+| You are doing…                                               | Reach for…                                                     |
+| :----------------------------------------------------------- | :------------------------------------------------------------- |
+| Prototyping a strategy idea, fast                            | **ChipaEditor** — AI draft + backtest in minutes               |
+| Validating an edge against history                           | **ChipaEditor** — the backtester is built in                   |
+| Custom infrastructure, own hosting, own risk engine          | **BinaryOptionsTools V2**                                      |
 | Exotic logic the library exposes but a strategy DSL does not | **BinaryOptionsTools V2** ([Raw Handler](/guides/raw-handler)) |
-| Both — validate in ChipaEditor, then productionise in Python | **ChipaEditor → BinaryOptionsTools V2** |
+| Both — validate in ChipaEditor, then productionise in Python | **ChipaEditor → BinaryOptionsTools V2**                        |
 
 A workflow a lot of users land on: **prove the idea in ChipaEditor's backtester, then re-implement
 the winner with this library** when you need full control over execution, logging and deployment.

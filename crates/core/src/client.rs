@@ -6,7 +6,7 @@ use crate::signals::Signals;
 use crate::traits::{ApiModule, AppState, ReconnectCallback, Rule, RunnerCommand};
 use futures_util::{stream::StreamExt, SinkExt};
 use kanal::{AsyncReceiver, AsyncSender};
-use rand::RngExt;
+use rand::Rng;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::future::Future;
@@ -193,6 +193,14 @@ impl<S: AppState> Client<S> {
         self.signal.is_connected()
     }
 
+    /// Milliseconds since the last inbound WebSocket frame.
+    ///
+    /// `None` means no frame has ever been received (the client has never
+    /// connected). This is a local read and never blocks.
+    pub fn millis_since_last_frame(&self) -> Option<u64> {
+        self.signal.millis_since_last_frame()
+    }
+
     /// Retrieves a clonable, typed handle to an already-registered module.
     pub async fn get_handle<M: ApiModule<S>>(&self) -> Option<M::Handle> {
         let handles = self.module_handles.read().await;
@@ -357,13 +365,21 @@ impl<S: AppState> ClientRunner<S> {
                 self.teardown_session(writer_task, reader_task, true).await;
                 false
             }
+            RunnerCommand::Connect | RunnerCommand::Reconnect => {
+                // Documented as "disconnect and reconnect", and callable in any
+                // state: tear the live session down (without holding) so the
+                // loop re-enters through `connect()` instead of swallowing the
+                // command as if it had been handled.
+                debug!(target: "Runner", "Connect/Reconnect command received while a session is active; tearing down first.");
+                self.teardown_session(writer_task, reader_task, false).await;
+                false
+            }
             RunnerCommand::Shutdown => {
                 debug!(target: "Runner", "Shutdown command received.");
                 self.teardown_session(writer_task, reader_task, false).await;
                 self.shutdown_requested = true;
                 false
             }
-            _ => true,
         }
     }
 
@@ -411,6 +427,12 @@ impl<S: AppState> ClientRunner<S> {
                 Ok(stream) => stream,
                 Err(e) => {
                     self.reconnect_attempts += 1;
+                    // Let middleware see the failure: without this the stack's
+                    // counters and `is_connected` never reflect reality.
+                    self.router
+                        .middleware_stack
+                        .record_connection_failure(&middleware_context, Some(e.to_string()))
+                        .await;
 
                     if self.max_allowed_loops > 0
                         && self.reconnect_attempts >= self.max_allowed_loops
@@ -437,7 +459,6 @@ impl<S: AppState> ClientRunner<S> {
                         if self.max_allowed_loops > 0 { self.max_allowed_loops.to_string() } else { "∞".to_string() },
                         delay);
                     tokio::time::sleep(delay).await;
-                    self.is_hard_disconnect = false;
                     continue;
                 }
             };
@@ -495,8 +516,14 @@ impl<S: AppState> ClientRunner<S> {
             let reader_task = tokio::spawn({
                 let to_ws_sender = self.to_ws_sender.clone();
                 let router = Arc::clone(&self.router);
+                let signal = self.signal.clone();
                 async move {
                     while let Some(Ok(msg)) = ws_reader.next().await {
+                        // Any inbound frame, including an Engine.IO ping, proves
+                        // the connection is still being serviced. `is_responsive`
+                        // reads this timestamp, so it must be updated before the
+                        // message is routed (routing can be slow or fail).
+                        signal.mark_frame();
                         if let Err(e) = router.route(Arc::new(msg), &to_ws_sender).await {
                             warn!(target: "Router", "Error routing message: {:?}", e);
                         }

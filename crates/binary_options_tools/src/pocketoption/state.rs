@@ -77,11 +77,32 @@ pub struct State {
     pub tls_cipher_suites: Option<Vec<String>>,
     pub tls_alpn: Option<Vec<String>>,
     pub raw_subscribers: RwLock<Vec<AsyncSender<Arc<Message>>>>,
-    /// Reason the server rejected authentication, if it did (e.g. `NotAuthorized`).
+    /// Asset the server's chart stream is currently pointed at.
     ///
+    /// The server streams ticks for the chart symbol only, so this is the thing
+    /// that actually decides which symbol produces data. It belongs to one
+    /// connection: a new socket has no chart until `changeSymbol` is sent again.
+    pub chart_symbol: SyncRwLock<Option<String>>,
+    /// Reason the server rejected authentication, if it did (e.g. `NotAuthorized`).
     /// Set by the init module so that client construction can report the real cause
     /// instead of a generic connection timeout.
     pub auth_error: SyncRwLock<Option<String>>,
+    /// Whether the server confirmed the session (auth ack or a balance frame).
+    ///
+    /// Assets are pushed to unauthenticated sockets too, so they prove nothing. A
+    /// confirmation is what distinguishes a usable session from one the server is
+    /// silently ignoring, e.g. a guest token it no longer accepts.
+    pub session_confirmed: std::sync::atomic::AtomicBool,
+    /// Notified when [`State::session_confirmed`] flips to true.
+    pub session_confirmed_notice: Arc<tokio::sync::Notify>,
+    /// Difference between the broker's clock and UTC, in seconds.
+    ///
+    /// The broker stamps live data with its own wall clock: `updateStream` ticks,
+    /// `updateHistoryNewFast` history and deals all arrive on a clock that runs two
+    /// hours ahead of UTC, while `loadHistoryPeriod` history is stamped in UTC.
+    /// Recording the difference keeps live ticks on the same timeline as history
+    /// instead of producing candles two hours in the future.
+    pub broker_clock_offset: std::sync::atomic::AtomicI64,
 }
 /// Builder pattern for creating State instances
 ///
@@ -198,7 +219,11 @@ impl StateBuilder {
             tls_cipher_suites: self.tls_cipher_suites,
             tls_alpn: self.tls_alpn,
             raw_subscribers: RwLock::new(Vec::new()),
+            chart_symbol: SyncRwLock::new(None),
             auth_error: SyncRwLock::new(None),
+            session_confirmed: std::sync::atomic::AtomicBool::new(false),
+            session_confirmed_notice: Arc::new(tokio::sync::Notify::new()),
+            broker_clock_offset: std::sync::atomic::AtomicI64::new(0),
         })
     }
 }
@@ -218,9 +243,30 @@ impl AppState for State {
 
         // Mark subscriptions as requiring re-subscription
         self.active_subscriptions.write().await.clear();
+        // The chart stream belongs to the connection that pointed it: a new
+        // socket charts nothing until `changeSymbol` is sent again, so the
+        // pointer must not survive and suppress that re-send.
+        *self.chart_symbol.write().unwrap_or_else(|e| e.into_inner()) = None;
+        // Raw handlers own their state for their whole lifetime, not for the
+        // connection's. Their sinks, validators and keep-alives must survive a
+        // reconnect -- the module re-sends the keep-alives and the handlers keep
+        // matching -- so nothing here is cleared. `RawApiModule::drop` cleans up.
 
-        // Clear raw validators
-        self.clear_raw_validators();
+        // Confirmation and rejection describe one connection, not the client:
+        // a new socket has not yet been accepted (or refused) by the server.
+        // Keeping a stale `true` here lets construction skip the handshake and
+        // hand back a client whose snapshots were never sent.
+        self.session_confirmed
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        if let Ok(mut guard) = self.auth_error.write() {
+            *guard = None;
+        }
+
+        // The clock offset belongs to the server we were just talking to. A
+        // reconnect can land on a region with a different clock, so the next
+        // live tick has to re-measure it instead of inheriting the old shift.
+        self.broker_clock_offset
+            .store(0, std::sync::atomic::Ordering::SeqCst);
 
         // Note: We don't clear server time as it's useful to maintain
         // time synchronization across reconnections
@@ -252,6 +298,39 @@ impl State {
         let mut state = self.balance.write().await;
         *state = Some(balance);
         self.balance_updated.notify_waiters();
+        // Balance frames are only sent to authenticated sockets.
+        self.mark_session_confirmed();
+    }
+
+    /// Records that the server answered the session, i.e. that the auth payload was accepted.
+    pub fn mark_session_confirmed(&self) {
+        use std::sync::atomic::Ordering;
+        if !self.session_confirmed.swap(true, Ordering::SeqCst) {
+            self.session_confirmed_notice.notify_waiters();
+        }
+    }
+
+    /// Whether the server confirmed the session (see [`State::session_confirmed`]).
+    pub fn is_session_confirmed(&self) -> bool {
+        self.session_confirmed
+            .load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Waits for the server to confirm the session, up to `timeout`.
+    ///
+    /// Returns `true` when it was confirmed, `false` on timeout.
+    pub async fn wait_for_session_confirmation(&self, timeout: std::time::Duration) -> bool {
+        if self.is_session_confirmed() {
+            return true;
+        }
+        // Register interest before re-checking, so a confirmation that lands
+        // between the two checks is not missed.
+        let notice = self.session_confirmed_notice.notified();
+        tokio::pin!(notice);
+        if self.is_session_confirmed() {
+            return true;
+        }
+        tokio::time::timeout(timeout, notice).await.is_ok() && self.is_session_confirmed()
     }
 
     /// Get the current balance
@@ -285,6 +364,31 @@ impl State {
     /// * `timestamp` - New server timestamp to synchronize with
     pub async fn update_server_time(&self, timestamp: i64) {
         self.server_time.write().await.update(timestamp);
+        // Live frames are stamped with the broker's wall clock; remember how far it
+        // is from UTC so those timestamps can be put back on the UTC timeline.
+        self.broker_clock_offset.store(
+            timestamp - Utc::now().timestamp(),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+    }
+
+    /// Difference between the broker's clock and UTC, in seconds.
+    ///
+    /// Zero until the first live tick has been seen. See
+    /// [`State::normalize_stream_timestamp`].
+    pub fn broker_clock_offset(&self) -> i64 {
+        self.broker_clock_offset
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Converts a timestamp from the broker's clock to UTC seconds.
+    ///
+    /// `updateStream` ticks and deals carry the broker's wall clock (measured
+    /// two hours ahead of UTC), while `loadHistoryPeriod` and `updateHistoryNewFast`
+    /// data is UTC. Live ticks go through this so compiled candles line up with
+    /// historical ones.
+    pub fn normalize_stream_timestamp(&self, timestamp: i64) -> i64 {
+        timestamp - self.broker_clock_offset()
     }
 
     /// Check if server time data is stale
@@ -498,6 +602,85 @@ impl TradeState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Builds a bare state for the clock tests.
+    fn test_state() -> State {
+        let ssid = Ssid::parse(r#"42["auth",{"session":"dummy","isDemo":1,"uid":1,"platform":2}]"#)
+            .unwrap();
+        StateBuilder::default().ssid(ssid).build().unwrap()
+    }
+
+    #[tokio::test]
+    async fn live_frames_are_moved_onto_the_utc_timeline() {
+        let state = test_state();
+        // Before any tick the offset is unknown, so timestamps pass through.
+        assert_eq!(state.broker_clock_offset(), 0);
+        assert_eq!(state.normalize_stream_timestamp(1_000), 1_000);
+
+        // The demo server stamps `updateStream` ticks two hours ahead of UTC.
+        let broker_now = Utc::now().timestamp() + 7_200;
+        state.update_server_time(broker_now).await;
+        assert!(
+            (state.broker_clock_offset() - 7_200).abs() <= 2,
+            "offset should track the broker clock, got {}",
+            state.broker_clock_offset()
+        );
+
+        let normalized = state.normalize_stream_timestamp(broker_now);
+        assert!(
+            (normalized - Utc::now().timestamp()).abs() <= 2,
+            "a broker-stamped tick must land on the local clock, got {normalized}"
+        );
+    }
+
+    #[tokio::test]
+    async fn servers_on_utc_leave_timestamps_untouched() {
+        let state = test_state();
+        // Servers whose ticks are already UTC report a zero offset, so history and
+        // live data stay aligned without any correction.
+        state.update_server_time(Utc::now().timestamp()).await;
+        assert!(state.broker_clock_offset().abs() <= 2);
+        assert!((state.normalize_stream_timestamp(1_791_932_536) - 1_791_932_536).abs() <= 2);
+    }
+
+    #[tokio::test]
+    async fn teardown_forgets_state_that_belonged_to_the_old_session() {
+        let state = test_state();
+        state.mark_session_confirmed();
+        state.set_auth_error("NotAuthorized");
+        *state
+            .chart_symbol
+            .write()
+            .unwrap_or_else(|e| e.into_inner()) = Some("EURUSD_otc".to_string());
+        state
+            .update_server_time(Utc::now().timestamp() + 7_200)
+            .await;
+        assert!(state.broker_clock_offset() != 0);
+
+        state.clear_temporal_data().await;
+
+        assert!(
+            !state.is_session_confirmed(),
+            "a new socket has not been accepted yet"
+        );
+        assert!(
+            state.auth_error().is_none(),
+            "the rejection belonged to the previous socket"
+        );
+        assert_eq!(
+            state.broker_clock_offset(),
+            0,
+            "the next connection re-measures the clock"
+        );
+        assert!(
+            state
+                .chart_symbol
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .is_none(),
+            "a new socket charts nothing until changeSymbol is sent again"
+        );
+    }
 
     #[test]
     fn test_state_builder_defaults() {

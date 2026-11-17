@@ -1,10 +1,11 @@
 # Test dependencies
-pytest>=7.0.0
+# pytest is pinned to a patched release: GHSA-6w46-j5rx-g56g affects < 9.0.3.
+pytest>=9.0.3
 pytest-asyncio>=0.21.0
 pytest-timeout>=2.1.0
 anyio>=4.0.0
 python-dotenv>=1.0.0
-# Documentation dependencies
-mkdocs-material>=9.5.0
-pymdown-extensions>=10.7.0
-mkdocstrings[python]>=0.24.0
+
+# The documentation in docs/ is plain Markdown with Docusaurus-style
+# frontmatter; no site generator is configured in this repository, so there is
+# no docs toolchain to install here.

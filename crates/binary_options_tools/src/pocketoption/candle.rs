@@ -137,6 +137,39 @@ impl HistoryItem {
             HistoryItem::Candle(c) => (c.timestamp, c.close),
         }
     }
+
+    /// Returns the item with `delta` seconds added to its timestamp.
+    ///
+    /// Used to move data that arrives on the broker's wall clock onto the UTC
+    /// timeline, so it lines up with the freshly compiled candles it is merged with.
+    pub fn shifted(self, delta: i64) -> Self {
+        match self {
+            HistoryItem::Tick([t, p]) => {
+                let ts =
+                    crate::pocketoption::utils::normalize_timestamp(t.as_f64().unwrap_or_default())
+                        + delta;
+                HistoryItem::Tick([serde_json::Value::from(ts), p])
+            }
+            HistoryItem::TickWithNull([t, p, other]) => {
+                let ts =
+                    crate::pocketoption::utils::normalize_timestamp(t.as_f64().unwrap_or_default())
+                        + delta;
+                HistoryItem::Tick([serde_json::Value::from(ts), p]).with_third(other)
+            }
+            HistoryItem::Candle(mut c) => {
+                c.timestamp += delta;
+                HistoryItem::Candle(c)
+            }
+        }
+    }
+
+    /// Keeps the three-element tick shape when a `TickWithNull` is shifted.
+    fn with_third(self, third: serde_json::Value) -> Self {
+        match self {
+            HistoryItem::Tick([t, p]) => HistoryItem::TickWithNull([t, p, third]),
+            other => other,
+        }
+    }
 }
 
 /// Raw candle item from server responses: [timestamp, open, close, high, low, volume]
@@ -1097,6 +1130,35 @@ mod tests {
             ci.timestamp, from_seconds,
             "CandleItem should match normalize_timestamp"
         );
+    }
+
+    #[test]
+    fn history_items_shift_while_keeping_their_shape() {
+        use serde_json::json;
+
+        // Tick shape is preserved, even when the server appended a third field.
+        let shifted = HistoryItem::Tick([json!(1_791_930_000), json!(1.5)]).shifted(-7_200);
+        assert_eq!(shifted.to_tick(), (1_791_922_800, 1.5));
+        assert!(matches!(shifted, HistoryItem::Tick(_)));
+
+        let shifted = HistoryItem::TickWithNull([json!(1_791_930_000), json!(1.5), json!(null)])
+            .shifted(-7_200);
+        assert_eq!(shifted.to_tick(), (1_791_922_800, 1.5));
+        assert!(
+            matches!(shifted, HistoryItem::TickWithNull(_)),
+            "the three-element shape must survive the shift"
+        );
+
+        // Candle payloads from `updateHistoryNewFast` are shifted too.
+        let candle = HistoryItem::Candle(CandleItem {
+            timestamp: 1_791_930_000,
+            open: 1.0,
+            close: 1.5,
+            high: 2.0,
+            low: 0.5,
+            volume: 3.0,
+        });
+        assert_eq!(candle.shifted(-7_200).to_tick(), (1_791_922_800, 1.5));
     }
 
     #[test]

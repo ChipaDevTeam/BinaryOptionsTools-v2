@@ -1,10 +1,20 @@
+"""Synchronous thread bridge over :class:`PocketOptionAsync`.
+
+Each method schedules the matching coroutine on the client's background event
+loop and blocks the calling thread. Parsing, validation and protocol logic belong
+in ``asynchronous.py``: add a method there first, then delegate to it here, so the
+two clients cannot drift. API layering is described in
+``docs/architecture/python-api-layers.md``.
+"""
+
 import asyncio
+
 import json
 import threading
 import sys
 import warnings
 from datetime import timedelta
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 from ..config import Config
 from ..validator import Validator as Validator
 from .asynchronous import PocketOptionAsync as PocketOptionAsync
@@ -386,6 +396,51 @@ class PocketOption:
         # The raw binding takes (asset, period, offset, time).
         return self._run(self._client.get_candles_advanced(asset, period, offset, time))
 
+    def candles_many(
+        self,
+        assets: Sequence[str],
+        period: int,
+        *,
+        count: int = 100,
+        timeout: Optional[float] = None,
+    ) -> Dict[str, List[Dict]]:
+        """Fetches the latest closed candles for many symbols in one call.
+
+        Polls snapshots instead of holding a live stream per symbol, so it is not
+        limited by how many symbols the server streams at once. Symbols that cannot
+        be fetched (closed market, unknown symbol) are absent from the result
+        instead of failing the whole batch.
+
+        Closed candles are immutable, so the snapshot for a given
+        ``(symbol, period, count)`` is cached until the next candle boundary:
+        repeated polls inside one period return the cached candles without
+        another broker request. Pass ``count=2`` when you only need the latest
+        closed candle; the default requests a much wider tick window.
+
+        Raises:
+            ConnectionError: If the client is not connected or the channel closed
+                during the batch.
+            TimeoutError: If ``timeout`` expires; the in-flight requests are
+                cancelled in the engine, so the worker thread is not held.
+
+        The broker has no multi-symbol history request, so each symbol costs its
+        own ``loadHistoryPeriod`` round-trip. The client starts history requests
+        about 200 ms apart and keeps at most four in flight, which caps the whole
+        process at roughly five requests per second: budget at least
+        ``len(assets) / 5`` seconds for a batch, shared with every other history
+        request on this client.
+
+        Args:
+            assets: Symbols to fetch.
+            period: Candle timeframe in seconds.
+            count: Candles to request per symbol.
+            timeout: Optional deadline in seconds for the whole batch.
+
+        Returns:
+            Mapping of symbol to its candles, oldest first.
+        """
+        return self._run(self._client.candles_many(assets, period, count=count, timeout=timeout))
+
     def candles(
         self,
         asset: str,
@@ -405,6 +460,13 @@ class PocketOption:
         Returns:
             List of closed candles, each with 'time', 'open', 'high',
             'low', 'close'.
+
+        Note:
+            With ``end_time`` set, this returns the history binding's raw
+            ``Candle`` payload (``timestamp``, ``symbol``, ``volume``,
+            ``is_closed``) and forwards ``count`` as the request's ``offset``,
+            which is a window in seconds. Without ``end_time`` the result uses
+            the normalized ``time``/OHLC shape.
 
         Example:
             ```python
@@ -506,11 +568,12 @@ class PocketOption:
         """
         return self._run(self._client.balance())
 
-    def opened_deals(self) -> List[str]:
-        """Get a list of currently open deal IDs.
+    def opened_deals(self) -> List[Dict]:
+        """Get the currently open deals.
 
         Returns:
-            A list of open trade ID strings.
+            One dictionary per open deal, ordered by deal id. Each entry carries
+            the deal fields, including `id`, `asset`, `amount` and `direction`.
         """
         return self._run(self._client.opened_deals())
 
@@ -580,14 +643,15 @@ class PocketOption:
         """
         return self._run(self._client.cancel_pending_order(ticket))
 
-    def cancel_pending_orders(self, tickets: List[str]) -> List[Dict]:
-        """Cancel multiple pending orders.
+    def cancel_pending_orders(self, tickets: List[str]) -> Dict:
+        """Cancel multiple pending orders in one batch.
 
         Args:
             tickets: A list of order ticket/identifiers to cancel.
 
         Returns:
-            A list of dictionaries with the cancellation results.
+            A dictionary with a ``cancelled`` key holding the tickets that were
+            cancelled. Partial success is possible.
         """
         return self._run(self._client.cancel_pending_orders(tickets))
 
@@ -614,27 +678,53 @@ class PocketOption:
         """Clear the list of closed deals from local storage."""
         self._run(self._client.clear_closed_deals())
 
-    def payouts(self) -> Dict[str, int]:
+    def payouts(
+        self,
+        assets: Optional[Sequence[str]] = None,
+        *,
+        timeout: Optional[float] = None,
+    ) -> Dict[str, int]:
         """Get the current payout percentage for every asset.
 
-        Returns:
-            Mapping of asset symbol to payout percentage.
-        """
-        return self._run(self._client.payouts())
+        Args:
+            assets: Optional symbols to restrict the result to. ``None`` (the
+                default) returns every active asset. When a watchlist is given,
+                only those symbols are read and serialised, so polling a few
+                instruments does not pay for the whole catalog.
+            timeout: Optional deadline in seconds; the call is cancelled in the
+                engine when it expires, so the worker thread is released.
 
-    def payout(self, asset: str) -> Optional[int]:
+        Returns:
+            Mapping of asset symbol to payout percentage. Unknown and inactive
+            symbols are omitted.
+
+        Raises:
+            TimeoutError: If ``timeout`` expires.
+        """
+        return self._run(self._client.payouts(assets, timeout=timeout))
+
+    def payout(self, asset: str, *, timeout: Optional[float] = None) -> Optional[int]:
         """Get the current payout percentage for a single asset.
+
+        This is a single-symbol lookup: it neither serialises nor parses the
+        payout catalog, so it is the cheap path for a per-order payout check.
 
         Args:
             asset: Asset symbol (e.g. ``"EURUSD_otc"``).
+            timeout: Optional deadline in seconds; the call is cancelled in the
+                engine when it expires, so the worker thread is released.
 
         Returns:
-            The payout percentage, or ``None`` if the asset is unknown.
+            The payout percentage, or ``None`` if the asset is unknown or not
+            currently active.
+
+        Raises:
+            TimeoutError: If ``timeout`` expires.
 
         See Also:
             :meth:`payouts` for the payout of every asset at once.
         """
-        return self._run(self._client.payout(asset))
+        return self._run(self._client.payout(asset, timeout=timeout))
 
     def history(self, asset: str, period: int) -> List[Dict]:
         """Get historical trade data for an asset.
@@ -845,11 +935,39 @@ class PocketOption:
         """
         return self._client.is_connected()
 
-    def is_ssid_valid(self) -> bool:
-        """Check whether the SSID passed format validation at construction time.
+    def is_responsive(self, max_silence: float = 60.0) -> bool:
+        """Check whether the session is connected and still receiving frames.
+
+        Unlike :meth:`is_connected`, this notices a half-dead connection: if no
+        frame (not even the broker's Engine.IO ping) arrived within
+        ``max_silence`` seconds, the session is reported as unresponsive. The
+        check reads local state only and cannot block, so it is safe to call
+        from a worker that suspects another call has stalled.
+
+        Args:
+            max_silence: Seconds without an inbound frame before the session is
+                considered wedged.
 
         Returns:
-            True if the SSID was valid, False otherwise.
+            True if connected and a frame arrived recently, False otherwise.
+        """
+        return self._client.is_responsive(max_silence)
+
+    def seconds_since_last_frame(self) -> Optional[float]:
+        """Seconds since the last inbound WebSocket frame, or ``None``.
+
+        ``None`` means no frame has ever been received. Local read; never blocks.
+        """
+        return self._client.seconds_since_last_frame()
+
+    def is_ssid_valid(self) -> bool:
+        """Whether the server has accepted this session.
+
+        Delegates to the async client, so it reports the live session state
+        rather than the construction-time format check.
+
+        Returns:
+            True if the session is confirmed and not rejected, False otherwise.
         """
         return self._client.is_ssid_valid()
 

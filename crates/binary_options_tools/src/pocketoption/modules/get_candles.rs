@@ -32,6 +32,19 @@ const LOAD_HISTORY_PERIOD_PATTERNS: [&str; 2] = ["loadHistoryPeriodFast", "loadH
 /// How long to wait for a candle/tick response before giving up.
 const RESPONSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
+/// How many candle/tick requests may be in flight at once.
+const MAX_CONCURRENT_REQUESTS: usize = 4;
+
+/// Minimum spacing between two history requests.
+///
+/// The endpoint throttles per session rather than per connection: measured against
+/// the live servers on 2026-10-30, requests spaced ~200 ms apart are answered 100%
+/// of the time (30/30, ~185 ms each), while a burst of concurrent calls leaves later
+/// answers missing, and a hammered session degrades until *every* request times out.
+/// Pacing the requests is what lets a multi-asset feed fetch more than a handful of
+/// symbols reliably.
+const REQUEST_PACE: std::time::Duration = std::time::Duration::from_millis(200);
+
 /// Default number of ticks/candles to fetch per pagination page.
 const DEFAULT_PAGE_OFFSET: i64 = 1000;
 /// Maximum number of ticks to keep per asset in `latest_ticks`.
@@ -272,9 +285,23 @@ impl Drop for PendingRequestGuard {
 pub struct GetCandlesHandle {
     sender: AsyncSender<Command>,
     router: Arc<ResponseRouter>,
+    /// Gateway for the server's history endpoint; see [`MAX_CONCURRENT_REQUESTS`].
+    request_slots: Arc<tokio::sync::Semaphore>,
+    /// Serialises request starts so they are spaced by [`REQUEST_PACE`].
+    request_pacer: Arc<tokio::sync::Mutex<Option<tokio::time::Instant>>>,
 }
 
 impl GetCandlesHandle {
+    /// Builds a handle with a fresh request gateway.
+    fn new(sender: AsyncSender<Command>, receiver: AsyncReceiver<CommandResponse>) -> Self {
+        Self {
+            sender,
+            router: ResponseRouter::new(receiver),
+            request_slots: Arc::new(tokio::sync::Semaphore::new(MAX_CONCURRENT_REQUESTS)),
+            request_pacer: Arc::new(tokio::sync::Mutex::new(None)),
+        }
+    }
+
     /// Gets historical candle data for a specific asset.
     ///
     /// # Arguments
@@ -312,35 +339,23 @@ impl GetCandlesHandle {
         time: i64,
         offset: i64,
     ) -> PocketResult<Vec<Candle>> {
-        info!(target: "GetCandlesHandle", "Requesting candles for asset: {}, period: {}, time: {}, offset: {}", asset.to_string(), period, time, offset);
         let asset_str = asset.to_string();
+        info!(target: "GetCandlesHandle", "Requesting candles for asset: {asset_str}, period: {period}, time: {time}, offset: {offset}");
         let req_id = Uuid::new_v4();
-        let response = self.router.register(req_id).await;
-
-        self.sender
-            .send(Command::GetCandles {
-                asset: asset_str.clone(),
-                period,
-                time,
-                offset,
+        let response = self
+            .request(
+                Command::GetCandles {
+                    asset: asset_str.clone(),
+                    period,
+                    time,
+                    offset,
+                    req_id,
+                },
                 req_id,
-            })
-            .await
-            .map_err(CoreError::from)?;
-
-        let guard = PendingRequestGuard {
-            sender: self.sender.clone(),
-            req_id,
-            armed: true,
-        };
-        let response = await_response_timed(
-            response,
-            "get_candles",
-            format!("asset: {asset_str}, period: {period}, offset: {offset}"),
-        )
-        .await?;
-        let mut guard = guard;
-        guard.armed = false;
+                "get_candles",
+                format!("asset: {asset_str}, period: {period}, offset: {offset}"),
+            )
+            .await?;
 
         match response {
             CommandResponse::CandlesResult { candles, .. } => Ok(candles),
@@ -353,6 +368,63 @@ impl GetCandlesHandle {
                 "Unexpected response to get_candles request: {other:?}"
             ))),
         }
+    }
+
+    /// Sends a history request and waits for its answer.
+    ///
+    /// Shared by candles and ticks: both differ only in the command they send and
+    /// the response variant they expect. The returned guard has already been
+    /// disarmed, so a caller that gives up later will not send a stray cancel.
+    async fn request(
+        &self,
+        command: Command,
+        req_id: Uuid,
+        task: &str,
+        context: String,
+    ) -> PocketResult<CommandResponse> {
+        // One request at a time per slot: a paginated fetch does not hold several.
+        let _slot = self.acquire_request_slot().await?;
+        let response = self.router.register(req_id).await;
+
+        self.sender.send(command).await.map_err(CoreError::from)?;
+
+        let guard = PendingRequestGuard {
+            sender: self.sender.clone(),
+            req_id,
+            armed: true,
+        };
+        let response = await_response_timed(response, task, context).await?;
+        let mut guard = guard;
+        guard.armed = false;
+        Ok(response)
+    }
+
+    /// Waits for a free history-request slot.
+    ///
+    /// Held for the whole request/response cycle: the limit is on how many requests
+    /// the server will answer at once, not on how many the client can track.
+    async fn acquire_request_slot(&self) -> PocketResult<tokio::sync::SemaphorePermit<'_>> {
+        let permit = self
+            .request_slots
+            .acquire()
+            .await
+            .map_err(|_| PocketError::General("GetCandlesApiModule stopped".to_string()))?;
+
+        // Wait out whatever is left of the pacing interval, then claim this slot's
+        // start time. The lock is held across the sleep on purpose: it is what spaces
+        // out concurrent callers instead of letting them all pick the same instant.
+        let mut last_start = self.request_pacer.lock().await;
+        if let Some(last) = *last_start {
+            let earliest = last + REQUEST_PACE;
+            let now = tokio::time::Instant::now();
+            if earliest > now {
+                tokio::time::sleep_until(earliest).await;
+            }
+        }
+        *last_start = Some(tokio::time::Instant::now());
+        drop(last_start);
+
+        Ok(permit)
     }
 
     /// Gets historical tick data (timestamp, price) for a specific asset with pagination.
@@ -386,31 +458,20 @@ impl GetCandlesHandle {
             let req_id = Uuid::new_v4();
             info!(target: "GetCandlesHandle", "Requesting ticks for asset: {}, period: {}, time: {}, offset: {}", asset_str, period, current_time, page_offset);
 
-            let response = self.router.register(req_id).await;
-            self.sender
-                .send(Command::GetTicks {
-                    asset: asset_str.clone(),
-                    period,
-                    time: current_time,
-                    offset: page_offset,
+            let response = self
+                .request(
+                    Command::GetTicks {
+                        asset: asset_str.clone(),
+                        period,
+                        time: current_time,
+                        offset: page_offset,
+                        req_id,
+                    },
                     req_id,
-                })
-                .await
-                .map_err(CoreError::from)?;
-
-            let guard = PendingRequestGuard {
-                sender: self.sender.clone(),
-                req_id,
-                armed: true,
-            };
-            let response = await_response_timed(
-                response,
-                "get_ticks",
-                format!("asset: {asset_str}, period: {period}"),
-            )
-            .await?;
-            let mut guard = guard;
-            guard.armed = false;
+                    "get_ticks",
+                    format!("asset: {asset_str}, period: {period}"),
+                )
+                .await?;
 
             let ticks = match response {
                 CommandResponse::TicksResult { ticks, .. } => ticks,
@@ -466,7 +527,6 @@ impl GetCandlesHandle {
 
 /// API module for handling candle data requests.
 pub struct GetCandlesApiModule {
-    #[allow(dead_code)]
     state: Arc<State>,
     ws_receiver: AsyncReceiver<Arc<Message>>,
     ws_sender: AsyncSender<Message>,
@@ -505,10 +565,7 @@ impl ApiModule<State> for GetCandlesApiModule {
         sender: AsyncSender<Self::Command>,
         receiver: AsyncReceiver<Self::CommandResponse>,
     ) -> Self::Handle {
-        GetCandlesHandle {
-            sender,
-            router: ResponseRouter::new(receiver),
-        }
+        GetCandlesHandle::new(sender, receiver)
     }
 
     async fn run(&mut self) -> CoreResult<()> {
@@ -667,8 +724,12 @@ impl GetCandlesApiModule {
     }
 
     /// Records a tick parsed from `text`, if it is an `updateStream` payload.
+    ///
+    /// `updateStream` timestamps come from the broker's clock, while the history
+    /// these ticks get appended to is UTC, so they are normalised before buffering.
     fn store_tick(&mut self, text: &str) {
         if let Some((symbol, timestamp, price)) = self.parse_update_stream(text) {
+            let timestamp = self.state.normalize_stream_timestamp(timestamp);
             self.latest_ticks
                 .entry(symbol)
                 .or_default()
@@ -886,6 +947,42 @@ mod tests {
     use binary_options_tools_core::reimports::bounded_async;
 
     #[tokio::test]
+    async fn request_slots_are_paced_and_capped() {
+        let (_responder, response_rx) = bounded_async::<CommandResponse>(8);
+        let (cmd_tx, _cmd_rx) = bounded_async::<Command>(8);
+        let handle = GetCandlesHandle::new(cmd_tx, response_rx);
+
+        // Two back-to-back starts must be spaced: the server drops answers for
+        // bursts, which is what made wide candle feeds time out.
+        let first = handle.acquire_request_slot().await.unwrap();
+        let started = tokio::time::Instant::now();
+        let second = handle.acquire_request_slot().await.unwrap();
+        assert!(
+            started.elapsed() >= REQUEST_PACE,
+            "the second request started {:?} after the first, expected at least {REQUEST_PACE:?}",
+            started.elapsed()
+        );
+        drop((first, second));
+
+        // Slots are released, and never more than MAX_CONCURRENT_REQUESTS at once.
+        let mut held = Vec::new();
+        for _ in 0..MAX_CONCURRENT_REQUESTS {
+            held.push(handle.acquire_request_slot().await.unwrap());
+        }
+        assert_eq!(
+            handle.request_slots.available_permits(),
+            0,
+            "all slots should be taken"
+        );
+        drop(held);
+        assert_eq!(
+            handle.request_slots.available_permits(),
+            MAX_CONCURRENT_REQUESTS,
+            "dropping the permits must free them"
+        );
+    }
+
+    #[tokio::test]
     async fn router_routes_out_of_order_responses_by_request_id() {
         let (responder, response_rx) = bounded_async::<CommandResponse>(8);
         let router = ResponseRouter::new(response_rx);
@@ -1001,10 +1098,7 @@ mod tests {
     async fn concurrent_get_candles_requests_each_receive_their_own_response() {
         let (command_tx, command_rx) = bounded_async::<Command>(8);
         let (response_tx, response_rx) = bounded_async::<CommandResponse>(8);
-        let handle = GetCandlesHandle {
-            sender: command_tx,
-            router: ResponseRouter::new(response_rx),
-        };
+        let handle = GetCandlesHandle::new(command_tx, response_rx);
 
         tokio::spawn(async move {
             let mut requests = Vec::new();

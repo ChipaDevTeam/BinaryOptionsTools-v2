@@ -60,7 +60,8 @@ function loadNative() {
 
 const native = loadNative();
 
-const toSnakeCase = (name) => name.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
+const toSnakeCase = (name) =>
+  name.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
 
 /**
  * Adds a `snake_case` alias for every `camelCase` method of `target`.
@@ -78,7 +79,8 @@ function addSnakeCaseAliases(target) {
     if (!descriptor || typeof descriptor.value !== "function") continue;
 
     const alias = toSnakeCase(key);
-    if (alias === key || Object.prototype.hasOwnProperty.call(target, alias)) continue;
+    if (alias === key || Object.prototype.hasOwnProperty.call(target, alias))
+      continue;
 
     Object.defineProperty(target, alias, {
       value: descriptor.value,

@@ -1,8 +1,11 @@
 use core::fmt;
 use std::hash::Hash;
 use std::{
-    collections::HashMap,
-    sync::atomic::{AtomicBool, Ordering},
+    collections::{HashMap, VecDeque},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Mutex,
+    },
 };
 
 use binary_options_tools_core::{reimports::Message, traits::Rule};
@@ -89,9 +92,16 @@ impl ServerTime {
 
     /// Get current estimated server time
     ///
+    /// Before the first tick arrives there is no offset to apply, so the local
+    /// clock is the best estimate. Reporting `last_server_time + elapsed` in that
+    /// state produced epoch timestamps (e.g. `1970-01-01T00:00:03Z`).
+    ///
     /// # Returns
     /// Current estimated server timestamp as i64
     pub fn get_server_time(&self) -> i64 {
+        if self.last_server_time == 0 {
+            return Utc::now().timestamp();
+        }
         let now = Utc::now();
         let elapsed = now.signed_duration_since(self.last_updated);
         self.last_server_time + elapsed.num_seconds()
@@ -157,6 +167,41 @@ impl<'de> Deserialize<'de> for StreamData {
     }
 }
 
+/// One or more price ticks delivered in a single frame.
+///
+/// With a single active subscription the server sends `[["SYMBOL",ts,price]]`.
+/// Once several symbols are subscribed it batches them into one frame:
+/// `[["A",ts,price],["B",ts,price]]`. Parsing only the single-entry form drops
+/// every batched frame, so the streams of all subscribed symbols stall.
+#[derive(Debug, Clone)]
+pub struct StreamBatch(pub Vec<StreamData>);
+
+impl<'de> Deserialize<'de> for StreamBatch {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let rows: Vec<Vec<serde_json::Value>> = Vec::deserialize(deserializer)?;
+        if rows.is_empty() {
+            return Err(serde::de::Error::custom("Empty StreamBatch"));
+        }
+        let mut ticks = Vec::with_capacity(rows.len());
+        for row in rows {
+            if row.len() != 3 {
+                return Err(serde::de::Error::custom("Invalid StreamData format"));
+            }
+            let price =
+                Decimal::from_f64_retain(row[2].as_f64().unwrap_or(0.0)).unwrap_or_default();
+            ticks.push(StreamData {
+                symbol: row[0].as_str().unwrap_or_default().to_string(),
+                timestamp: normalize_timestamp(row[1].as_f64().unwrap_or(0.0)),
+                price,
+            });
+        }
+        Ok(StreamBatch(ticks))
+    }
+}
+
 impl StreamData {
     /// Create new stream data
     ///
@@ -187,10 +232,84 @@ impl StreamData {
 /// using a read-write lock for concurrent access.
 pub type ServerTimeState = tokio::sync::RwLock<ServerTime>;
 
+/// How many binary halves the server may legitimately owe at once.
+///
+/// The real pairing never exceeds a handful; the bound only stops a broken
+/// stream from growing the queue without limit.
+const MAX_EXPECTED_BINARIES: usize = 8;
+
+/// The headers of two-step Socket.IO messages whose binary half is still owed.
+///
+/// A single `AtomicBool` cannot count. The server may keep several placeholders
+/// outstanding at once (`updateOpenedDeals` next to `updateClosedDeals`), and one
+/// flag meant each new header overwrote the pending one, so a binary was handed
+/// to the wrong parser — or to no parser at all. This keeps them in send order and
+/// refuses binaries nothing asked for.
+pub(crate) struct ExpectedBinaries {
+    queue: Mutex<VecDeque<ExpectedBinary>>,
+    epoch: AtomicU64,
+}
+
+#[derive(Clone, Debug)]
+struct ExpectedBinary {
+    event: String,
+    /// Connection the header arrived on; a reconnect invalidates it.
+    epoch: u64,
+}
+
+impl ExpectedBinaries {
+    pub(crate) fn new() -> Self {
+        Self {
+            queue: Mutex::new(VecDeque::new()),
+            epoch: AtomicU64::new(0),
+        }
+    }
+
+    /// Records that `event` announced a binary half.
+    pub(crate) fn push(&self, event: impl Into<String>) {
+        let epoch = self.epoch.load(Ordering::SeqCst);
+        let mut queue = self.queue.lock().unwrap_or_else(|e| e.into_inner());
+        if queue.len() >= MAX_EXPECTED_BINARIES {
+            // Nothing legitimate leaves this many outstanding, so the oldest is
+            // stale by definition.
+            queue.pop_front();
+        }
+        queue.push_back(ExpectedBinary {
+            event: event.into(),
+            epoch,
+        });
+    }
+
+    /// Consumes the oldest owed binary half, returning the event it belongs to.
+    ///
+    /// `None` means the binary is unpaired: it belongs to no outstanding header,
+    /// so accepting it would hand a payload to a parser that never asked.
+    pub(crate) fn claim(&self) -> Option<String> {
+        let epoch = self.epoch.load(Ordering::SeqCst);
+        let mut queue = self.queue.lock().unwrap_or_else(|e| e.into_inner());
+        queue.retain(|expected| expected.epoch == epoch);
+        queue.pop_front().map(|expected| expected.event)
+    }
+
+    /// Whether a binary half is still owed.
+    #[cfg(test)]
+    pub(crate) fn is_pending(&self) -> bool {
+        let epoch = self.epoch.load(Ordering::SeqCst);
+        let queue = self.queue.lock().unwrap_or_else(|e| e.into_inner());
+        queue.iter().any(|expected| expected.epoch == epoch)
+    }
+
+    /// Drops every outstanding expectation; called when the connection changes.
+    pub(crate) fn reset(&self) {
+        self.epoch.fetch_add(1, Ordering::SeqCst);
+        self.queue.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    }
+}
+
 /// Simple rule implementation for when the websocket data is sent using 2 messages
 /// The first one telling which message type it is, and the second one containing the actual data.
 pub struct TwoStepRule {
-    valid: AtomicBool,
+    expected: ExpectedBinaries,
     pattern: String,
 }
 
@@ -201,7 +320,7 @@ impl TwoStepRule {
     /// * `pattern` - The string pattern to match against incoming messages
     pub fn new(pattern: impl ToString) -> Self {
         Self {
-            valid: AtomicBool::new(false),
+            expected: ExpectedBinaries::new(),
             pattern: pattern.to_string(),
         }
     }
@@ -216,41 +335,44 @@ impl Rule for TwoStepRule {
                     // Check for binary placeholder in Socket.IO format
                     let has_placeholder = text.contains(r#""_placeholder":true"#);
 
-                    // If it has a placeholder, we MUST wait for the next (binary) message
+                    // If it has a placeholder, the binary half is owed: queue it
+                    // so a second placeholder cannot overwrite this one.
                     if has_placeholder {
-                        tracing::debug!(target: "TwoStepRule", "Detected binary placeholder for pattern '{}'. Waiting for next message.", self.pattern);
-                        self.valid.store(true, Ordering::SeqCst);
+                        tracing::debug!(target: "TwoStepRule", "Detected binary placeholder for pattern '{}'. Waiting for the binary half.", self.pattern);
+                        self.expected.push(self.pattern.clone());
                         return false;
                     }
 
                     // Check if it's a 1-step message (ends with ']') or contains other JSON data '{'
                     if text.ends_with(']') || text.contains('{') {
                         tracing::debug!(target: "TwoStepRule", "1-step message matched pattern '{}'! Allowing through.", self.pattern);
-                        self.valid.store(false, Ordering::SeqCst);
                         return true;
                     }
 
                     tracing::debug!(target: "TwoStepRule", "Pattern '{}' matched! Next message will be accepted.", self.pattern);
-                    self.valid.store(true, Ordering::SeqCst);
+                    self.expected.push(self.pattern.clone());
                     return false;
                 }
 
-                if self.valid.load(Ordering::SeqCst) {
-                    self.valid.store(false, Ordering::SeqCst);
+                // A non-matching text may be the second half in text form.
+                if self.expected.claim().is_some() {
                     return true;
                 }
                 false
             }
-            Message::Binary(_) if self.valid.load(Ordering::SeqCst) => {
-                self.valid.store(false, Ordering::SeqCst);
-                true
-            }
+            Message::Binary(_) => match self.expected.claim() {
+                Some(_) => true,
+                None => {
+                    tracing::debug!(target: "TwoStepRule", "Rejected a binary that no '{}' header asked for.", self.pattern);
+                    false
+                }
+            },
             _ => false,
         }
     }
 
     fn reset(&self) {
-        self.valid.store(false, Ordering::SeqCst)
+        self.expected.reset()
     }
 }
 
@@ -271,7 +393,7 @@ impl Rule for TwoStepRule {
 ///   after this flag is set will be considered part of the two-step message and allowed
 ///   to pass through (by returning `true` from `call`). All other messages will be filtered.
 pub struct MultiPatternRule {
-    valid: AtomicBool,
+    expected: ExpectedBinaries,
     pub patterns: Vec<String>,
 }
 
@@ -280,9 +402,13 @@ impl MultiPatternRule {
     ///
     /// # Arguments
     /// * `patterns` - The string patterns to match against incoming messages
-    pub fn new(patterns: Vec<impl ToString>) -> Self {
+    pub fn new<I, P>(patterns: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: ToString,
+    {
         Self {
-            valid: AtomicBool::new(false),
+            expected: ExpectedBinaries::new(),
             patterns: patterns.into_iter().map(|p| p.to_string()).collect(),
         }
     }
@@ -295,32 +421,39 @@ impl Rule for MultiPatternRule {
                 if let Some((event_name, is_placeholder)) = socketio_event(text) {
                     if self.patterns.iter().any(|p| p == &event_name) {
                         if is_placeholder {
-                            // Two-step message: wait for the binary half.
-                            self.valid.store(true, Ordering::SeqCst);
+                            // Two-step message: queue the header so the binary
+                            // half is matched to *this* event, not to whatever
+                            // header happened to arrive last.
+                            self.expected.push(event_name);
                             return false;
                         }
                         // 1-step message, allow it through
-                        self.valid.store(false, Ordering::SeqCst);
                         return true;
                     }
                 }
 
-                if self.valid.load(Ordering::SeqCst) {
-                    self.valid.store(false, Ordering::SeqCst);
+                // A non-matching text may be the second half in text form.
+                if self.expected.claim().is_some() {
                     return true;
                 }
                 false
             }
-            Message::Binary(_) if self.valid.load(Ordering::SeqCst) => {
-                self.valid.store(false, Ordering::SeqCst);
-                true
-            }
+            Message::Binary(_) => match self.expected.claim() {
+                Some(event) => {
+                    tracing::debug!(target: "MultiPatternRule", "Routed a binary as the payload of '{}'.", event);
+                    true
+                }
+                None => {
+                    tracing::debug!(target: "MultiPatternRule", "Rejected a binary that no matched header asked for.");
+                    false
+                }
+            },
             _ => false,
         }
     }
 
     fn reset(&self) {
-        self.valid.store(false, Ordering::SeqCst)
+        self.expected.reset()
     }
 }
 
@@ -367,6 +500,12 @@ pub struct Asset {
     pub payout: i32,
     pub allowed_candles: Vec<CandleLength>,
     pub asset_type: AssetType,
+    /// When a closed asset reopens (Unix seconds), as reported by the server.
+    ///
+    /// Weekend FX pairs and closed stocks report `is_active == false` together with
+    /// the time the market reopens, which is what makes "no data" actionable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opens_at: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -392,6 +531,29 @@ impl Asset {
         &self.allowed_candles
     }
 
+    /// Explains why an inactive asset cannot be used.
+    ///
+    /// Closed markets are the common case (weekend FX, outside stock hours), and
+    /// saying so is far more useful than the bare "not active" the client used to
+    /// report before a request timed out.
+    pub fn inactive_reason(&self) -> String {
+        match self.opens_at {
+            Some(ts) if ts > 0 => {
+                let reopen = chrono::DateTime::from_timestamp(ts, 0)
+                    .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
+                    .unwrap_or_else(|| ts.to_string());
+                format!(
+                    "Asset `{}` is not active: its market is closed (reopens {reopen})",
+                    self.symbol
+                )
+            }
+            _ => format!(
+                "Asset `{}` is not active: its market is closed",
+                self.symbol
+            ),
+        }
+    }
+
     /// Validates if the asset can be used for trading
     /// It checks if the asset is active.
     /// The error thrown allows users to understand why the asset is not valid for trading.
@@ -399,7 +561,7 @@ impl Asset {
     /// Note: Time validation has been removed to allow trading at any expiration time.
     pub fn validate(&self, time: u32) -> PocketResult<()> {
         if !self.is_active {
-            return Err(PocketError::InvalidAsset("Asset is not active".into()));
+            return Err(PocketError::InvalidAsset(self.inactive_reason()));
         }
         if time == 0 {
             return Err(PocketError::InvalidAsset(
@@ -436,7 +598,7 @@ impl<'de> Deserialize<'de> for Asset {
             Vec<CandleLength>,     // 15: allowed_candles (used)
             serde::de::IgnoredAny, // 16: unused
             serde::de::IgnoredAny, // 17: unused
-            serde::de::IgnoredAny, // 18: unused
+            Option<i64>,           // 18: reopen timestamp for closed assets (used)
         );
 
         let raw: AssetRawTuple = AssetRawTuple::deserialize(deserializer)?;
@@ -449,6 +611,7 @@ impl<'de> Deserialize<'de> for Asset {
             is_otc: raw.9 == 1,
             is_active: raw.14,
             allowed_candles: raw.15,
+            opens_at: raw.18,
         })
     }
 }
@@ -460,6 +623,35 @@ pub struct Assets(pub HashMap<String, Asset>);
 impl Assets {
     pub fn get(&self, symbol: &str) -> Option<&Asset> {
         self.0.get(symbol)
+    }
+
+    /// Payout percentage of one active asset.
+    ///
+    /// Reads the catalog in place, so a per-order payout lookup does not clone
+    /// or serialise every other symbol in it. Unknown and inactive assets both
+    /// return `None`: an inactive asset has no tradable payout.
+    pub fn payout(&self, symbol: &str) -> Option<i32> {
+        self.get(symbol)
+            .filter(|asset| asset.is_active)
+            .map(|asset| asset.payout)
+    }
+
+    /// Payout percentages of every active asset, keyed by symbol.
+    pub fn payouts(&self) -> HashMap<String, i32> {
+        self.active_iter()
+            .map(|asset| (asset.symbol.clone(), asset.payout))
+            .collect()
+    }
+
+    /// Payout percentages of the active assets among `symbols`.
+    ///
+    /// Unknown and inactive symbols are skipped, so the result only contains
+    /// symbols that can actually be traded right now.
+    pub fn payouts_for(&self, symbols: &[String]) -> HashMap<String, i32> {
+        symbols
+            .iter()
+            .filter_map(|symbol| self.payout(symbol).map(|payout| (symbol.clone(), payout)))
+            .collect()
     }
 
     pub fn validate(&self, symbol: &str, time: u32) -> PocketResult<()> {
@@ -741,6 +933,85 @@ mod tests {
     }
 
     #[test]
+    fn test_stream_batch_deserialization() {
+        let single: StreamBatch =
+            serde_json::from_str(r#"[["EURUSD_otc",1770856131.3,1.19537]]"#).unwrap();
+        assert_eq!(single.0.len(), 1);
+
+        let batch: StreamBatch = serde_json::from_str(
+            r#"[["EURUSD_otc",1770856131.3,1.19537],["GBPUSD_otc",1770856131.3,1.28142]]"#,
+        )
+        .unwrap();
+        assert_eq!(batch.0.len(), 2);
+        assert_eq!(batch.0[1].symbol, "GBPUSD_otc");
+        assert_eq!(batch.0[1].timestamp, 1770856131);
+
+        assert!(serde_json::from_str::<StreamBatch>("[]").is_err());
+        assert!(serde_json::from_str::<StreamBatch>(r#"[["A",1]]"#).is_err());
+    }
+
+    #[test]
+    fn server_time_falls_back_to_the_local_clock_before_the_first_tick() {
+        // No tick received yet: reporting `last_server_time + elapsed` produced
+        // epoch timestamps like 1970-01-01T00:00:03Z.
+        let unsynced = ServerTime::default();
+        let reported = unsynced.get_server_time();
+        assert!(
+            (reported - Utc::now().timestamp()).abs() <= 5,
+            "unsynced server time must be ~now, got {reported}"
+        );
+
+        // Once a tick arrives the server clock is reported as-is (plus elapsed).
+        let mut synced = ServerTime::default();
+        synced.update(1_791_932_536);
+        assert!((synced.get_server_time() - 1_791_932_536).abs() <= 5);
+    }
+
+    #[test]
+    fn payouts_can_be_scoped_to_a_watchlist() {
+        fn asset(symbol: &str, payout: i32, is_active: bool) -> Asset {
+            Asset {
+                id: 0,
+                name: symbol.to_string(),
+                symbol: symbol.to_string(),
+                is_otc: false,
+                is_active,
+                payout,
+                allowed_candles: vec![],
+                asset_type: AssetType::Currency,
+                opens_at: None,
+            }
+        }
+
+        let mut catalog = HashMap::new();
+        catalog.insert("EURUSD_otc".to_string(), asset("EURUSD_otc", 85, true));
+        catalog.insert("GBPUSD_otc".to_string(), asset("GBPUSD_otc", 82, true));
+        catalog.insert("CLOSED".to_string(), asset("CLOSED", 90, false));
+        let assets = Assets(catalog);
+
+        // Single-symbol lookups ignore closed markets and unknown symbols.
+        assert_eq!(assets.payout("EURUSD_otc"), Some(85));
+        assert_eq!(assets.payout("CLOSED"), None);
+        assert_eq!(assets.payout("MISSING"), None);
+
+        // The unfiltered view still contains only active assets.
+        let all = assets.payouts();
+        assert_eq!(all.len(), 2);
+        assert_eq!(all["GBPUSD_otc"], 82);
+        assert!(!all.contains_key("CLOSED"));
+
+        // A watchlist filters in place and drops unknown/inactive entries.
+        let requested = vec![
+            "EURUSD_otc".to_string(),
+            "CLOSED".to_string(),
+            "MISSING".to_string(),
+        ];
+        let filtered = assets.payouts_for(&requested);
+        assert_eq!(filtered, HashMap::from([("EURUSD_otc".to_string(), 85)]));
+        assert!(assets.payouts_for(&[]).is_empty());
+    }
+
+    #[test]
     fn test_two_step_rule_one_step_message() {
         let pattern = r#"451-["successupdateBalance","#;
         let rule = TwoStepRule::new(pattern);
@@ -753,8 +1024,8 @@ mod tests {
             rule.call(&msg),
             "Rule should accept 1-step messages containing data"
         );
-        // State should remain invalid (ready for another 1-step or start of 2-step)
-        assert!(!rule.valid.load(Ordering::SeqCst));
+        // Nothing is owed: a 1-step message asks for no binary half.
+        assert!(!rule.expected.is_pending());
     }
 
     #[test]
@@ -766,17 +1037,67 @@ mod tests {
         let msg1 = Message::Text(pattern.to_string().into());
         assert!(
             !rule.call(&msg1),
-            "Step 1 should return false and set valid flag"
+            "Step 1 should return false and owe a binary half"
         );
-        assert!(rule.valid.load(Ordering::SeqCst));
+        assert!(rule.expected.is_pending());
 
         // Step 2: The binary data message
         let msg2 = Message::Binary(vec![1, 2, 3].into());
         assert!(
             rule.call(&msg2),
-            "Step 2 should return true and clear valid flag"
+            "Step 2 should return true and clear the debt"
         );
-        assert!(!rule.valid.load(Ordering::SeqCst));
+        assert!(!rule.expected.is_pending());
+    }
+
+    #[test]
+    fn two_outstanding_placeholders_each_get_their_own_binary() {
+        let rule = MultiPatternRule::new(["updateOpenedDeals", "updateClosedDeals"]);
+        let header_a = Message::Text(r#"451-["updateOpenedDeals",{"_placeholder":true}]"#.into());
+        let header_b = Message::Text(r#"451-["updateClosedDeals",{"_placeholder":true}]"#.into());
+
+        assert!(
+            !rule.call(&header_a),
+            "a placeholder asks for the binary half"
+        );
+        assert!(
+            !rule.call(&header_b),
+            "a second placeholder must not overwrite the first"
+        );
+        assert!(
+            rule.call(&Message::Binary(vec![1].into())),
+            "first binary answers the first header"
+        );
+        assert!(
+            rule.call(&Message::Binary(vec![2].into())),
+            "second binary answers the second header"
+        );
+        assert!(!rule.expected.is_pending(), "both debts are paid");
+    }
+
+    #[test]
+    fn a_binary_no_header_asked_for_is_rejected() {
+        let rule = TwoStepRule::new(r#"451-["successupdateBalance","#);
+        assert!(
+            !rule.call(&Message::Binary(vec![1, 2, 3].into())),
+            "an unpaired binary must not be routed as a payload"
+        );
+        assert!(!rule.call(&Message::Binary(vec![4].into())));
+    }
+
+    #[test]
+    fn reset_forgets_outstanding_headers() {
+        let rule = MultiPatternRule::new(["updateOpenedDeals"]);
+        let header = Message::Text(r#"451-["updateOpenedDeals",{"_placeholder":true}]"#.into());
+        assert!(!rule.call(&header));
+        assert!(rule.expected.is_pending());
+
+        rule.reset();
+        assert!(!rule.expected.is_pending());
+        assert!(
+            !rule.call(&Message::Binary(vec![1].into())),
+            "a binary arriving after a reconnect belongs to no header we know"
+        );
     }
 
     #[test]

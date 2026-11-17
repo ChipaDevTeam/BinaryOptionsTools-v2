@@ -661,7 +661,11 @@ mod tests {
     /// Read a demo SSID from the `POCKET_OPTION_SSID` environment variable.
     /// Returns `None` if unset so tests can skip gracefully.
     fn demo_ssid_from_env() -> Option<String> {
-        std::env::var("POCKET_OPTION_SSID").ok()
+        // An empty value counts as unset, so the tests skip instead of trying to
+        // parse it (which fails with a confusing "SSID is required" error).
+        std::env::var("POCKET_OPTION_SSID")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
     }
 
     #[test]

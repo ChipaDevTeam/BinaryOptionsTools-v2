@@ -3,177 +3,72 @@ sidebar_position: 1
 slug: /project/deployment
 ---
 
-# GitLab Pages Deployment Guide
+# Documentation Deployment
 
-This documentation site is deployed to GitLab Pages using Docusaurus.
+The documentation in `docs/` is a set of Markdown files with Docusaurus-style
+frontmatter (`sidebar_position`, `slug`). **No site generator configuration is
+tracked in this repository**: `docusaurus.config.js`, `sidebars.js` and the
+`docs-site/` package were deleted in 0.2.15, and the repository has no root Node
+manifest. The Markdown is the deliverable; building a site from it needs the
+generator to be set up again.
 
-## Quick Deployment Steps
-
-### 1. Enable GitHub Pages
-
-1. Go to your repository on GitLab
-2. Click on **Settings** tab
-3. Scroll down to **Pages** section
-4. Under **Source**, select **Deploy from a branch**
-5. Choose `master` branch and `/` folder
-6. Click **Save**
-
-### 2. Configure Docusaurus
-
-Update `docusaurus.config.js` with your project details:
-
-```javascript
-url: 'https://chipatrade.gitlab.io',
-baseUrl: '/chipadevorg/BinaryOptionsTools-v2/',
-organizationName: 'chipadevorg',
-projectName: 'BinaryOptionsTools-v2',
-```
-
-### 3. Deploy
-
-The site is automatically deployed via GitLab CI on push to master branch.
-
-Manual deployment:
-
-```bash
-npm run build
-npm run deploy
-```
-
-### 4. Custom Domain (Optional)
-
-1. Add a `CNAME` file to `static/` folder with your domain:
-
-   ```
-   your-domain.com
-   ```
-
-2. Configure DNS settings with your domain provider
-
-## GitLab CI Workflow
-
-The deployment is handled by `.gitlab-ci.yml`:
-
-```yaml
-stages:
-  - build
-
-pages:
-  stage: build
-  image: node:20-bookworm
-  script:
-    - npm ci
-    - npm run build
-  artifacts:
-    paths:
-      - public
-  only:
-    - master
-```
-
-## Features Enabled
-
-- ✅ **Responsive Design** - Works on desktop, tablet, and mobile
-- ✅ **Dark/Light Mode** - Choose your preferred viewing theme
-- ✅ **Search** - Full-text search via Algolia DocSearch
-- ✅ **Versioned Docs** - Maintain documentation for multiple versions
-- ✅ **Internationalization** - Ready for multi-language support
-- ✅ **SEO Optimized** - Sitemap, meta tags, Open Graph
-
-## File Structure
+## What is in the repository
 
 ```
 docs/
+├── README.md             # Documentation index
 ├── intro.md              # Homepage
-├── overview.md           # Documentation overview
-├── api/                  # API Reference
+├── ecosystem.md          # Chipa ecosystem
+├── api/                  # API reference
 ├── guides/               # Trading guides
 ├── architecture/         # Architecture docs
 ├── examples/             # Code examples
 ├── tutorials/            # Step-by-step tutorials
 ├── project/              # Project info
-├── docusaurus.config.js  # Docusaurus configuration
-├── sidebars.js           # Sidebar navigation
-├── package.json          # Dependencies
-├── src/
-│   └── css/
-│       └── custom.css    # Custom styles
-└── static/
-    ├── img/              # Images
-    └── CNAME             # Custom domain (optional)
+├── data/                 # Asset lists and CSV fixtures
+└── assets/               # Images
 ```
 
-## Customization
+## Reading the docs without a site
 
-### Colors
+Every page is plain Markdown and reads correctly on its own — for example
+[`docs/README.md`](../README.md) (the index) or [`docs/api/reference.md`](../api/reference.md).
+Relative links between pages resolve in a checkout (GitHub or a local
+editor preview).
 
-Edit CSS custom properties in `src/css/custom.css`:
+## Re-creating a site (optional)
 
-```css
-:root {
-  --ifm-color-primary: #4f46e5;
-  --ifm-color-primary-dark: #4338ca;
-  --ifm-color-primary-darker: #3730a3;
-  --ifm-color-primary-darkest: #312e81;
-  --ifm-color-primary-light: #6366f1;
-  --ifm-color-primary-lighter: #818cf8;
-  --ifm-color-primary-lightest: #a5b4fc;
-}
-```
+If you want a hosted site again, the frontmatter is already Docusaurus-shaped:
 
-### Content
-
-- Edit markdown files in `docs/` for content changes
-- Modify `sidebars.js` for navigation structure
-- Update `docusaurus.config.js` for site configuration
+1. Create a dedicated directory with its own `package.json` (for example
+   `docs-site/`), and keep it out of `docs/` so the Markdown stays readable.
+2. Add `@docusaurus/core` and `@docusaurus/preset-classic`, point
+   `docs: { path: '../docs' }` at this directory, and add the standard
+   `docusaurus.config.js`.
+3. Serve locally with the usual `npm run start`, and build with `npm run build`.
+4. Deploy the built output with whatever CI you choose. Note that this
+   repository's `.gitlab-ci.yml` only builds wheels, and
+   `.github/workflows/CI.yml` only builds wheels, the Node addon and the
+   release — neither has a docs job.
 
 ## Troubleshooting
 
-### Site not loading?
+### A page link does not resolve
 
-1. Check if GitLab Pages is enabled in repository settings
-2. Ensure the branch and folder are correctly selected (master / public)
-3. Wait 5-10 minutes for changes to propagate
-4. Check GitLab CI build logs
+Links are relative to the file that contains them. Check the target exists in
+this tree before changing the link; several historical links pointed at pages
+that were renamed (for example `docs/macro_examples.rs`, now
+`crates/macros/docs/macro_examples.rs`).
 
-### Styles not loading?
+### A `npm run …` command from an older doc fails
 
-1. Check file paths in HTML files
-2. Ensure all CSS files are properly imported
-3. Verify baseUrl in docusaurus.config.js
-
-### Build failing?
-
-1. Check Node.js version (requires 18+)
-2. Run `npm ci` to reinstall dependencies
-3. Check for markdown syntax errors
-
-## Performance Tips
-
-1. **Images**: Add optimized images to `static/img/`
-2. **Caching**: GitHub Pages automatically handles caching
-3. **CDN**: GitHub Pages uses a global CDN
-4. **Minification**: Docusaurus minifies CSS/JS in production
-
-## Analytics Integration
-
-Add Google Analytics by updating `docusaurus.config.js`:
-
-```javascript
-themeConfig: {
-  // ...
-  gtag: {
-    trackingID: 'GA_MEASUREMENT_ID',
-    anonymizeIP: true,
-  },
-}
-```
+There is no root `package.json`, so npm commands only work inside
+`nodejs/` (the Node addon) or inside a site directory you create yourself.
 
 ## Support
 
-For issues with the documentation site:
+For documentation issues:
 
-1. Check this deployment guide
-2. Verify all file paths are correct
-3. Test locally with `npm run start`
-4. Check GitHub Actions build logs in repository Actions tab
+1. Read the page in a Markdown preview to confirm the content itself is fine.
+2. Check that the paths you reference exist in `git ls-files`.
+3. Open an issue on the repository with the file and line.

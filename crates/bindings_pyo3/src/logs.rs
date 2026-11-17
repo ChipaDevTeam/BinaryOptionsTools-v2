@@ -6,7 +6,7 @@ use futures_util::{
     StreamExt,
 };
 use pyo3::{pyclass, pyfunction, pymethods, Bound, Py, PyAny, PyResult, Python};
-use pyo3_async_runtimes::tokio::future_into_py;
+use pyaio_faq::tokio::future_into_py;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument, level_filters::LevelFilter, warn, Level};
 use tracing_subscriber::{
@@ -31,11 +31,11 @@ pub fn start_tracing(
     let error_logs = OpenOptions::new()
         .append(true)
         .create(true)
-        .open(format!("{}/error.log", &path))?;
+        .open(format!("{}/error.log", path))?;
     let logs = OpenOptions::new()
         .append(true)
         .create(true)
-        .open(format!("{}/logs.log", &path))?;
+        .open(format!("{}/logs.log", path))?;
     let default = fmt::Layer::default().with_writer(NoneWriter).boxed();
     let mut layers = layers
         .into_iter()
@@ -201,10 +201,7 @@ impl LogBuilder {
         self.build = true;
         let default = fmt::Layer::default().with_writer(NoneWriter).boxed();
         self.layers.push(default);
-        let layers = self
-            .layers
-            .drain(..)
-            .collect::<Vec<Box<dyn Layer<Registry> + Send + Sync>>>();
+        let layers = std::mem::take(&mut self.layers);
 
         // Use try_init and ignore errors to prevent panics if already initialized
         let _ = tracing_subscriber::registry().with(layers).try_init();

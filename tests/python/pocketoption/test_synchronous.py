@@ -5,6 +5,12 @@ import pytest
 
 from BinaryOptionsToolsV2.pocketoption.synchronous import PocketOption
 
+# These tests open a real PocketOption session, so they need both a valid
+# POCKET_OPTION_SSID and a reachable broker. Marking the module keeps the
+# offline suite runnable with `-k "not integration"`, as documented in
+# pytest.ini.
+pytestmark = pytest.mark.integration
+
 
 def test_sync_manual_connect_shutdown():
     ssid = os.getenv("POCKET_OPTION_SSID")

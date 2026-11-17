@@ -103,7 +103,6 @@ impl Bot {
     pub async fn run(&mut self) -> PocketResult<()> {
         info!("Starting bot...");
         self.strategy.on_start(&self.ctx).await?;
-        self.spawn_balance_task();
 
         let mut streams = Vec::new();
 
@@ -125,6 +124,11 @@ impl Bot {
             return Ok(());
         }
 
+        // Only spawn once there is something to run for: a poller started before
+        // the empty check would outlive `run()` and keep polling with a clone of
+        // the strategy after the bot had already returned.
+        self.spawn_balance_task();
+
         let mut combined_stream = select_all(streams);
 
         info!("Bot is now running.");
@@ -141,7 +145,17 @@ impl Bot {
             }
         }
 
+        // The streams are done, so nothing needs a live balance feed any more.
+        self.abort_background_tasks();
+
         Ok(())
+    }
+
+    /// Stops every task `run()` started on the bot's behalf.
+    fn abort_background_tasks(&mut self) {
+        for task in self.background_tasks.drain(..) {
+            task.abort();
+        }
     }
 
     fn spawn_balance_task(&mut self) {
